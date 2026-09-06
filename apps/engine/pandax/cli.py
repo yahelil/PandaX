@@ -158,7 +158,17 @@ def verify(
 
 
 def _reproduce_findings(run_dir: Path):
-    """Re-query OSV for the recorded components and compare the CVE set."""
+    """Re-query OSV for the recorded components and compare the CVE sets.
+
+    Comparison is on CVE identity, not OSV advisory id. Several advisories can
+    describe the same CVE for the same package, and a scan keeps one row per
+    (CVE, component) - so comparing raw advisory ids would report deduplicated
+    entries as if they were newly published, which is simply untrue.
+
+    A recorded CVE that the live feed no longer returns is a real discrepancy.
+    A CVE that appeared since the scan is expected drift, reported but not failed:
+    the bundle attests to what was known when it was sealed.
+    """
     from .evidence import Check
     from .feeds import Feeds, FeedError
 
@@ -169,31 +179,42 @@ def _reproduce_findings(run_dir: Path):
 
     sbom = json.loads(sbom_path.read_text(encoding="utf-8"))
     purls = [c["purl"] for c in sbom.get("components", []) if c.get("purl")]
-    recorded = {row["osv_id"] for row in json.loads(findings_path.read_text(encoding="utf-8"))}
+    recorded = {row["cve"] for row in json.loads(findings_path.read_text(encoding="utf-8"))}
 
     feeds = Feeds(CACHE_DIR)
     try:
-        live = {vid for ids in feeds.query_purls(purls).values() for vid in ids}
+        live: set[str] = set()
+        for advisory_ids in feeds.query_purls(purls).values():
+            for advisory_id in advisory_ids:
+                detail = feeds.vuln_detail(advisory_id)
+                aliases = [a for a in detail.get("aliases", []) if a.startswith("CVE-")]
+                live.update(aliases or [advisory_id])
     except FeedError as exc:
         return Check("OSV reproducibility", False, str(exc))
     finally:
         feeds.close()
 
     missing = recorded - live
-    added = live - recorded
-    if not missing and not added:
+    appeared = live - recorded
+    if missing:
+        return Check(
+            "OSV reproducibility",
+            False,
+            f"{len(missing)} recorded CVEs are no longer returned by OSV: "
+            + ", ".join(sorted(missing)[:5]),
+        )
+    if appeared:
         return Check(
             "OSV reproducibility",
             True,
-            f"{len(recorded)} advisories reproduce exactly against the live feed",
+            f"all {len(recorded)} recorded CVEs still reproduce; "
+            f"{len(appeared)} newly published since the scan",
         )
-    detail = []
-    if missing:
-        detail.append(f"{len(missing)} recorded advisories no longer returned")
-    if added:
-        detail.append(f"{len(added)} new advisories published since the scan")
-    # New advisories are expected over time and are not a bundle-integrity failure.
-    return Check("OSV reproducibility", not missing, "; ".join(detail))
+    return Check(
+        "OSV reproducibility",
+        True,
+        f"all {len(recorded)} CVEs reproduce exactly against the live feed",
+    )
 
 
 # ------------------------------------------------------------------- tamper

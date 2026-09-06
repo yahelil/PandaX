@@ -42,6 +42,9 @@ each ecosystem contributes one **real** CISA KEV vulnerability:
 Expect: 11 components, ~102 vulnerabilities, **4 actively exploited**, 4 Article
 14 clocks armed, two PDFs, and a sealed bundle in `out/run-<timestamp>/`.
 
+> The first run takes ~45s because it fetches and caches every OSV advisory
+> into `.cache/`. Subsequent runs take a few seconds.
+
 ---
 
 ## Proving it actually worked

@@ -140,6 +140,52 @@ MANUFACTURER INPUT REQUIRED.
 
 ---
 
+## Does it actually detect real vulnerabilities?
+
+The demo fixture is circular — its components were picked *because* they carry
+known-exploited CVEs, so detecting them proves little. `tools/evaluate.py` scans
+real Apache-published artifacts instead, with ground truth from Apache's own
+security advisories and an independent scanner as the control.
+
+```bash
+uv run python tools/evaluate.py     # digest-pinned; installs grype for the cross-check
+```
+
+The targets are chosen so that detection has to follow the artifact's **actual
+contents**. The first two are the same product at the same version, packaged
+differently — a scanner that guesses from name and version cannot tell them
+apart, and will fail one of them.
+
+| Target | Contents | Findings | KEV | Agreement with Grype |
+|---|---|---|---|---|
+| Struts 2.5.12 full (93 jars) | includes `struts2-rest-plugin` | 158 | 5 | **157/157 CVEs (100%)** |
+| Struts 2.5.12 min (8 jars) | same version, no REST plugin | 22 | 2 | **22/22 (100%)** |
+| Struts 2.5.33 min (Dec 2023) | the differential control | 9 | 0 | **9/9 (100%)** |
+
+Ground-truth checks, all passing:
+
+- **CVE-2018-11776** (S2-057, KEV) found in both 2.5.12 packages — `struts2-core` is in both.
+- **CVE-2017-9805** (S2-052, KEV) found in the full package, and **correctly absent
+  from the minimal one**, because `struts2-rest-plugin` is not bundled there.
+  Reporting it would have been a false positive.
+- Neither CVE appears in 2.5.33, where both were fixed years earlier.
+
+Grype is a genuinely independent control: a different tool, from a different
+vendor, matching against Anchore's NVD/GitHub-derived database rather than
+OSV.dev. The two agree on every CVE across all three artifacts.
+
+> Two caveats on that table. Grype's JSON lists only the artifacts it matched,
+> not its full catalogue, so its component count is not comparable to the SBOM's.
+> And the engine reports one extra advisory on the full distribution —
+> `GHSA-r7wm-3cxj-wff9` against jackson-core 2.6.1 — which has no CVE assigned
+> yet, so it is a real finding that a CVE-keyed comparison simply cannot see.
+
+**What this does not prove:** all three targets are Java jar bundles. Firmware
+images (squashfs/ubifs) are still unpacked, and no npm/PyPI application has been
+evaluated this way.
+
+---
+
 ## What makes the output trustworthy
 
 Each stage appends a record to `ledger.jsonl` naming its tool, version, inputs

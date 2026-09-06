@@ -40,3 +40,8 @@ out/
 # fetched by tools/bootstrap.py, digest-pinned - not source
 fixtures/smarthub-sh100/lib/*.jar
 fixtures/*.zip
+
+# Evaluation corpus: real third-party artifacts, re-fetched by tools/evaluate.py
+# against pinned digests. Results are reproducible, so neither is committed.
+evaluation/corpus/
+evaluation/results/

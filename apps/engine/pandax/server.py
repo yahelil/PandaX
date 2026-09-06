@@ -135,6 +135,19 @@ def start_scan(body: dict[str, str]) -> dict[str, Any]:
     return {"started": True, "artifact": str(artifact)}
 
 
+@api.get("/api/job")
+def job_status() -> dict[str, Any]:
+    """Whether a run is in flight, so a reloaded page can re-attach to it."""
+    if CURRENT is None:
+        return {"exists": False, "running": False, "run_dir": ""}
+    return {
+        "exists": True,
+        "running": not CURRENT.finished,
+        "run_dir": CURRENT.run_dir,
+        "events": len(CURRENT.history),
+    }
+
+
 @api.get("/api/events")
 def stream() -> StreamingResponse:
     """Server-sent events: the pipeline stream, verbatim."""
@@ -220,6 +233,11 @@ def tamper(run_id: str, body: dict[str, str] | None = None) -> dict[str, Any]:
 
 @api.get("/api/run/{run_id}/summary")
 def summary(run_id: str) -> dict[str, Any]:
+    """Everything the dashboard renders, in one call.
+
+    The bundle's own files are the source of truth - nothing is recomputed here
+    that the sealed run did not already record.
+    """
     target = OUT_DIR / run_id
     if not target.exists():
         raise HTTPException(404, f"run not found: {run_id}")
@@ -229,18 +247,86 @@ def summary(run_id: str) -> dict[str, Any]:
         return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
 
     findings = load("findings.json", [])
+    incidents = load("incidents.json", [])
+    dossier = load("dossier.json", {})
+    manifest = load("manifest.json", {})
+    sbom = load("sbom.cdx.json", {})
+
+    components = [
+        {
+            "purl": c["purl"],
+            "name": c.get("name", ""),
+            "version": c.get("version", ""),
+            "ecosystem": c["purl"].split("/")[0].replace("pkg:", ""),
+            "type": c.get("type", "library"),
+        }
+        for c in sbom.get("components", [])
+        if c.get("purl")
+    ]
+    # A component is "affected" if any finding cites its package URL.
+    affected = {f["purl"] for f in findings}
+    kev_purls = {f["purl"] for f in findings if f.get("kev")}
+    for component in components:
+        component["findings"] = sum(1 for f in findings if f["purl"] == component["purl"])
+        component["affected"] = component["purl"] in affected
+        component["kev"] = component["purl"] in kev_purls
+
+    ledger = [
+        json.loads(line)
+        for line in (target / "ledger.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ] if (target / "ledger.jsonl").exists() else []
+
+    dossier_summary = dossier.get("summary", {})
+    derived = dossier_summary.get("derived", 0)
+    attested = dossier_summary.get("attested", 0)
+    required = dossier_summary.get("required_input", 0)
+    total_fields = derived + attested + required
+
     return {
         "run_id": run_id,
-        "dossier": load("dossier.json", {}),
-        "incidents": load("incidents.json", []),
-        "kev": [f for f in findings if f.get("kev")],
-        "findings_total": len(findings),
+        "product": dossier.get("product", {}),
+        "manufacturer": dossier.get("manufacturer", {}),
+        "generated": dossier.get("generated", manifest.get("created", "")),
+        "stats": {
+            "components": len(components),
+            "ecosystems": dossier_summary.get("ecosystems", ""),
+            "findings": len(findings),
+            "kev": sum(1 for f in findings if f.get("kev")),
+            "incidents": len(incidents),
+            "derived": derived,
+            "attested": attested,
+            "required_input": required,
+            "total_fields": total_fields,
+            # Annex VII/V completeness: the share of required entries this run
+            # can actually evidence. Not a marketing "compliance score".
+            "completeness": round(100 * (derived + attested) / total_fields)
+            if total_fields
+            else 0,
+            "sealed_bundles": _sealed_bundle_count(),
+            "ledger_records": len(ledger),
+            "manifest_files": len(manifest.get("files", [])),
+            "ledger_root": manifest.get("ledger_root", ""),
+            "tool_versions": manifest.get("tool_versions", {}),
+        },
+        "components": components,
+        "findings": findings,
+        "incidents": incidents,
+        "ledger": ledger,
+        "annex_vii": dossier.get("annex_vii", []),
+        "annex_v": dossier.get("annex_v", []),
         "files": sorted(
             p.relative_to(target).as_posix()
             for p in target.rglob("*")
             if p.is_file() and "extracted" not in p.parts
         ),
     }
+
+
+def _sealed_bundle_count() -> int:
+    if not OUT_DIR.exists():
+        return 0
+    return sum(1 for p in OUT_DIR.glob("run-*") if (p / "manifest.json").exists())
 
 
 @api.get("/api/run/{run_id}/file/{path:path}")

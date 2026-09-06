@@ -47,6 +47,13 @@ def _iso(moment: dt.datetime) -> str:
     )
 
 
+def _short(iso: str) -> str:
+    """2026-09-07T16:20:27Z -> 07 Sep 16:20, so the table fits a terminal."""
+    return dt.datetime.fromisoformat(iso.replace("Z", "+00:00")).strftime(
+        "%d %b %H:%M"
+    )
+
+
 def deadlines(aware_at: dt.datetime) -> dict[str, str]:
     """The three statutory deadlines from the moment of awareness."""
     return {
@@ -212,6 +219,7 @@ def run(ctx: RunContext) -> ev.Stream:
 
     outputs = []
     incidents = []
+    clock_rows: list[list[str]] = []
     for finding in sorted(hits, key=lambda f: -f.epss):
         due = deadlines(aware_at)
         incident = {
@@ -248,13 +256,22 @@ def run(ctx: RunContext) -> ev.Stream:
             path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             outputs.append(path)
 
-        yield ev.alert(
-            STAGE,
-            f"{finding.cve}: 24h EARLY WARNING due {due['early_warning']}",
-            cve=finding.cve,
+        clock_rows.append(
+            [finding.cve] + [_short(due[k]) for k in
+                             ("early_warning", "notification", "final_report")]
         )
-        yield ev.log(STAGE, f"  72h notification due {due['notification']}", ev.WARN)
-        yield ev.log(STAGE, f"  14d final report  due {due['final_report']}", ev.WARN)
+
+    yield ev.alert(
+        STAGE,
+        f">> {len(incidents)} statutory clock(s) started - deadlines are UTC",
+    )
+    yield ev.table(
+        STAGE,
+        "Article 14 deadlines",
+        ["CVE ID", "24h warning (a)", "72h notice (b)", "14d final (c)"],
+        clock_rows,
+        ev.ALERT_LVL,
+    )
 
     incidents_path = ctx.path("incidents.json")
     incidents_path.write_text(json.dumps(incidents, indent=2), encoding="utf-8")

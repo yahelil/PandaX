@@ -171,16 +171,25 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
     if hits:
         yield ev.alert(
             STAGE,
-            f"{len(hits)} ACTIVELY EXPLOITED vulnerabilities - CRA Art.14 applies",
+            f">> {len(hits)} ACTIVELY EXPLOITED - CRA Art.14 applies",
             count=len(hits),
         )
-        for finding in sorted(hits, key=lambda f: -f.epss):
-            yield ev.alert(
-                STAGE,
-                f"  {finding.cve}  {finding.component} {finding.version}  "
-                f"EPSS {finding.epss:.5f}  KEV since {finding.kev_date_added}",
-                cve=finding.cve,
-            )
+        yield ev.table(
+            STAGE,
+            "Actively exploited",
+            ["CVE ID", "Package", "Version", "EPSS", "Severity"],
+            [
+                [
+                    f.cve,
+                    f.component,
+                    f.version,
+                    f"{f.epss:.5f}",
+                    f.severity,
+                ]
+                for f in sorted(hits, key=lambda f: -f.epss)
+            ],
+            ev.ALERT_LVL,
+        )
     else:
         yield ev.log(STAGE, "no actively exploited vulnerabilities found", ev.GOOD)
 

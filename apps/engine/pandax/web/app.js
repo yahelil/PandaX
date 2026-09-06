@@ -1,221 +1,601 @@
-// Dashboard renderer. Consumes the same Event objects the CLI does, over SSE.
+// Dashboard renderer. Consumes the same Event objects the CLI does, over SSE,
+// then renders the sealed bundle's own files - nothing here is recomputed.
 
 const STAGES = [
-  ["S1 INGEST", "Ingest", "Safe unpack, digest every file"],
-  ["S2 SBOM", "SBOM", "CycloneDX 1.6 via Syft"],
-  ["S3 MATCH", "Match", "OSV.dev by package URL"],
-  ["S4 TRIAGE", "Triage", "CISA KEV + EPSS, VEX"],
-  ["S5 CLOCK", "Article 14", "24h / 72h / 14d filings"],
-  ["S6 DOSSIER", "Dossier", "Annex VII + Annex V, PDF/A"],
-  ["SEAL", "Seal", "Hash chain + Ed25519"],
+  ["S1 INGEST", "Ingest"],
+  ["S2 SBOM", "SBOM"],
+  ["S3 MATCH", "Match"],
+  ["S4 TRIAGE", "KEV / EPSS"],
+  ["S5 CLOCK", "Article 14"],
+  ["S6 DOSSIER", "Dossier"],
+  ["SEAL", "Seal"],
+];
+
+// Statutory milestones from Regulation (EU) 2024/2847.
+const CRA_MILESTONES = [
+  ["2026-09-11", "Article 14 reporting obligations apply"],
+  ["2027-12-11", "Full application of the Regulation"],
 ];
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, text) => {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text !== undefined) node.textContent = text;
-  return node;
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
 };
+const esc = (s) => String(s ?? "");
 
 let runId = "";
 let source = null;
+let DATA = null;
+let vulnFilter = "all";
 
-// ------------------------------------------------------------------ stages
+// --------------------------------------------------------------- navigation
 
-function buildStages() {
-  const host = $("pipeline");
+const PAGE_TITLES = {
+  overview: "Dashboard",
+  artifacts: "Artifacts",
+  vulns: "Vulnerability Monitor",
+  article14: "Article 14",
+  reports: "Reports",
+  audit: "Audit Trail",
+};
+
+function showView(name) {
+  if (!PAGE_TITLES[name]) name = "overview";
+  document.querySelectorAll(".view").forEach((v) => {
+    v.hidden = v.dataset.view !== name;
+  });
+  document.querySelectorAll(".nav").forEach((b) => {
+    if (b.dataset.view === name) b.setAttribute("aria-current", "page");
+    else b.removeAttribute("aria-current");
+  });
+  $("page-title").textContent = PAGE_TITLES[name];
+  window.scrollTo(0, 0);
+}
+
+// Views are addressable (#vulns, #audit...), so links are shareable and the
+// browser back button behaves.
+const routeTo = (name) => {
+  if (location.hash.slice(1) === name) showView(name);
+  else location.hash = name;
+};
+window.addEventListener("hashchange", () => showView(location.hash.slice(1) || "overview"));
+
+document.querySelectorAll(".nav").forEach((b) =>
+  b.addEventListener("click", () => routeTo(b.dataset.view))
+);
+document.querySelectorAll("[data-goto]").forEach((b) =>
+  b.addEventListener("click", () => routeTo(b.dataset.goto))
+);
+
+// ------------------------------------------------------------------- steps
+
+function buildSteps() {
+  const host = $("steps");
   host.innerHTML = "";
-  for (const [code, name, desc] of STAGES) {
-    const card = el("div", "stage");
-    card.id = "stage-" + code.replace(/\s/g, "-");
-    card.append(el("div", "code", code), el("div", "name", name), el("div", "msg", desc));
-    host.append(card);
-  }
+  STAGES.forEach(([code, name], i) => {
+    const li = el("li");
+    li.id = "step-" + code.replace(/\s/g, "-");
+    li.append(el("div", "n", `[${i + 1}/${STAGES.length}]`), el("div", "t", name));
+    host.append(li);
+  });
 }
 
-function stageCard(stage) {
-  return $("stage-" + stage.replace(/\s/g, "-"));
-}
+const stepOf = (stage) => $("step-" + stage.replace(/\s/g, "-"));
+const stageIndex = (stage) => STAGES.findIndex(([c]) => c === stage) + 1;
 
-// --------------------------------------------------------------------- log
+// ----------------------------------------------------------------- console
 
-function logLine(cls, ...parts) {
+function logRow(cls, ...parts) {
   const log = $("log");
   const row = el("div", "row " + cls);
-  for (const part of parts) row.append(part);
+  parts.forEach((p) => row.append(p));
   log.append(row);
   log.scrollTop = log.scrollHeight;
 }
 
 const MARK = { info: "·", good: "✓", warn: "!", alert: "▶" };
 
+function boxTable(columns, rows) {
+  const widths = columns.map((c, i) =>
+    Math.max(String(c).length, ...rows.map((r) => String(r[i]).length))
+  );
+  const line = (l, m, r) => l + widths.map((w) => "─".repeat(w + 2)).join(m) + r;
+  const row = (cells) =>
+    "│" + cells.map((c, i) => " " + String(c).padEnd(widths[i]) + " ").join("│") + "│";
+  return [
+    line("┌", "┬", "┐"),
+    row(columns),
+    line("├", "┼", "┤"),
+    ...rows.map(row),
+    line("└", "┴", "┘"),
+  ].join("\n");
+}
+
 function handle(e) {
   switch (e.kind) {
     case "stage_start": {
-      const card = stageCard(e.stage);
-      if (card) {
-        card.classList.add("active");
-        card.querySelector(".msg").textContent = e.message;
+      const li = stepOf(e.stage);
+      if (li) {
+        li.classList.remove("done", "alert");
+        li.classList.add("active");
       }
-      $("log").append(el("div", "stage-tag", e.stage));
+      const head = el("div", "row stage");
+      head.append(
+        el("span", "num", `[${stageIndex(e.stage)}/${STAGES.length}] `),
+        el("span", "", e.stage + ": "),
+        el("span", "info", e.message)
+      );
+      $("log").append(head);
+      $("log").scrollTop = $("log").scrollHeight;
       break;
     }
     case "log":
-      logLine(
-        e.level,
-        el("span", "mark", MARK[e.level] || "·"),
-        el("span", "", e.message)
-      );
+      logRow(e.level, el("span", "mark", MARK[e.level] || "·"), el("span", "", e.message));
       break;
     case "metric": {
       const row = el("div", "row metric");
-      row.append(el("span", "mark", " "));
-      const label = el("span", "", (e.data.label || "") + "  ");
-      const value = el("b", "", String(e.data.value));
-      row.append(label, value);
+      row.append(
+        el("span", "mark", " "),
+        el("span", "info", String(e.data.label || "").padEnd(26)),
+        el("b", "", String(e.data.value))
+      );
       $("log").append(row);
       $("log").scrollTop = $("log").scrollHeight;
       break;
     }
     case "artifact": {
       const row = el("div", "row artifact");
-      row.append(el("span", "mark", "→"));
-      const name = el("span", "", e.data.path + "  ");
-      const sha = el("span", "sha", "sha256 " + (e.data.sha256 || "").slice(0, 16) + "…");
-      row.append(name, sha);
+      row.append(
+        el("span", "mark", "→"),
+        el("span", "", e.data.path + "  "),
+        el("span", "sha", "sha256 " + String(e.data.sha256 || "").slice(0, 16) + "…")
+      );
       $("log").append(row);
       $("log").scrollTop = $("log").scrollHeight;
       break;
     }
+    case "table": {
+      const pre = el("pre", "", boxTable(e.data.columns, e.data.rows));
+      $("log").append(pre);
+      $("log").scrollTop = $("log").scrollHeight;
+      break;
+    }
     case "alert": {
-      const card = stageCard(e.stage);
-      if (card) card.classList.add("alert");
-      logLine("alert", el("span", "mark", "▶"), el("span", "", e.message));
+      const li = stepOf(e.stage);
+      if (li) li.classList.add("alert");
+      logRow("alert", el("span", "mark", "▶"), el("span", "", e.message));
       break;
     }
     case "stage_done": {
-      const card = stageCard(e.stage);
-      if (card) {
-        card.classList.remove("active");
-        card.classList.add(e.level === "alert" ? "alert" : "done");
-        card.querySelector(".msg").textContent = e.message;
+      const li = stepOf(e.stage);
+      if (li) {
+        li.classList.remove("active");
+        li.classList.add(e.level === "alert" ? "alert" : "done");
       }
-      logLine("done" + (e.level === "alert" ? " alert" : ""),
-        el("span", "mark", "✔"), el("span", "", e.stage + "  " + e.message));
+      logRow(
+        "done" + (e.level === "alert" ? " alert" : ""),
+        el("span", "mark", e.level === "alert" ? "!!" : "OK"),
+        el("span", "", e.message)
+      );
       break;
     }
-    case "run_done":
+    case "run_done": {
       runId = e.data.run_id || runId;
-      $("s-components").textContent = e.data.components ?? "—";
-      $("s-vulns").textContent = e.data.findings ?? "—";
-      $("s-kev").textContent = e.data.kev ?? "—";
-      $("s-clocks").textContent = e.data.incidents ?? "—";
-      logLine("done", el("span", "mark", "✔"), el("span", "", e.message));
-      if (runId) loadSummary();
+      const failed = e.data.failed;
+      const final = el("div", "row final " + (failed || e.data.kev ? "alert" : "good"));
+      final.append(
+        el("span", "", failed ? "> failed." : e.data.kev ? "> complete — CONFORMITY BLOCKED" : "> complete.")
+      );
+      $("log").append(final);
+      $("log").scrollTop = $("log").scrollHeight;
       $("run").disabled = false;
+      if (runId && !failed) loadRun(runId);
       break;
+    }
   }
   if (e.data && e.data.run_id && !runId) runId = e.data.run_id;
 }
 
-// ----------------------------------------------------------------- summary
+// -------------------------------------------------------------- load a run
 
-async function loadSummary() {
-  const res = await fetch(`/api/run/${runId}/summary`);
+async function loadRun(id) {
+  const res = await fetch(`/api/run/${id}/summary`);
   if (!res.ok) return;
-  const data = await res.json();
+  DATA = await res.json();
+  runId = DATA.run_id;
+  $("appbar-run").textContent = runId;
+  renderOverview();
+  renderComponents();
+  renderVulns();
+  renderArticle14();
+  renderReports();
+  renderLedger();
+  runVerify();
+}
 
-  const kev = data.kev || [];
-  if (kev.length) {
-    const table = $("kev-table");
-    table.innerHTML = "";
-    for (const f of kev.sort((a, b) => b.epss - a.epss)) {
-      const tr = el("tr");
-      tr.append(
-        el("td", "cve", f.cve),
-        el("td", "cmp", `${f.component} ${f.version}`),
-        el("td", "epss", Number(f.epss).toFixed(5))
-      );
-      table.append(tr);
-    }
-    $("kev-panel").hidden = false;
+// ----------------------------------------------------------------- overview
+
+function renderOverview() {
+  const s = DATA.stats;
+  const p = DATA.product || {};
+
+  $("product-line").textContent = p.name
+    ? `${p.name} ${p.version} · ${p.type || "product with digital elements"} · ${(p.risk_tier || "default").toUpperCase()} tier · ${p.conformity_route || ""}`
+    : "Sealed evidence bundle.";
+
+  const banner = $("blocked-banner");
+  if (s.kev) {
+    banner.hidden = false;
+    banner.innerHTML =
+      `<b>EU Declaration of Conformity blocked.</b> ${s.kev} actively exploited ` +
+      `${s.kev === 1 ? "vulnerability is" : "vulnerabilities are"} present. ` +
+      `Annex I Part I(2)(a) requires products to be placed on the market without ` +
+      `known exploitable vulnerabilities.`;
+  } else {
+    banner.hidden = true;
   }
 
-  const root = (data.dossier && data.dossier.run_id) || runId;
-  $("chain-root").textContent = root;
-  $("seal-panel").hidden = false;
+  $("s-components").textContent = s.components;
+  $("s-components-note").textContent = s.ecosystems || "inventoried from the artifact";
 
-  const docs = $("docs");
-  docs.innerHTML = "";
-  const interesting = [
-    ["AnnexVII_Technical_Documentation.pdf", "Annex VII technical documentation (PDF/A-2b)"],
-    ["EU_Declaration_of_Conformity.pdf", "Annex V EU declaration of conformity"],
-    ["sbom.cdx.json", "CycloneDX 1.6 SBOM"],
-    ["findings.cdx-vex.json", "CycloneDX VEX — exploitation status"],
-    ["ledger.jsonl", "Hash-chained evidence ledger"],
-    ["manifest.json", "Signed manifest"],
-  ];
-  for (const [file, label] of interesting) {
-    if (!data.files.includes(file)) continue;
-    const li = el("li");
-    const a = el("a", "", file);
+  $("s-complete").textContent = s.completeness + "%";
+  $("ring-fg").style.strokeDasharray = `${s.completeness} ${100 - s.completeness}`;
+  $("s-complete-note").textContent =
+    `${s.derived} derived + ${s.attested} attested of ${s.total_fields} Annex fields`;
+
+  $("s-kev").textContent = s.kev;
+  $("kev-dot").className = "dot " + (s.kev ? "red" : "green");
+  const kevNote = $("s-kev-note");
+  kevNote.textContent = s.kev
+    ? "Article 14 reporting engaged"
+    : "no actively exploited vulnerabilities";
+  kevNote.className = "note" + (s.kev ? " danger" : "");
+
+  $("s-dossiers").textContent = s.sealed_bundles;
+  $("s-dossiers-note").textContent = `${s.manifest_files} files sealed in this run`;
+
+  // A run restored from disk shows its stages already complete.
+  if (!$("log").classList.contains("running")) {
+    STAGES.forEach(([code]) => stepOf(code)?.classList.add("done"));
+    $("log").innerHTML = "";
+    logRow("info", el("span", "mark", "·"),
+      el("span", "", `restored sealed run ${DATA.run_id} — press Run pipeline to stream a new one`));
+  }
+  $("chain-root").textContent = s.ledger_root || "—";
+  $("seal-card").hidden = false;
+  $("console-hint").textContent = `${s.ledger_records} chained records`;
+
+  // Vulnerability Monitor preview: the exploited ones first.
+  const rows = [...DATA.findings].sort(
+    (a, b) => Number(b.kev) - Number(a.kev) || b.epss - a.epss
+  );
+  $("monitor-table").innerHTML = vulnTable(rows.slice(0, 6));
+  $("monitor-card").hidden = false;
+
+  renderTimeline();
+}
+
+function renderTimeline() {
+  const host = $("timeline");
+  host.innerHTML = "";
+  const now = new Date();
+  const items = [];
+
+  for (const incident of DATA.incidents) {
+    const d = incident.deadlines;
+    items.push({
+      when: new Date(d.early_warning),
+      date: "24h early warning",
+      what: `${incident.cve} — Art.14(2)(a)`,
+      cls: "urgent",
+    });
+  }
+  if (DATA.incidents.length) {
+    const d = DATA.incidents[0].deadlines;
+    items.push({
+      when: new Date(d.notification),
+      date: "72h notification",
+      what: "Art.14(2)(b), all open incidents",
+      cls: "soon",
+    });
+    items.push({
+      when: new Date(d.final_report),
+      date: "14d final report",
+      what: "Art.14(2)(c), all open incidents",
+      cls: "soon",
+    });
+  }
+  for (const [iso, what] of CRA_MILESTONES) {
+    items.push({ when: new Date(iso + "T00:00:00Z"), date: fmtDate(iso), what, cls: "", dateOnly: true });
+  }
+
+  items.sort((a, b) => a.when - b.when);
+  // Collapse the per-CVE 24h rows into one when they share a deadline.
+  const seen = new Set();
+  for (const item of items) {
+    const key = item.date + item.when.toISOString();
+    if (item.date === "24h early warning") {
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const count = DATA.incidents.length;
+      item.what = `Art.14(2)(a) — ${count} incident${count === 1 ? "" : "s"}`;
+    }
+    const li = el("li", item.cls);
+    const days = Math.round((item.when - now) / 86400000);
+    li.append(el("div", "date", item.date));
+    li.append(el("div", "what", item.what));
+    const stamp = item.dateOnly ? "" : fmtDateTime(item.when) + " · ";
+    li.append(
+      el(
+        "div",
+        "when",
+        item.when < now
+          ? `overdue — was ${item.dateOnly ? fmtDate(item.when) : fmtDateTime(item.when)}`
+          : days > 1
+            ? `${stamp}in ${days} days`
+            : `${stamp}in ${Math.max(0, Math.round((item.when - now) / 3600000))}h`
+      )
+    );
+    if (item.when < now) li.classList.add("past");
+    host.append(li);
+  }
+}
+
+const fmtDate = (iso) =>
+  new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+const fmtDateTime = (d) =>
+  new Date(d).toLocaleString("en-GB", {
+    day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+  });
+
+// ---------------------------------------------------------------- artifacts
+
+function renderComponents() {
+  const rows = DATA.components
+    .slice()
+    .sort((a, b) => Number(b.kev) - Number(a.kev) || b.findings - a.findings);
+  $("eco-hint").textContent = DATA.stats.ecosystems;
+  $("components-table").innerHTML = `
+    <thead><tr>
+      <th>Component</th><th>Version</th><th>Ecosystem</th>
+      <th>Package URL</th><th style="text-align:right">Findings</th><th>Status</th>
+    </tr></thead>
+    <tbody>${rows
+      .map(
+        (c) => `<tr>
+        <td><b>${esc(c.name)}</b></td>
+        <td class="mono">${esc(c.version)}</td>
+        <td><span class="pill blue">${esc(c.ecosystem)}</span></td>
+        <td class="mono dim">${esc(c.purl)}</td>
+        <td class="num">${c.findings || "—"}</td>
+        <td>${
+          c.kev
+            ? kevFlag()
+            : c.affected
+              ? '<span class="pill medium">affected</span>'
+              : '<span class="pill good">clean</span>'
+        }</td>
+      </tr>`
+      )
+      .join("")}</tbody>`;
+}
+
+// -------------------------------------------------------------------- vulns
+
+const kevFlag = () =>
+  '<span class="kev-flag"><svg viewBox="0 0 24 24"><path d="M12 2 1 21h22L12 2zm0 6 7 12H5l7-12z"/><path d="M11 10h2v5h-2zm0 6h2v2h-2z"/></svg>KEV</span>';
+
+const okFlag = (text) =>
+  `<span class="ok-flag"><svg viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5"/></svg>${esc(text)}</span>`;
+
+function vulnTable(rows) {
+  if (!rows.length) return '<tbody><tr><td class="empty-state">No findings.</td></tr></tbody>';
+  return `
+    <thead><tr>
+      <th>Vulnerability ID</th><th>Impacted Component</th><th>Severity</th>
+      <th>KEV Status</th><th style="text-align:right">EPSS</th>
+      <th>Fixed In</th><th>Actions</th>
+    </tr></thead>
+    <tbody>${rows
+      .map(
+        (f) => `<tr>
+        <td class="mono"><b>${esc(f.cve)}</b></td>
+        <td>${esc(f.component)} <span class="dim mono">${esc(f.version)}</span></td>
+        <td><span class="pill ${f.severity.toLowerCase()}">${esc(f.severity)}</span></td>
+        <td>${f.kev ? kevFlag() : '<span class="dim">—</span>'}</td>
+        <td class="num">${Number(f.epss).toFixed(5)}</td>
+        <td class="mono">${f.fixed_version ? esc(f.fixed_version) : '<span class="dim">none</span>'}</td>
+        <td><a class="link" href="https://osv.dev/vulnerability/${esc(f.osv_id)}"
+               target="_blank" rel="noopener">View Details</a></td>
+      </tr>`
+      )
+      .join("")}</tbody>`;
+}
+
+function renderVulns() {
+  let rows = [...DATA.findings];
+  if (vulnFilter === "kev") rows = rows.filter((f) => f.kev);
+  if (vulnFilter === "critical") rows = rows.filter((f) => ["CRITICAL", "HIGH"].includes(f.severity));
+  if (vulnFilter === "fixable") rows = rows.filter((f) => f.fixed_version);
+  rows.sort((a, b) => Number(b.kev) - Number(a.kev) || b.epss - a.epss);
+  $("vulns-table").innerHTML = vulnTable(rows);
+}
+
+document.querySelectorAll("#vuln-filters .chip").forEach((chip) =>
+  chip.addEventListener("click", () => {
+    document.querySelectorAll("#vuln-filters .chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    vulnFilter = chip.dataset.filter;
+    if (DATA) renderVulns();
+  })
+);
+
+// --------------------------------------------------------------- article 14
+
+function renderArticle14() {
+  const host = $("article14-body");
+  host.innerHTML = "";
+  if (!DATA.incidents.length) {
+    const card = el("article", "card");
+    card.append(
+      el("div", "empty-state",
+        "No actively exploited vulnerabilities were found, so Article 14 is not triggered for this run.")
+    );
+    host.append(card);
+    return;
+  }
+
+  for (const incident of DATA.incidents) {
+    const card = el("article", "card");
+    const head = el("div", "card-head");
+    head.append(el("h3", "", `${incident.cve} — ${incident.component}`));
+    head.append(el("span", "hint", `coordinating CSIRT: ${incident.coordinating_csirt_member_state || "unknown"} · Art.14(7)`));
+    card.append(head);
+
+    const table = el("table", "grid");
+    const filings = [
+      ["early_warning", "24h early warning", "Art.14(2)(a)", incident.deadlines.early_warning],
+      ["notification", "72h vulnerability notification", "Art.14(2)(b)", incident.deadlines.notification],
+      ["final_report", "14d final report", "Art.14(2)(c)", incident.deadlines.final_report],
+    ];
+    table.innerHTML = `
+      <thead><tr><th>Filing</th><th>Article</th><th>Due (UTC)</th><th>Remaining</th><th>Draft</th></tr></thead>
+      <tbody>${filings
+        .map(([file, label, article, due]) => {
+          const left = new Date(due) - new Date();
+          const overdue = left <= 0;
+          const remaining = overdue
+            ? `<span class="pill critical">OVERDUE</span>`
+            : `<span class="pill ${left < 86400000 ? "medium" : "low"}">${Math.floor(left / 3600000)}h ${Math.floor((left % 3600000) / 60000)}m</span>`;
+          return `<tr>
+            <td><b>${label}</b></td>
+            <td class="mono dim">${article}</td>
+            <td class="mono">${esc(due)}</td>
+            <td>${remaining}</td>
+            <td><a class="link" target="_blank" rel="noopener"
+                   href="/api/run/${runId}/file/filings/${esc(incident.cve)}/${file}.json">Open JSON</a></td>
+          </tr>`;
+        })
+        .join("")}</tbody>`;
+    card.append(table);
+    host.append(card);
+  }
+}
+
+// ------------------------------------------------------------------ reports
+
+const REPORT_META = [
+  ["AnnexVII_Technical_Documentation.pdf", "Annex VII technical documentation",
+   "The eight items required by Annex VII, each labelled machine-derived, manufacturer-attested, or input required. PDF/A-2b."],
+  ["EU_Declaration_of_Conformity.pdf", "EU Declaration of Conformity",
+   "Annex V, eight items. Blocked automatically while any actively exploited vulnerability remains."],
+  ["sbom.cdx.json", "Software Bill of Materials",
+   "CycloneDX 1.6, satisfying Annex I Part II(1). Carries no vulnerability data by design."],
+  ["findings.cdx-vex.json", "VEX exploitation status",
+   "CycloneDX 1.6 VEX. KEV hits are exploitable; everything else stays in_triage."],
+  ["incidents.json", "Article 14 incident register",
+   "Open incidents with their 24h / 72h / 14d statutory deadlines."],
+  ["manifest.json", "Signed manifest",
+   "Every file digest plus the ledger head, signed with Ed25519."],
+];
+
+function renderReports() {
+  const host = $("reports-body");
+  host.innerHTML = "";
+  for (const [file, title, desc] of REPORT_META) {
+    if (!DATA.files.includes(file)) continue;
+    const card = el("article", "card doc");
+    card.append(el("h3", "", title));
+    card.append(el("span", "file", file));
+    card.append(el("p", "", desc));
+    const a = el("a", "", file.endsWith(".pdf") ? "Open PDF →" : "Open JSON →");
     a.href = `/api/run/${runId}/file/${file}`;
     a.target = "_blank";
-    li.append(a, el("span", "tag", label));
-    docs.append(li);
+    a.rel = "noopener";
+    card.append(a);
+    host.append(card);
   }
-  $("docs-panel").hidden = false;
+}
 
-  // Show the real chain root from the manifest.
-  const man = await fetch(`/api/run/${runId}/file/manifest.json`);
-  if (man.ok) {
-    const manifest = JSON.parse(await man.text());
-    $("chain-root").textContent = manifest.ledger_root;
+// -------------------------------------------------------------- audit trail
+
+function renderLedger() {
+  const host = $("ledger-body");
+  host.innerHTML = "";
+  $("ledger-hint").textContent =
+    `${DATA.ledger.length} records · root ${String(DATA.stats.ledger_root).slice(0, 16)}…`;
+  for (const rec of DATA.ledger) {
+    const row = el("div", "ledger-row");
+    const top = el("div", "ledger-top");
+    top.append(
+      el("span", "seq", `#${rec.seq}`),
+      el("span", "stage", rec.stage),
+      el("span", "tool", `${rec.tool} ${rec.tool_version}`),
+      el("span", "tool", rec.ts)
+    );
+    row.append(top);
+    for (const out of rec.outputs || []) {
+      const io = el("div", "ledger-io");
+      io.append(el("span", "", "→ "), document.createTextNode(`${out.path}  ${out.sha256.slice(0, 24)}…`));
+      row.append(io);
+    }
+    row.append(el("div", "chain-hash", `prev ${rec.prev_hash.slice(0, 24)}…  ·  hash ${rec.record_hash.slice(0, 24)}…`));
+    host.append(row);
   }
 }
 
 // ------------------------------------------------------------ verify/tamper
 
-function renderChecks(result) {
-  const host = $("checks");
+function renderChecks(host, result) {
   host.innerHTML = "";
   for (const c of result.checks) {
     const row = el("div", "check " + (c.ok ? "ok" : "bad"));
-    row.append(
-      el("span", "m", c.ok ? "✔" : "✘"),
-      (() => {
-        const wrap = el("div");
-        wrap.append(el("div", "n", c.name), el("div", "d", c.detail));
-        return wrap;
-      })()
-    );
+    const body = el("div");
+    body.append(el("div", "n", c.name), el("div", "d", c.detail));
+    row.append(el("span", "m", c.ok ? "✔" : "✘"), body);
     host.append(row);
   }
   const verdict = el("div", "verdict " + (result.ok ? "ok" : "bad"));
   verdict.textContent = result.ok
-    ? "VERIFIED — every digest recomputed, every chain link re-derived, signature valid."
-    : "TAMPERING DETECTED — the files on disk are not the files that were signed.";
+    ? "VERIFIED — every digest recomputed, every chain link re-derived, signature valid. Proves integrity, not legal identity."
+    : "TAMPERING DETECTED — the files on disk are not the files that were signed. A regulator would reject this bundle.";
   host.append(verdict);
+
+  const pill = $("seal-pill");
+  pill.hidden = false;
+  pill.textContent = result.ok ? "SEALED" : "TAMPERED";
+  pill.className = "seal-pill " + (result.ok ? "ok" : "bad");
 }
 
-$("verify").addEventListener("click", async () => {
+async function runVerify() {
+  if (!runId) return;
   const res = await fetch(`/api/verify/${runId}`);
-  renderChecks(await res.json());
-});
+  const result = await res.json();
+  // Both panels show the same verdict, so neither view can go stale.
+  renderChecks($("checks"), result);
+  renderChecks($("checks2"), result);
+}
 
-$("tamper").addEventListener("click", async () => {
+async function runTamper() {
+  if (!runId) return;
   const res = await fetch(`/api/tamper/${runId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ target: "sbom.cdx.json" }),
   });
   const info = await res.json();
-  logLine("warn", el("span", "mark", "!"),
-    el("span", "", `tampered ${info.file} at byte ${info.offset}: '${info.before}' -> '${info.after}'`));
-  const verify = await fetch(`/api/verify/${runId}`);
-  renderChecks(await verify.json());
-});
+  logRow("warn", el("span", "mark", "!"),
+    el("span", "", `tampered ${info.file} at byte ${info.offset}: '${info.before}' → '${info.after}'`));
+  await runVerify();
+}
+
+$("verify").addEventListener("click", runVerify);
+$("verify2").addEventListener("click", runVerify);
+$("tamper").addEventListener("click", runTamper);
+$("tamper2").addEventListener("click", runTamper);
 
 // --------------------------------------------------------------------- run
 
@@ -224,12 +604,11 @@ $("run").addEventListener("click", async () => {
   if (!artifact) return;
   $("run").disabled = true;
   $("log").innerHTML = "";
-  $("kev-panel").hidden = true;
-  $("seal-panel").hidden = true;
-  $("docs-panel").hidden = true;
-  $("checks").innerHTML = "";
+  $("log").classList.add("running");
+  $("seal-pill").hidden = true;
   runId = "";
-  buildStages();
+  DATA = null;
+  buildSteps();
 
   const res = await fetch("/api/scan", {
     method: "POST",
@@ -237,11 +616,15 @@ $("run").addEventListener("click", async () => {
     body: JSON.stringify({ artifact }),
   });
   if (!res.ok) {
-    logLine("alert", el("span", "mark", "▶"), el("span", "", await res.text()));
+    logRow("alert", el("span", "mark", "▶"), el("span", "", await res.text()));
     $("run").disabled = false;
     return;
   }
 
+  attachStream();
+});
+
+function attachStream() {
   if (source) source.close();
   source = new EventSource("/api/events");
   source.onmessage = (msg) => handle(JSON.parse(msg.data));
@@ -249,26 +632,42 @@ $("run").addEventListener("click", async () => {
     source.close();
     source = null;
     $("run").disabled = false;
+    $("log").classList.remove("running");
   });
-});
+}
 
 // -------------------------------------------------------------------- boot
 
 (async function boot() {
-  buildStages();
-  const res = await fetch("/api/artifacts");
-  const list = await res.json();
+  buildSteps();
+  showView(location.hash.slice(1) || "overview");
+
+  const artifacts = await (await fetch("/api/artifacts")).json();
   const select = $("artifact");
   select.innerHTML = "";
-  for (const item of list) {
-    const option = el("option", "", item.name + (item.bytes ? ` (${(item.bytes / 1024).toFixed(0)} KB)` : ""));
+  for (const item of artifacts) {
+    const option = el("option", "",
+      item.name + (item.bytes ? `  (${(item.bytes / 1024).toFixed(0)} KB)` : ""));
     option.value = item.path;
     select.append(option);
   }
-  if (!list.length) {
-    const option = el("option", "", "no artifacts — run tools/bootstrap.py");
-    option.value = "";
-    select.append(option);
+  if (!artifacts.length) {
+    select.append(el("option", "", "no artifacts — run tools/bootstrap.py"));
     $("run").disabled = true;
   }
+
+  // A run already in flight wins: re-attach and replay it, so reloading the
+  // page mid-scan shows the live stream rather than an empty console.
+  const job = await (await fetch("/api/job")).json();
+  if (job.running) {
+    $("run").disabled = true;
+    $("log").innerHTML = "";
+    $("log").classList.add("running");
+    attachStream();
+    return;
+  }
+
+  // Otherwise load the most recent sealed run so the dashboard is never empty.
+  const runs = await (await fetch("/api/runs")).json();
+  if (runs.length) await loadRun(runs[0].run_id);
 })();

@@ -3,75 +3,225 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PandaX — CRA Compliance Engine</title>
+<title>PandaX — CRA Compliance Vault</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
-<header class="top">
-  <div class="brand">
-    <span class="dot"></span>
-    <div>
-      <h1>PandaX</h1>
-      <p>CRA Compliance Engine · Regulation (EU) 2024/2847</p>
-    </div>
+<header class="appbar">
+  <div class="appbar-left">
+    <svg class="shield" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2 4 5.5v6c0 5 3.4 9.3 8 10.5 4.6-1.2 8-5.5 8-10.5v-6L12 2z"/>
+      <path class="shield-mark" d="M12 6.5v11c3-.9 5.2-4 5.2-7.4V7.1L12 6.5z"/>
+    </svg>
+    <span class="product">CRA Compliance Vault</span>
+    <span class="divider"></span>
+    <span class="page" id="page-title">Dashboard</span>
   </div>
-  <div class="controls">
-    <select id="artifact" aria-label="Artifact to scan"></select>
-    <button id="run" class="primary">Run pipeline</button>
+  <div class="appbar-right">
+    <span class="seal-pill" id="seal-pill" hidden></span>
+    <span class="run-id" id="appbar-run">no run yet</span>
   </div>
 </header>
 
-<main>
-  <section class="pipeline" id="pipeline" aria-label="Pipeline stages"></section>
+<div class="shell">
+  <nav class="sidebar" aria-label="Sections">
+    <button class="nav" data-view="overview" aria-current="page">
+      <svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+      Overview
+    </button>
+    <button class="nav" data-view="artifacts">
+      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
+      Artifacts
+    </button>
+    <button class="nav" data-view="vulns">
+      <svg viewBox="0 0 24 24"><path d="M12 2 4 5.5v6c0 5 3.4 9.3 8 10.5 4.6-1.2 8-5.5 8-10.5v-6L12 2z"/><path d="M12 8v5M12 16v.5"/></svg>
+      Vulnerability Monitor
+    </button>
+    <button class="nav" data-view="article14">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+      Article 14
+    </button>
+    <div class="nav-sep"></div>
+    <button class="nav" data-view="reports">
+      <svg viewBox="0 0 24 24"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>
+      Reports
+    </button>
+    <button class="nav" data-view="audit">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>
+      Audit Trail
+    </button>
+  </nav>
 
-  <section class="grid">
-    <div class="panel">
-      <div class="panel-head">
-        <h2>Live evidence stream</h2>
-        <span class="hint">identical events to the CLI</span>
-      </div>
-      <div id="log" class="log" role="log" aria-live="polite">
-        <p class="empty">Pick an artifact and run the pipeline. Every stage
-          streams its inputs, outputs and SHA-256 digests here as it happens.</p>
-      </div>
-    </div>
-
-    <aside class="side">
-      <div class="panel stats">
-        <div class="panel-head"><h2>Results</h2></div>
-        <div class="statgrid">
-          <div><b id="s-components">—</b><span>components</span></div>
-          <div><b id="s-vulns">—</b><span>vulnerabilities</span></div>
-          <div><b id="s-kev" class="danger">—</b><span>actively exploited</span></div>
-          <div><b id="s-clocks">—</b><span>Art.14 clocks</span></div>
+  <main>
+    <!-- ------------------------------------------------------ OVERVIEW -->
+    <section class="view" data-view="overview">
+      <div class="view-head">
+        <div>
+          <h1>Dashboard</h1>
+          <p class="sub" id="product-line">Run the pipeline to produce a sealed evidence bundle.</p>
+        </div>
+        <div class="runner">
+          <select id="artifact" aria-label="Artifact to scan"></select>
+          <button id="run" class="btn primary">Run pipeline</button>
         </div>
       </div>
 
-      <div class="panel" id="kev-panel" hidden>
-        <div class="panel-head"><h2 class="danger">Article 14(1) engaged</h2></div>
-        <table class="kev" id="kev-table"></table>
-      </div>
+      <div class="banner" id="blocked-banner" hidden></div>
 
-      <div class="panel" id="seal-panel" hidden>
-        <div class="panel-head"><h2>Evidence seal</h2></div>
-        <div class="seal">
-          <div class="kv"><span>chain root</span><code id="chain-root">—</code></div>
-          <div class="actions">
-            <button id="verify">Verify bundle</button>
-            <button id="tamper" class="warn">Tamper one byte</button>
+      <h2 class="section">Overview</h2>
+      <div class="cards">
+        <article class="card stat">
+          <h3>Components</h3>
+          <div class="figure"><span class="dot blue"></span><b id="s-components">—</b></div>
+          <p class="note" id="s-components-note">awaiting first run</p>
+        </article>
+
+        <article class="card stat">
+          <h3>Annex VII Completeness</h3>
+          <div class="figure ring-wrap">
+            <svg class="ring" viewBox="0 0 42 42" aria-hidden="true">
+              <circle class="ring-bg" cx="21" cy="21" r="16"></circle>
+              <circle class="ring-fg" id="ring-fg" cx="21" cy="21" r="16" pathLength="100"></circle>
+            </svg>
+            <b class="ring-label" id="s-complete">—</b>
           </div>
-          <div id="checks" class="checks"></div>
-        </div>
+          <p class="note" id="s-complete-note">derived + attested fields</p>
+        </article>
+
+        <article class="card stat">
+          <h3>Active Threats (KEV)</h3>
+          <div class="figure"><span class="dot red" id="kev-dot"></span><b id="s-kev">—</b></div>
+          <p class="note danger" id="s-kev-note">CISA Known Exploited catalogue</p>
+        </article>
+
+        <article class="card stat">
+          <h3>Dossiers Sealed</h3>
+          <div class="figure"><b id="s-dossiers">—</b></div>
+          <p class="note" id="s-dossiers-note">Ed25519-signed bundles in out/</p>
+        </article>
       </div>
 
-      <div class="panel" id="docs-panel" hidden>
-        <div class="panel-head"><h2>Documents</h2></div>
-        <ul class="docs" id="docs"></ul>
+      <div class="split">
+        <div>
+          <article class="card" id="console-card">
+            <div class="card-head">
+              <h3>Pipeline</h3>
+              <span class="hint" id="console-hint">identical event stream to the CLI</span>
+            </div>
+            <ol class="steps" id="steps"></ol>
+            <div class="console" id="log">
+              <p class="placeholder">Select an artifact and press <b>Run pipeline</b>.
+                Each stage streams its inputs, outputs and SHA-256 digests here.</p>
+            </div>
+          </article>
+
+          <article class="card" id="monitor-card" hidden>
+            <div class="card-head">
+              <h3>Vulnerability Monitor</h3>
+              <button class="link" data-goto="vulns">View all</button>
+            </div>
+            <div class="table-scroll">
+              <table class="grid" id="monitor-table"></table>
+            </div>
+          </article>
+        </div>
+
+        <aside>
+          <article class="card">
+            <div class="card-head"><h3>Compliance Readiness</h3></div>
+            <ul class="timeline" id="timeline"></ul>
+          </article>
+
+          <article class="card" id="seal-card" hidden>
+            <div class="card-head"><h3>Evidence Seal</h3></div>
+            <div class="seal-body">
+              <div class="kv"><span>chain root</span><code id="chain-root">—</code></div>
+              <div class="btn-row">
+                <button id="verify" class="btn">Verify bundle</button>
+                <button id="tamper" class="btn warn">Tamper 1 byte</button>
+              </div>
+              <div id="checks" class="checks"></div>
+            </div>
+          </article>
+        </aside>
       </div>
-    </aside>
-  </section>
-</main>
+    </section>
+
+    <!-- ----------------------------------------------------- ARTIFACTS -->
+    <section class="view" data-view="artifacts" hidden>
+      <div class="view-head"><div>
+        <h1>Artifacts</h1>
+        <p class="sub">Software bill of materials — CycloneDX 1.6, Annex I Part II(1).</p>
+      </div></div>
+      <article class="card">
+        <div class="card-head"><h3>Components</h3><span class="hint" id="eco-hint"></span></div>
+        <div class="table-scroll"><table class="grid" id="components-table"></table></div>
+      </article>
+    </section>
+
+    <!-- --------------------------------------------------------- VULNS -->
+    <section class="view" data-view="vulns" hidden>
+      <div class="view-head">
+        <div>
+          <h1>Vulnerability Monitor</h1>
+          <p class="sub">Matched by Package URL against OSV.dev, cross-referenced with CISA KEV and FIRST EPSS.</p>
+        </div>
+        <div class="filters" id="vuln-filters">
+          <button class="chip active" data-filter="all">All</button>
+          <button class="chip" data-filter="kev">KEV only</button>
+          <button class="chip" data-filter="critical">Critical / High</button>
+          <button class="chip" data-filter="fixable">Has fix</button>
+        </div>
+      </div>
+      <article class="card">
+        <div class="table-scroll"><table class="grid" id="vulns-table"></table></div>
+      </article>
+    </section>
+
+    <!-- ----------------------------------------------------- ARTICLE 14 -->
+    <section class="view" data-view="article14" hidden>
+      <div class="view-head"><div>
+        <h1>Article 14 Reporting</h1>
+        <p class="sub">Statutory clocks started by an actively exploited vulnerability. Filings are
+          generated for human sign-off — the ENISA single reporting platform is not live until 11 Sept 2026.</p>
+      </div></div>
+      <div id="article14-body"></div>
+    </section>
+
+    <!-- ------------------------------------------------------- REPORTS -->
+    <section class="view" data-view="reports" hidden>
+      <div class="view-head"><div>
+        <h1>Reports</h1>
+        <p class="sub">Documents produced by this run. Every one is covered by the signed manifest.</p>
+      </div></div>
+      <div class="cards docs" id="reports-body"></div>
+    </section>
+
+    <!-- --------------------------------------------------------- AUDIT -->
+    <section class="view" data-view="audit" hidden>
+      <div class="view-head"><div>
+        <h1>Audit Trail</h1>
+        <p class="sub">Every stage's inputs and outputs, hash-chained and sealed with Ed25519.
+          Editing any of them breaks a named link.</p>
+      </div></div>
+      <article class="card">
+        <div class="card-head">
+          <h3>Verification</h3>
+          <div class="btn-row tight">
+            <button id="verify2" class="btn">Verify bundle</button>
+            <button id="tamper2" class="btn warn">Tamper 1 byte</button>
+          </div>
+        </div>
+        <div id="checks2" class="checks pad"></div>
+      </article>
+      <article class="card">
+        <div class="card-head"><h3>Evidence ledger</h3><span class="hint" id="ledger-hint"></span></div>
+        <div id="ledger-body"></div>
+      </article>
+    </section>
+  </main>
+</div>
 
 <script src="/app.js"></script>
 </body>

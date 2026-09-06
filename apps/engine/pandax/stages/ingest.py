@@ -136,7 +136,7 @@ def run(ctx: RunContext) -> ev.Stream:
         local_input = inputs_dir / ctx.artifact.name
         shutil.copy2(ctx.artifact, local_input)
         digest = sha256_file(local_input)
-        yield ev.log(STAGE, f"artifact sha256 {digest}", ev.GOOD)
+        yield ev.log(STAGE, f"artifact sha256:{digest[:16]}... verified", ev.GOOD)
         yield ev.log(
             STAGE,
             f"limits: <={MAX_TOTAL_BYTES // (1024 * 1024)} MiB uncompressed, "

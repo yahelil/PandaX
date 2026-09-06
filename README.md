@@ -120,8 +120,23 @@ Article 14 field mapping, and a full end-to-end run asserting the three KEV CVEs
 ```bash
 uv run pandax serve      # http://127.0.0.1:8000
 ```
+
 Same event stream as the CLI, over SSE — the browser view is not a
-reimplementation. Includes Verify and Tamper buttons.
+reimplementation. Six views, each backed by the sealed bundle's own files:
+
+| View | Shows |
+|---|---|
+| `#overview` | Live pipeline console, four stat cards, KEV table, statutory timeline |
+| `#artifacts` | Every SBOM component, its ecosystem and finding count |
+| `#vulns` | All findings, filterable by KEV / severity / fixability |
+| `#article14` | Per-incident 24h / 72h / 14d clocks, linked to the filing drafts |
+| `#reports` | The Annex VII PDF, the DoC, SBOM, VEX and signed manifest |
+| `#audit` | The hash chain record by record, plus Verify and Tamper buttons |
+
+The **Annex VII Completeness** ring is not a marketing score: it is the share of
+the 22 Annex VII and Annex V entries this run can actually evidence
+(derived + attested). The remainder are the fields flagged
+MANUFACTURER INPUT REQUIRED.
 
 ---
 

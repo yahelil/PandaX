@@ -2,6 +2,10 @@
 
 Contains no pipeline logic: it renders whatever events arrive, exactly as the
 SSE dashboard does. Anything shown here is shown there.
+
+Layout follows the classic build-tool shape - a numbered step per stage, detail
+indented underneath, and a right-aligned OK with the elapsed time - so progress
+is readable at a glance and a failure is obvious.
 """
 
 from __future__ import annotations
@@ -23,21 +27,30 @@ LEVEL_STYLE = {
     ev.WARN: "yellow",
     ev.ALERT_LVL: "bold red",
 }
-LEVEL_MARK = {
-    ev.INFO: "·",  # middot
-    ev.GOOD: "✓",  # check
-    ev.WARN: "!",
-    ev.ALERT_LVL: "▶",  # triangle
+LEVEL_MARK = {ev.INFO: "·", ev.GOOD: "✓", ev.WARN: "!", ev.ALERT_LVL: "▶"}
+
+# Human titles for the stage codes, in the reference's "Noun: detail" voice.
+STAGE_TITLE = {
+    "S1 INGEST": "Ingest",
+    "S2 SBOM": "SBOM Synthesis",
+    "S3 MATCH": "Vulnerability Match",
+    "S4 TRIAGE": "CISA KEV / EPSS Cross-Reference",
+    "S5 CLOCK": "Article 14 Clock",
+    "S6 DOSSIER": "Technical Dossier Compiler",
+    "SEAL": "Evidence Seal",
 }
 
 BANNER = "PandaX — CRA Compliance Engine"
+RESULT_COLUMN = 62  # where the trailing OK [time] is aligned
 
 
 def banner(console: Console, artifact: str, subtitle: str = "") -> None:
     body = Text()
     body.append("Regulation (EU) 2024/2847 ", style="bold")
-    body.append("— artifact → SBOM → CVE → KEV → "
-                "Art.14 → Annex VII, sealed and verifiable", style="dim")
+    body.append(
+        "— artifact → SBOM → CVE → KEV → Art.14 → Annex VII, sealed and verifiable",
+        style="dim",
+    )
     body.append("\n\nartifact  ", style="dim")
     body.append(artifact, style="bold cyan")
     if subtitle:
@@ -45,8 +58,29 @@ def banner(console: Console, artifact: str, subtitle: str = "") -> None:
     console.print(Panel(body, title=BANNER, border_style="cyan", padding=(1, 2)))
 
 
+def _box_table(columns: list[str], rows: list[list[str]]) -> str:
+    """Box-drawn table, monospace-aligned, for inline display inside a stage."""
+    widths = [
+        max(len(str(columns[i])), *(len(str(r[i])) for r in rows)) if rows
+        else len(str(columns[i]))
+        for i in range(len(columns))
+    ]
+    def line(left: str, mid: str, right: str, fill: str = "─") -> str:
+        return left + mid.join(fill * (w + 2) for w in widths) + right
+
+    def row(cells: list[str]) -> str:
+        return "│" + "│".join(
+            f" {str(c):<{w}} " for c, w in zip(cells, widths)
+        ) + "│"
+
+    out = [line("┌", "┬", "┐"), row(columns), line("├", "┼", "┤")]
+    out += [row(r) for r in rows]
+    out.append(line("└", "┴", "┘"))
+    return "\n".join(out)
+
+
 class CliRenderer:
-    """Streams events to the terminal, one stage block at a time."""
+    """Streams events to the terminal, one numbered stage block at a time."""
 
     def __init__(self, console: Console | None = None, verbose: bool = True):
         self.console = console or Console()
@@ -62,8 +96,11 @@ class CliRenderer:
             self.stage_started[event.stage] = time.perf_counter()
             console.print()
             header = Text()
-            header.append(f"  {event.stage}  ", style="bold white on blue")
-            header.append(f" {event.message}", style="bold")
+            header.append(f"{ev.stage_number(event.stage)} ", style="bold white")
+            header.append(
+                STAGE_TITLE.get(event.stage, event.stage) + ": ", style="bold cyan"
+            )
+            header.append(event.message, style="dim")
             console.print(header)
 
         elif event.kind == ev.LOG:
@@ -76,9 +113,7 @@ class CliRenderer:
         elif event.kind == ev.METRIC:
             label = str(event.data.get("label", ""))
             value = str(event.data.get("value", ""))
-            console.print(
-                f"        [dim]{label:<26}[/] [bold bright_white]{value}[/]"
-            )
+            console.print(f"        [dim]{label:<26}[/] [bold bright_white]{value}[/]")
 
         elif event.kind == ev.ARTIFACT:
             digest = str(event.data.get("sha256", ""))[:16]
@@ -89,6 +124,14 @@ class CliRenderer:
                 f"  [dim]sha256 {digest}...[/]{suffix}"
             )
 
+        elif event.kind == ev.TABLE:
+            colour = "red" if event.level == ev.ALERT_LVL else "cyan"
+            drawn = _box_table(event.data["columns"], event.data["rows"])
+            console.print()
+            for row in drawn.splitlines():
+                console.print(f"      [{colour}]{row}[/]")
+            console.print()
+
         elif event.kind == ev.ALERT:
             self.alerts.append(event.message)
             console.print(f"      [bold red]▶ {event.message}[/]")
@@ -98,9 +141,12 @@ class CliRenderer:
                 event.stage, time.perf_counter()
             )
             colour = "red" if event.level == ev.ALERT_LVL else "green"
+            verdict = "!!" if event.level == ev.ALERT_LVL else "OK"
+            message = event.message
+            pad = max(1, RESULT_COLUMN - len(message) - 6)
             console.print(
-                f"    [{colour}]✔[/] [bold]{event.stage}[/] "
-                f"[{colour}]{event.message}[/] [dim]({elapsed:.2f}s)[/]"
+                f"      [{colour}]{message}[/] [dim]{'.' * pad}[/] "
+                f"[bold {colour}]{verdict}[/] [dim][{elapsed:.2f}s][/]"
             )
 
         elif event.kind == ev.RUN_DONE:
@@ -115,7 +161,21 @@ class CliRenderer:
 
     def final_report(self, findings: list, run_dir: str) -> None:
         console = self.console
+        kev = int(self.summary.get("kev", 0))
+
         console.print()
+        if kev:
+            console.print(
+                Text("> ", style="dim")
+                + Text("complete — CONFORMITY BLOCKED", style="bold red")
+                + Text(
+                    f"  ({kev} actively exploited, Annex I Part I(2)(a))", style="dim"
+                )
+            )
+        else:
+            console.print(
+                Text("> ", style="dim") + Text("complete.", style="bold green")
+            )
         console.print(Rule(style="dim"))
 
         stats = Table.grid(padding=(0, 3))
@@ -123,14 +183,11 @@ class CliRenderer:
         stats.add_column(style="dim")
         stats.add_row(str(self.summary.get("components", 0)), "components inventoried")
         stats.add_row(str(self.summary.get("findings", 0)), "known vulnerabilities")
-        kev = int(self.summary.get("kev", 0))
         stats.add_row(
             Text(str(kev), style="bold red" if kev else "bold green"),
             "actively exploited (CISA KEV)",
         )
-        stats.add_row(
-            str(self.summary.get("incidents", 0)), "Article 14 clocks armed"
-        )
+        stats.add_row(str(self.summary.get("incidents", 0)), "Article 14 clocks armed")
 
         console.print()
         console.print(stats)

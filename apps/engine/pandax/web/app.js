@@ -272,7 +272,7 @@ function renderOverview() {
   const rows = [...DATA.findings].sort(
     (a, b) => Number(b.kev) - Number(a.kev) || b.epss - a.epss
   );
-  $("monitor-table").innerHTML = vulnTable(rows.slice(0, 6));
+  $("monitor-table").innerHTML = vulnTable(rows.slice(0, 6), true);
   $("monitor-card").hidden = false;
 
   renderTimeline();
@@ -391,13 +391,15 @@ const kevFlag = () =>
 const okFlag = (text) =>
   `<span class="ok-flag"><svg viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5"/></svg>${esc(text)}</span>`;
 
-function vulnTable(rows) {
+// `compact` drops the Actions column for the Overview preview, which is too
+// narrow for it - the full table behind "View all" keeps the links.
+function vulnTable(rows, compact = false) {
   if (!rows.length) return '<tbody><tr><td class="empty-state">No findings.</td></tr></tbody>';
   return `
     <thead><tr>
       <th>Vulnerability ID</th><th>Impacted Component</th><th>Severity</th>
       <th>KEV Status</th><th style="text-align:right">EPSS</th>
-      <th>Fixed In</th><th>Actions</th>
+      <th>Fixed In</th>${compact ? "" : "<th>Actions</th>"}
     </tr></thead>
     <tbody>${rows
       .map(
@@ -408,8 +410,8 @@ function vulnTable(rows) {
         <td>${f.kev ? kevFlag() : '<span class="dim">—</span>'}</td>
         <td class="num">${Number(f.epss).toFixed(5)}</td>
         <td class="mono">${f.fixed_version ? esc(f.fixed_version) : '<span class="dim">none</span>'}</td>
-        <td><a class="link" href="https://osv.dev/vulnerability/${esc(f.osv_id)}"
-               target="_blank" rel="noopener">View Details</a></td>
+        ${compact ? "" : `<td><a class="link" href="https://osv.dev/vulnerability/${esc(f.osv_id)}"
+               target="_blank" rel="noopener">View Details</a></td>`}
       </tr>`
       )
       .join("")}</tbody>`;

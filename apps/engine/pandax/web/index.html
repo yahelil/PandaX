@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PandaX — CRA Compliance Engine</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="dot"></span>
+    <div>
+      <h1>PandaX</h1>
+      <p>CRA Compliance Engine · Regulation (EU) 2024/2847</p>
+    </div>
+  </div>
+  <div class="controls">
+    <select id="artifact" aria-label="Artifact to scan"></select>
+    <button id="run" class="primary">Run pipeline</button>
+  </div>
+</header>
+
+<main>
+  <section class="pipeline" id="pipeline" aria-label="Pipeline stages"></section>
+
+  <section class="grid">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Live evidence stream</h2>
+        <span class="hint">identical events to the CLI</span>
+      </div>
+      <div id="log" class="log" role="log" aria-live="polite">
+        <p class="empty">Pick an artifact and run the pipeline. Every stage
+          streams its inputs, outputs and SHA-256 digests here as it happens.</p>
+      </div>
+    </div>
+
+    <aside class="side">
+      <div class="panel stats">
+        <div class="panel-head"><h2>Results</h2></div>
+        <div class="statgrid">
+          <div><b id="s-components">—</b><span>components</span></div>
+          <div><b id="s-vulns">—</b><span>vulnerabilities</span></div>
+          <div><b id="s-kev" class="danger">—</b><span>actively exploited</span></div>
+          <div><b id="s-clocks">—</b><span>Art.14 clocks</span></div>
+        </div>
+      </div>
+
+      <div class="panel" id="kev-panel" hidden>
+        <div class="panel-head"><h2 class="danger">Article 14(1) engaged</h2></div>
+        <table class="kev" id="kev-table"></table>
+      </div>
+
+      <div class="panel" id="seal-panel" hidden>
+        <div class="panel-head"><h2>Evidence seal</h2></div>
+        <div class="seal">
+          <div class="kv"><span>chain root</span><code id="chain-root">—</code></div>
+          <div class="actions">
+            <button id="verify">Verify bundle</button>
+            <button id="tamper" class="warn">Tamper one byte</button>
+          </div>
+          <div id="checks" class="checks"></div>
+        </div>
+      </div>
+
+      <div class="panel" id="docs-panel" hidden>
+        <div class="panel-head"><h2>Documents</h2></div>
+        <ul class="docs" id="docs"></ul>
+      </div>
+    </aside>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>

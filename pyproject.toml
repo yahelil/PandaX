@@ -1,0 +1,36 @@
+[project]
+name = "pandax"
+version = "0.1.0"
+description = "CRA Compliance-in-a-Box - artifact to verifiable Annex VII dossier"
+requires-python = ">=3.10"
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.7",
+    "httpx>=0.27",
+    "cryptography>=42.0",
+    "typst>=0.13",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+pandax = "pandax.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# Monorepo layout: the package lives at apps/engine/pandax but imports as `pandax`.
+only-include = ["apps/engine/pandax"]
+sources = ["apps/engine"]
+
+[tool.pytest.ini_options]
+testpaths = ["apps/engine/tests"]
+markers = [
+    "slow: end-to-end tests needing the bootstrapped syft binary and network",
+]

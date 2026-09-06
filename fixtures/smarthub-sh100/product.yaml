@@ -1,0 +1,32 @@
+# Manufacturer-attested product metadata (CRA Annex V / Annex VII inputs)
+product:
+  name: "SmartHub SH-100"
+  type: "Smart home hub (products with digital elements)"
+  version: "2.3.1"
+  unique_id: "PDX-SH100-EU"
+  intended_purpose: >
+    Residential smart-home gateway providing local device orchestration, a
+    local web configuration interface, and encrypted telemetry upload.
+  risk_tier: "default"           # Default tier -> Annex VIII Part I (Module A, internal control)
+  conformity_route: "Module A - internal production control"
+  support_period_months: 60
+  support_period_rationale: >
+    Five years, set to match the expected product lifetime of residential
+    gateway hardware and the contractual availability of third-party
+    component security updates.
+manufacturer:
+  legal_name: "PandaX Devices B.V."
+  address: "Keizersgracht 1, 1015 CJ Amsterdam, Netherlands"
+  main_establishment_ms: "NL"    # Art.14(7): determines the coordinating CSIRT
+  signatory_name: "A. Bakker"
+  signatory_function: "Head of Product Security"
+  place_of_issue: "Amsterdam"
+vulnerability_handling:
+  cvd_policy_url: "https://example-pandax.eu/security/cvd-policy"
+  contact_address: "security@example-pandax.eu"          # Annex I Part II(6), Art.13
+  security_txt_url: "https://example-pandax.eu/.well-known/security.txt"
+  secure_update_mechanism: >
+    Dual-bank A/B over-the-air updates. Images are signed with Ed25519 and
+    verified by the bootloader before activation; anti-rollback is enforced
+    with a monotonic version counter.
+  markets_available: ["NL", "DE", "BE", "FR"]            # Art.14(2)(a) Member States

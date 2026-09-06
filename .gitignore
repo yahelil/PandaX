@@ -33,3 +33,10 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
+# PandaX POC
+out/
+.tools/
+.cache/
+# fetched by tools/bootstrap.py, digest-pinned - not source
+fixtures/smarthub-sh100/lib/*.jar
+fixtures/*.zip

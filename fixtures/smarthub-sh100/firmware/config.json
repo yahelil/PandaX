@@ -1,0 +1,7 @@
+{
+  "device": "SmartHub SH-100",
+  "firmware": "2.3.1",
+  "build": "2026-08-14T09:22:41Z",
+  "features": { "ota": true, "tls": "1.3", "local_ui": true },
+  "log": { "backend": "log4j", "level": "INFO" }
+}

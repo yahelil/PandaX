@@ -77,13 +77,20 @@ def _extract_zip(src: Path, dest: Path) -> tuple[int, int]:
     return count, total
 
 
-def _extract_tar(src: Path, dest: Path) -> tuple[int, int]:
+def _extract_tar(src: Path, dest: Path, recorded_links: list | None = None) -> tuple[int, int]:
     total = count = 0
     with tarfile.open(src) as tf:
-        for member in tf:
-            if member.issym() or member.islnk():
-                raise UnsafeArtifact(f"link member refused: {member.name!r}")
+        for index, member in enumerate(tf, 1):
+            if index > MAX_ENTRIES:
+                raise UnsafeArtifact(f"archive exceeds {MAX_ENTRIES} entries")
             target = _safe_target(dest, member.name)
+            if member.issym() or member.islnk():
+                if recorded_links is not None:
+                    # For digest-pinned public fixtures only. Record links as
+                    # evidence, never create or follow them on the host.
+                    recorded_links.append({"path": member.name, "target": member.linkname})
+                    continue
+                raise UnsafeArtifact(f"link member refused: {member.name!r}")
             if member.isdir():
                 target.mkdir(parents=True, exist_ok=True)
                 continue
@@ -142,7 +149,17 @@ def run(ctx: RunContext) -> ev.Stream:
             f"limits: <={MAX_TOTAL_BYTES // (1024 * 1024)} MiB uncompressed, "
             f"<={MAX_ENTRIES:,} entries, <={MAX_DEPTH} path depth",
         )
-        count, total = extract(local_input, work)
+        from ..scenarios import identify
+        release = identify(local_input)
+        if release is not None:
+            links: list = []
+            work.mkdir(parents=True, exist_ok=True)
+            count, total = _extract_tar(local_input, work, links)
+            ctx.path("archive-links.json").write_text(json.dumps(links, indent=2), encoding="utf-8")
+            ctx.path("release-source.json").write_text(json.dumps(release, indent=2), encoding="utf-8")
+            yield ev.log(STAGE, f"verified official {release['kind']}; {len(links)} links recorded, not created")
+        else:
+            count, total = extract(local_input, work)
         yield ev.log(STAGE, "zip-slip / bomb / depth checks passed", ev.GOOD)
 
     ctx.extracted_dir = work
@@ -180,7 +197,8 @@ def run(ctx: RunContext) -> ev.Stream:
         tool="pandax.ingest",
         tool_version="0.1.0",
         inputs=[ctx.ledger.ref(local_input)] if local_input.is_file() else [],
-        outputs=[ctx.ledger.ref(tree_path)],
+        outputs=[ctx.ledger.ref(tree_path)] + [ctx.ledger.ref(ctx.path(n)) for n in
+                 ("archive-links.json", "release-source.json") if ctx.path(n).exists()],
         params={
             "max_total_bytes": MAX_TOTAL_BYTES,
             "max_entries": MAX_ENTRIES,

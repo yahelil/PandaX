@@ -8,6 +8,7 @@ It renders nothing - see render_cli.py and server.py.
 from __future__ import annotations
 
 import shutil
+import json
 from pathlib import Path
 from typing import Any
 
@@ -155,6 +156,18 @@ def _run(
 
         yield from match.run(ctx, feeds)
         yield from triage.run(ctx, feeds)
+        source_path = ctx.path("release-source.json")
+        if source_path.exists():
+            from .scenarios import check_release
+            result = check_release(ctx, json.loads(source_path.read_text(encoding="utf-8")))
+            checks_path = ctx.path("release-checks.json")
+            checks_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+            ctx.ledger.append(stage="RELEASE_CHECKS", tool="pandax.scenarios", tool_version="1",
+                inputs=[ctx.ledger.ref(source_path), ctx.ledger.ref(ctx.path("native-assessments.json")),
+                        ctx.ledger.ref(ctx.path("findings.json"))],
+                outputs=[ctx.ledger.ref(checks_path)], params={"oracle_separate_from_matching": True})
+            yield ev.log("RUN", "Release checks: " + ("passed" if result['passed'] else "FAILED"),
+                         ev.GOOD if result['passed'] else ev.ALERT_LVL)
         yield from clock.run(ctx)
         yield from dossier.run(ctx)
     finally:

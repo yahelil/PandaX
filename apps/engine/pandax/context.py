@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,9 @@ class Finding:
     # CycloneDX bom-ref of the affected component, so VEX rows point at the
     # exact SBOM entry rather than being re-matched by name.
     bom_ref: str = ""
+    source: str = "OSV"
+    source_url: str = ""
+    applicability: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return dict(self.__dict__)
@@ -58,6 +62,7 @@ class RunContext:
     incidents: list[dict[str, Any]] = field(default_factory=list)
     tool_versions: dict[str, str] = field(default_factory=dict)
     started: str = ""
+    native_inventory: dict[str, Any] = field(default_factory=dict)
 
     # A run can begin from a product artifact or from a pre-built SBOM.  These
     # fields make that provenance available to the dossier and both renderers.
@@ -80,7 +85,7 @@ class RunContext:
 
 def new_run_dir(base: Path | None = None) -> tuple[Path, str]:
     base = base or OUT_DIR
-    run_id = "run-" + dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_id = "run-" + dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f") + "-" + uuid.uuid4().hex[:6]
     run_dir = base / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir, run_id

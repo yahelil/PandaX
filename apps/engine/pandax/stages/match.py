@@ -13,6 +13,7 @@ from .. import events as ev
 from ..context import CACHE_DIR, Finding, RunContext
 from ..evidence import sha256_file
 from ..feeds import Feeds, severity_from_vector
+from .sbom import is_matchable_purl
 
 STAGE = "S3 MATCH"
 
@@ -45,9 +46,16 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
     feeds = feeds or Feeds(CACHE_DIR)
     ctx.tool_versions["osv"] = "api.osv.dev/v1"
 
-    purls = [c["purl"] for c in ctx.components]
-    by_purl = {c["purl"]: c for c in ctx.components}
+    matchable = [c for c in ctx.components if is_matchable_purl(c.get("purl"))]
+    purls = list(dict.fromkeys(c["purl"] for c in matchable))
+    by_purl = {c["purl"]: c for c in matchable}
     yield ev.log(STAGE, f"POST /v1/querybatch with {len(purls)} package URLs")
+    if ctx.skipped_components:
+        yield ev.log(
+            STAGE,
+            f"{ctx.skipped_components} component(s) have no usable versioned purl and were skipped",
+            ev.WARN,
+        )
 
     try:
         hits = feeds.query_purls(purls)
@@ -124,12 +132,16 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
     )
     yield ev.artifact(STAGE, ctx.ledger.rel(out_path), sha256_file(out_path))
 
+    ledger_inputs = [ctx.ledger.ref(ctx.sbom_path)] if ctx.sbom_path else []
+    native_inventory_path = ctx.path("native-inventory.json")
+    if native_inventory_path.exists():
+        ledger_inputs.append(ctx.ledger.ref(native_inventory_path))
+
     ctx.ledger.append(
         stage="S3_MATCH",
         tool="osv.dev",
         tool_version="v1",
-        inputs=([ctx.ledger.ref(ctx.sbom_path)] if ctx.sbom_path else []) +
-               [ctx.ledger.ref(ctx.path("native-inventory.json"))],
+        inputs=ledger_inputs,
         outputs=[ctx.ledger.ref(out_path), ctx.ledger.ref(osv_path), ctx.ledger.ref(vendor_path)],
         params={"endpoint": "https://api.osv.dev/v1/querybatch", "purls": len(purls),
                 "native_rules": "pandax.native/1", "native_coverage": "requested CVEs only"},

@@ -24,12 +24,15 @@ const el = (tag, cls, text) => {
   if (text !== undefined) n.textContent = text;
   return n;
 };
-const esc = (s) => String(s ?? "");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+}[ch]));
 
 let runId = "";
 let source = null;
 let DATA = null;
 let vulnFilter = "all";
+let inputMode = "artifact";
 
 // --------------------------------------------------------------- navigation
 
@@ -182,6 +185,15 @@ function handle(e) {
       );
       break;
     }
+    case "stage_skipped": {
+      const li = stepOf(e.stage);
+      if (li) {
+        li.classList.remove("active", "done", "alert");
+        li.classList.add("skipped");
+      }
+      logRow("warn", el("span", "mark", "–"), el("span", "", `${e.stage}: ${e.message} [SKIP]`));
+      break;
+    }
     case "run_done": {
       runId = e.data.run_id || runId;
       const failed = e.data.failed;
@@ -243,7 +255,11 @@ function renderOverview() {
   }
 
   $("s-components").textContent = s.components;
-  $("s-components-note").textContent = s.ecosystems || "inventoried from the artifact";
+  const source = s.input_type === "sbom"
+    ? `${s.sbom_source_format} ${s.sbom_source_version} · ${s.matchable_components} matchable` +
+      (s.skipped_components ? ` · ${s.skipped_components} not scanned` : "")
+    : (s.ecosystems || "inventoried from the artifact");
+  $("s-components-note").textContent = source;
 
   $("s-complete").textContent = s.completeness + "%";
   $("ring-fg").style.strokeDasharray = `${s.completeness} ${100 - s.completeness}`;
@@ -264,6 +280,10 @@ function renderOverview() {
   // A run restored from disk shows its stages already complete.
   if (!$("log").classList.contains("running")) {
     STAGES.forEach(([code]) => stepOf(code)?.classList.add("done"));
+    if (s.input_type === "sbom") {
+      stepOf("S1 INGEST")?.classList.remove("done");
+      stepOf("S1 INGEST")?.classList.add("skipped");
+    }
     $("log").innerHTML = "";
     logRow("info", el("span", "mark", "·"),
       el("span", "", `restored sealed run ${DATA.run_id} — press Run pipeline to stream a new one`));
@@ -383,10 +403,12 @@ function renderComponents() {
         <td><b>${esc(c.name)}</b></td>
         <td class="mono">${esc(c.version)}</td>
         <td><span class="pill blue">${esc(c.ecosystem)}</span></td>
-        <td class="mono dim">${esc(c.purl)}</td>
+        <td class="mono dim">${c.purl ? esc(c.purl) : "Unavailable"}</td>
         <td class="num">${c.findings || "—"}</td>
         <td>${
-          c.kev
+          !c.matchable
+            ? '<span class="pill unknown">not scanned</span>'
+            : c.kev
             ? kevFlag()
             : c.affected
               ? '<span class="pill medium">affected</span>'
@@ -621,11 +643,40 @@ $("tamper2").addEventListener("click", runTamper);
 
 // --------------------------------------------------------------------- run
 
+function syncRunner() {
+  const sbom = inputMode === "sbom";
+  $("artifact").hidden = sbom;
+  $("sbom-picker").hidden = !sbom;
+  $("mode-artifact").classList.toggle("active", !sbom);
+  $("mode-sbom").classList.toggle("active", sbom);
+  $("run").disabled = sbom ? !$("sbom-file").files.length : !$("artifact").value;
+}
+
+function setRunnerDisabled(disabled) {
+  $("mode-artifact").disabled = disabled;
+  $("mode-sbom").disabled = disabled;
+  $("artifact").disabled = disabled;
+  $("sbom-file").disabled = disabled;
+  $("run").disabled = disabled;
+  if (!disabled) syncRunner();
+}
+
+$("mode-artifact").addEventListener("click", () => { inputMode = "artifact"; syncRunner(); });
+$("mode-sbom").addEventListener("click", () => { inputMode = "sbom"; syncRunner(); });
+$("artifact").addEventListener("change", syncRunner);
+$("sbom-file").addEventListener("change", () => {
+  const file = $("sbom-file").files[0];
+  $("sbom-filename").textContent = file ? file.name : "Choose JSON SBOM";
+  syncRunner();
+});
+
 $("run").addEventListener("click", async () => {
   const artifact = $("artifact").value;
+  const sbomFile = $("sbom-file").files[0];
   $("comparison-panel").hidden = true;
-  if (!artifact) return;
-  $("run").disabled = true;
+  if (inputMode === "artifact" && !artifact) return;
+  if (inputMode === "sbom" && !sbomFile) return;
+  setRunnerDisabled(true);
   $("log").innerHTML = "";
   $("log").classList.add("running");
   $("seal-pill").hidden = true;
@@ -633,16 +684,30 @@ $("run").addEventListener("click", async () => {
   DATA = null;
   buildSteps();
 
+  let res;
   try {
-    const res = await fetch("/api/scan", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ artifact }),
-    });
-    if (!res.ok) throw new Error(await res.text());
+    if (inputMode === "sbom") {
+      const form = new FormData();
+      form.append("file", sbomFile);
+      res = await fetch("/api/scan/sbom", { method: "POST", body: form });
+    } else {
+      res = await fetch("/api/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artifact }),
+      });
+    }
   } catch (error) {
-    logRow("alert", el("span", "mark", "▶"), el("span", "", error.message));
-    $("run").disabled = false;
+    logRow("alert", el("span", "mark", "▶"), el("span", "", `Upload failed: ${error.message}`));
+    setRunnerDisabled(false);
+    $("log").classList.remove("running");
+    return;
+  }
+  if (!res.ok) {
+    let detail = await res.text();
+    try { detail = JSON.parse(detail).detail || detail; } catch (_) {}
+    logRow("alert", el("span", "mark", "▶"), el("span", "", detail));
+    setRunnerDisabled(false);
     $("log").classList.remove("running");
     return;
   }
@@ -657,7 +722,7 @@ function attachStream() {
   source.addEventListener("end", () => {
     source.close();
     source = null;
-    $("run").disabled = false;
+    setRunnerDisabled(false);
     $("log").classList.remove("running");
   });
 }
@@ -693,14 +758,15 @@ function attachStream() {
   selectionNote();
   if (!artifacts.length) {
     select.append(el("option", "", "no artifacts — run tools/bootstrap.py"));
-    $("run").disabled = true;
+    select.value = "";
   }
+  syncRunner();
 
   // A run already in flight wins: re-attach and replay it, so reloading the
   // page mid-scan shows the live stream rather than an empty console.
   const job = await (await fetch("/api/job")).json();
   if (job.running) {
-    $("run").disabled = true;
+    setRunnerDisabled(true);
     $("log").innerHTML = "";
     $("log").classList.add("running");
     attachStream();

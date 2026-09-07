@@ -4,7 +4,7 @@ Structure follows Regulation (EU) 2024/2847 exactly: Annex VII has eight
 numbered items, Annex V has eight. Each entry carries its `ref` and one of
 three provenance states:
 
-  derived         computed by this pipeline from the artifact itself
+  derived         computed by this pipeline from the artifact or supplied SBOM
   attested        supplied by the manufacturer in product.yaml
   required_input  neither - rendered as a red MANUFACTURER INPUT REQUIRED box
 
@@ -55,10 +55,19 @@ def build_dossier(ctx: RunContext) -> dict:
     product = ctx.product.get("product", {})
     manufacturer = ctx.product.get("manufacturer", {})
     handling = ctx.product.get("vulnerability_handling", {})
+    sbom_origin = (
+        "generated from the product artifact with Syft"
+        if ctx.input_type == "artifact"
+        else f"imported from {ctx.sbom_source_format} {ctx.sbom_source_version} and normalised"
+    )
 
     ecosystems: dict[str, int] = {}
     for comp in ctx.components:
-        eco = comp["purl"].split("/")[0].replace("pkg:", "")
+        eco = (
+            comp["purl"].split("/")[0].replace("pkg:", "")
+            if comp["purl"]
+            else "unidentified"
+        )
         ecosystems[eco] = ecosystems.get(eco, 0) + 1
 
     by_severity: dict[str, int] = {}
@@ -106,7 +115,7 @@ def build_dossier(ctx: RunContext) -> dict:
                     f"Product version {product.get('version', 'unknown')}. "
                     f"{len(ctx.components)} software components inventoried: "
                     f"{versions_line}",
-                    "Derived from the CycloneDX 1.6 SBOM attached at item 8.",
+                    f"Derived from the CycloneDX 1.6 SBOM attached at item 8; {sbom_origin}.",
                 ),
                 _entry(
                     "1(c)",
@@ -152,8 +161,8 @@ def build_dossier(ctx: RunContext) -> dict:
                         f"Secure update distribution: "
                         f"{handling.get('secure_update_mechanism') or NEEDS_INPUT}"
                     ),
-                    "SBOM machine-generated; policy URLs and update mechanism "
-                    "attested by the manufacturer.",
+                    f"SBOM {sbom_origin}; policy URLs and update mechanism "
+                    "are attested by the manufacturer when supplied.",
                 ),
                 _entry(
                     "2(c)",
@@ -218,7 +227,7 @@ def build_dossier(ctx: RunContext) -> dict:
                         "been cited in the Official Journal of the European Union as "
                         "at the date of this document. Conformity is therefore "
                         "demonstrated by describing the solutions adopted: automated "
-                        "SBOM generation (CycloneDX 1.6), continuous vulnerability "
+                        f"CycloneDX 1.6 SBOM processing ({sbom_origin}), continuous vulnerability "
                         "monitoring against OSV.dev and the CISA KEV catalogue, and "
                         "the secure update mechanism described at item 2(b)."
                     ),
@@ -237,7 +246,8 @@ def build_dossier(ctx: RunContext) -> dict:
                     DERIVED,
                     (
                         f"Run {ctx.run_id}: composition analysis over "
-                        f"{len(ctx.components)} components against OSV.dev, "
+                        f"{ctx.matchable_components} of {len(ctx.components)} "
+                        "components with usable package URLs against OSV.dev, "
                         f"CISA KEV and FIRST EPSS. Results attached as "
                         "findings.cdx-vex.json (CycloneDX 1.6 VEX). Every input "
                         "and output is hash-chained in ledger.jsonl and sealed by "
@@ -402,6 +412,11 @@ def build_dossier(ctx: RunContext) -> dict:
         },
         "summary": {
             "components": len(ctx.components),
+            "input_type": ctx.input_type,
+            "sbom_source_format": ctx.sbom_source_format,
+            "sbom_source_version": ctx.sbom_source_version,
+            "matchable_components": ctx.matchable_components,
+            "skipped_components": ctx.skipped_components,
             "ecosystems": ", ".join(
                 f"{k}={v}" for k, v in sorted(ecosystems.items())
             ),

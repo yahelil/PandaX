@@ -179,7 +179,8 @@ def _reproduce_findings(run_dir: Path):
 
     sbom = json.loads(sbom_path.read_text(encoding="utf-8"))
     purls = [c["purl"] for c in sbom.get("components", []) if c.get("purl")]
-    recorded = {row["cve"] for row in json.loads(findings_path.read_text(encoding="utf-8"))}
+    recorded = {row["cve"] for row in json.loads(findings_path.read_text(encoding="utf-8"))
+                if row.get("source", "OSV") == "OSV"}
 
     feeds = Feeds(CACHE_DIR)
     try:
@@ -390,6 +391,31 @@ def serve(
         )
     )
     uvicorn.run("pandax.server:api", host=host, port=port, log_level="warning")
+
+
+@app.command()
+def compare(scenario: str = typer.Argument(..., help="Scenario id, or 'list'"),
+            out: Optional[Path] = typer.Option(None, "--out")) -> None:
+    """Download both releases, scan them and seal a comparison (including failures)."""
+    from .scenarios import SCENARIOS, run_scenario
+    if scenario == 'list':
+        for item in SCENARIOS.values():
+            console.print(f"{item['id']}: {item['before']} → {item['after']}")
+        return
+    if scenario not in SCENARIOS:
+        raise typer.BadParameter('Unknown scenario. Run pandax compare list')
+    renderer = CliRenderer(console)
+    summary = {}
+    for event in run_scenario(scenario, out_base=out):
+        renderer.handle(event)
+        if event.kind == ev.RUN_DONE:
+            summary = event.data
+    report = summary.get('comparison', {})
+    for row in report.get('rows', []):
+        console.print(f"{'PASS' if row['passed'] else 'FAIL'} {row['cve']}: "
+                      f"{row['before']['observed']} → {row['after']['observed']} — {row['result']}")
+    console.print(f"Evidence: {summary.get('run_dir', '')}")
+    raise typer.Exit(code=0 if report.get('passed') else 1)
 
 
 if __name__ == "__main__":

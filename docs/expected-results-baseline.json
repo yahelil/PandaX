@@ -1,0 +1,1451 @@
+{
+  "reference_version": "2.0",
+  "research_date": "2026-09-07",
+  "scope_commit": "d7f78903473a0efb3ed3830b4b5b2e470d7ae8ad",
+  "independence": "Expected CVEs are transcribed from public sources, never scanner output. Input names and declarations establish scope only. This is a selected named-CVE baseline, not a complete vulnerability census.",
+  "sources": [
+    {
+      "id": "W1",
+      "title": "OpenWrt: libubox advisory, 31 Jan 2020",
+      "url": "https://openwrt.org/advisory/2020-01-31-2"
+    },
+    {
+      "id": "W2",
+      "title": "OpenWrt: DNSpooq advisory, 19 Jan 2021",
+      "url": "https://openwrt.org/advisory/2021-01-19-1"
+    },
+    {
+      "id": "M1",
+      "title": "OpenWrt 19.07.0: official x86/64 generic manifest",
+      "url": "https://downloads.openwrt.org/releases/19.07.0/targets/x86/64/openwrt-19.07.0-x86-64-generic.manifest"
+    },
+    {
+      "id": "M2",
+      "title": "OpenWrt 19.07.1: official x86/64 generic manifest",
+      "url": "https://downloads.openwrt.org/releases/19.07.1/targets/x86/64/openwrt-19.07.1-x86-64-generic.manifest"
+    },
+    {
+      "id": "M3",
+      "title": "OpenWrt 19.07.5: official x86/64 generic manifest",
+      "url": "https://downloads.openwrt.org/releases/19.07.5/targets/x86/64/openwrt-19.07.5-x86-64-generic.manifest"
+    },
+    {
+      "id": "M4",
+      "title": "OpenWrt 19.07.6: official x86/64 generic manifest",
+      "url": "https://downloads.openwrt.org/releases/19.07.6/targets/x86/64/openwrt-19.07.6-x86-64-generic.manifest"
+    },
+    {
+      "id": "C1",
+      "title": "curl: SOCKS5 heap buffer overflow",
+      "url": "https://curl.se/docs/CVE-2023-38545.html"
+    },
+    {
+      "id": "C2",
+      "title": "curl: cookie injection with none file",
+      "url": "https://curl.se/docs/CVE-2023-38546.html"
+    },
+    {
+      "id": "C3",
+      "title": "curl: cookie mixed case PSL bypass",
+      "url": "https://curl.se/docs/CVE-2023-46218.html"
+    },
+    {
+      "id": "C4",
+      "title": "curl: HTTP headers eat all memory",
+      "url": "https://curl.se/docs/CVE-2023-38039.html"
+    },
+    {
+      "id": "C5",
+      "title": "curl: versions and source version identification",
+      "url": "https://curl.se/docs/versions.html"
+    },
+    {
+      "id": "O1",
+      "title": "OpenSSL: Heartbleed advisory, 7 Apr 2014",
+      "url": "https://openssl-library.org/news/secadv/20140407.txt"
+    },
+    {
+      "id": "O2",
+      "title": "OpenSSL: security advisory, 5 Jun 2014",
+      "url": "https://openssl-library.org/news/secadv/20140605.txt"
+    },
+    {
+      "id": "J1",
+      "title": "jQuery maintainer: CVE-2020-11023",
+      "url": "https://github.com/jquery/jquery/security/advisories/GHSA-jpcq-cgw6-v4j6"
+    },
+    {
+      "id": "J2",
+      "title": "GitHub reviewed advisory: lodash CVE-2020-8203",
+      "url": "https://github.com/advisories/GHSA-p6mc-m468-83gw"
+    },
+    {
+      "id": "J3",
+      "title": "GitHub reviewed advisory: minimist CVE-2021-44906",
+      "url": "https://github.com/advisories/GHSA-xvch-5gv4-984h"
+    },
+    {
+      "id": "J4",
+      "title": "Forge maintainer: CVE-2022-24771",
+      "url": "https://github.com/digitalbazaar/forge/security/advisories/GHSA-cfm4-qjh2-4765"
+    },
+    {
+      "id": "P1",
+      "title": "Pillow 8.1.1 security release notes",
+      "url": "https://pillow.readthedocs.io/en/stable/releasenotes/8.1.1.html"
+    },
+    {
+      "id": "P2",
+      "title": "Requests maintainer: 2.20.0 release history",
+      "url": "https://github.com/psf/requests/blob/main/HISTORY.md"
+    },
+    {
+      "id": "P3",
+      "title": "urllib3 team disclosure: CVE-2019-11324",
+      "url": "https://seclists.org/oss-sec/2019/q2/50"
+    },
+    {
+      "id": "P4",
+      "title": "GitHub reviewed advisory: PyYAML CVE-2020-14343",
+      "url": "https://github.com/advisories/GHSA-8q59-q68h-6hv4"
+    },
+    {
+      "id": "P5",
+      "title": "Jinja maintainer: 2.10.1 security release",
+      "url": "https://palletsprojects.com/blog/jinja-2-10-1-released"
+    },
+    {
+      "id": "P6",
+      "title": "Pillow 10.0.1: updated libwebp wheels",
+      "url": "https://pillow.readthedocs.io/en/stable/releasenotes/10.0.1.html"
+    },
+    {
+      "id": "L1",
+      "title": "Apache Logging: Log4j security advisories",
+      "url": "https://logging.apache.org/security.html"
+    },
+    {
+      "id": "S1",
+      "title": "Apache Struts: S2-052 / CVE-2017-9805",
+      "url": "https://cwiki.apache.org/confluence/display/WW/S2-052"
+    },
+    {
+      "id": "S2",
+      "title": "Apache Struts: S2-057 / CVE-2018-11776",
+      "url": "https://cwiki.apache.org/confluence/display/WW/S2-057"
+    },
+    {
+      "id": "S3",
+      "title": "Apache Struts: S2-066 / CVE-2023-50164",
+      "url": "https://cwiki.apache.org/confluence/display/WW/S2-066"
+    },
+    {
+      "id": "A1",
+      "title": "Apache archive: Struts 2.5.12 full libraries",
+      "url": "https://archive.apache.org/dist/struts/2.5.12/struts-2.5.12-lib.zip"
+    },
+    {
+      "id": "A2",
+      "title": "Apache archive: Struts 2.5.12 minimum libraries",
+      "url": "https://archive.apache.org/dist/struts/2.5.12/struts-2.5.12-min-lib.zip"
+    },
+    {
+      "id": "A3",
+      "title": "Apache archive: Struts 2.5.33 minimum libraries",
+      "url": "https://archive.apache.org/dist/struts/2.5.33/struts-2.5.33-min-lib.zip"
+    }
+  ],
+  "cases": [
+    {
+      "id": "openwrt-19.07.0",
+      "title": "OpenWrt 19.07.0",
+      "mode": "artifact",
+      "selector": "release:openwrt-19.07.0",
+      "inventory": [
+        {
+          "name": "libubox",
+          "version": "2019-12-28-cd75136b-1",
+          "aliases": [
+            "libubox",
+            "libubox20191228"
+          ]
+        },
+        {
+          "name": "libblobmsg-json",
+          "version": "2019-12-28-cd75136b-1",
+          "aliases": [
+            "libblobmsg-json"
+          ]
+        },
+        {
+          "name": "dnsmasq",
+          "version": "2.80-15",
+          "aliases": [
+            "dnsmasq"
+          ]
+        },
+        {
+          "name": "ubus",
+          "version": "2019-12-27-041c9d1c-1",
+          "aliases": [
+            "ubus"
+          ]
+        },
+        {
+          "name": "rpcd",
+          "version": "2019-11-10-77ad0de0-1",
+          "aliases": [
+            "rpcd"
+          ]
+        },
+        {
+          "name": "uhttpd",
+          "version": "2019-12-22-5f9ae573-1",
+          "aliases": [
+            "uhttpd"
+          ]
+        }
+      ],
+      "inventory_sources": [
+        "M1"
+      ],
+      "checks": [
+        {
+          "cve": "CVE-2020-7248",
+          "name": "JSON serialization stack overflow",
+          "component": "libubox",
+          "expected": "find",
+          "source": "W1",
+          "reason": "Fixed from OpenWrt 19.07.1. Associate the library with ubus, rpcd and uhttpd without claiming a proven runtime call path.",
+          "fix": "19.07.1"
+        },
+        {
+          "cve": "CVE-2020-25681",
+          "name": "DNSSEC RRset overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25682",
+          "name": "DNSSEC name extraction overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25683",
+          "name": "DNSSEC rdata overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25684",
+          "name": "DNS response validation",
+          "component": "dnsmasq",
+          "expected": "find",
+          "source": "W2",
+          "reason": "Affected before package revision 2.80-16.2; the upstream 2.80 number alone is insufficient.",
+          "fix": "2.80-16.2"
+        },
+        {
+          "cve": "CVE-2020-25685",
+          "name": "DNS response hash validation",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25686",
+          "name": "DNS duplicate-query validation",
+          "component": "dnsmasq",
+          "expected": "find",
+          "source": "W2",
+          "reason": "Affected before package revision 2.80-16.2; the upstream 2.80 number alone is insufficient.",
+          "fix": "2.80-16.2"
+        },
+        {
+          "cve": "CVE-2020-25687",
+          "name": "DNSSEC RRset overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        }
+      ],
+      "triage": "Confirm the standard dnsmasq package. A custom dnsmasq-full build needs different applicability checks. Runtime input paths and DNS service configuration remain unverified.",
+      "expected_change": "19.07.0 to 19.07.1 fixes the libubox check. 19.07.5 to 19.07.6 fixes two standard-dnsmasq checks; five variant exclusions remain exclusions."
+    },
+    {
+      "id": "openwrt-19.07.1",
+      "title": "OpenWrt 19.07.1",
+      "mode": "artifact",
+      "selector": "release:openwrt-19.07.1",
+      "inventory": [
+        {
+          "name": "libubox",
+          "version": "2020-01-20-43a103ff-1",
+          "aliases": [
+            "libubox",
+            "libubox20191228"
+          ]
+        },
+        {
+          "name": "libblobmsg-json",
+          "version": "2020-01-20-43a103ff-1",
+          "aliases": [
+            "libblobmsg-json"
+          ]
+        },
+        {
+          "name": "dnsmasq",
+          "version": "2.80-15",
+          "aliases": [
+            "dnsmasq"
+          ]
+        },
+        {
+          "name": "ubus",
+          "version": "2019-12-27-041c9d1c-1",
+          "aliases": [
+            "ubus"
+          ]
+        },
+        {
+          "name": "rpcd",
+          "version": "2019-11-10-77ad0de0-1",
+          "aliases": [
+            "rpcd"
+          ]
+        },
+        {
+          "name": "uhttpd",
+          "version": "2019-12-22-5f9ae573-1",
+          "aliases": [
+            "uhttpd"
+          ]
+        }
+      ],
+      "inventory_sources": [
+        "M2"
+      ],
+      "checks": [
+        {
+          "cve": "CVE-2020-7248",
+          "name": "JSON serialization stack overflow",
+          "component": "libubox",
+          "expected": "fixed",
+          "source": "W1",
+          "reason": "Fixed from OpenWrt 19.07.1. Associate the library with ubus, rpcd and uhttpd without claiming a proven runtime call path.",
+          "fix": "19.07.1"
+        },
+        {
+          "cve": "CVE-2020-25681",
+          "name": "DNSSEC RRset overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25682",
+          "name": "DNSSEC name extraction overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25683",
+          "name": "DNSSEC rdata overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25684",
+          "name": "DNS response validation",
+          "component": "dnsmasq",
+          "expected": "find",
+          "source": "W2",
+          "reason": "Affected before package revision 2.80-16.2; the upstream 2.80 number alone is insufficient.",
+          "fix": "2.80-16.2"
+        },
+        {
+          "cve": "CVE-2020-25685",
+          "name": "DNS response hash validation",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25686",
+          "name": "DNS duplicate-query validation",
+          "component": "dnsmasq",
+          "expected": "find",
+          "source": "W2",
+          "reason": "Affected before package revision 2.80-16.2; the upstream 2.80 number alone is insufficient.",
+          "fix": "2.80-16.2"
+        },
+        {
+          "cve": "CVE-2020-25687",
+          "name": "DNSSEC RRset overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        }
+      ],
+      "triage": "Confirm the standard dnsmasq package. A custom dnsmasq-full build needs different applicability checks. Runtime input paths and DNS service configuration remain unverified.",
+      "expected_change": "19.07.0 to 19.07.1 fixes the libubox check. 19.07.5 to 19.07.6 fixes two standard-dnsmasq checks; five variant exclusions remain exclusions."
+    },
+    {
+      "id": "openwrt-19.07.5",
+      "title": "OpenWrt 19.07.5",
+      "mode": "artifact",
+      "selector": "release:openwrt-19.07.5",
+      "inventory": [
+        {
+          "name": "libubox",
+          "version": "2020-05-25-66195aee-1",
+          "aliases": [
+            "libubox",
+            "libubox20191228"
+          ]
+        },
+        {
+          "name": "libblobmsg-json",
+          "version": "2020-05-25-66195aee-1",
+          "aliases": [
+            "libblobmsg-json"
+          ]
+        },
+        {
+          "name": "dnsmasq",
+          "version": "2.80-16.1",
+          "aliases": [
+            "dnsmasq"
+          ]
+        },
+        {
+          "name": "ubus",
+          "version": "2019-12-27-041c9d1c-1",
+          "aliases": [
+            "ubus"
+          ]
+        },
+        {
+          "name": "rpcd",
+          "version": "2020-05-26-67c8a3fd-1",
+          "aliases": [
+            "rpcd"
+          ]
+        },
+        {
+          "name": "uhttpd",
+          "version": "2020-10-01-3abcc891-1",
+          "aliases": [
+            "uhttpd"
+          ]
+        }
+      ],
+      "inventory_sources": [
+        "M3"
+      ],
+      "checks": [
+        {
+          "cve": "CVE-2020-7248",
+          "name": "JSON serialization stack overflow",
+          "component": "libubox",
+          "expected": "fixed",
+          "source": "W1",
+          "reason": "Fixed from OpenWrt 19.07.1. Associate the library with ubus, rpcd and uhttpd without claiming a proven runtime call path.",
+          "fix": "19.07.1"
+        },
+        {
+          "cve": "CVE-2020-25681",
+          "name": "DNSSEC RRset overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25682",
+          "name": "DNSSEC name extraction overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25683",
+          "name": "DNSSEC rdata overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25684",
+          "name": "DNS response validation",
+          "component": "dnsmasq",
+          "expected": "find",
+          "source": "W2",
+          "reason": "Affected before package revision 2.80-16.2; the upstream 2.80 number alone is insufficient.",
+          "fix": "2.80-16.2"
+        },
+        {
+          "cve": "CVE-2020-25685",
+          "name": "DNS response hash validation",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25686",
+          "name": "DNS duplicate-query validation",
+          "component": "dnsmasq",
+          "expected": "find",
+          "source": "W2",
+          "reason": "Affected before package revision 2.80-16.2; the upstream 2.80 number alone is insufficient.",
+          "fix": "2.80-16.2"
+        },
+        {
+          "cve": "CVE-2020-25687",
+          "name": "DNSSEC RRset overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        }
+      ],
+      "triage": "Confirm the standard dnsmasq package. A custom dnsmasq-full build needs different applicability checks. Runtime input paths and DNS service configuration remain unverified.",
+      "expected_change": "19.07.0 to 19.07.1 fixes the libubox check. 19.07.5 to 19.07.6 fixes two standard-dnsmasq checks; five variant exclusions remain exclusions."
+    },
+    {
+      "id": "openwrt-19.07.6",
+      "title": "OpenWrt 19.07.6",
+      "mode": "artifact",
+      "selector": "release:openwrt-19.07.6",
+      "inventory": [
+        {
+          "name": "libubox",
+          "version": "2020-05-25-66195aee-1",
+          "aliases": [
+            "libubox",
+            "libubox20191228"
+          ]
+        },
+        {
+          "name": "libblobmsg-json",
+          "version": "2020-05-25-66195aee-1",
+          "aliases": [
+            "libblobmsg-json"
+          ]
+        },
+        {
+          "name": "dnsmasq",
+          "version": "2.80-16.2",
+          "aliases": [
+            "dnsmasq"
+          ]
+        },
+        {
+          "name": "ubus",
+          "version": "2019-12-27-041c9d1c-1",
+          "aliases": [
+            "ubus"
+          ]
+        },
+        {
+          "name": "rpcd",
+          "version": "2020-05-26-67c8a3fd-1",
+          "aliases": [
+            "rpcd"
+          ]
+        },
+        {
+          "name": "uhttpd",
+          "version": "2020-10-01-3abcc891-1",
+          "aliases": [
+            "uhttpd"
+          ]
+        }
+      ],
+      "inventory_sources": [
+        "M4"
+      ],
+      "checks": [
+        {
+          "cve": "CVE-2020-7248",
+          "name": "JSON serialization stack overflow",
+          "component": "libubox",
+          "expected": "fixed",
+          "source": "W1",
+          "reason": "Fixed from OpenWrt 19.07.1. Associate the library with ubus, rpcd and uhttpd without claiming a proven runtime call path.",
+          "fix": "19.07.1"
+        },
+        {
+          "cve": "CVE-2020-25681",
+          "name": "DNSSEC RRset overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25682",
+          "name": "DNSSEC name extraction overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25683",
+          "name": "DNSSEC rdata overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25684",
+          "name": "DNS response validation",
+          "component": "dnsmasq",
+          "expected": "fixed",
+          "source": "W2",
+          "reason": "Affected before package revision 2.80-16.2; the upstream 2.80 number alone is insufficient.",
+          "fix": "2.80-16.2"
+        },
+        {
+          "cve": "CVE-2020-25685",
+          "name": "DNS response hash validation",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        },
+        {
+          "cve": "CVE-2020-25686",
+          "name": "DNS duplicate-query validation",
+          "component": "dnsmasq",
+          "expected": "fixed",
+          "source": "W2",
+          "reason": "Affected before package revision 2.80-16.2; the upstream 2.80 number alone is insufficient.",
+          "fix": "2.80-16.2"
+        },
+        {
+          "cve": "CVE-2020-25687",
+          "name": "DNSSEC RRset overflow",
+          "component": "dnsmasq",
+          "expected": "excluded",
+          "source": "W2",
+          "reason": "Standard dnsmasq variant: vendor excludes this CVE.",
+          "fix": ""
+        }
+      ],
+      "triage": "Confirm the standard dnsmasq package. A custom dnsmasq-full build needs different applicability checks. Runtime input paths and DNS service configuration remain unverified.",
+      "expected_change": "19.07.0 to 19.07.1 fixes the libubox check. 19.07.5 to 19.07.6 fixes two standard-dnsmasq checks; five variant exclusions remain exclusions."
+    },
+    {
+      "id": "curl-8.3.0",
+      "title": "curl / libcurl 8.3.0",
+      "mode": "artifact",
+      "selector": "release:curl-8.3.0",
+      "inventory": [
+        {
+          "name": "libcurl",
+          "version": "8.3.0",
+          "aliases": [
+            "libcurl"
+          ]
+        },
+        {
+          "name": "curl",
+          "version": "8.3.0",
+          "aliases": [
+            "curl"
+          ]
+        }
+      ],
+      "inventory_sources": [
+        "C5"
+      ],
+      "checks": [
+        {
+          "cve": "CVE-2023-38545",
+          "name": "SOCKS5 heap buffer overflow",
+          "component": "libcurl",
+          "expected": "find",
+          "source": "C1",
+          "reason": "SOCKS5 remote DNS, hostname/buffer length and handshake conditions matter.",
+          "fix": "8.4.0"
+        },
+        {
+          "cve": "CVE-2023-38546",
+          "name": "Cookie injection via duplicated handle",
+          "component": "libcurl",
+          "expected": "find",
+          "source": "C2",
+          "reason": "Library API path; not accessible through the curl CLI.",
+          "fix": "8.4.0"
+        },
+        {
+          "cve": "CVE-2023-46218",
+          "name": "Mixed-case cookie PSL bypass",
+          "component": "libcurl",
+          "expected": "find",
+          "source": "C3",
+          "reason": "Still affected in 8.4.0. Inspect cookie use and PSL support.",
+          "fix": "8.5.0"
+        },
+        {
+          "cve": "CVE-2023-38039",
+          "name": "Unbounded response-header memory",
+          "component": "libcurl",
+          "expected": "fixed",
+          "source": "C4",
+          "reason": "Both selected releases contain this earlier fix.",
+          "fix": "8.3.0"
+        }
+      ],
+      "triage": "Source inventory does not establish a running application. For CVE-2023-38545, the CLI default 100 KiB buffer prevents the heap overflow, but a low --limit-rate can reduce it below 65,541 bytes. The advisory also documents another hostname-length consequence even with a larger buffer. Do not label the whole CVE harmless from buffer size alone.",
+      "expected_change": "8.3.0 to 8.4.0 fixes CVE-2023-38545 and CVE-2023-38546. CVE-2023-46218 must remain a finding."
+    },
+    {
+      "id": "curl-8.4.0",
+      "title": "curl / libcurl 8.4.0",
+      "mode": "artifact",
+      "selector": "release:curl-8.4.0",
+      "inventory": [
+        {
+          "name": "libcurl",
+          "version": "8.4.0",
+          "aliases": [
+            "libcurl"
+          ]
+        },
+        {
+          "name": "curl",
+          "version": "8.4.0",
+          "aliases": [
+            "curl"
+          ]
+        }
+      ],
+      "inventory_sources": [
+        "C5"
+      ],
+      "checks": [
+        {
+          "cve": "CVE-2023-38545",
+          "name": "SOCKS5 heap buffer overflow",
+          "component": "libcurl",
+          "expected": "fixed",
+          "source": "C1",
+          "reason": "SOCKS5 remote DNS, hostname/buffer length and handshake conditions matter.",
+          "fix": "8.4.0"
+        },
+        {
+          "cve": "CVE-2023-38546",
+          "name": "Cookie injection via duplicated handle",
+          "component": "libcurl",
+          "expected": "fixed",
+          "source": "C2",
+          "reason": "Library API path; not accessible through the curl CLI.",
+          "fix": "8.4.0"
+        },
+        {
+          "cve": "CVE-2023-46218",
+          "name": "Mixed-case cookie PSL bypass",
+          "component": "libcurl",
+          "expected": "find",
+          "source": "C3",
+          "reason": "Still affected in 8.4.0. Inspect cookie use and PSL support.",
+          "fix": "8.5.0"
+        },
+        {
+          "cve": "CVE-2023-38039",
+          "name": "Unbounded response-header memory",
+          "component": "libcurl",
+          "expected": "fixed",
+          "source": "C4",
+          "reason": "Both selected releases contain this earlier fix.",
+          "fix": "8.3.0"
+        }
+      ],
+      "triage": "Source inventory does not establish a running application. For CVE-2023-38545, the CLI default 100 KiB buffer prevents the heap overflow, but a low --limit-rate can reduce it below 65,541 bytes. The advisory also documents another hostname-length consequence even with a larger buffer. Do not label the whole CVE harmless from buffer size alone.",
+      "expected_change": "8.3.0 to 8.4.0 fixes CVE-2023-38545 and CVE-2023-38546. CVE-2023-46218 must remain a finding."
+    },
+    {
+      "id": "openssl-1.0.1f",
+      "title": "OpenSSL 1.0.1f / s_server",
+      "mode": "artifact",
+      "selector": "release:openssl-1.0.1f",
+      "inventory": [
+        {
+          "name": "libssl",
+          "version": "1.0.1f",
+          "aliases": [
+            "libssl",
+            "openssl"
+          ]
+        }
+      ],
+      "inventory_sources": [
+        "O1",
+        "O2"
+      ],
+      "checks": [
+        {
+          "cve": "CVE-2014-0160",
+          "name": "Heartbleed memory disclosure",
+          "component": "libssl",
+          "expected": "find",
+          "source": "O1",
+          "reason": "Heartbeat support and the actual loaded library matter.",
+          "fix": "1.0.1g"
+        },
+        {
+          "cve": "CVE-2014-0224",
+          "name": "CCS man-in-the-middle weakness",
+          "component": "libssl",
+          "expected": "find",
+          "source": "O2",
+          "reason": "Both client and server must be vulnerable; both tested releases precede the fix.",
+          "fix": "1.0.1h"
+        },
+        {
+          "cve": "CVE-2014-0195",
+          "name": "DTLS fragment buffer overflow",
+          "component": "libssl",
+          "expected": "find",
+          "source": "O2",
+          "reason": "Requires DTLS use. TLS-only operation does not exercise this path.",
+          "fix": "1.0.1h"
+        }
+      ],
+      "triage": "Confirm the actual TLS library and build flags, including OPENSSL_NO_HEARTBEATS. Source-only scans cannot establish deployed reachability. Keep DTLS-specific conditions separate from TLS server operation.",
+      "expected_change": "1.0.1f to 1.0.1g fixes Heartbleed. The two June 2014 CVEs remain affected at the component-version level."
+    },
+    {
+      "id": "openssl-1.0.1g",
+      "title": "OpenSSL 1.0.1g / s_server",
+      "mode": "artifact",
+      "selector": "release:openssl-1.0.1g",
+      "inventory": [
+        {
+          "name": "libssl",
+          "version": "1.0.1g",
+          "aliases": [
+            "libssl",
+            "openssl"
+          ]
+        }
+      ],
+      "inventory_sources": [
+        "O1",
+        "O2"
+      ],
+      "checks": [
+        {
+          "cve": "CVE-2014-0160",
+          "name": "Heartbleed memory disclosure",
+          "component": "libssl",
+          "expected": "fixed",
+          "source": "O1",
+          "reason": "Heartbeat support and the actual loaded library matter.",
+          "fix": "1.0.1g"
+        },
+        {
+          "cve": "CVE-2014-0224",
+          "name": "CCS man-in-the-middle weakness",
+          "component": "libssl",
+          "expected": "find",
+          "source": "O2",
+          "reason": "Both client and server must be vulnerable; both tested releases precede the fix.",
+          "fix": "1.0.1h"
+        },
+        {
+          "cve": "CVE-2014-0195",
+          "name": "DTLS fragment buffer overflow",
+          "component": "libssl",
+          "expected": "find",
+          "source": "O2",
+          "reason": "Requires DTLS use. TLS-only operation does not exercise this path.",
+          "fix": "1.0.1h"
+        }
+      ],
+      "triage": "Confirm the actual TLS library and build flags, including OPENSSL_NO_HEARTBEATS. Source-only scans cannot establish deployed reachability. Keep DTLS-specific conditions separate from TLS server operation.",
+      "expected_change": "1.0.1f to 1.0.1g fixes Heartbleed. The two June 2014 CVEs remain affected at the component-version level."
+    },
+    {
+      "id": "smarthub-directory",
+      "title": "SmartHub 2.3.1 / directory",
+      "mode": "artifact",
+      "path": "fixtures/smarthub-sh100",
+      "inventory": [
+        {
+          "name": "jquery",
+          "version": "3.4.0",
+          "aliases": [
+            "jquery"
+          ]
+        },
+        {
+          "name": "lodash",
+          "version": "4.17.15",
+          "aliases": [
+            "lodash"
+          ]
+        },
+        {
+          "name": "minimist",
+          "version": "1.2.0",
+          "aliases": [
+            "minimist"
+          ]
+        },
+        {
+          "name": "node-forge",
+          "version": "0.9.0",
+          "aliases": [
+            "node-forge"
+          ]
+        },
+        {
+          "name": "pillow",
+          "version": "8.1.0",
+          "aliases": [
+            "pillow"
+          ]
+        },
+        {
+          "name": "requests",
+          "version": "2.19.1",
+          "aliases": [
+            "requests"
+          ]
+        },
+        {
+          "name": "urllib3",
+          "version": "1.24.1",
+          "aliases": [
+            "urllib3"
+          ]
+        },
+        {
+          "name": "PyYAML",
+          "version": "5.1",
+          "aliases": [
+            "PyYAML"
+          ]
+        },
+        {
+          "name": "Jinja2",
+          "version": "2.10",
+          "aliases": [
+            "Jinja2"
+          ]
+        },
+        {
+          "name": "log4j-core",
+          "version": "2.14.1",
+          "aliases": [
+            "log4j-core"
+          ]
+        }
+      ],
+      "inventory_sources": [],
+      "checks": [
+        {
+          "cve": "CVE-2020-11023",
+          "name": "HTML injection / XSS",
+          "component": "jquery",
+          "expected": "find",
+          "source": "J1",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "3.5.0"
+        },
+        {
+          "cve": "CVE-2020-8203",
+          "name": "Prototype pollution",
+          "component": "lodash",
+          "expected": "find",
+          "source": "J2",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "4.17.19"
+        },
+        {
+          "cve": "CVE-2021-44906",
+          "name": "Prototype pollution",
+          "component": "minimist",
+          "expected": "find",
+          "source": "J3",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "1.2.6 (1.x)"
+        },
+        {
+          "cve": "CVE-2022-24771",
+          "name": "RSA signature verification weakness",
+          "component": "node-forge",
+          "expected": "find",
+          "source": "J4",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "1.3.0"
+        },
+        {
+          "cve": "CVE-2021-25293",
+          "name": "SGI image out-of-bounds read",
+          "component": "pillow",
+          "expected": "find",
+          "source": "P1",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "8.1.1"
+        },
+        {
+          "cve": "CVE-2018-18074",
+          "name": "Authorization header disclosure",
+          "component": "requests",
+          "expected": "find",
+          "source": "P2",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "2.20.0"
+        },
+        {
+          "cve": "CVE-2019-11324",
+          "name": "Custom certificate trust bypass",
+          "component": "urllib3",
+          "expected": "find",
+          "source": "P3",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "1.24.2"
+        },
+        {
+          "cve": "CVE-2020-14343",
+          "name": "Unsafe YAML construction",
+          "component": "PyYAML",
+          "expected": "find",
+          "source": "P4",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "5.4"
+        },
+        {
+          "cve": "CVE-2019-10906",
+          "name": "Template sandbox escape",
+          "component": "Jinja2",
+          "expected": "find",
+          "source": "P5",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "2.10.1"
+        },
+        {
+          "cve": "CVE-2021-44228",
+          "name": "Log4Shell",
+          "component": "log4j-core",
+          "expected": "find",
+          "source": "L1",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "2.15.0 initial fix"
+        }
+      ],
+      "triage": "Synthetic product: these are public-advisory checks for its declared dependencies, not an online attestation of the product. Log4j requires log4j-core, not only log4j-api. For CVE-2023-4863, a Pillow requirement alone does not prove the installed libwebp version; inspect the actual wheel/native library. Missing build/configuration evidence is unresolved.",
+      "expected_change": "The directory and ZIP should agree only when their contents agree. Compare each input independently; do not infer that a missing JAR was patched."
+    },
+    {
+      "id": "smarthub-zip",
+      "title": "SmartHub 2.3.1 / zip",
+      "mode": "artifact",
+      "path": "fixtures/smarthub-sh100-v2.3.1.zip",
+      "inventory": [
+        {
+          "name": "jquery",
+          "version": "3.4.0",
+          "aliases": [
+            "jquery"
+          ]
+        },
+        {
+          "name": "lodash",
+          "version": "4.17.15",
+          "aliases": [
+            "lodash"
+          ]
+        },
+        {
+          "name": "minimist",
+          "version": "1.2.0",
+          "aliases": [
+            "minimist"
+          ]
+        },
+        {
+          "name": "node-forge",
+          "version": "0.9.0",
+          "aliases": [
+            "node-forge"
+          ]
+        },
+        {
+          "name": "pillow",
+          "version": "8.1.0",
+          "aliases": [
+            "pillow"
+          ]
+        },
+        {
+          "name": "requests",
+          "version": "2.19.1",
+          "aliases": [
+            "requests"
+          ]
+        },
+        {
+          "name": "urllib3",
+          "version": "1.24.1",
+          "aliases": [
+            "urllib3"
+          ]
+        },
+        {
+          "name": "PyYAML",
+          "version": "5.1",
+          "aliases": [
+            "PyYAML"
+          ]
+        },
+        {
+          "name": "Jinja2",
+          "version": "2.10",
+          "aliases": [
+            "Jinja2"
+          ]
+        },
+        {
+          "name": "log4j-core",
+          "version": "2.14.1",
+          "aliases": [
+            "log4j-core"
+          ]
+        }
+      ],
+      "inventory_sources": [],
+      "checks": [
+        {
+          "cve": "CVE-2020-11023",
+          "name": "HTML injection / XSS",
+          "component": "jquery",
+          "expected": "find",
+          "source": "J1",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "3.5.0"
+        },
+        {
+          "cve": "CVE-2020-8203",
+          "name": "Prototype pollution",
+          "component": "lodash",
+          "expected": "find",
+          "source": "J2",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "4.17.19"
+        },
+        {
+          "cve": "CVE-2021-44906",
+          "name": "Prototype pollution",
+          "component": "minimist",
+          "expected": "find",
+          "source": "J3",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "1.2.6 (1.x)"
+        },
+        {
+          "cve": "CVE-2022-24771",
+          "name": "RSA signature verification weakness",
+          "component": "node-forge",
+          "expected": "find",
+          "source": "J4",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "1.3.0"
+        },
+        {
+          "cve": "CVE-2021-25293",
+          "name": "SGI image out-of-bounds read",
+          "component": "pillow",
+          "expected": "find",
+          "source": "P1",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "8.1.1"
+        },
+        {
+          "cve": "CVE-2018-18074",
+          "name": "Authorization header disclosure",
+          "component": "requests",
+          "expected": "find",
+          "source": "P2",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "2.20.0"
+        },
+        {
+          "cve": "CVE-2019-11324",
+          "name": "Custom certificate trust bypass",
+          "component": "urllib3",
+          "expected": "find",
+          "source": "P3",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "1.24.2"
+        },
+        {
+          "cve": "CVE-2020-14343",
+          "name": "Unsafe YAML construction",
+          "component": "PyYAML",
+          "expected": "find",
+          "source": "P4",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "5.4"
+        },
+        {
+          "cve": "CVE-2019-10906",
+          "name": "Template sandbox escape",
+          "component": "Jinja2",
+          "expected": "find",
+          "source": "P5",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "2.10.1"
+        },
+        {
+          "cve": "CVE-2021-44228",
+          "name": "Log4Shell",
+          "component": "log4j-core",
+          "expected": "find",
+          "source": "L1",
+          "reason": "Conditional on the declared component/version being in the input.",
+          "fix": "2.15.0 initial fix"
+        }
+      ],
+      "triage": "Synthetic product: these are public-advisory checks for its declared dependencies, not an online attestation of the product. Log4j requires log4j-core, not only log4j-api. For CVE-2023-4863, a Pillow requirement alone does not prove the installed libwebp version; inspect the actual wheel/native library. Missing build/configuration evidence is unresolved.",
+      "expected_change": "The directory and ZIP should agree only when their contents agree. Compare each input independently; do not infer that a missing JAR was patched."
+    },
+    {
+      "id": "struts-2.5.12-full",
+      "title": "Struts 2.5.12 / full libraries",
+      "mode": "artifact",
+      "url": "https://archive.apache.org/dist/struts/2.5.12/struts-2.5.12-lib.zip",
+      "sha256": "c75922069cf0ec83723a2c678552c4098361179181b03c1fbb7855a852547884",
+      "inventory": [
+        {
+          "name": "struts2-core",
+          "version": "2.5.12",
+          "aliases": [
+            "struts2-core"
+          ]
+        },
+        {
+          "name": "struts2-rest-plugin",
+          "version": "2.5.12",
+          "aliases": [
+            "struts2-rest-plugin"
+          ]
+        }
+      ],
+      "inventory_sources": [
+        "A1"
+      ],
+      "checks": [
+        {
+          "cve": "CVE-2018-11776",
+          "name": "Namespace handling / RCE",
+          "component": "struts2-core",
+          "expected": "find",
+          "source": "S2",
+          "reason": "Check namespace and alwaysSelectFullNamespace configuration.",
+          "fix": "2.5.17"
+        },
+        {
+          "cve": "CVE-2023-50164",
+          "name": "File upload path traversal",
+          "component": "struts2-core",
+          "expected": "find",
+          "source": "S3",
+          "reason": "Runtime applicability requires the affected file upload path.",
+          "fix": "2.5.33"
+        },
+        {
+          "cve": "CVE-2017-9805",
+          "name": "REST XML deserialization / RCE",
+          "component": "struts2-rest-plugin",
+          "expected": "find",
+          "source": "S1",
+          "reason": "REST plugin present in the full ZIP; absent from the minimum ZIPs.",
+          "fix": "2.5.13"
+        }
+      ],
+      "triage": "The full 2.5.12 ZIP contains 93 JARs, including REST plugin 2.5.12 and XStream 1.4.8. Each minimum ZIP contains 8 JARs without REST plugin. These counts were independently obtained from official ZIP entries. Plugin presence does not prove XML endpoints or vulnerable application configuration.",
+      "expected_change": "2.5.12 minimum: two named core findings, no REST-plugin finding. 2.5.33 minimum: none of these three named CVEs should be active; other CVEs are outside this selected baseline."
+    },
+    {
+      "id": "struts-2.5.12-min",
+      "title": "Struts 2.5.12 / min libraries",
+      "mode": "artifact",
+      "url": "https://archive.apache.org/dist/struts/2.5.12/struts-2.5.12-min-lib.zip",
+      "sha256": "80c9d177e866f4138de9278a36bf9da9dabdb8e313e526aa3e864c2068157600",
+      "inventory": [
+        {
+          "name": "struts2-core",
+          "version": "2.5.12",
+          "aliases": [
+            "struts2-core"
+          ]
+        }
+      ],
+      "inventory_sources": [
+        "A2"
+      ],
+      "checks": [
+        {
+          "cve": "CVE-2018-11776",
+          "name": "Namespace handling / RCE",
+          "component": "struts2-core",
+          "expected": "find",
+          "source": "S2",
+          "reason": "Check namespace and alwaysSelectFullNamespace configuration.",
+          "fix": "2.5.17"
+        },
+        {
+          "cve": "CVE-2023-50164",
+          "name": "File upload path traversal",
+          "component": "struts2-core",
+          "expected": "find",
+          "source": "S3",
+          "reason": "Runtime applicability requires the affected file upload path.",
+          "fix": "2.5.33"
+        },
+        {
+          "cve": "CVE-2017-9805",
+          "name": "REST XML deserialization / RCE",
+          "component": "struts2-rest-plugin",
+          "expected": "excluded",
+          "source": "S1",
+          "reason": "REST plugin present in the full ZIP; absent from the minimum ZIPs.",
+          "fix": "2.5.13"
+        }
+      ],
+      "triage": "The full 2.5.12 ZIP contains 93 JARs, including REST plugin 2.5.12 and XStream 1.4.8. Each minimum ZIP contains 8 JARs without REST plugin. These counts were independently obtained from official ZIP entries. Plugin presence does not prove XML endpoints or vulnerable application configuration.",
+      "expected_change": "2.5.12 minimum: two named core findings, no REST-plugin finding. 2.5.33 minimum: none of these three named CVEs should be active; other CVEs are outside this selected baseline."
+    },
+    {
+      "id": "struts-2.5.33-min",
+      "title": "Struts 2.5.33 / min libraries",
+      "mode": "artifact",
+      "url": "https://archive.apache.org/dist/struts/2.5.33/struts-2.5.33-min-lib.zip",
+      "sha256": "5dde2aa5a9f93e73fe9f8105d1902a2da277f19695c8093b6e97450d53c42b4e",
+      "inventory": [
+        {
+          "name": "struts2-core",
+          "version": "2.5.33",
+          "aliases": [
+            "struts2-core"
+          ]
+        }
+      ],
+      "inventory_sources": [
+        "A3"
+      ],
+      "checks": [
+        {
+          "cve": "CVE-2018-11776",
+          "name": "Namespace handling / RCE",
+          "component": "struts2-core",
+          "expected": "fixed",
+          "source": "S2",
+          "reason": "Check namespace and alwaysSelectFullNamespace configuration.",
+          "fix": "2.5.17"
+        },
+        {
+          "cve": "CVE-2023-50164",
+          "name": "File upload path traversal",
+          "component": "struts2-core",
+          "expected": "fixed",
+          "source": "S3",
+          "reason": "Runtime applicability requires the affected file upload path.",
+          "fix": "2.5.33"
+        },
+        {
+          "cve": "CVE-2017-9805",
+          "name": "REST XML deserialization / RCE",
+          "component": "struts2-rest-plugin",
+          "expected": "excluded",
+          "source": "S1",
+          "reason": "REST plugin present in the full ZIP; absent from the minimum ZIPs.",
+          "fix": "2.5.13"
+        }
+      ],
+      "triage": "The full 2.5.12 ZIP contains 93 JARs, including REST plugin 2.5.12 and XStream 1.4.8. Each minimum ZIP contains 8 JARs without REST plugin. These counts were independently obtained from official ZIP entries. Plugin presence does not prove XML endpoints or vulnerable application configuration.",
+      "expected_change": "2.5.12 minimum: two named core findings, no REST-plugin finding. 2.5.33 minimum: none of these three named CVEs should be active; other CVEs are outside this selected baseline."
+    },
+    {
+      "id": "example-sbom",
+      "title": "Example web application 1.0.0 / SBOM",
+      "mode": "sbom",
+      "path": "fixtures/example-sbom.cdx.json",
+      "inventory": [
+        {
+          "name": "jquery",
+          "version": "3.4.0",
+          "aliases": [
+            "jquery"
+          ]
+        },
+        {
+          "name": "internal-device-agent",
+          "version": "1.0.0",
+          "aliases": [
+            "internal-device-agent"
+          ]
+        }
+      ],
+      "inventory_sources": [],
+      "checks": [
+        {
+          "cve": "CVE-2020-11023",
+          "name": "HTML injection / XSS",
+          "component": "jquery",
+          "expected": "find",
+          "source": "J1",
+          "reason": "jQuery 3.4.0 is within the public affected range.",
+          "fix": "3.5.0"
+        }
+      ],
+      "triage": "The internal-device-agent has no public identity or versioned Package URL in the supplied SBOM. Preserve it in the inventory and label vulnerability coverage unresolved / not scanned. Do not infer that it has zero vulnerabilities. No runtime use of jQuery is established by the SBOM.",
+      "expected_change": "New input in the pulled update. Verify both components are retained, jQuery is matched, and the unidentified component is visibly not scanned."
+    }
+  ]
+}

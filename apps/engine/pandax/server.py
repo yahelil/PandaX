@@ -9,18 +9,23 @@ from __future__ import annotations
 
 import json
 import queue
+import re
+import shutil
+import tempfile
 import threading
 from pathlib import Path
 from typing import Any, Iterator
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from . import events as ev
 from .context import OUT_DIR, ROOT
 from .evidence import verify_run
+from .stages.sbom import is_matchable_purl
 
 WEB = Path(__file__).resolve().parent / "web"
+MAX_SBOM_BYTES = 50 * 1024 * 1024
 
 api = FastAPI(title="PandaX CRA Compliance Engine", docs_url="/api/docs")
 
@@ -41,6 +46,7 @@ class Job:
         self.finished = False
         self.error: str | None = None
         self.run_dir: str = ""
+        self.input_type: str = "artifact"
 
     def subscribe(self) -> tuple[list[dict[str, Any]], queue.Queue]:
         with self.lock:
@@ -59,20 +65,35 @@ class Job:
             for listener in self.listeners:
                 listener.put(payload)
 
-    def start(self, artifact: Path | str) -> None:
+    def start(
+        self,
+        artifact: Path | str,
+        input_type: str = "artifact",
+        cleanup_dir: Path | None = None,
+    ) -> None:
         from . import pipeline
+
+        self.input_type = input_type
 
         def worker() -> None:
             try:
-                from .scenarios import download, run_scenario
-                value = str(artifact)
-                if value.startswith('scenario:'):
-                    stream = run_scenario(value.removeprefix('scenario:'))
-                elif value.startswith('release:'):
-                    self._emit(ev.log('RUN', 'Downloading / verifying official release').as_dict())
-                    stream = pipeline.run(download(value.removeprefix('release:')))
+                if input_type == "sbom":
+                    stream = pipeline.run_sbom(Path(artifact))
                 else:
-                    stream = pipeline.run(Path(artifact))
+                    from .scenarios import download, run_scenario
+
+                    value = str(artifact)
+                    if value.startswith("scenario:"):
+                        stream = run_scenario(value.removeprefix("scenario:"))
+                    elif value.startswith("release:"):
+                        self._emit(
+                            ev.log(
+                                "RUN", "Downloading / verifying official release"
+                            ).as_dict()
+                        )
+                        stream = pipeline.run(download(value.removeprefix("release:")))
+                    else:
+                        stream = pipeline.run(Path(artifact))
                 for event in stream:
                     payload = event.as_dict()
                     if "run_dir" in event.data:
@@ -86,6 +107,8 @@ class Job:
                     ).as_dict()
                 )
             finally:
+                if cleanup_dir is not None:
+                    shutil.rmtree(cleanup_dir, ignore_errors=True)
                 self.finished = True
                 self._emit(None)
 
@@ -163,6 +186,57 @@ def start_scan(body: dict[str, str]) -> dict[str, Any]:
     return {'started': True, 'artifact': str(artifact)}
 
 
+@api.post("/api/scan/sbom")
+async def start_sbom_scan(file: UploadFile = File(...)) -> dict[str, Any]:
+    """Validate and start a run from an uploaded CycloneDX or SPDX JSON SBOM."""
+    global CURRENT
+    with SCAN_LOCK:
+        if CURRENT is not None and not CURRENT.finished:
+            raise HTTPException(409, "a scan is already running")
+
+    upload_dir = Path(tempfile.mkdtemp(prefix="pandax-sbom-"))
+    filename = Path(file.filename or "uploaded-sbom.json").name
+    filename = re.sub(r"[^A-Za-z0-9._-]", "_", filename) or "uploaded-sbom.json"
+    target = upload_dir / filename
+    size = 0
+    started = False
+    try:
+        with open(target, "wb") as out:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+                if size > MAX_SBOM_BYTES:
+                    raise HTTPException(413, "SBOM upload exceeds the 50 MiB limit")
+                out.write(chunk)
+
+        from .stages.sbom import SbomError, inspect_sbom
+
+        try:
+            info = inspect_sbom(target)
+        except SbomError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+        with SCAN_LOCK:
+            # A product scan may have started while this file was uploading and
+            # being validated, so claim the single-run slot atomically here.
+            if CURRENT is not None and not CURRENT.finished:
+                raise HTTPException(409, "a scan is already running")
+            CURRENT = Job()
+            CURRENT.start(target, input_type="sbom", cleanup_dir=upload_dir)
+        started = True
+        return {
+            "started": True,
+            "source_type": "sbom",
+            "filename": filename,
+            **info,
+        }
+    except Exception:
+        if not started:
+            shutil.rmtree(upload_dir, ignore_errors=True)
+        raise
+    finally:
+        await file.close()
+
+
 @api.get("/api/job")
 def job_status() -> dict[str, Any]:
     """Whether a run is in flight, so a reloaded page can re-attach to it."""
@@ -173,6 +247,7 @@ def job_status() -> dict[str, Any]:
         "running": not CURRENT.finished,
         "run_dir": CURRENT.run_dir,
         "events": len(CURRENT.history),
+        "input_type": CURRENT.input_type,
     }
 
 
@@ -288,14 +363,18 @@ def summary(run_id: str) -> dict[str, Any]:
 
     components = [
         {
-            "purl": c["purl"],
+            "purl": c.get("purl", ""),
             "name": c.get("name", ""),
             "version": c.get("version", ""),
-            "ecosystem": c["purl"].split("/")[0].replace("pkg:", ""),
+            "ecosystem": (
+                c.get("purl", "").split("/")[0].replace("pkg:", "")
+                if c.get("purl")
+                else "unidentified"
+            ),
             "type": c.get("type", "library"),
+            "matchable": is_matchable_purl(c.get("purl")),
         }
         for c in sbom.get("components", [])
-        if c.get("purl")
     ]
     # A component is "affected" if any finding cites its package URL.
     affected = {f["purl"] for f in findings}
@@ -327,6 +406,13 @@ def summary(run_id: str) -> dict[str, Any]:
         "generated": dossier.get("generated", manifest.get("created", "")),
         "stats": {
             "components": len(components),
+            "input_type": dossier_summary.get("input_type", "artifact"),
+            "sbom_source_format": dossier_summary.get("sbom_source_format", "CycloneDX"),
+            "sbom_source_version": dossier_summary.get("sbom_source_version", "1.6"),
+            "matchable_components": dossier_summary.get(
+                "matchable_components", len(components)
+            ),
+            "skipped_components": dossier_summary.get("skipped_components", 0),
             "ecosystems": dossier_summary.get("ecosystems", ""),
             "findings": len(findings),
             "kev": sum(1 for f in findings if f.get("kev")),

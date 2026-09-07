@@ -1,7 +1,7 @@
 [project]
 name = "pandax"
 version = "0.1.0"
-description = "CRA Compliance-in-a-Box - artifact to verifiable Annex VII dossier"
+description = "CRA Compliance-in-a-Box - artifact or SBOM to verifiable Annex VII dossier"
 requires-python = ">=3.10"
 dependencies = [
     "typer>=0.12",
@@ -12,6 +12,7 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "pyyaml>=6.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]

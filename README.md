@@ -1,23 +1,25 @@
 # PandaX — CRA Compliance-in-a-Box (proof of concept)
 
-Turns a product artifact into a **signed, independently verifiable** EU Cyber
-Resilience Act evidence bundle: SBOM → CVE matching → actively-exploited triage
-→ Article 14 filings → Annex VII technical documentation, sealed so a regulator
-can prove nothing was edited afterwards.
+Turns a product artifact **or an existing JSON SBOM** into a signed,
+independently verifiable EU Cyber Resilience Act evidence bundle: SBOM → CVE
+matching → actively-exploited triage → Article 14 filings → Annex VII technical
+documentation, sealed so a regulator can prove nothing was edited afterwards.
 
 This POC exists to answer one question: **is the automated compliance engine
 actually buildable?** The answer is yes, and everything below is runnable.
 
 ```
-artifact.zip
-   │
-   ├─ S1 INGEST    zip-slip / bomb / depth limits, SHA-256 every file
-   ├─ S2 SBOM      Syft → CycloneDX 1.6            [asserts: no CVE data in SBOM]
-   ├─ S3 MATCH     OSV.dev, exact Package-URL matching
-   ├─ S4 TRIAGE    ∩ CISA KEV + EPSS → CycloneDX VEX
-   ├─ S5 CLOCK     KEV hit ⇒ Art.14 24h / 72h / 14d filings
-   ├─ S6 DOSSIER   Typst → Annex VII + Annex V, PDF/A-2b
-   └─ SEAL         hash-chained ledger + Ed25519 signature
+artifact.zip                         existing-sbom.json
+   │                                      │
+   ├─ S1 INGEST  unpack safely            ├─ S1 INGEST  skipped and recorded
+   └─ S2 SBOM    Syft → CDX 1.6           └─ S2 SBOM    detect + normalise
+                    │                              │
+                    └──────────────┬───────────────┘
+                                   ├─ S3 MATCH     OSV.dev, exact purl matching
+                                   ├─ S4 TRIAGE    CISA KEV + EPSS → CDX VEX
+                                   ├─ S5 CLOCK     Art.14 24h / 72h / 14d filings
+                                   ├─ S6 DOSSIER   Annex VII + Annex V, PDF/A-2b
+                                   └─ SEAL         hash chain + Ed25519 signature
 ```
 
 ---
@@ -39,6 +41,32 @@ uv sync --extra dev
 uv run python tools/bootstrap.py           # pinned, digest-verified downloads
 uv run pandax scan fixtures/smarthub-sh100-v2.3.1.zip
 ```
+
+To start from an SBOM, Syft and the bootstrap step are not required:
+
+```bash
+uv sync --extra dev
+uv run pandax scan-sbom fixtures/example-sbom.cdx.json
+```
+
+PandaX detects the document from its contents; the user does not need to choose
+a format. The accepted inputs are **CycloneDX 1.2/1.6 JSON** and **SPDX 2.2/2.3
+JSON**. CycloneDX 1.2 and SPDX are upgraded to the pipeline's CycloneDX 1.6
+component model. The
+unaltered upload is retained under `input/`, while the normalised inventory is
+written as `sbom.cdx.json`; both are covered by the evidence seal.
+
+Vulnerability matching requires a versioned Package URL (`purl`), such as
+`pkg:npm/jquery@3.4.0`. Components without one are preserved in the SBOM,
+dashboard and dossier, but are clearly counted as **not scanned**. PandaX does
+not guess an identifier from a name because that can attach vulnerabilities to
+the wrong package. A run is refused only when none of the components can be
+matched safely.
+
+For imported SBOMs, product name and version come from CycloneDX
+`metadata.component` or a single SPDX `documentDescribes` package. Manufacturer
+identity, intended purpose, risk tier and other attestations are not inferred;
+the dossier marks them `MANUFACTURER INPUT REQUIRED`.
 
 The demo product, *PandaX SmartHub SH-100 v2.3.1*, is deliberately built so that
 each ecosystem contributes one **real** CISA KEV vulnerability:
@@ -118,7 +146,7 @@ print(rec['record_hash'])"
 **6 · Tests**
 
 ```bash
-uv run pytest -q                    # 56 tests
+uv run pytest -q                    # complete suite
 uv run pytest -q -m "not slow"      # skip the network/Syft end-to-end ones
 ```
 Covers zip-slip and decompression-bomb refusal, chain and signature tamper
@@ -133,6 +161,11 @@ uv run pandax serve      # http://127.0.0.1:8000
 
 Same event stream as the CLI, over SSE — the browser view is not a
 reimplementation. Six views, each backed by the sealed bundle's own files:
+
+The runner offers **Product artifact** and **SBOM file** modes. In SBOM mode,
+choose a JSON file and press **Run pipeline**; the dashboard uploads it, reports
+the detected format and matchable/skipped component counts, then streams the
+same S3-through-SEAL execution shown by `pandax scan-sbom`.
 
 | View | Shows |
 |---|---|
@@ -199,8 +232,10 @@ evaluated this way.
 ## What makes the output trustworthy
 
 Each stage appends a record to `ledger.jsonl` naming its tool, version, inputs
-and outputs with SHA-256 digests, chained by `prev_hash`. The chain head is
-committed in `manifest.json`, which is signed with Ed25519.
+and outputs with SHA-256 digests, chained by `prev_hash`. For imported runs the
+ledger explicitly records that ingest was skipped, identifies the source SBOM
+format/version, and links the original upload to the normalised CycloneDX file.
+The chain head is committed in `manifest.json`, which is signed with Ed25519.
 
 Changing any file breaks its digest. Editing a ledger record breaks that link.
 Re-linking the whole chain to hide the edit still fails, because the head no
@@ -247,6 +282,8 @@ exploitable vulnerabilities").
 4. Filings are generated, not submitted — the ENISA platform is not live.
 5. Squashfs/UBIFS images are not unpacked. The added OpenWrt scenarios use official rootfs tar archives; see the scenario guide.
 6. Risk-tier classification is manufacturer-declared, not derived.
+7. SBOM import currently accepts CycloneDX 1.2/1.6 and SPDX 2.2/2.3 JSON only;
+   packages without versioned purls remain visible but cannot be OSV-matched.
 
 ---
 
@@ -256,7 +293,7 @@ exploitable vulnerabilities").
 apps/engine/pandax/
   cli.py  pipeline.py  events.py  evidence.py  feeds.py  context.py
   render_cli.py  server.py        # two renderers, one event stream
-  stages/{ingest,sbom,match,triage,clock,dossier}.py
+  stages/{ingest,sbom,match,triage,clock,dossier}.py  # generate or import at S2
   templates/*.typ  web/           # Typst dossier, dashboard
 tools/bootstrap.py                # digest-pinned syft + log4j, builds the artifact
 fixtures/smarthub-sh100/          # the demo product

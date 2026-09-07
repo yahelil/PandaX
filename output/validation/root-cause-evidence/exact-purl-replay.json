@@ -1,0 +1,62 @@
+{
+  "name": "exact-purl-replay",
+  "url": "https://api.osv.dev/v1/querybatch",
+  "request": {
+    "queries": [
+      {
+        "package": {
+          "purl": "pkg:generic/libcurl@8.3.0"
+        }
+      },
+      {
+        "package": {
+          "purl": "pkg:generic/curl@8.3.0"
+        }
+      },
+      {
+        "package": {
+          "purl": "pkg:generic/libcurl@8.4.0"
+        }
+      },
+      {
+        "package": {
+          "purl": "pkg:generic/curl@8.4.0"
+        }
+      },
+      {
+        "package": {
+          "purl": "pkg:generic/libssl@1.0.1f"
+        }
+      },
+      {
+        "package": {
+          "purl": "pkg:generic/openssl-s_server@1.0.1f"
+        }
+      },
+      {
+        "package": {
+          "purl": "pkg:generic/libssl@1.0.1g"
+        }
+      },
+      {
+        "package": {
+          "purl": "pkg:generic/openssl-s_server@1.0.1g"
+        }
+      }
+    ]
+  },
+  "checked_utc": "2026-09-07T12:51:27.570293+00:00",
+  "http_status": 200,
+  "response": {
+    "results": [
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {}
+    ]
+  }
+}

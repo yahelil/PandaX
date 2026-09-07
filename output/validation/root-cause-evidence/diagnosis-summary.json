@@ -1,0 +1,116 @@
+{
+  "purls": [
+    "pkg:generic/libcurl@8.3.0",
+    "pkg:generic/curl@8.3.0",
+    "pkg:generic/libcurl@8.4.0",
+    "pkg:generic/curl@8.4.0",
+    "pkg:generic/libssl@1.0.1f",
+    "pkg:generic/openssl-s_server@1.0.1f",
+    "pkg:generic/libssl@1.0.1g",
+    "pkg:generic/openssl-s_server@1.0.1g"
+  ],
+  "exact_query_file": "exact-purl-replay.json",
+  "exact_http_status": 200,
+  "exact_response": {
+    "results": [
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {},
+      {}
+    ]
+  },
+  "git_probes": [
+    {
+      "case": "curl-8.3.0",
+      "repo": "https://github.com/curl/curl.git",
+      "tag": "curl-8_3_0",
+      "http_status": [
+        200
+      ],
+      "record_count": 80,
+      "target_cves_found": [
+        "CVE-2023-38546",
+        "CVE-2023-46218"
+      ],
+      "pagination_complete": true,
+      "errors": []
+    },
+    {
+      "case": "curl-8.4.0",
+      "repo": "https://github.com/curl/curl.git",
+      "tag": "curl-8_4_0",
+      "http_status": [
+        200
+      ],
+      "record_count": 78,
+      "target_cves_found": [
+        "CVE-2023-38546",
+        "CVE-2023-46218"
+      ],
+      "pagination_complete": true,
+      "errors": []
+    },
+    {
+      "case": "openssl-1.0.1f",
+      "repo": "https://github.com/openssl/openssl.git",
+      "tag": "OpenSSL_1_0_1f",
+      "http_status": [
+        200
+      ],
+      "record_count": 29,
+      "target_cves_found": [],
+      "pagination_complete": true,
+      "errors": []
+    },
+    {
+      "case": "openssl-1.0.1g",
+      "repo": "https://github.com/openssl/openssl.git",
+      "tag": "OpenSSL_1_0_1g",
+      "http_status": [
+        200
+      ],
+      "record_count": 29,
+      "target_cves_found": [],
+      "pagination_complete": true,
+      "errors": []
+    }
+  ],
+  "direct_records": [
+    {
+      "cve": "CVE-2023-38546",
+      "http_status": 200,
+      "packages": [
+        {}
+      ],
+      "range_repositories": [
+        "https://github.com/curl/curl"
+      ]
+    },
+    {
+      "cve": "CVE-2023-46218",
+      "http_status": 200,
+      "packages": [
+        {}
+      ],
+      "range_repositories": [
+        "https://github.com/curl/curl"
+      ]
+    },
+    {
+      "cve": "CVE-2014-0224",
+      "http_status": 200,
+      "packages": [],
+      "range_repositories": []
+    },
+    {
+      "cve": "CVE-2014-0195",
+      "http_status": 200,
+      "packages": [],
+      "range_repositories": []
+    }
+  ]
+}

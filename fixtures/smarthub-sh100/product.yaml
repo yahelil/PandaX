@@ -23,6 +23,8 @@ manufacturer:
   place_of_issue: "Amsterdam"
 vulnerability_handling:
   cvd_policy_url: "https://example-pandax.eu/security/cvd-policy"
+  # Art.13(20): the address the simplified declaration must point to
+  declaration_url: "https://example-pandax.eu/compliance/sh100/eu-doc"
   contact_address: "security@example-pandax.eu"          # Annex I Part II(6), Art.13
   security_txt_url: "https://example-pandax.eu/.well-known/security.txt"
   secure_update_mechanism: >

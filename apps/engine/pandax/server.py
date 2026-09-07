@@ -277,6 +277,10 @@ def summary(run_id: str) -> dict[str, Any]:
         if line.strip()
     ] if (target / "ledger.jsonl").exists() else []
 
+    from .verdict import build_verdict
+
+    decision = build_verdict(findings, incidents, dossier)
+
     dossier_summary = dossier.get("summary", {})
     derived = dossier_summary.get("derived", 0)
     attested = dossier_summary.get("attested", 0)
@@ -309,6 +313,7 @@ def summary(run_id: str) -> dict[str, Any]:
             "ledger_root": manifest.get("ledger_root", ""),
             "tool_versions": manifest.get("tool_versions", {}),
         },
+        "verdict": decision.as_dict(),
         "components": components,
         "findings": findings,
         "incidents": incidents,

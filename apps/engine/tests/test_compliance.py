@@ -221,3 +221,52 @@ def test_early_warning_reports_the_member_states(ctx: RunContext):
 )
 def test_severity_banding(vector: str, expected: str):
     assert severity_from_vector(vector) == expected
+
+
+# --- declaration of conformity, Article 28 ----------------------------------
+
+
+def test_declaration_carries_the_regulation_publication_reference(ctx: RunContext):
+    """Art.28(3) identifies Union acts 'including their publication references'."""
+    data = dossier.build_dossier(ctx)
+    ref = data["regulation_reference"]
+    assert "2024/2847" in ref["title"]
+    assert ref["oj"] == "OJ L, 2024/2847, 20.11.2024"
+    assert ref["eli"] == "http://data.europa.eu/eli/reg/2024/2847/oj"
+
+
+def test_ce_marking_block_is_present_and_never_drawn(ctx: RunContext):
+    """Art.30(1): for software the CE marking goes on the declaration.
+
+    The graphic form is prescribed by Annex II to Regulation (EC) No 765/2008,
+    so the tool must not synthesise one - it reserves the space instead.
+    """
+    data = dossier.build_dossier(ctx)
+    ce = data["ce_marking"]
+    assert ce["applies"] is True
+    assert "765/2008" in ce["form"]
+    assert "5 mm" in ce["placement"]
+    assert ce["artwork"] == ""  # nothing invented when none is supplied
+
+
+def test_retention_statement_matches_annex_viii(ctx: RunContext):
+    """Annex VIII Part I(4.2): 10 years or the support period, whichever longer."""
+    statement = dossier.build_dossier(ctx)["retention"]["statement"]
+    assert "10 years" in statement and "whichever is longer" in statement
+
+
+def test_annex_v_item_8_is_additional_information_not_the_signature(ctx: RunContext):
+    """Annex V item 8 is 'Additional information:'; the signature block follows it."""
+    data = dossier.build_dossier(ctx)
+    item8 = next(e for e in data["annex_v"] if e["ref"] == "8")
+    assert "Signed for and on behalf of" not in item8["value"]
+    assert "Support period" in item8["value"]
+
+
+def test_simplified_declaration_needs_the_full_text_address(ctx: RunContext):
+    """Art.13(20): the simplified declaration must carry the exact address."""
+    data = dossier.build_dossier(ctx)
+    assert data["doc_url"] == "https://example.invalid/doc"
+
+    ctx.product["vulnerability_handling"]["declaration_url"] = ""
+    assert dossier.build_dossier(ctx)["doc_url"] == ""

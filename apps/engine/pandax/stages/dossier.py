@@ -362,13 +362,18 @@ def build_dossier(ctx: RunContext) -> dict:
         ),
         _attest(
             "8",
-            "Additional information, place and date of issue, signatory",
-            f"Signed for and on behalf of {manufacturer.get('legal_name', '')}. "
-            f"Place: {manufacturer.get('place_of_issue', '')}. "
-            f"Signatory: {manufacturer.get('signatory_name', '')}, "
-            f"{manufacturer.get('signatory_function', '')}."
+            "Additional information",
+            (
+                f"Conformity assessment: {product.get('conformity_route', '')}. "
+                f"Support period: {product.get('support_period_months', '?')} months. "
+                f"Coordinated vulnerability disclosure policy: "
+                f"{handling.get('cvd_policy_url') or NEEDS_INPUT}. "
+                f"Vulnerability reporting contact: "
+                f"{handling.get('contact_address') or NEEDS_INPUT}."
+            )
             if manufacturer.get("legal_name")
             else "",
+            "Annex V item 8 is followed by the signature block below.",
         ),
     ]
 
@@ -379,12 +384,58 @@ def build_dossier(ctx: RunContext) -> dict:
     for entry in annex_v:
         counts[entry["status"]] = counts.get(entry["status"], 0) + 1
 
+    support_months = product.get("support_period_months")
     return {
         "generated": dt.datetime.now(dt.timezone.utc)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z"),
         "run_id": ctx.run_id,
         "regulation": "Regulation (EU) 2024/2847 (Cyber Resilience Act)",
+        # Article 28(3) requires the DoC to identify the Union legal acts with
+        # their publication references; Annex VI shows the citation form.
+        "regulation_reference": {
+            "title": "Regulation (EU) 2024/2847 of the European Parliament and of "
+            "the Council of 23 October 2024 on horizontal cybersecurity "
+            "requirements for products with digital elements",
+            "oj": "OJ L, 2024/2847, 20.11.2024",
+            "eli": "http://data.europa.eu/eli/reg/2024/2847/oj",
+        },
+        # Annex VIII Part I(4.2) and Article 13(13): kept at the disposal of the
+        # market surveillance authorities for 10 years or the support period,
+        # whichever is longer.
+        "retention": {
+            "years": 10,
+            "support_period_months": support_months or 0,
+            "statement": (
+                "This declaration and the technical documentation are kept at the "
+                "disposal of the market surveillance authorities for 10 years "
+                "after the product with digital elements has been placed on the "
+                "market, or for the support period"
+                + (f" of {support_months} months" if support_months else "")
+                + ", whichever is longer."
+            ),
+        },
+        # Article 30(1): for products in the form of software the CE marking is
+        # affixed to the declaration of conformity or the accompanying website.
+        "ce_marking": {
+            "applies": True,
+            "notified_body_number": "",  # Module A involves no notified body
+            "placement": (
+                "Affixed to this EU declaration of conformity in accordance with "
+                "Article 30(1). Where the product is hardware, the CE marking "
+                "must also be affixed visibly, legibly and indelibly to the "
+                "product itself, at a height of at least 5 mm."
+            ),
+            "form": (
+                "The CE marking must take the form set out in Annex II to "
+                "Regulation (EC) No 765/2008, per Article 29."
+            ),
+            # The graphic form of the CE marking is prescribed by law. Drawing an
+            # approximation would risk affixing a non-conforming mark, so the
+            # official artwork is supplied by the manufacturer or left blank.
+            "artwork": str(ctx.product.get("manufacturer", {}).get("ce_marking_file", "")),
+        },
+        "doc_url": str(handling.get("declaration_url", "")),
         "product": {
             "name": str(product.get("name", "")),
             "type": str(product.get("type", "")),
@@ -475,6 +526,13 @@ def run(ctx: RunContext) -> ev.Stream:
     for template, pdf_name, label in (
         ("annex_vii.typ", "AnnexVII_Technical_Documentation.pdf", "Annex VII"),
         ("annex_v_doc.typ", "EU_Declaration_of_Conformity.pdf", "Annex V DoC"),
+        # Art.13(20): the manufacturer must supply either a copy of the full
+        # declaration or this simplified one, with the address of the full text.
+        (
+            "annex_vi_simplified.typ",
+            "Simplified_EU_Declaration_of_Conformity.pdf",
+            "Annex VI simplified DoC",
+        ),
     ):
         src = TEMPLATES / template
         local = ctx.run_dir / template

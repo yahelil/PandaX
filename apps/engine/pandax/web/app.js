@@ -275,7 +275,40 @@ function renderOverview() {
   $("monitor-table").innerHTML = vulnTable(rows.slice(0, 6), true);
   $("monitor-card").hidden = false;
 
+  renderFixPlan();
   renderTimeline();
+}
+
+// The remediation plan is the answer to "what do I actually do?" - a handful of
+// upgrades rather than a hundred CVE rows.
+function renderFixPlan() {
+  const upgrades = (DATA.verdict && DATA.verdict.upgrades) || [];
+  const actionable = upgrades.filter((u) => u.target);
+  if (!actionable.length) {
+    $("fix-card").hidden = true;
+    return;
+  }
+  const cleared = upgrades.reduce((n, u) => n + u.clears, 0);
+  $("fix-hint").textContent =
+    `${actionable.length} upgrades clear ${cleared} findings`;
+  $("fix-table").innerHTML = `
+    <thead><tr>
+      <th>Package</th><th>Installed</th><th></th><th>Upgrade to</th>
+      <th style="text-align:right">Clears</th><th>Exploited</th>
+    </tr></thead>
+    <tbody>${actionable
+      .map(
+        (u) => `<tr>
+        <td><b>${esc(u.component)}</b></td>
+        <td class="mono dim">${esc(u.version)}</td>
+        <td class="dim">&rarr;</td>
+        <td class="mono"><b>${esc(u.target)}</b></td>
+        <td class="num">${u.clears}</td>
+        <td>${u.kev.length ? kevFlag() : '<span class="dim">&mdash;</span>'}</td>
+      </tr>`
+      )
+      .join("")}</tbody>`;
+  $("fix-card").hidden = false;
 }
 
 function renderTimeline() {

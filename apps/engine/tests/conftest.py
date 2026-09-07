@@ -47,6 +47,7 @@ def product() -> dict:
         },
         "vulnerability_handling": {
             "cvd_policy_url": "https://example.invalid/cvd",
+            "declaration_url": "https://example.invalid/doc",
             "contact_address": "security@example.invalid",
             "security_txt_url": "https://example.invalid/.well-known/security.txt",
             "secure_update_mechanism": "Signed dual-bank OTA.",

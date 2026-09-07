@@ -25,13 +25,21 @@ def _cvss_vector(advisory: dict) -> str:
 
 
 def _fixed_version(advisory: dict, purl: str) -> str:
-    """First 'fixed' event OSV records for this package, if any."""
+    """First released version OSV records as fixing this package, if any.
+
+    GIT ranges are skipped: their `fixed` events are commit hashes, not
+    versions. Telling a manufacturer to "upgrade to 2444cddab2f8..." is worse
+    than saying nothing, and a hash also sorts above real versions when
+    picking the highest fix.
+    """
     base = purl.split("@")[0]
     for affected in advisory.get("affected") or []:
         pkg_purl = (affected.get("package") or {}).get("purl", "")
         if pkg_purl and not base.startswith(pkg_purl.split("@")[0]):
             continue
         for rng in affected.get("ranges") or []:
+            if rng.get("type") == "GIT":
+                continue
             for event in rng.get("events") or []:
                 if "fixed" in event:
                     return str(event["fixed"])

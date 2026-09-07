@@ -121,6 +121,48 @@ def scan(
         raise typer.Exit(code=2)  # actively exploited: a CI gate should fail
 
 
+# ------------------------------------------------------------------ verdict
+
+
+def _load_run(target: Path) -> tuple[dict, list, list, dict]:
+    def load(name: str, default):
+        path = target / name
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
+
+    dossier = load("dossier.json", {})
+    return (
+        dossier.get("product", {}),
+        load("findings.json", []),
+        load("incidents.json", []),
+        dossier,
+    )
+
+
+@app.command()
+def verdict(
+    run_dir: Optional[Path] = typer.Argument(None, help="Run directory (default: latest)"),
+) -> None:
+    """Answer the only question that matters: can this product go on the market?"""
+    from .render_verdict import render
+    from .verdict import build_verdict
+
+    target = _resolve_run(run_dir)
+    product, findings, incidents, dossier = _load_run(target)
+    if not dossier:
+        raise typer.BadParameter(f"{target} has no dossier.json - not a completed run")
+
+    result = build_verdict(findings, incidents, dossier)
+    render(console, product, result)
+    console.print(
+        Text("  evidence: ", style="dim")
+        + Text(str(target), style="cyan")
+        + Text("   verify with ", style="dim")
+        + Text(f"pandax verify {target.name}", style="bold cyan")
+    )
+    console.print()
+    raise typer.Exit(code=0 if result.can_ship else 2)
+
+
 # ------------------------------------------------------------------- verify
 
 

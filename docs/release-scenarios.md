@@ -121,3 +121,9 @@ their official release endpoints and their exact retrieved bytes pinned.
 - [OpenWrt 19.07.1 artifacts](https://downloads.openwrt.org/releases/19.07.1/targets/x86/64/)
 - [OpenWrt 19.07.5 artifacts](https://downloads.openwrt.org/releases/19.07.5/targets/x86/64/)
 - [OpenWrt 19.07.6 artifacts](https://downloads.openwrt.org/releases/19.07.6/targets/x86/64/)
+
+## Developer handoff package
+
+[Developer review ZIP](../output/share/PandaX_Developer_Review_2026-09-07.zip) contains an offline per-input index, the independent answer-key PDF, an observed-results PDF, all 76 reference checks, all 407 reported finding rows, the seven misses, raw API evidence, and output artifacts from 26 scan/comparison bundles. Vendor input/extracted trees are omitted; included output hashes and original manifest signatures were verified. See the ZIP's START_HERE.md for scope and reproduction instructions.
+
+[Root-cause investigation](../output/validation/PandaX_Root_Cause_Report.md) traces the misses to exact-identity OSV query coverage and missing native rules. Fresh diagnostic probes also expose conflicting OSV data for the vendor-fixed curl 8.4.0 control. This handoff does not modify scanner rules or the independent baseline.

@@ -334,12 +334,6 @@ function renderTimeline() {
       what: "Art.14(2)(b), all open incidents",
       cls: "soon",
     });
-    items.push({
-      when: new Date(d.final_report),
-      date: "14d final report",
-      what: "Art.14(2)(c), all open incidents",
-      cls: "soon",
-    });
   }
   for (const [iso, what] of CRA_MILESTONES) {
     items.push({ when: new Date(iso + "T00:00:00Z"), date: fmtDate(iso), what, cls: "", dateOnly: true });
@@ -494,12 +488,20 @@ function renderArticle14() {
     const filings = [
       ["early_warning", "24h early warning", "Art.14(2)(a)", incident.deadlines.early_warning],
       ["notification", "72h vulnerability notification", "Art.14(2)(b)", incident.deadlines.notification],
-      ["final_report", "14d final report", "Art.14(2)(c)", incident.deadlines.final_report],
+      ["final_report", "Final report (14d after measure availability)", "Art.14(2)(c)", null],
     ];
     table.innerHTML = `
       <thead><tr><th>Filing</th><th>Article</th><th>Due (UTC)</th><th>Remaining</th><th>Draft</th></tr></thead>
       <tbody>${filings
         .map(([file, label, article, due]) => {
+          if (!due) return `<tr>
+            <td><b>${label}</b></td>
+            <td class="mono dim">${article}</td>
+            <td class="mono">Awaiting confirmed measure availability</td>
+            <td><span class="pill medium">INPUT REQUIRED</span></td>
+            <td><a class="link" target="_blank" rel="noopener"
+                   href="/api/run/${runId}/file/filings/${esc(incident.cve)}/${file}.json">Open JSON</a></td>
+          </tr>`;
           const left = new Date(due) - new Date();
           const overdue = left <= 0;
           const remaining = overdue

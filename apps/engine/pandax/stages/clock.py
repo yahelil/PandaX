@@ -21,8 +21,9 @@ Regulation (EU) 2024/2847 that requires it. Article 14(2), verbatim:
       malicious actor exploiting it, and (iii) details about the security update
       or other corrective measures.
 
-The notifications are generated, not submitted: the ENISA single reporting
-platform (Article 16) does not go live until 11 September 2026.
+The notifications are generated as ENISA Single Reporting Platform (SRP)
+submission drafts, never as completed legal notifications.  The SRP glossary
+is the current operational format; it has no published API/JSON schema.
 """
 
 from __future__ import annotations
@@ -55,11 +56,39 @@ def _short(iso: str) -> str:
 
 
 def deadlines(aware_at: dt.datetime) -> dict[str, str]:
-    """The three statutory deadlines from the moment of awareness."""
+    """Deadlines triggered by awareness. Final-report timing needs another fact."""
     return {
         "early_warning": _iso(aware_at + dt.timedelta(hours=EARLY_WARNING_HOURS)),
         "notification": _iso(aware_at + dt.timedelta(hours=NOTIFICATION_HOURS)),
-        "final_report": _iso(aware_at + dt.timedelta(days=FINAL_REPORT_DAYS)),
+    }
+
+
+def _srp_common(finding: Finding, ctx: RunContext, aware_at: dt.datetime, level: str) -> dict:
+    """SRP field labels and values carried across the Article 14 stages."""
+    handling = ctx.product.get("vulnerability_handling", {})
+    product = _product_identity(ctx)
+    return {
+        "notification_type": {"value": "Vulnerability", "srp_requirement": "required"},
+        "notification_level": {"value": level, "srp_requirement": "required"},
+        "title": {
+            "value": f"Active exploitation affecting {product['name']} {product['version']} ({finding.cve})"[:255],
+            "srp_requirement": "required",
+        },
+        "summary": {
+            "value": (finding.summary or "MANUFACTURER INPUT REQUIRED - concise factual summary.")[:4000],
+            "srp_requirement": "required",
+        },
+        "manufacturer_name": {"value": product["manufacturer"], "srp_requirement": "required"},
+        "member_states_where_product_available": {
+            "value": handling.get("markets_available", []), "srp_requirement": "required_if_available"
+        },
+        "product_name": {"value": product["name"], "srp_requirement": "required"},
+        "product_version": {"value": product["version"], "srp_requirement": "required"},
+        "component_name": {"value": f"{finding.component} {finding.version}", "srp_requirement": "optional"},
+        "cve_id": {"value": finding.cve, "srp_requirement": "optional"},
+        "date_time_manufacturer_became_aware": {
+            "value": _iso(aware_at), "format": "ISO 8601 UTC", "srp_requirement": "required"
+        },
     }
 
 
@@ -71,7 +100,10 @@ def _early_warning(finding: Finding, ctx: RunContext, aware_at: dt.datetime) -> 
         "deadline_hours": EARLY_WARNING_HOURS,
         "aware_at": _iso(aware_at),
         "due_by": deadlines(aware_at)["early_warning"],
-        "fields": {
+        "srp_format": "ENISA CRA SRP Glossary v1.1 (05 September 2026)",
+        "submission_status": "DRAFT — requires authorised representative review and SRP submission",
+        "fields": _srp_common(finding, ctx, aware_at, "24h"),
+        "article_14_fields": {
             "actively_exploited_vulnerability": {
                 "article_ref": "Art.14(1)",
                 "value": finding.cve,
@@ -105,7 +137,10 @@ def _notification(finding: Finding, ctx: RunContext, aware_at: dt.datetime) -> d
         "deadline_hours": NOTIFICATION_HOURS,
         "aware_at": _iso(aware_at),
         "due_by": deadlines(aware_at)["notification"],
-        "fields": {
+        "srp_format": "ENISA CRA SRP Glossary v1.1 (05 September 2026)",
+        "submission_status": "DRAFT — requires authorised representative review and SRP submission",
+        "fields": _srp_common(finding, ctx, aware_at, "72h"),
+        "article_14_fields": {
             "product_general_information": {
                 "article_ref": "Art.14(2)(b)",
                 "value": _product_identity(ctx),
@@ -142,21 +177,51 @@ def _notification(finding: Finding, ctx: RunContext, aware_at: dt.datetime) -> d
 
 
 def _final_report(finding: Finding, ctx: RunContext, aware_at: dt.datetime) -> dict:
+    fields = _srp_common(finding, ctx, aware_at, "Final")
+    fields.update({
+        "corrective_or_mitigating_measures_taken": {
+            "value": "MANUFACTURER INPUT REQUIRED - completed measures and dates.",
+            "srp_requirement": "required",
+        },
+        "corrective_or_mitigating_measures_users_can_take": {
+            "value": (f"Upgrade {finding.component} to {finding.fixed_version} or later."
+                      if finding.fixed_version else "MANUFACTURER INPUT REQUIRED - user measures."),
+            "srp_requirement": "required",
+        },
+        "date_time_corrective_or_mitigating_measure_available": {
+            "value": "MANUFACTURER INPUT REQUIRED",
+            "format": "ISO 8601 UTC",
+            "srp_requirement": "required",
+        },
+        "full_description_severity": {
+            "value": f"Severity: {finding.severity}. CVSS vector: {finding.cvss_vector or 'not available'}. "
+                     "MANUFACTURER INPUT REQUIRED - assessment rationale.",
+            "srp_requirement": "required",
+        },
+        "full_description_impact": {
+            "value": "MANUFACTURER INPUT REQUIRED - confirmed product-specific impact.",
+            "srp_requirement": "required",
+        },
+        "malicious_actor_information": {
+            "value": "Not available to the manufacturer.",
+            "srp_requirement": "required_if_available",
+        },
+    })
     return {
         "filing_type": "final_report",
         "article_ref": "Art.14(2)(c)",
         "deadline_days": FINAL_REPORT_DAYS,
         "deadline_basis": (
             "Art.14(2)(c): no later than 14 days after a corrective or mitigating "
-            "measure is available. A fixed upstream version is already published, "
-            "so the clock is measured from the moment of awareness."
-            if finding.fixed_version
-            else "Art.14(2)(c): clock starts once a corrective measure is available; "
-            "no upstream fix is published yet, so this date is provisional."
+            "measure is available. Availability must be confirmed by the manufacturer; "
+            "an upstream fixed version alone does not establish that fact."
         ),
         "aware_at": _iso(aware_at),
-        "due_by": deadlines(aware_at)["final_report"],
-        "fields": {
+        "due_by": None,
+        "srp_format": "ENISA CRA SRP Glossary v1.1 (05 September 2026)",
+        "submission_status": "INCOMPLETE DRAFT — final report cannot be submitted until required facts are confirmed",
+        "fields": fields,
+        "article_14_fields": {
             "vulnerability_description_severity_impact": {
                 "article_ref": "Art.14(2)(c)(i)",
                 "value": finding.summary,
@@ -257,8 +322,8 @@ def run(ctx: RunContext) -> ev.Stream:
             outputs.append(path)
 
         clock_rows.append(
-            [finding.cve] + [_short(due[k]) for k in
-                             ("early_warning", "notification", "final_report")]
+            [finding.cve, _short(due["early_warning"]), _short(due["notification"]),
+             "measure availability + 14d"]
         )
 
     yield ev.alert(

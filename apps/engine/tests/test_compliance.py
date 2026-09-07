@@ -127,7 +127,7 @@ def test_article_14_deadlines_match_the_statute():
     due = clock.deadlines(aware)
     assert due["early_warning"] == "2026-09-07T12:00:00Z"  # 24h, Art.14(2)(a)
     assert due["notification"] == "2026-09-09T12:00:00Z"  # 72h, Art.14(2)(b)
-    assert due["final_report"] == "2026-09-20T12:00:00Z"  # 14d, Art.14(2)(c)
+    assert "final_report" not in due  # runs from confirmed measure availability
 
 
 def test_clock_only_arms_for_actively_exploited(ctx: RunContext):
@@ -191,9 +191,9 @@ def test_filings_carry_every_field_the_article_requires(
     path = ctx.run_dir / "filings" / "CVE-2021-44228" / f"{filing}.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["article_ref"] == article
-    assert list(payload["fields"]) == required
+    assert list(payload["article_14_fields"]) == required
     # Every field must name the sub-paragraph that requires it.
-    assert all("article_ref" in field for field in payload["fields"].values())
+    assert all("article_ref" in field for field in payload["article_14_fields"].values())
 
 
 def test_early_warning_reports_the_member_states(ctx: RunContext):
@@ -203,8 +203,24 @@ def test_early_warning_reports_the_member_states(ctx: RunContext):
             encoding="utf-8"
         )
     )
-    assert payload["fields"]["member_states_made_available"]["value"] == ["NL", "DE"]
+    assert payload["article_14_fields"]["member_states_made_available"]["value"] == ["NL", "DE"]
     assert payload["coordinating_csirt_member_state"] == "NL"  # Art.14(7)
+
+
+def test_final_report_uses_srp_fields_and_does_not_invent_its_deadline(ctx: RunContext):
+    list(clock.run(ctx))
+    payload = json.loads(
+        (ctx.run_dir / "filings" / "CVE-2021-44228" / "final_report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert payload["due_by"] is None
+    assert payload["submission_status"].startswith("INCOMPLETE DRAFT")
+    assert payload["fields"]["notification_level"]["value"] == "Final"
+    assert payload["fields"]["date_time_corrective_or_mitigating_measure_available"][
+        "value"
+    ] == "MANUFACTURER INPUT REQUIRED"
+    assert {"full_description_severity", "full_description_impact"} <= set(payload["fields"])
 
 
 # --- severity banding -------------------------------------------------------

@@ -22,6 +22,16 @@ artifact.zip
 
 ---
 
+## OpenWrt, curl and OpenSSL release comparisons
+
+The dashboard selector includes four downloadable release comparisons and all
+eight individual releases. Run `uv run pandax compare list` for CLI ids.
+Comparisons show passes, failures, package-variant exclusions and vendor evidence;
+failed downloads/scans remain visible and do not stop the other release being tested.
+See [the scenario guide](docs/release-scenarios.md) for instructions and limitations.
+OpenWrt uses official firmware rootfs archives; curl/OpenSSL use official source
+releases. These are inventory/advisory tests, not runtime exploit tests.
+
 ## Quickstart
 
 ```bash
@@ -235,7 +245,7 @@ exploitable vulnerabilities").
 2. Ed25519 proves integrity, not legal identity (eIDAS seal needed).
 3. PDF/A-2b is requested via Typst, not independently validated with veraPDF.
 4. Filings are generated, not submitted — the ENISA platform is not live.
-5. Firmware images (squashfs/ubifs) are not unpacked; archives and manifests only.
+5. Squashfs/UBIFS images are not unpacked. The added OpenWrt scenarios use official rootfs tar archives; see the scenario guide.
 6. Risk-tier classification is manufacturer-declared, not derived.
 
 ---

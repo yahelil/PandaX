@@ -20,6 +20,7 @@ ARTIFACT = "artifact"
 ALERT = "alert"
 TABLE = "table"
 STAGE_DONE = "stage_done"
+STAGE_SKIPPED = "stage_skipped"
 RUN_DONE = "run_done"
 
 # The pipeline's stages, in order. Both renderers use this to show progress
@@ -104,6 +105,10 @@ def table(
 
 def done(stage: str, message: str, level: str = GOOD, **data: Any) -> Event:
     return Event(STAGE_DONE, stage, message, level, data)
+
+
+def skipped(stage: str, message: str, **data: Any) -> Event:
+    return Event(STAGE_SKIPPED, stage, message, WARN, data)
 
 
 def run_done(message: str, level: str = GOOD, **data: Any) -> Event:

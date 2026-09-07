@@ -44,15 +44,17 @@ BANNER = "PandaX — CRA Compliance Engine"
 RESULT_COLUMN = 62  # where the trailing OK [time] is aligned
 
 
-def banner(console: Console, artifact: str, subtitle: str = "") -> None:
+def banner(
+    console: Console, source: str, subtitle: str = "", input_label: str = "artifact"
+) -> None:
     body = Text()
     body.append("Regulation (EU) 2024/2847 ", style="bold")
     body.append(
-        "— artifact → SBOM → CVE → KEV → Art.14 → Annex VII, sealed and verifiable",
+        "— artifact/SBOM → CVE → KEV → Art.14 → Annex VII, sealed and verifiable",
         style="dim",
     )
-    body.append("\n\nartifact  ", style="dim")
-    body.append(artifact, style="bold cyan")
+    body.append(f"\n\n{input_label:<8}  ", style="dim")
+    body.append(source, style="bold cyan")
     if subtitle:
         body.append("\n" + subtitle, style="dim")
     console.print(Panel(body, title=BANNER, border_style="cyan", padding=(1, 2)))
@@ -148,6 +150,17 @@ class CliRenderer:
                 f"      [{colour}]{message}[/] [dim]{'.' * pad}[/] "
                 f"[bold {colour}]{verdict}[/] [dim][{elapsed:.2f}s][/]"
             )
+
+        elif event.kind == ev.STAGE_SKIPPED:
+            console.print()
+            header = Text()
+            header.append(f"{ev.stage_number(event.stage)} ", style="bold white")
+            header.append(
+                STAGE_TITLE.get(event.stage, event.stage) + ": ", style="bold yellow"
+            )
+            header.append(event.message, style="yellow")
+            header.append("  SKIP", style="bold yellow")
+            console.print(header)
 
         elif event.kind == ev.RUN_DONE:
             self.summary = dict(event.data)

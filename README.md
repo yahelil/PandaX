@@ -52,6 +52,16 @@ Expect: 11 components, ~102 vulnerabilities, **4 actively exploited**, 4 Article
 Every claim this POC makes has a command that checks it. None of these require
 trusting PandaX.
 
+**0 · The one-screen answer**
+
+```bash
+uv run pandax verdict
+```
+Answers the three questions behind a scan — can this product go on the EU market
+(blockers, each with the article that blocks it), what is due and when (Article 14
+clocks), and what to actually do about it. The last one collapses ~100 CVE rows
+into ~10 package upgrades, which is the whole backlog.
+
 **1 · The seal holds**
 
 ```bash

@@ -165,23 +165,6 @@
   addEventListener('scroll', onScroll, { passive: true });
   onScroll();
 
-  /* ===================== cursor ===================== */
-  const ring = $('#curRing'), dot = $('#curDot');
-  if (matchMedia('(pointer: fine)').matches && ring && dot) {
-    document.body.classList.add('cur-on');
-    let mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my;
-    addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
-    (function tick() {
-      rx += (mx - rx) * 0.18; ry += (my - ry) * 0.18;
-      dot.style.left = mx + 'px';  dot.style.top = my + 'px';
-      ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
-      requestAnimationFrame(tick);
-    })();
-    const hov = 'a, button, .scr, .tri-i, .plan, .step, .why-row, .kpi';
-    document.addEventListener('mouseover', e => { if (e.target.closest(hov)) document.body.classList.add('cur-hover'); });
-    document.addEventListener('mouseout',  e => { if (e.target.closest(hov)) document.body.classList.remove('cur-hover'); });
-  }
-
   /* ===================== countdowns ===================== */
   const pad = n => String(n).padStart(2, '0');
   const clocks = $$('[data-countdown]').map(el => ({

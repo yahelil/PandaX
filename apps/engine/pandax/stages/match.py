@@ -8,6 +8,7 @@ free of the name-collision false positives that plague CPE-based matching.
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 from .. import events as ev
 from ..context import CACHE_DIR, Finding, RunContext
@@ -16,6 +17,7 @@ from ..feeds import Feeds, severity_from_vector
 from .sbom import is_matchable_purl
 
 STAGE = "S3 MATCH"
+OSV_DETAIL_WORKERS = 8
 
 
 def _cvss_vector(advisory: dict) -> str:
@@ -36,7 +38,7 @@ def _fixed_version(advisory: dict, purl: str) -> str:
     base = purl.split("@")[0]
     for affected in advisory.get("affected") or []:
         pkg_purl = (affected.get("package") or {}).get("purl", "")
-        if pkg_purl and not base.startswith(pkg_purl.split("@")[0]):
+        if pkg_purl and base != pkg_purl.split("@")[0]:
             continue
         for rng in affected.get("ranges") or []:
             if rng.get("type") == "GIT":
@@ -73,7 +75,14 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
         unique_ids = sorted({vid for ids in hits.values() for vid in ids})
         yield ev.log(STAGE, f"resolving {len(unique_ids)} advisories (cached on disk)")
 
-        advisories = {vid: feeds.vuln_detail(vid) for vid in unique_ids}
+        advisories = {}
+        if unique_ids:
+            with ThreadPoolExecutor(
+                max_workers=min(OSV_DETAIL_WORKERS, len(unique_ids))
+            ) as executor:
+                advisories = dict(
+                    zip(unique_ids, executor.map(feeds.vuln_detail, unique_ids))
+                )
 
         findings: list[Finding] = []
         for purl, ids in hits.items():

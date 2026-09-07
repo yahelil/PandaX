@@ -67,6 +67,18 @@
         </div>
       </div>
 
+      <p id="artifact-note" class="sub"></p>
+      <p><label for="run-history">Saved results (including failures): </label>
+        <select id="run-history" aria-label="Saved results"></select></p>
+      <article id="comparison-panel" class="card" hidden aria-live="polite">
+        <h2 id="comparison-title">Release comparison</h2>
+        <p id="comparison-scope"></p>
+        <div id="comparison-runs"></div>
+        <div class="table-wrap"><table class="grid">
+          <thead><tr><th>CVE</th><th>Before</th><th>After</th><th>Check</th></tr></thead>
+          <tbody id="comparison-rows"></tbody>
+        </table></div>
+      </article>
       <div class="banner" id="blocked-banner" hidden></div>
 
       <h2 class="section">Overview</h2>

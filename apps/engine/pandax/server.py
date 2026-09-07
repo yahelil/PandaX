@@ -59,12 +59,21 @@ class Job:
             for listener in self.listeners:
                 listener.put(payload)
 
-    def start(self, artifact: Path) -> None:
+    def start(self, artifact: Path | str) -> None:
         from . import pipeline
 
         def worker() -> None:
             try:
-                for event in pipeline.run(artifact):
+                from .scenarios import download, run_scenario
+                value = str(artifact)
+                if value.startswith('scenario:'):
+                    stream = run_scenario(value.removeprefix('scenario:'))
+                elif value.startswith('release:'):
+                    self._emit(ev.log('RUN', 'Downloading / verifying official release').as_dict())
+                    stream = pipeline.run(download(value.removeprefix('release:')))
+                else:
+                    stream = pipeline.run(Path(artifact))
+                for event in stream:
                     payload = event.as_dict()
                     if "run_dir" in event.data:
                         self.run_dir = event.data["run_dir"]
@@ -85,6 +94,7 @@ class Job:
 
 
 CURRENT: Job | None = None
+SCAN_LOCK = threading.Lock()
 
 
 @api.get("/", response_class=HTMLResponse)
@@ -105,7 +115,13 @@ def style_css() -> FileResponse:
 @api.get("/api/artifacts")
 def artifacts() -> list[dict[str, Any]]:
     """Scannable artifacts found in fixtures/."""
-    found = []
+    from .scenarios import SCENARIOS, RELEASES
+    found = [dict(path='scenario:' + s['id'], name=s['name'] + ' — ' +
+                  RELEASES[s['before']]['version'] + ' → ' + RELEASES[s['after']]['version'],
+                  bytes=0, note=s['note'], group='Release comparisons') for s in SCENARIOS.values()]
+    found += [dict(path='release:' + r['id'], name=r['name'] + ' ' + r['version'],
+                   bytes=0, note='Single release scan. Official download verified by SHA-256.',
+                   group='Individual releases') for r in RELEASES.values()]
     fixtures = ROOT / "fixtures"
     if fixtures.exists():
         for path in sorted(fixtures.iterdir()):
@@ -125,14 +141,26 @@ def artifacts() -> list[dict[str, Any]]:
 @api.post("/api/scan")
 def start_scan(body: dict[str, str]) -> dict[str, Any]:
     global CURRENT
-    if CURRENT is not None and not CURRENT.finished:
-        raise HTTPException(409, "a scan is already running")
-    artifact = Path(body.get("artifact", ""))
-    if not artifact.exists():
-        raise HTTPException(400, f"artifact not found: {artifact}")
-    CURRENT = Job()
-    CURRENT.start(artifact)
-    return {"started": True, "artifact": str(artifact)}
+    from .scenarios import SCENARIOS, RELEASES
+    value = body.get('artifact', '')
+    if value.startswith('scenario:'):
+        if value.removeprefix('scenario:') not in SCENARIOS:
+            raise HTTPException(400, 'unknown scenario')
+        artifact = value
+    elif value.startswith('release:'):
+        if value.removeprefix('release:') not in RELEASES:
+            raise HTTPException(400, 'unknown release')
+        artifact = value
+    else:
+        artifact = Path(value)
+        if not value or not artifact.exists():
+            raise HTTPException(400, f'artifact not found: {value}')
+    with SCAN_LOCK:
+        if CURRENT is not None and not CURRENT.finished:
+            raise HTTPException(409, 'a scan is already running')
+        CURRENT = Job()
+        CURRENT.start(artifact)
+    return {'started': True, 'artifact': str(artifact)}
 
 
 @api.get("/api/job")
@@ -187,11 +215,17 @@ def runs() -> list[dict[str, Any]]:
         if not manifest.exists():
             continue
         data = json.loads(manifest.read_text(encoding="utf-8"))
+        source = path / "release-source.json"
+        release = json.loads(source.read_text(encoding="utf-8")) if source.exists() else {}
+        comparison_path = path / "comparison.json"
+        comparison = json.loads(comparison_path.read_text(encoding="utf-8")) if comparison_path.exists() else None
         out.append(
             {
+                "comparison_passed": comparison['passed'] if comparison else None,
                 "run_id": data.get("run_id"),
                 "created": data.get("created"),
-                "product": data.get("product", {}).get("name", ""),
+                "product": data.get("product", {}).get("name", "") or
+                           (release.get("name", "") + " " + release.get("version", "")).strip(),
                 "files": len(data.get("files", [])),
                 "ledger_root": data.get("ledger_root", ""),
             }
@@ -289,7 +323,10 @@ def summary(run_id: str) -> dict[str, Any]:
 
     return {
         "run_id": run_id,
-        "product": dossier.get("product", {}),
+        "product": dossier.get("product", manifest.get("product", {})),
+        "comparison": load("comparison.json", None),
+        "release_checks": load("release-checks.json", None),
+        "native_assessments": load("native-assessments.json", []),
         "manufacturer": dossier.get("manufacturer", {}),
         "generated": dossier.get("generated", manifest.get("created", "")),
         "stats": {

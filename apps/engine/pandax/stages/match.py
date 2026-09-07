@@ -93,6 +93,16 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
         if owned:
             feeds.close()
 
+    # Native vendor rules are recorded separately; OSV output keeps its meaning.
+    osv_path = ctx.path("findings.osv.json")
+    osv_path.write_text(json.dumps([f.as_dict() for f in findings], indent=2), encoding="utf-8")
+    from ..native import assess, findings as native_findings
+    assessments = assess(ctx.native_inventory)
+    vendor_path = ctx.path("native-assessments.json")
+    vendor_path.write_text(json.dumps(assessments, indent=2), encoding="utf-8")
+    findings.extend(native_findings(assessments))
+    yield ev.log(STAGE, f"vendor supplement: {len(assessments)} native determinations (bounded CVE coverage)")
+
     # One row per (CVE, component): the same CVE can hit several components.
     unique: dict[tuple[str, str], Finding] = {}
     for finding in findings:
@@ -101,7 +111,7 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
         unique.values(), key=lambda f: (f.component, f.cve), reverse=False
     )
 
-    out_path = ctx.path("findings.osv.json")
+    out_path = ctx.path("findings.matched.json")
     out_path.write_text(
         json.dumps([f.as_dict() for f in ctx.findings], indent=2), encoding="utf-8"
     )
@@ -126,8 +136,10 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
         stage="S3_MATCH",
         tool="osv.dev",
         tool_version="v1",
-        inputs=[ctx.ledger.ref(ctx.sbom_path)] if ctx.sbom_path else [],
-        outputs=[ctx.ledger.ref(out_path)],
-        params={"endpoint": "https://api.osv.dev/v1/querybatch", "purls": len(purls)},
+        inputs=([ctx.ledger.ref(ctx.sbom_path)] if ctx.sbom_path else []) +
+               [ctx.ledger.ref(ctx.path("native-inventory.json"))],
+        outputs=[ctx.ledger.ref(out_path), ctx.ledger.ref(osv_path), ctx.ledger.ref(vendor_path)],
+        params={"endpoint": "https://api.osv.dev/v1/querybatch", "purls": len(purls),
+                "native_rules": "pandax.native/1", "native_coverage": "requested CVEs only"},
     )
     yield ev.done(STAGE, f"{len(ctx.findings)} vulnerabilities matched")

@@ -50,9 +50,43 @@ def run(
     clock_speed: float = 1.0,
     offline: bool = False,
 ) -> ev.Stream:
+    """Run from a product artifact, including ingest and SBOM synthesis."""
+    yield from _run(
+        artifact,
+        input_type="artifact",
+        out_base=out_base,
+        clock_speed=clock_speed,
+        offline=offline,
+    )
+
+
+def run_sbom(
+    sbom_path: Path,
+    out_base: Path | None = None,
+    clock_speed: float = 1.0,
+    offline: bool = False,
+) -> ev.Stream:
+    """Run from a supplied JSON SBOM, skipping artifact ingest and Syft."""
+    yield from _run(
+        sbom_path,
+        input_type="sbom",
+        out_base=out_base,
+        clock_speed=clock_speed,
+        offline=offline,
+    )
+
+
+def _run(
+    artifact: Path,
+    input_type: str,
+    out_base: Path | None,
+    clock_speed: float,
+    offline: bool,
+) -> ev.Stream:
     artifact = Path(artifact).resolve()
     if not artifact.exists():
-        raise FileNotFoundError(f"artifact not found: {artifact}")
+        label = "SBOM" if input_type == "sbom" else "artifact"
+        raise FileNotFoundError(f"{label} not found: {artifact}")
 
     run_dir, run_id = new_run_dir(out_base)
     ledger = Ledger(run_dir)
@@ -62,6 +96,7 @@ def run(
         run_id=run_id,
         ledger=ledger,
         clock_speed=clock_speed,
+        input_type=input_type,
     )
     ctx.tool_versions["pandax"] = "0.1.0"
 
@@ -72,29 +107,52 @@ def run(
         run_id=run_id,
         run_dir=str(run_dir),
         artifact=str(artifact),
+        input_type=input_type,
     )
 
     feeds = Feeds(CACHE_DIR, offline=offline)
     try:
-        yield from ingest.run(ctx)
+        if input_type == "artifact":
+            yield from ingest.run(ctx)
+            ctx.product = load_product_metadata(artifact, ctx.extracted_dir)
+            yield from sbom.run(ctx)
+        else:
+            reason = "SBOM supplied; product artifact ingestion skipped"
+            yield ev.skipped("S1 INGEST", reason, reason=reason)
+            ctx.ledger.append(
+                stage="S1_INGEST",
+                tool="pandax.skip",
+                tool_version="0.1.0",
+                inputs=[],
+                outputs=[],
+                params={"reason": reason, "input_type": "sbom"},
+            )
+            yield from sbom.import_run(ctx)
 
-        ctx.product = load_product_metadata(artifact, ctx.extracted_dir)
         product = ctx.product.get("product", {})
         if product:
             yield ev.log(
                 "RUN",
-                f"product.yaml: {product.get('name')} v{product.get('version')} "
-                f"(tier: {product.get('risk_tier', 'unknown')})",
+                (
+                    f"product.yaml: {product.get('name')} v{product.get('version')} "
+                    f"(tier: {product.get('risk_tier', 'unknown')})"
+                    if input_type == "artifact"
+                    else f"SBOM product metadata: {product.get('name')} "
+                    f"v{product.get('version', 'unknown')}"
+                ),
                 ev.GOOD,
             )
         else:
             yield ev.log(
                 "RUN",
-                "no product.yaml found - Annex fields will be marked as required input",
+                (
+                    "no product.yaml found - Annex fields will be marked as required input"
+                    if input_type == "artifact"
+                    else "no unambiguous product identity in SBOM - Annex fields will be marked as required input"
+                ),
                 ev.WARN,
             )
 
-        yield from sbom.run(ctx)
         yield from match.run(ctx, feeds)
         yield from triage.run(ctx, feeds)
         yield from clock.run(ctx)
@@ -133,6 +191,11 @@ def run(
         findings=len(ctx.findings),
         kev=len(ctx.kev_findings),
         incidents=len(ctx.incidents),
+        input_type=ctx.input_type,
+        sbom_format=ctx.sbom_source_format,
+        sbom_version=ctx.sbom_source_version,
+        matchable_components=ctx.matchable_components,
+        skipped_components=ctx.skipped_components,
     )
 
 

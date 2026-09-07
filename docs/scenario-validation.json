@@ -1,0 +1,122 @@
+{
+  "date": "2026-09-07",
+  "environment": "macOS arm64; Python 3.12; Syft 1.51.1; live OSV, KEV and EPSS feeds",
+  "scope": "Inventory and bounded vendor-advisory matching; not runtime exploitation or independent scanner validation",
+  "pytest": {
+    "passed": 71,
+    "failed": 0,
+    "warnings": 2
+  },
+  "scenarios": {
+    "openwrt-libubox": {
+      "passed": true,
+      "rows": [
+        {
+          "cve": "CVE-2020-7248",
+          "passed": true,
+          "before": "affected",
+          "after": "fixed",
+          "before_version": "2019-12-28-cd75136b-1",
+          "after_version": "2020-01-20-43a103ff-1",
+          "result": "fix evidenced"
+        }
+      ]
+    },
+    "curl-socks5": {
+      "passed": true,
+      "rows": [
+        {
+          "cve": "CVE-2023-38545",
+          "passed": true,
+          "before": "affected",
+          "after": "fixed",
+          "before_version": "8.3.0",
+          "after_version": "8.4.0",
+          "result": "fix evidenced"
+        }
+      ]
+    },
+    "openwrt-dnsmasq": {
+      "passed": true,
+      "rows": [
+        {
+          "cve": "CVE-2020-25681",
+          "passed": true,
+          "before": "variant_excluded",
+          "after": "variant_excluded",
+          "before_version": "2.80-16.1",
+          "after_version": "2.80-16.2",
+          "result": "excluded package variant in both releases"
+        },
+        {
+          "cve": "CVE-2020-25682",
+          "passed": true,
+          "before": "variant_excluded",
+          "after": "variant_excluded",
+          "before_version": "2.80-16.1",
+          "after_version": "2.80-16.2",
+          "result": "excluded package variant in both releases"
+        },
+        {
+          "cve": "CVE-2020-25683",
+          "passed": true,
+          "before": "variant_excluded",
+          "after": "variant_excluded",
+          "before_version": "2.80-16.1",
+          "after_version": "2.80-16.2",
+          "result": "excluded package variant in both releases"
+        },
+        {
+          "cve": "CVE-2020-25684",
+          "passed": true,
+          "before": "affected",
+          "after": "fixed",
+          "before_version": "2.80-16.1",
+          "after_version": "2.80-16.2",
+          "result": "fix evidenced"
+        },
+        {
+          "cve": "CVE-2020-25685",
+          "passed": true,
+          "before": "variant_excluded",
+          "after": "variant_excluded",
+          "before_version": "2.80-16.1",
+          "after_version": "2.80-16.2",
+          "result": "excluded package variant in both releases"
+        },
+        {
+          "cve": "CVE-2020-25686",
+          "passed": true,
+          "before": "affected",
+          "after": "fixed",
+          "before_version": "2.80-16.1",
+          "after_version": "2.80-16.2",
+          "result": "fix evidenced"
+        },
+        {
+          "cve": "CVE-2020-25687",
+          "passed": true,
+          "before": "variant_excluded",
+          "after": "variant_excluded",
+          "before_version": "2.80-16.1",
+          "after_version": "2.80-16.2",
+          "result": "excluded package variant in both releases"
+        }
+      ]
+    },
+    "openssl-heartbleed": {
+      "passed": true,
+      "rows": [
+        {
+          "cve": "CVE-2014-0160",
+          "passed": true,
+          "before": "affected",
+          "after": "fixed",
+          "before_version": "1.0.1f",
+          "after_version": "1.0.1g",
+          "result": "fix evidenced"
+        }
+      ]
+    }
+  }
+}

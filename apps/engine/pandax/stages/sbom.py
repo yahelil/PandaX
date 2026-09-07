@@ -69,6 +69,13 @@ def run(ctx: RunContext) -> ev.Stream:
         raise SbomError(f"syft failed (exit {proc.returncode}): {proc.stderr.strip()}")
 
     sbom = json.loads(out_path.read_text(encoding="utf-8"))
+    from ..native import inventory, enrich_sbom
+    ctx.native_inventory = inventory(ctx.extracted_dir)
+    enrich_sbom(sbom, ctx.native_inventory)
+    out_path.write_text(json.dumps(sbom, indent=2), encoding="utf-8")
+    native_path = ctx.path("native-inventory.json")
+    native_path.write_text(json.dumps(ctx.native_inventory, indent=2), encoding="utf-8")
+    yield ev.log(STAGE, f"native metadata adapter: {len(ctx.native_inventory['components'])} components")
 
     # --- invariants, checked not claimed ---
     spec = sbom.get("specVersion")
@@ -128,7 +135,8 @@ def run(ctx: RunContext) -> ev.Stream:
         tool="syft",
         tool_version=version,
         inputs=[ctx.ledger.ref(ctx.path("ingest_tree.json"))],
-        outputs=[ctx.ledger.ref(out_path)],
-        params={"format": f"cyclonedx-json@{CDX_VERSION}", "source_name": name},
+        outputs=[ctx.ledger.ref(out_path), ctx.ledger.ref(native_path)],
+        params={"format": f"cyclonedx-json@{CDX_VERSION}", "source_name": name,
+                "native_adapter": "pandax.native/1"},
     )
     yield ev.done(STAGE, f"{len(components)} components inventoried")

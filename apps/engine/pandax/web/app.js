@@ -197,14 +197,15 @@ function handle(e) {
     case "run_done": {
       runId = e.data.run_id || runId;
       const failed = e.data.failed;
-      const final = el("div", "row final " + (failed || e.data.kev ? "alert" : "good"));
+      const comparisonFailed = e.data.comparison_passed === false;
+      const final = el("div", "row final " + (failed || comparisonFailed || e.data.kev ? "alert" : "good"));
       final.append(
-        el("span", "", failed ? "> failed." : e.data.kev ? "> complete — CONFORMITY BLOCKED" : "> complete.")
+        el("span", "", failed ? "> failed." : comparisonFailed ? "> comparison checks FAILED — see results." : e.data.kev ? "> complete — CONFORMITY BLOCKED" : "> complete.")
       );
       $("log").append(final);
       $("log").scrollTop = $("log").scrollHeight;
-      setRunnerDisabled(false);
       if (runId && !failed) loadRun(runId);
+      refreshHistory();
       break;
     }
   }
@@ -219,12 +220,15 @@ async function loadRun(id) {
   DATA = await res.json();
   runId = DATA.run_id;
   $("appbar-run").textContent = runId;
+  renderComparison();
   renderOverview();
   renderComponents();
   renderVulns();
   renderArticle14();
   renderReports();
   renderLedger();
+  $("run-history").value = runId;
+  $("tamper").disabled = $("tamper2").disabled = Boolean(DATA.comparison);
   runVerify();
 }
 
@@ -235,7 +239,7 @@ function renderOverview() {
   const p = DATA.product || {};
 
   $("product-line").textContent = p.name
-    ? `${p.name} ${p.version} · ${p.type || "product with digital elements"} · ${(p.risk_tier || "default").toUpperCase()} tier · ${p.conformity_route || ""}`
+    ? `${p.name} ${p.version || ""} · ${p.type || "product with digital elements"} · ${(p.risk_tier || "default").toUpperCase()} tier · ${p.conformity_route || ""}`
     : "Sealed evidence bundle.";
 
   const banner = $("blocked-banner");
@@ -295,6 +299,16 @@ function renderOverview() {
   $("monitor-table").innerHTML = vulnTable(rows.slice(0, 6), true);
   $("monitor-card").hidden = false;
 
+  if (DATA.comparison) {
+    $("product-line").textContent = DATA.comparison.scenario.name + " — signed release comparison";
+    for (const id of ["s-components", "s-complete", "s-kev"]) $(id).textContent = "—";
+    for (const id of ["s-components-note", "s-complete-note", "s-kev-note"])
+      $(id).textContent = "Inspect an individual release for scan results";
+    $("monitor-card").hidden = true;
+  } else if (DATA.release_checks) {
+    const r = DATA.release_checks.release;
+    $("product-line").textContent = r.name + " " + r.version + " — " + r.kind;
+  }
   renderTimeline();
 }
 
@@ -512,6 +526,12 @@ function renderArticle14() {
 // ------------------------------------------------------------------ reports
 
 const REPORT_META = [
+  ["comparison.json", "Release comparison", "Passes, failures, exclusions and both input bundle references."],
+  ["release-checks.json", "Release checks", "Expected and observed outcomes, with missing detections shown as failures."],
+  ["native-inventory.json", "Native component evidence", "Package revisions, source-header evidence and declared dependencies."],
+  ["native-assessments.json", "Vendor advisory determinations", "Affected, fixed, unknown and variant exclusions. Bounded coverage for the requested native CVEs."],
+  ["release-source.json", "Official artifact provenance", "Source URL, release type and pinned SHA-256 digest."],
+  ["archive-links.json", "Archive links", "Links recorded from the official archive; none are created or followed on the host."],
   ["AnnexVII_Technical_Documentation.pdf", "Annex VII technical documentation",
    "The eight items required by Annex VII, each labelled machine-derived, manufacturer-attested, or input required. PDF/A-2b."],
   ["EU_Declaration_of_Conformity.pdf", "EU Declaration of Conformity",
@@ -653,6 +673,7 @@ $("sbom-file").addEventListener("change", () => {
 $("run").addEventListener("click", async () => {
   const artifact = $("artifact").value;
   const sbomFile = $("sbom-file").files[0];
+  $("comparison-panel").hidden = true;
   if (inputMode === "artifact" && !artifact) return;
   if (inputMode === "sbom" && !sbomFile) return;
   setRunnerDisabled(true);
@@ -679,6 +700,7 @@ $("run").addEventListener("click", async () => {
   } catch (error) {
     logRow("alert", el("span", "mark", "▶"), el("span", "", `Upload failed: ${error.message}`));
     setRunnerDisabled(false);
+    $("log").classList.remove("running");
     return;
   }
   if (!res.ok) {
@@ -686,6 +708,7 @@ $("run").addEventListener("click", async () => {
     try { detail = JSON.parse(detail).detail || detail; } catch (_) {}
     logRow("alert", el("span", "mark", "▶"), el("span", "", detail));
     setRunnerDisabled(false);
+    $("log").classList.remove("running");
     return;
   }
 
@@ -713,12 +736,26 @@ function attachStream() {
   const artifacts = await (await fetch("/api/artifacts")).json();
   const select = $("artifact");
   select.innerHTML = "";
+  const groups = new Map();
   for (const item of artifacts) {
     const option = el("option", "",
       item.name + (item.bytes ? `  (${(item.bytes / 1024).toFixed(0)} KB)` : ""));
     option.value = item.path;
-    select.append(option);
+    option.dataset.note = item.note || "Local fixture";
+    const groupName = item.group || "Local fixtures";
+    if (!groups.has(groupName)) {
+      const group = document.createElement("optgroup");
+      group.label = groupName;
+      groups.set(groupName, group);
+      select.append(group);
+    }
+    groups.get(groupName).append(option);
   }
+  const selectionNote = () => {
+    $("artifact-note").textContent = select.selectedOptions[0]?.dataset.note || "";
+  };
+  select.addEventListener("change", selectionNote);
+  selectionNote();
   if (!artifacts.length) {
     select.append(el("option", "", "no artifacts — run tools/bootstrap.py"));
     select.value = "";
@@ -737,6 +774,76 @@ function attachStream() {
   }
 
   // Otherwise load the most recent sealed run so the dashboard is never empty.
-  const runs = await (await fetch("/api/runs")).json();
+  const runs = await refreshHistory();
   if (runs.length) await loadRun(runs[0].run_id);
 })();
+
+
+function renderComparison() {
+  const report = DATA.comparison;
+  const checks = DATA.release_checks;
+  const host = $("comparison-panel");
+  host.hidden = !report && !checks;
+  if (host.hidden) return;
+  const passed = report ? report.passed : checks.passed;
+  $("comparison-title").textContent = (passed ? "PASS — " : "FAIL — ") +
+    (report ? report.scenario.name : checks.release.name + " " + checks.release.version);
+  $("comparison-scope").textContent = report ? report.scenario.note + " " + report.scope : checks.scope;
+  const runs = $("comparison-runs");
+  runs.replaceChildren();
+  for (const [i, run] of (report?.runs || []).entries()) {
+    const row = el("p", "", (i ? "After: " : "Before: ") + run.release_id + " ");
+    if (run.run_id) {
+      const button = el("button", "btn", "Inspect run");
+      button.addEventListener("click", () => loadRun(run.run_id));
+      row.append(button);
+    }
+    if (run.error) row.append(el("span", "", "FAILED: " + run.error));
+    runs.append(row);
+  }
+  const rows = $("comparison-rows");
+  rows.replaceChildren();
+  const items = report?.rows || checks.checks.map(c => ({cve: c.cve, before: c,
+    after: {observed: "—"}, passed: c.passed, result: "Expected: " + c.expected}));
+  for (const item of items) {
+    const row = el("tr");
+    const cve = el("td", "", item.cve);
+    row.append(cve);
+    for (const side of [item.before, item.after]) {
+      const cell = el("td", "", (side.component_version || "") + " " + side.observed);
+      if (side.detail) {
+        const details = el("details");
+        details.append(el("summary", "", "Evidence / applicability"), el("p", "", side.detail));
+        if (side.source) {
+          const link = el("a", "", "Vendor advisory");
+          link.href = side.source; link.target = "_blank"; link.rel = "noopener";
+          details.append(link);
+        }
+        cell.append(details);
+      }
+      row.append(cell);
+    }
+    row.append(el("td", "", (item.passed ? "PASS: " : "FAIL: ") + item.result));
+    rows.append(row);
+  }
+  const link = el("a", "", "Download sealed comparison / check results");
+  link.href = `/api/run/${runId}/file/${report ? "comparison.json" : "release-checks.json"}`;
+  link.target = "_blank"; link.rel = "noopener";
+  runs.append(link);
+}
+
+
+async function refreshHistory() {
+  const runs = await (await fetch("/api/runs")).json();
+  const select = $("run-history");
+  select.replaceChildren();
+  for (const run of runs) {
+    const status = run.comparison_passed === null ? "" : run.comparison_passed ? "PASS — " : "FAIL — ";
+    const option = el("option", "", status + (run.product || run.run_id) + " · " + run.created);
+    option.value = run.run_id;
+    select.append(option);
+  }
+  if (runId) select.value = runId;
+  return runs;
+}
+$("run-history").addEventListener("change", () => loadRun($("run-history").value));

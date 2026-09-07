@@ -94,13 +94,15 @@ def build_vex(ctx: RunContext) -> dict:
             "bom-ref": f"vuln-{finding.cve}-{finding.purl}",
             "id": finding.cve,
             "source": {
-                "name": "OSV",
-                "url": f"https://osv.dev/vulnerability/{finding.osv_id}",
+                "name": finding.source,
+                "url": finding.source_url or f"https://osv.dev/vulnerability/{finding.osv_id}",
             },
             "description": finding.summary,
             "affects": [{"ref": finding.bom_ref}],
             "analysis": analysis,
         }
+        if finding.applicability:
+            entry["analysis"]["detail"] += " " + finding.applicability
         if ratings:
             entry["ratings"] = ratings
         if finding.fixed_version:
@@ -219,7 +221,7 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
         stage="S4_TRIAGE",
         tool="cisa-kev+epss",
         tool_version=ctx.tool_versions["cisa_kev"],
-        inputs=[ctx.ledger.ref(ctx.path("findings.osv.json"))],
+        inputs=[ctx.ledger.ref(ctx.path("findings.matched.json"))],
         outputs=[ctx.ledger.ref(vex_path), ctx.ledger.ref(findings_path)],
         params={"kev_entries": len(kev), "epss_resolved": len(epss)},
     )

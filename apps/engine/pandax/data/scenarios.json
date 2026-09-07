@@ -1,0 +1,120 @@
+{
+  "releases": [
+    {
+      "id": "openwrt-19.07.0",
+      "name": "OpenWrt x86/64 firmware rootfs",
+      "version": "19.07.0",
+      "kind": "firmware-rootfs",
+      "url": "https://downloads.openwrt.org/releases/19.07.0/targets/x86/64/openwrt-19.07.0-x86-64-generic-rootfs.tar.gz",
+      "sha256": "ddceb591c09223e0aeb8a588bf039b3ef6a63bf84d58bda3b5a963ef25fcd3a4"
+    },
+    {
+      "id": "openwrt-19.07.1",
+      "name": "OpenWrt x86/64 firmware rootfs",
+      "version": "19.07.1",
+      "kind": "firmware-rootfs",
+      "url": "https://downloads.openwrt.org/releases/19.07.1/targets/x86/64/openwrt-19.07.1-x86-64-generic-rootfs.tar.gz",
+      "sha256": "023c32c4c9a744c3a11f28d7bd720d72b14ede05352ae7e8eaf61611b126c21a"
+    },
+    {
+      "id": "openwrt-19.07.5",
+      "name": "OpenWrt x86/64 firmware rootfs",
+      "version": "19.07.5",
+      "kind": "firmware-rootfs",
+      "url": "https://downloads.openwrt.org/releases/19.07.5/targets/x86/64/openwrt-19.07.5-x86-64-generic-rootfs.tar.gz",
+      "sha256": "8a0fb9498d7dcd795b52492f203d99d4fb1300d289c11b8ff3d9f7dd0ded15ea"
+    },
+    {
+      "id": "openwrt-19.07.6",
+      "name": "OpenWrt x86/64 firmware rootfs",
+      "version": "19.07.6",
+      "kind": "firmware-rootfs",
+      "url": "https://downloads.openwrt.org/releases/19.07.6/targets/x86/64/openwrt-19.07.6-x86-64-generic-rootfs.tar.gz",
+      "sha256": "56ea54cec104c9082199b0c465ba53ca985ebd627483b03ff4d9c8376a851ec1"
+    },
+    {
+      "id": "curl-8.3.0",
+      "name": "curl / libcurl source",
+      "version": "8.3.0",
+      "kind": "source",
+      "url": "https://curl.se/download/curl-8.3.0.tar.gz",
+      "sha256": "d3a19aeea301085a56c32bc0f7d924a818a7893af253e41505d1e26d7db8e95a"
+    },
+    {
+      "id": "curl-8.4.0",
+      "name": "curl / libcurl source",
+      "version": "8.4.0",
+      "kind": "source",
+      "url": "https://curl.se/download/curl-8.4.0.tar.gz",
+      "sha256": "816e41809c043ff285e8c0f06a75a1fa250211bbfb2dc0a037eeef39f1a9e427"
+    },
+    {
+      "id": "openssl-1.0.1f",
+      "name": "OpenSSL s_server / libssl source",
+      "version": "1.0.1f",
+      "kind": "source",
+      "url": "https://www.openssl.org/source/old/1.0.1/openssl-1.0.1f.tar.gz",
+      "sha256": "6cc2a80b17d64de6b7bac985745fdaba971d54ffd7d38d3556f998d7c0c9cb5a"
+    },
+    {
+      "id": "openssl-1.0.1g",
+      "name": "OpenSSL s_server / libssl source",
+      "version": "1.0.1g",
+      "kind": "source",
+      "url": "https://www.openssl.org/source/old/1.0.1/openssl-1.0.1g.tar.gz",
+      "sha256": "53cb818c3b90e507a8348f4f5eaedb05d8bfe5358aabb508b7263cc670c3e028"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "openwrt-libubox",
+      "name": "OpenWrt / libubox",
+      "before": "openwrt-19.07.0",
+      "after": "openwrt-19.07.1",
+      "component": "libblobmsg-json",
+      "cves": [
+        "CVE-2020-7248"
+      ],
+      "note": "Official x86/64 firmware root filesystem. Trace libubox JSON conversion to installed ubus, rpcd and uhttpd dependencies."
+    },
+    {
+      "id": "curl-socks5",
+      "name": "curl / libcurl \u2014 SOCKS5",
+      "before": "curl-8.3.0",
+      "after": "curl-8.4.0",
+      "component": "libcurl",
+      "cves": [
+        "CVE-2023-38545"
+      ],
+      "note": "Official source releases, including the curl program. Record SOCKS5 remote DNS, buffer size and rate-limit prerequisites; runtime reachability remains unverified."
+    },
+    {
+      "id": "openwrt-dnsmasq",
+      "name": "OpenWrt / dnsmasq \u2014 backported fixes",
+      "before": "openwrt-19.07.5",
+      "after": "openwrt-19.07.6",
+      "component": "dnsmasq",
+      "cves": [
+        "CVE-2020-25681",
+        "CVE-2020-25682",
+        "CVE-2020-25683",
+        "CVE-2020-25684",
+        "CVE-2020-25685",
+        "CVE-2020-25686",
+        "CVE-2020-25687"
+      ],
+      "note": "Official firmware with standard dnsmasq. Two applicable CVEs; five DNSSEC-related CVEs excluded by the vendor for this package variant. Compare full package revisions."
+    },
+    {
+      "id": "openssl-heartbleed",
+      "name": "OpenSSL s_server / libssl \u2014 Heartbleed",
+      "before": "openssl-1.0.1f",
+      "after": "openssl-1.0.1g",
+      "component": "libssl",
+      "cves": [
+        "CVE-2014-0160"
+      ],
+      "note": "Official source releases containing apps/s_server.c and libssl. Checks source version and heartbeat fix; does not launch a TLS server or prove deployed reachability."
+    }
+  ]
+}

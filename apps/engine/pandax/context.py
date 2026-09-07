@@ -59,6 +59,14 @@ class RunContext:
     tool_versions: dict[str, str] = field(default_factory=dict)
     started: str = ""
 
+    # A run can begin from a product artifact or from a pre-built SBOM.  These
+    # fields make that provenance available to the dossier and both renderers.
+    input_type: str = "artifact"
+    sbom_source_format: str = "CycloneDX"
+    sbom_source_version: str = "1.6"
+    matchable_components: int = 0
+    skipped_components: int = 0
+
     # Demo control: compress statutory countdowns so 24h/72h/14d are watchable.
     clock_speed: float = 1.0
 

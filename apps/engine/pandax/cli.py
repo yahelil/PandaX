@@ -71,24 +71,17 @@ def _resolve_run(run_dir: Optional[Path]) -> Path:
 # --------------------------------------------------------------------- scan
 
 
-@app.command()
-def scan(
-    artifact: Path = typer.Argument(..., help="Product artifact: .zip, .tar.gz, or directory"),
-    out: Optional[Path] = typer.Option(None, "--out", help="Output base directory"),
-    offline: bool = typer.Option(False, "--offline", help="Use cached feeds only"),
-    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress per-file detail"),
+def _render_pipeline(
+    source: Path,
+    stream: ev.Stream,
+    quiet: bool,
+    input_label: str = "artifact",
+    subtitle: str = "",
 ) -> None:
-    """Run the full pipeline: ingest, SBOM, match, triage, Article 14, dossier."""
-    from . import pipeline
-
-    banner(console, str(artifact))
+    banner(console, str(source), subtitle=subtitle, input_label=input_label)
     renderer = CliRenderer(console, verbose=not quiet)
 
     ctx_holder: dict = {}
-    stream = pipeline.run(artifact, out_base=out, offline=offline)
-
-    # The pipeline yields a first RUN event carrying the run directory; capture
-    # it so the final report can point at the bundle even on a later failure.
     try:
         for event in stream:
             if event.kind == ev.LOG and "run_dir" in event.data:
@@ -118,7 +111,43 @@ def scan(
     renderer.final_report(findings, str(run_dir))
 
     if renderer.summary.get("kev"):
-        raise typer.Exit(code=2)  # actively exploited: a CI gate should fail
+        raise typer.Exit(code=2)
+
+
+@app.command()
+def scan(
+    artifact: Path = typer.Argument(..., help="Product artifact: .zip, .tar.gz, or directory"),
+    out: Optional[Path] = typer.Option(None, "--out", help="Output base directory"),
+    offline: bool = typer.Option(False, "--offline", help="Use cached feeds only"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress per-file detail"),
+) -> None:
+    """Run the full pipeline: ingest, SBOM, match, triage, Article 14, dossier."""
+    from . import pipeline
+
+    _render_pipeline(
+        artifact,
+        pipeline.run(artifact, out_base=out, offline=offline),
+        quiet,
+    )
+
+
+@app.command("scan-sbom")
+def scan_sbom(
+    sbom_file: Path = typer.Argument(..., help="CycloneDX 1.2/1.6 or SPDX 2.2/2.3 JSON SBOM"),
+    out: Optional[Path] = typer.Option(None, "--out", help="Output base directory"),
+    offline: bool = typer.Option(False, "--offline", help="Use cached feeds only"),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress per-file detail"),
+) -> None:
+    """Run from an existing JSON SBOM, skipping artifact ingest and Syft."""
+    from . import pipeline
+
+    _render_pipeline(
+        sbom_file,
+        pipeline.run_sbom(sbom_file, out_base=out, offline=offline),
+        quiet,
+        input_label="SBOM",
+        subtitle="format is detected automatically; input is preserved in the sealed bundle",
+    )
 
 
 # ------------------------------------------------------------------- verify

@@ -125,7 +125,7 @@ def write_reports(report):
     dest = ROOT / 'output/validation'; dest.mkdir(parents=True, exist_ok=True)
     (dest/'pandax-reference-comparison.json').write_text(json.dumps(report, indent=2) + '\n')
     with (dest/'pandax-reference-comparison.csv').open('w', newline='') as f:
-        writer = csv.writer(f)
+        writer = csv.writer(f, lineterminator='\n')
         writer.writerow(['input', 'component', 'CVE', 'expected', 'observed', 'verdict', 'assessment_states', 'reference_source', 'run_id'])
         for c in report['cases']:
             for x in c.get('checks', []):

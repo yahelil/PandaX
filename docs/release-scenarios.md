@@ -10,6 +10,26 @@ The **Saved results** selector keeps previous comparisons accessible, including
 failures. **Inspect run** opens either release's SBOM, findings, reports and seal.
 Expand **Evidence / applicability** to see the vendor source and triage conditions.
 
+## Independent answer key and actual comparison
+
+- [Release-by-release PDF answer key](../output/pdf/PandaX_Independent_Expected_Results.pdf):
+  plain-language CVE names, expected findings and exclusions, and an observation column.
+- [Latest independent comparison report](../output/validation/PandaX_Comparison_Report.md):
+  actual results, missed findings, triage limitations and links to individual run evidence.
+- [CSV comparison](../output/validation/pandax-reference-comparison.csv) and
+  [JSON evidence summary](../output/validation/pandax-reference-comparison.json).
+
+The public-source expectations live in `docs/expected-results-baseline.json`,
+separate from the scanner's matching rules and built-in scenario checks. The
+PDF builder reads only this reference. It does not read scan output.
+
+To repeat the comparison, pull the desired code, install its dependencies and
+restart `pandax serve`, then run `python tools/evaluate_reference.py`. This uses
+the dashboard HTTP API for all 14 reference inputs and four comparison actions.
+Exit 1 means at least one independent check failed; raw errors remain in the
+report. The engine itself is not modified by the evaluator. The reference is
+a selected CVE test set, not a complete vulnerability census.
+
 | Comparison / CLI id | Before → after | Input and expected result |
 | --- | --- | --- |
 | `openwrt-libubox` | 19.07.0 → 19.07.1 | Official x86/64 firmware rootfs; CVE-2020-7248 affected → fixed in the libubox/libblobmsg-json packages. |

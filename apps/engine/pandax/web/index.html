@@ -62,7 +62,15 @@
           <p class="sub" id="product-line">Run the pipeline to produce a sealed evidence bundle.</p>
         </div>
         <div class="runner">
+          <div class="source-toggle" role="group" aria-label="Pipeline input">
+            <button type="button" id="mode-artifact" class="source-option active">Product artifact</button>
+            <button type="button" id="mode-sbom" class="source-option">SBOM file</button>
+          </div>
           <select id="artifact" aria-label="Artifact to scan"></select>
+          <label id="sbom-picker" class="file-picker" hidden>
+            <input id="sbom-file" type="file" accept=".json,application/json">
+            <span id="sbom-filename">Choose JSON SBOM</span>
+          </label>
           <button id="run" class="btn primary">Run pipeline</button>
         </div>
       </div>

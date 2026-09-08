@@ -73,3 +73,39 @@ CLI export refuses to overwrite an existing file. HTML escapes supplied values;
 JSON is PandaX internal interchange, not an SRP API schema. Packs are prepared
 artifacts, never proof of submission. Older approved revisions remain readable
 but cannot be presented as the latest ready pack.
+
+## Submissions, receipts and snapshots
+
+`record-submission` requires operator/authority_attestation, revision, report_hash,
+result (`submitted` or `failed`), submitted_at, and explicit simulated boolean.
+Success requires platform_reference; failure requires failure_reason. The exact
+revision must be complete and approved before the recorded submission time.
+Failure does not satisfy any obligation. A retry uses a new request ID; replaying
+the same ID returns the original response even after later events.
+
+`attach-receipt` takes submission_id, filename, content_base64, acknowledged_at,
+operator/authority_attestation and optional sha256 to verify. Receipt bytes (up
+to 5 MiB) and metadata commit together. Acknowledgement cannot predate submission.
+Downloads use `/api/cases/{id}/receipts/{receipt_id}` and verify stored hashes.
+
+`amend` takes submission_id, reason, fields and operator/authority_attestation.
+It creates a new unapproved revision linked to that successful submission.
+Editing an amendment retains the link. Earlier payloads, approvals, attempts
+and receipts are immutable. Notification amendments cannot postpone an incident's
+original final deadline.
+
+Set `simulated: true` at case creation for a rehearsal case. Its events, report
+packs and attempts stay labeled. It cannot record real submissions. A simulated
+attempt on a real case remains visible but satisfies no real obligation and
+cannot start a real incident final clock. Amendments preserve simulation mode.
+
+`snapshot` takes revision plus operator/authority_attestation. It creates a ZIP
+containing case history, the selected report pack, receipts, ledger and signed
+manifest. The immutable ZIP and digest commit together in SQLite; request replay
+does not generate another snapshot. Download through
+`/api/cases/{id}/snapshots/{snapshot_id}` or
+`pandax case download-snapshot CASE_ID SNAPSHOT_ID output.zip`.
+The existing PoC signer uses a separate key at `PANDAX_DATA_DIR/case_signing_key.pem`.
+Snapshot integrity/signature checks are not external signer trust; establish
+that trust separately. No original scan is rewritten and no network submission
+is performed. Snapshot temporary files are cleaned after generation.

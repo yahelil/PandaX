@@ -42,6 +42,17 @@ MIGRATIONS = (
         for action in ('UPDATE', 'DELETE')
     ),
     (allow_incident_without_finding,),
+    (
+        'CREATE TABLE case_snapshots (id TEXT PRIMARY KEY, case_id TEXT NOT NULL REFERENCES remediation_cases(id), revision INTEGER NOT NULL, sha256 TEXT NOT NULL, content BLOB NOT NULL, created_at TEXT NOT NULL)',
+    ) + tuple(
+        f"CREATE TRIGGER immutable_{table}_{action.lower()} BEFORE {action} ON {table} BEGIN SELECT RAISE(ABORT, 'immutable case history'); END"
+        for table in ('submissions', 'receipts', 'case_snapshots', 'requests')
+        for action in ('UPDATE', 'DELETE')
+    ),
+    (
+        'ALTER TABLE remediation_cases ADD COLUMN release_id TEXT REFERENCES releases(id)',
+        "UPDATE remediation_cases SET release_id=COALESCE((SELECT release_id FROM case_runs WHERE case_id=remediation_cases.id AND role='source' LIMIT 1), json_extract(state_json, '$.release_id'))",
+    ),
 )
 
 

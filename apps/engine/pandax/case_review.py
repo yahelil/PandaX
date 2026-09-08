@@ -35,6 +35,9 @@ def save_state(service, db, case, state):
     if case['report']:
         payload = dict(case['report']['payload'])
         payload['case_facts'] = state
+        payload['measure_available_at'] = case['measure_available_at']
+        payload['measure_details'] = case['measure_details']
+        payload['candidate_resolution'] = case['candidate']
         payload['review_status'] = 'unreviewed'
         if payload.get('field_definition'):
             from .case_fields import fields_for
@@ -87,7 +90,7 @@ def apply_review(service, db, action, body, case):
         if case['report'] and case['report']['payload'].get('field_definition'):
             from .case_workflow import prepare_report
             required(body, 'reason')
-            prepare_report(service, db, case, {**body, 'stage': case['report']['payload']['stage'], 'fields': payload.get('fields', payload)})
+            prepare_report(service, db, case, {**body, 'stage': case['report']['payload']['stage'], 'fields': payload.get('fields', payload)}, amends_submission_id=case['report']['payload'].get('amends_submission_id'))
             return True
         if set(payload) & {'field_definition', 'case_type', 'stage', 'fields'}:
             raise CaseError('structured reports must use prepare-report')

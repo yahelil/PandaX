@@ -1,7 +1,10 @@
 .case-card details { margin: 1rem 0; }
+.case-card { padding: 1rem; }
+#cases-body ~ details, #cases-body { margin-top: 1rem; }
 .case-card summary { cursor: pointer; font-weight: 600; }
 .case-card pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24rem; overflow: auto; }
 .case-card .case-grid { margin: 1rem 0; }
 .case-card label { min-width: 0; }
+.case-grid [hidden] { display: none !important; }
 .case-card .btn { margin: .25rem; }
 @media (max-width: 700px) { .case-grid { grid-template-columns: 1fr !important; } }

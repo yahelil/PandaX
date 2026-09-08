@@ -52,10 +52,13 @@ class CaseService:
         db.execute('INSERT OR IGNORE INTO products VALUES (?, ?)', (product_id, product['name']))
         db.execute('INSERT OR IGNORE INTO releases VALUES (?, ?, ?)', (release_id, product_id, product['version']))
         db.execute('INSERT OR IGNORE INTO case_runs VALUES (?, ?, ?, ?)', (case_id, run_id, release_id, role))
+        if role == 'source':
+            db.execute('UPDATE remediation_cases SET release_id=? WHERE id=?', (release_id, case_id))
 
     def get(self, case_id, db=None):
         if db is None:
             with self.store._connect() as connection:
+                connection.execute('BEGIN')
                 return self.get(case_id, connection)
         case = self.store.get(case_id, db)
         row = db.execute('SELECT p.name, r.version FROM case_runs cr JOIN releases r ON cr.release_id=r.id JOIN products p ON r.product_id=p.id WHERE cr.case_id=? AND cr.role=\'source\'', (case_id,)).fetchone()
@@ -69,19 +72,36 @@ class CaseService:
         from .case_workflow import clocks, clock_status
         case['deadlines'] = case['state'].get('deadlines', clocks(case, case['state']))
         case['clock_status'] = clock_status(case['deadlines'])
+        case['submissions'] = []
+        for row in db.execute('SELECT * FROM submissions WHERE case_id=? ORDER BY rowid', (case_id,)):
+            item = dict(row)
+            item['payload'] = json.loads(item.pop('payload_json'))
+            item['receipts'] = [{**dict(r), 'payload': json.loads(r['payload_json'])} for r in db.execute('SELECT id, sha256, payload_json FROM receipts WHERE submission_id=? ORDER BY rowid', (item['id'],))]
+            for receipt in item['receipts']:
+                receipt.pop('payload_json')
+            item['status'] = 'acknowledged' if item['receipts'] else item['payload']['result']
+            case['submissions'].append(item)
+        case['snapshots'] = [dict(r) for r in db.execute('SELECT id, revision, sha256, created_at FROM case_snapshots WHERE case_id=? ORDER BY rowid', (case_id,))]
         from .case_export import pack
         case['readiness'] = {key: value for key, value in pack(case).items() if key in ('ready', 'missing', 'status')} if case['report'] else {'ready': False, 'missing': ['report revision'], 'status': 'No draft prepared'}
         return case
 
     def list(self):
         with self.store._connect() as db:
+            db.execute('BEGIN')
             return [self.get(row['id'], db) for row in db.execute('SELECT id FROM remediation_cases ORDER BY updated_at DESC')]
 
     def execute(self, action, body, case_id=None):
         if not isinstance(body, dict):
             raise CaseError('request must be an object')
         request_id = required(body, 'request_id')
-        fingerprint = hashlib.sha256(_json([action, case_id, body]).encode()).hexdigest()
+        if 'simulated' in body and type(body['simulated']) is not bool:
+            raise CaseError('simulated must be a boolean')
+        try:
+            json.dumps(body, allow_nan=False)
+            fingerprint = hashlib.sha256(_json([action, case_id, body]).encode()).hexdigest()
+        except (TypeError, ValueError) as exc:
+            raise CaseError('request must contain finite JSON values') from exc
         with self.store._connect() as db:
             db.execute('BEGIN IMMEDIATE')
             prior = db.execute('SELECT * FROM requests WHERE request_id=?', (request_id,)).fetchone()
@@ -114,7 +134,9 @@ class CaseService:
                 raise CaseNotFound('finding not found')
             if len(matches) != 1:
                 raise CaseError('multiple findings match; supply purl')
-            case = self.store.create(run_id, matches[0], db=db)
+            case = self.store.create(run_id, matches[0], db=db, simulated=body.get('simulated', False))
+            if case['state'].get('simulated', False) != body.get('simulated', False):
+                raise CaseConflict('existing case has a different simulation mode')
             self.link_run(db, case['id'], run_id, 'source')
             if action == 'import-draft':
                 filename = required(body, 'draft_file')
@@ -128,7 +150,14 @@ class CaseService:
             return case['id']
         if case is None:
             raise CaseError('case ID required')
+        if action == 'snapshot':
+            from .case_snapshot import create_snapshot
+            create_snapshot(self, db, case, body)
+            return case['id']
         from .case_review import apply_review, timestamp
+        from .case_submissions import apply_submission
+        if apply_submission(self, db, action, body, case):
+            return case['id']
         if apply_review(self, db, action, body, case):
             return case['id']
         if action == 'prepare-report':
@@ -146,7 +175,11 @@ class CaseService:
             self.store.observe_release(case['id'], run_id, self.run_json(run_id, 'findings.json', []), self.run_json(run_id, 'sbom.cdx.json', {}).get('components', []), db=db)
             self.link_run(db, case['id'], run_id, 'observed')
             if case['report']:
-                self.revision(db, case['id'], self.store._report_payload(self.get(case['id'], db)))
+                if case['report']['payload'].get('field_definition'):
+                    from .case_review import save_state
+                    save_state(self, db, self.get(case['id'], db), dict(case['state']))
+                else:
+                    self.revision(db, case['id'], self.store._report_payload(self.get(case['id'], db)))
         elif action == 'confirm-measure':
             if case['case_type'] != 'vulnerability':
                 raise CaseError('measure confirmation is a vulnerability operation; use incident assessment')
@@ -154,7 +187,12 @@ class CaseService:
                 required(body, 'reason')
             from .case_workflow import persist_clocks
             persist_clocks(self, db, {**case, 'measure_available_at': timestamp(required(body, 'measure_available_at'))}, dict(case['state']))
-            self.store.confirm_measure(case['id'], timestamp(required(body, 'measure_available_at')), required(body, 'operator'), required(body, 'authority_attestation'), required(body, 'measure_details'), db=db)
+            structured = bool(case['report'] and case['report']['payload'].get('field_definition'))
+            self.store.confirm_measure(case['id'], timestamp(required(body, 'measure_available_at')), required(body, 'operator'), required(body, 'authority_attestation'), required(body, 'measure_details'), db=db, create_report=not structured)
+            if structured:
+                from .case_review import save_state
+                updated = self.get(case['id'], db)
+                save_state(self, db, updated, dict(updated['state']))
             from .case_review import record
             record(self, db, case, 'measure_decision', {key: body.get(key) for key in ('operator', 'authority_attestation', 'measure_details', 'reason')}, timestamp(body['measure_available_at']), body['operator'], 'decisions')
         else:

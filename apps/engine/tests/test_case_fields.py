@@ -12,8 +12,12 @@ from test_case_review import command
 from test_case_incident import incident
 
 
-def ready_case(service, case_type='vulnerability', stage='early_warning'):
-    case = incident(service) if case_type == 'incident' else create(service)
+def ready_case(service, case_type='vulnerability', stage='early_warning', simulated=False):
+    if simulated:
+        from test_case_review import IDENTITY
+        case = service.execute('create-incident', {'request_id': 'incident', **IDENTITY, 'simulated': True, 'title': 'Simulated outage', 'severity': 'Severe', 'impact': 'Service interruption', 'product_name': 'Device', 'product_version': '1'})
+    else:
+        case = incident(service) if case_type == 'incident' else create(service)
     case = command(service, case, 'record-awareness', aware_at='2026-09-15T00:00:00Z', evidence='Verified timeline')
     case = command(service, case, 'record-decision', reportability='reportable', reason='Reviewed', evidence='Evidence')
     if case_type == 'vulnerability':

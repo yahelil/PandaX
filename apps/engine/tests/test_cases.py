@@ -32,6 +32,8 @@ def test_case_creation_is_idempotent_and_durable(store, finding):
     second = store.create("run-source", finding)
 
     assert first["id"] == second["id"]
+    assert "candidate_json" not in first
+    assert first["candidate"] is None
     assert store.list()[0]["status"] == "detected"
     assert store.list()[0]["events"][0]["event_type"] == "finding_recorded"
 

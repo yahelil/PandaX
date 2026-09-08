@@ -14,6 +14,7 @@ import re
 import shutil
 import tempfile
 import threading
+from collections import Counter
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -96,6 +97,11 @@ class Job:
                 self.history.append(payload)
             for listener in self.listeners:
                 listener.put(payload)
+
+    def unsubscribe(self, listener: queue.Queue) -> None:
+        with self.lock:
+            if listener in self.listeners:
+                self.listeners.remove(listener)
 
     def start(
         self,
@@ -297,14 +303,17 @@ def stream() -> StreamingResponse:
         return "data: " + json.dumps(payload) + "\n\n"
 
     def generate() -> Iterator[str]:
-        for payload in backlog:
-            yield frame(payload)
-        while True:
-            payload = listener.get()
-            if payload is None:
-                yield "event: end\ndata: {}\n\n"
-                return
-            yield frame(payload)
+        try:
+            for payload in backlog:
+                yield frame(payload)
+            while True:
+                payload = listener.get()
+                if payload is None:
+                    yield "event: end\ndata: {}\n\n"
+                    return
+                yield frame(payload)
+        finally:
+            job.unsubscribe(listener)
 
     return StreamingResponse(
         generate(),
@@ -364,10 +373,10 @@ def tamper(run_id: str, body: dict[str, str] | None = None) -> dict[str, Any]:
     """Flip one byte, so the dashboard can demonstrate the seal catching it."""
     import random
 
-    target = OUT_DIR / run_id
+    target = (OUT_DIR / run_id).resolve()
     name = (body or {}).get("target", "sbom.cdx.json")
-    victim = target / name
-    if not victim.exists():
+    victim = (target / name).resolve()
+    if not victim.is_relative_to(target) or not victim.is_file():
         raise HTTPException(404, f"{name} not found in {run_id}")
     blob = bytearray(victim.read_bytes())
     candidates = [i for i, b in enumerate(blob) if chr(b).isdigit()]
@@ -417,8 +426,9 @@ def summary(run_id: str) -> dict[str, Any]:
     # A component is "affected" if any finding cites its package URL.
     affected = {f["purl"] for f in findings}
     kev_purls = {f["purl"] for f in findings if f.get("kev")}
+    finding_counts = Counter(f["purl"] for f in findings)
     for component in components:
-        component["findings"] = sum(1 for f in findings if f["purl"] == component["purl"])
+        component["findings"] = finding_counts[component["purl"]]
         component["affected"] = component["purl"] in affected
         component["kev"] = component["purl"] in kev_purls
 

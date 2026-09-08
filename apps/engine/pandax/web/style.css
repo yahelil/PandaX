@@ -100,6 +100,8 @@ main { padding: 22px 26px 60px; max-width: 1480px; }
   gap: 20px; flex-wrap: wrap; margin-bottom: 18px;
 }
 .view-head h1 { font-size: 21px; font-weight: 700; letter-spacing: -.3px; }
+.clock-preview { display: grid; gap: 5px; max-width: 260px; margin: 0 0 18px; font-size: 12px; font-weight: 650; }
+.clock-preview small { color: var(--muted); font-weight: 400; }
 .sub { margin: 5px 0 0; color: var(--muted); font-size: 13px; max-width: 74ch; }
 .section { font-size: 15px; font-weight: 700; margin: 4px 0 12px; }
 

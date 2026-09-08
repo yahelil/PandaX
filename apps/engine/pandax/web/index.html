@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PandaX — CRA Compliance Vault</title>
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/style.css?v=clock-preview">
 </head>
 <body>
 
@@ -216,6 +216,14 @@
         <p class="sub">Statutory clocks started by an actively exploited vulnerability. Filings are
           generated for human sign-off — the ENISA single reporting platform is not live until 11 Sept 2026.</p>
       </div></div>
+      <label class="clock-preview">Final-report preview
+        <select id="clock-preview">
+          <option value="recorded">Recorded evidence</option>
+          <option value="pending">Awaiting measure</option>
+          <option value="overdue">Overdue</option>
+        </select>
+        <small>Display only; sealed evidence is unchanged.</small>
+      </label>
       <div id="article14-body"></div>
     </section>
 
@@ -253,6 +261,6 @@
   </main>
 </div>
 
-<script src="/app.js"></script>
+<script src="/app.js?v=clock-preview"></script>
 </body>
 </html>

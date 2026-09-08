@@ -41,11 +41,21 @@ def save_state(service, db, case, state):
 
 def apply_review(service, db, action, body, case):
     from .case_service import required
-    if action not in ('record-awareness', 'record-decision', 'revise', 'approve'):
+    if action not in ('record-awareness', 'record-decision', 'revise', 'approve', 'assess-incident'):
         return False
     identity = attestation(body)
     state = dict(case['state'])
-    if action == 'record-awareness':
+    if action == 'assess-incident':
+        if case['case_type'] != 'incident':
+            raise CaseError('incident assessment requires an incident case')
+        changes = {key: required(body, key) for key in ('severity', 'impact', 'mitigation', 'root_cause') if key in body}
+        if not changes:
+            raise CaseError('incident assessment fields required')
+        payload = {**identity, 'changes': changes, 'evidence': required(body, 'evidence'), 'reason': required(body, 'reason')}
+        state['incident'] = {**state['incident'], **changes}
+        record(service, db, case, 'incident_assessed', payload, _utc_now(), identity['operator'], 'decisions')
+        save_state(service, db, case, state)
+    elif action == 'record-awareness':
         changes = {key: timestamp(body[key]) for key in ('occurred_at', 'detected_at', 'aware_at') if key in body}
         if not changes:
             raise CaseError('at least one factual timestamp is required')

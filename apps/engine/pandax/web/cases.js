@@ -104,7 +104,7 @@ function renderCases(cases) {
   for (const item of cases) {
     const card = el("article", "card case-card");
     const head = el("div", "card-head");
-    head.append(el("h3", "", `${item.cve} — ${item.component} ${item.component_version}`));
+    head.append(el("h3", "", item.case_type === 'incident' ? item.state.incident.title : `${item.cve} — ${item.component} ${item.component_version}`));
     const statusClass = item.status === "measure_confirmed" ? "good" : item.status === "candidate_resolution" ? "blue" : "medium";
     head.append(el("span", `pill ${statusClass}`, item.status.replaceAll("_", " ")));
     card.append(head);
@@ -132,6 +132,7 @@ function renderCases(cases) {
       card.append(candidate);
     }
 
+    if (item.case_type === "vulnerability") {
     const compare = el("div", "case-actions");
     const options = laterRunOptions(item);
     compare.innerHTML = `<label>Later analyzed release<select id="target-${esc(item.id)}">${options.html}</select></label>`;
@@ -166,6 +167,7 @@ function renderCases(cases) {
       card.append(confirm);
     }
 
+    }
     const history = el("details");
     history.append(el("summary", "", `${item.events.length} recorded event(s)`));
     const events = el("ul");
@@ -196,6 +198,7 @@ function reviewForm(item) {
   form.innerHTML = `
     <label>Action<select name="action">
       <option value="record-awareness">Record or correct factual dates</option>
+      <option value="assess-incident">Update incident assessment</option>
       <option value="record-decision">Decide reportability</option>
       <option value="revise">Save report revision</option>
       <option value="prepare-report">Prepare reporting stage</option>
@@ -209,6 +212,7 @@ function reviewForm(item) {
     <label>Evidence<textarea name="evidence"></textarea></label>
     <label>Reason / correction reason<textarea name="reason"></textarea></label>
     <label>Reportability<select name="reportability"><option>under_review</option><option>reportable</option><option>not_reportable</option></select></label>
+    <label>Incident assessment (severity, impact, mitigation, root_cause JSON)<textarea name="incident">{}</textarea></label>
     <label>Report content (JSON)<textarea name="payload">{}</textarea></label>
     <label>Reporting stage<select name="stage"><option>early_warning</option><option>notification</option><option>final_report</option></select></label>
     <button class="btn primary">Save reviewed action</button>`;
@@ -225,6 +229,7 @@ function reviewForm(item) {
       Object.assign(body, {revision: item.report?.revision, report_hash: item.report?.report_hash, approved_at: new Date().toISOString()});
     }
     try {
+      if (action === 'assess-incident') Object.assign(body, JSON.parse(values.incident), {evidence: values.evidence, reason: values.reason});
       if (action === 'revise') Object.assign(body, {payload: JSON.parse(values.payload), reason: values.reason});
       if (action === 'prepare-report') Object.assign(body, {stage: values.stage, fields: JSON.parse(values.payload)});
       await caseRequest(`/api/cases/${item.id}/${action}`, {method: 'POST', body: JSON.stringify(body)});
@@ -240,3 +245,23 @@ function reviewForm(item) {
   return details;
 }
 
+
+const incidentIntake = el('details', 'card');
+incidentIntake.append(el('summary', '', 'Open an incident case'));
+const incidentForm = el('form', 'case-grid');
+for (const key of ['title', 'product_name', 'product_version', 'severity', 'impact', 'operator', 'authority_attestation']) {
+  const label = el('label', '', key.replaceAll('_', ' '));
+  const input = el('input'); input.name = key; input.required = true;
+  label.append(input); incidentForm.append(label);
+}
+const incidentSubmit = el('button', 'btn primary', 'Record incident');
+incidentForm.append(incidentSubmit);
+incidentForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  try {
+    await caseRequest('/api/cases/create-incident', {method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(incidentForm)))});
+    incidentForm.reset(); await loadCases();
+  } catch (error) { caseMessage(error.message, true); }
+});
+incidentIntake.append(incidentForm);
+$('cases-body').before(incidentIntake);

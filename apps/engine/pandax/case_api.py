@@ -46,6 +46,11 @@ def import_draft(body: dict):
     return call(lambda: service().execute('import-draft', body))
 
 
+@router.post('/api/cases/create-incident')
+def incident(body: dict):
+    return call(lambda: service().execute('create-incident', body))
+
+
 @router.get('/api/cases/{case_id}')
 def detail(case_id: str):
     return call(lambda: service().get(case_id))

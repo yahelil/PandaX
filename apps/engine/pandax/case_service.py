@@ -59,7 +59,7 @@ class CaseService:
                 return self.get(case_id, connection)
         case = self.store.get(case_id, db)
         row = db.execute('SELECT p.name, r.version FROM case_runs cr JOIN releases r ON cr.release_id=r.id JOIN products p ON r.product_id=p.id WHERE cr.case_id=? AND cr.role=\'source\'', (case_id,)).fetchone()
-        case['source_product'] = dict(row) if row else {'name': '', 'version': ''}
+        case['source_product'] = dict(row) if row else case['state'].get('product', {'name': '', 'version': ''})
         case['runs'] = [dict(r) for r in db.execute('SELECT run_id, release_id, role FROM case_runs WHERE case_id=?', (case_id,))]
         case['revisions'] = [{**dict(r), 'payload': json.loads(r['payload_json'])} for r in db.execute('SELECT revision, created_at, report_hash, payload_json FROM report_revisions WHERE case_id=? ORDER BY revision', (case_id,))]
         for revision in case['revisions']:
@@ -101,6 +101,9 @@ class CaseService:
             return result
 
     def _apply(self, db, action, body, case):
+        if action == 'create-incident' and case is None:
+            from .case_workflow import create_incident
+            return create_incident(self, db, body)
         if action in ('create', 'import-draft') and case is None:
             run_id = required(body, 'source_run_id')
             cve = required(body, 'cve')
@@ -143,6 +146,8 @@ class CaseService:
             if case['report']:
                 self.revision(db, case['id'], self.store._report_payload(self.get(case['id'], db)))
         elif action == 'confirm-measure':
+            if case['case_type'] != 'vulnerability':
+                raise CaseError('measure confirmation is a vulnerability operation; use incident assessment')
             if case['measure_available_at'] and timestamp(body.get('measure_available_at')) != case['measure_available_at']:
                 required(body, 'reason')
             from .case_workflow import persist_clocks

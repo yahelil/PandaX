@@ -1,5 +1,7 @@
 """Reviewed case clocks. Scan-time demo clocks never enter this state."""
 import datetime as dt
+import calendar
+import uuid
 
 from .cases import CaseError, _json, _utc_now
 from .case_review import timestamp
@@ -13,10 +15,44 @@ def clocks(case, state):
         awareness = dt.datetime.fromisoformat(state['aware_at'].replace('Z', '+00:00'))
         for stage, hours in (('early_warning', 24), ('notification', 72)):
             result[stage] = timestamp((awareness + dt.timedelta(hours=hours)).isoformat())
-    if case.get('measure_available_at'):
+    if case['case_type'] == 'incident':
+        if state.get('notification_submitted_at'):
+            notification = dt.datetime.fromisoformat(state['notification_submitted_at'].replace('Z', '+00:00'))
+            year = notification.year + (notification.month == 12)
+            month = notification.month % 12 + 1
+            result['final_report'] = timestamp(notification.replace(year=year, month=month, day=min(notification.day, calendar.monthrange(year, month)[1])).isoformat())
+    elif case.get('measure_available_at'):
         available = dt.datetime.fromisoformat(case['measure_available_at'].replace('Z', '+00:00'))
         result['final_report'] = timestamp((available + dt.timedelta(days=14)).isoformat())
     return result
+
+
+def create_incident(service, db, body):
+    from .case_service import required
+    from .case_review import attestation, record
+    identity = attestation(body)
+    case_id = 'case-' + uuid.uuid4().hex[:12]
+    state = {'incident': {key: required(body, key) for key in ('title', 'severity', 'impact')}, 'product': {'name': required(body, 'product_name'), 'version': required(body, 'product_version')}, 'reportability': 'under_review'}
+    state['incident'].update({key: str(body.get(key, '')) for key in ('mitigation', 'root_cause')})
+    now = _utc_now()
+    db.execute("INSERT INTO remediation_cases(id,source_run_id,cve,component,component_version,purl,finding_json,status,created_at,updated_at,case_type,state_json) VALUES(?,?,NULL,'','','','{}','under_review',?,?,'incident',?)", (case_id, body.get('source_run_id') or '', now, now, _json(state)))
+    case = service.get(case_id, db)
+    if body.get('source_run_id'):
+        service.link_run(db, case_id, body['source_run_id'], 'source')
+    else:
+        product_id = hashlib_product(state['product']['name'])
+        release_id = hashlib_product(_json([product_id, state['product']['version']]))
+        db.execute('INSERT OR IGNORE INTO products VALUES (?,?)', (product_id, state['product']['name']))
+        db.execute('INSERT OR IGNORE INTO releases VALUES (?,?,?)', (release_id, product_id, state['product']['version']))
+        state['release_id'] = release_id
+    persist_clocks(service, db, case, state)
+    record(service, db, case, 'incident_recorded', {**identity, **state['incident']}, now, identity['operator'], 'decisions')
+    return case_id
+
+
+def hashlib_product(value):
+    import hashlib
+    return hashlib.sha256(value.casefold().encode()).hexdigest()
 
 
 def persist_clocks(service, db, case, state):

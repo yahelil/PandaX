@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from pandax import native, scenarios, pipeline, server, context
 from pandax.context import new_run_dir
+from pandax.context import Finding
 from pandax.stages.ingest import _extract_tar, UnsafeArtifact
 
 
@@ -121,8 +122,9 @@ def test_selector_available_before_downloads_and_validates_ids(monkeypatch):
     monkeypatch.setattr(server, 'CURRENT', None)
     client = TestClient(server.api)
     items = client.get('/api/artifacts').json()
-    assert len([i for i in items if i['path'].startswith('scenario:')]) == 4
-    assert len([i for i in items if i['path'].startswith('release:')]) == 8
+    assert len([i for i in items if i['path'].startswith('scenario:')]) == 5
+    assert len([i for i in items if i['path'].startswith('release:')]) == 10
+    assert any(i['path'] == 'scenario:tomcat-partial-put' for i in items)
     assert client.post('/api/scan', json={'artifact': 'scenario:invalid'}).status_code == 400
     assert client.post('/api/scan', json={'artifact': ''}).status_code == 400
     calls = []
@@ -150,3 +152,43 @@ def test_both_sides_attempted_and_failure_report_is_sealed(tmp_path, monkeypatch
 
 def test_fast_runs_do_not_overwrite_each_other(tmp_path):
     assert new_run_dir(tmp_path)[0] != new_run_dir(tmp_path)[0]
+
+
+@pytest.mark.parametrize('version,found,passed,state', [
+    ('9.0.98', True, True, 'affected'),
+    ('9.0.98', False, False, 'not_detected'),
+    ('9.0.99', False, True, 'fixed'),
+    ('9.0.99', True, False, 'affected'),
+])
+def test_tomcat_real_patch_requires_inventory_and_differential_findings(ctx, version, found, passed, state):
+    purl = f'pkg:maven/org.apache.tomcat/tomcat-catalina@{version}'
+    ctx.components = [dict(name='catalina', version=version, purl=purl)]
+    ctx.findings = [Finding(cve='CVE-2025-24813', osv_id='GHSA-83qj-6fr2-vhqg',
+                           purl=purl, component='catalina', version=version, summary='Partial PUT')] if found else []
+    result = scenarios.check_release(ctx, scenarios.RELEASES[f'tomcat-{version}'])
+    assert result['passed'] is passed
+    assert result['checks'][0]['observed'] == state
+    assert result['checks'][0]['patch'].startswith('https://github.com/apache/tomcat/commit/')
+
+
+@pytest.mark.parametrize('components', [
+    [],
+    [dict(name='tomcat-catalina', version='9.0.99', purl='pkg:maven/other/tomcat-catalina@9.0.99')],
+    [dict(name='catalina', version='9.0.98', purl='pkg:maven/org.apache.tomcat/tomcat-catalina@9.0.98')],
+    [dict(name='catalina', version='9.0.98', purl='pkg:maven/org.apache.tomcat/tomcat-catalina@9.0.99')],
+    [dict(name='catalina', version=v, purl=f'pkg:maven/org.apache.tomcat/tomcat-catalina@{v}')
+     for v in ('9.0.98', '9.0.99')],
+])
+def test_tomcat_missing_wrong_or_mixed_component_cannot_pass(ctx, components):
+    ctx.components = components
+    ctx.findings = []
+    result = scenarios.check_release(ctx, scenarios.RELEASES['tomcat-9.0.99'])
+    assert not result['passed']
+    assert result['checks'][0]['observed'] == 'unknown'
+
+
+def test_tomcat_other_vulnerabilities_do_not_fail_targeted_patch_check(ctx):
+    ctx.components = [dict(name='catalina', version='9.0.99',
+                           purl='pkg:maven/org.apache.tomcat/tomcat-catalina@9.0.99?type=jar')]
+    # Existing fixture findings concern other components and CVEs.
+    assert scenarios.check_release(ctx, scenarios.RELEASES['tomcat-9.0.99'])['passed']

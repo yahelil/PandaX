@@ -24,13 +24,15 @@ artifact.zip                         existing-sbom.json
 
 ---
 
-## OpenWrt, curl and OpenSSL release comparisons
+## Tomcat, OpenWrt, curl and OpenSSL release comparisons
 
-The dashboard selector includes four downloadable release comparisons and all
-eight individual releases. Run `uv run pandax compare list` for CLI ids.
+The dashboard selector includes five downloadable release comparisons and all
+ten individual releases. Run `uv run pandax compare list` for CLI ids.
 Comparisons show passes, failures, package-variant exclusions and vendor evidence;
 failed downloads/scans remain visible and do not stop the other release being tested.
 See [the scenario guide](docs/release-scenarios.md) for instructions and limitations.
+Tomcat uses official server binaries before and after the CVE-2025-24813 patch
+(9.0.98 → 9.0.99), including bundled libraries, configuration and example webapps.
 OpenWrt uses official firmware rootfs archives; curl/OpenSSL use official source
 releases. These are inventory/advisory tests, not runtime exploit tests.
 

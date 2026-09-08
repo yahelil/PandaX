@@ -27,6 +27,11 @@ MIGRATIONS = (
         "CREATE TABLE submissions (id TEXT PRIMARY KEY, case_id TEXT NOT NULL, revision INTEGER NOT NULL, report_hash TEXT NOT NULL, payload_json TEXT NOT NULL, FOREIGN KEY(case_id, revision) REFERENCES report_revisions(case_id, revision))",
         "CREATE TABLE receipts (id TEXT PRIMARY KEY, submission_id TEXT NOT NULL REFERENCES submissions(id), content BLOB NOT NULL, sha256 TEXT NOT NULL, payload_json TEXT NOT NULL)",
     ),
+    tuple(
+        f"CREATE TRIGGER immutable_{table}_{action.lower()} BEFORE {action} ON {table} BEGIN SELECT RAISE(ABORT, 'immutable case history'); END"
+        for table in ('case_events', 'report_revisions', 'approvals', 'decisions', 'awareness_evidence')
+        for action in ('UPDATE', 'DELETE')
+    ),
 )
 
 

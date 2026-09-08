@@ -171,6 +171,7 @@ function renderCases(cases) {
     item.events.forEach((event) => events.append(el("li", "", `${event.recorded_at} · ${event.event_type} · ${event.actor || "system"}`)));
     history.append(events);
     card.append(history);
+    card.append(reviewForm(item));
     host.append(card);
   }
 }
@@ -184,4 +185,54 @@ async function loadCases() {
 }
 
 $("refresh-cases").addEventListener("click", loadCases);
+
+function reviewForm(item) {
+  const details = el('details');
+  details.append(el('summary', '', 'Review facts and report'));
+  details.append(el('pre', '', JSON.stringify(item.state, null, 2)));
+  details.append(el('p', 'sub', item.approved ? 'Latest revision approved' : 'Review required — latest revision is not approved'));
+  const form = el('form', 'case-grid');
+  form.innerHTML = `
+    <label>Action<select name="action">
+      <option value="record-awareness">Record or correct factual dates</option>
+      <option value="record-decision">Decide reportability</option>
+      <option value="revise">Save report revision</option>
+      <option value="approve">Approve latest exact revision</option>
+    </select></label>
+    <label>Named operator<input name="operator" required></label>
+    <label>Authority attestation<input name="authority_attestation" required></label>
+    <label>Occurrence time (ISO with timezone)<input name="occurred_at" placeholder="2026-09-08T12:00:00Z"></label>
+    <label>Detection time (ISO with timezone)<input name="detected_at"></label>
+    <label>Awareness time (ISO with timezone)<input name="aware_at"></label>
+    <label>Evidence<textarea name="evidence"></textarea></label>
+    <label>Reason / correction reason<textarea name="reason"></textarea></label>
+    <label>Reportability<select name="reportability"><option>under_review</option><option>reportable</option><option>not_reportable</option></select></label>
+    <label>Report content (JSON)<textarea name="payload">{}</textarea></label>
+    <button class="btn primary">Save reviewed action</button>`;
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(form));
+    const action = values.action;
+    const body = {operator: values.operator, authority_attestation: values.authority_attestation};
+    if (action === 'record-awareness') {
+      for (const key of ['occurred_at', 'detected_at', 'aware_at', 'evidence', 'reason']) if (values[key]) body[key] = values[key];
+    } else if (action === 'record-decision') {
+      Object.assign(body, {reportability: values.reportability, evidence: values.evidence, reason: values.reason});
+    } else if (action === 'approve') {
+      Object.assign(body, {revision: item.report?.revision, report_hash: item.report?.report_hash, approved_at: new Date().toISOString()});
+    }
+    try {
+      if (action === 'revise') Object.assign(body, {payload: JSON.parse(values.payload), reason: values.reason});
+      await caseRequest(`/api/cases/${item.id}/${action}`, {method: 'POST', body: JSON.stringify(body)});
+      await loadCases();
+      caseMessage('Recorded. Earlier evidence and revisions remain in history.');
+    } catch (error) { caseMessage(error.message, true); }
+  });
+  details.append(form);
+  const revisions = el('details');
+  revisions.append(el('summary', '', `${item.revisions.length} immutable report revision(s)`));
+  revisions.append(el('pre', '', JSON.stringify(item.revisions, null, 2)));
+  details.append(revisions);
+  return details;
+}
 

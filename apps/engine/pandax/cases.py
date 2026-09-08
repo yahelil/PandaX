@@ -272,6 +272,7 @@ class CaseStore:
             "document_type": "CRA Article 14 actively exploited vulnerability final-report draft",
             "submission_status": "REVIEW REQUIRED - not submitted",
             "case_id": case["id"],
+            "case_facts": case.get("state", {}),
             "source_run_id": case["source_run_id"],
             "vulnerability": {
                 "cve": case["cve"],

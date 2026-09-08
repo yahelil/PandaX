@@ -41,6 +41,9 @@ app = typer.Typer(
     no_args_is_help=True,
     help="CRA Compliance-in-a-Box: artifact in, verifiable Annex VII dossier out.",
 )
+from .case_cli import app as case_app
+app.add_typer(case_app, name="case")
+
 # legacy_windows=False keeps Rich off the win32 console API, which cannot
 # render UTF-8 and is never needed on a modern terminal.
 console = Console(legacy_windows=False)

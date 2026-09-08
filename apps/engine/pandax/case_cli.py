@@ -42,6 +42,7 @@ def export(case_id: str, format: str = 'json', revision: Optional[int] = None, d
     try:
         content = render(CaseService().get(case_id), revision, format)
         if destination:
+            protect_scan_destination(destination)
             # Never overwrite an existing artifact or an original scan file.
             with destination.open('x', encoding='utf-8') as file:
                 file.write(content)
@@ -50,3 +51,24 @@ def export(case_id: str, format: str = 'json', revision: Optional[int] = None, d
     except (CaseError, OSError) as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
+
+
+@app.command('download-snapshot')
+def download_snapshot(case_id: str, snapshot_id: str, destination: Path):
+    from .case_snapshot import snapshot_bytes
+    try:
+        protect_scan_destination(destination)
+        content = snapshot_bytes(CaseService(), case_id, snapshot_id)
+        with destination.open('xb') as file:
+            file.write(content)
+    except (CaseError, OSError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+
+
+def protect_scan_destination(destination):
+    from .context import OUT_DIR
+    resolved = destination.resolve()
+    root = OUT_DIR.resolve()
+    if resolved.is_relative_to(root) and resolved.relative_to(root).parts[0].startswith('run-'):
+        raise CaseError('exports cannot be written inside original scan bundles')

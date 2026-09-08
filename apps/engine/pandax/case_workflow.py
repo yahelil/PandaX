@@ -34,6 +34,7 @@ def create_incident(service, db, body):
     case_id = 'case-' + uuid.uuid4().hex[:12]
     state = {'incident': {key: required(body, key) for key in ('title', 'severity', 'impact')}, 'product': {'name': required(body, 'product_name'), 'version': required(body, 'product_version')}, 'reportability': 'under_review'}
     state['incident'].update({key: str(body.get(key, '')) for key in ('mitigation', 'root_cause')})
+    state['simulated'] = body.get('simulated', False)
     now = _utc_now()
     db.execute("INSERT INTO remediation_cases(id,source_run_id,cve,component,component_version,purl,finding_json,status,created_at,updated_at,case_type,state_json) VALUES(?,?,NULL,'','','','{}','under_review',?,?,'incident',?)", (case_id, body.get('source_run_id') or '', now, now, _json(state)))
     case = service.get(case_id, db)
@@ -45,6 +46,7 @@ def create_incident(service, db, body):
         db.execute('INSERT OR IGNORE INTO products VALUES (?,?)', (product_id, state['product']['name']))
         db.execute('INSERT OR IGNORE INTO releases VALUES (?,?,?)', (release_id, product_id, state['product']['version']))
         state['release_id'] = release_id
+        db.execute('UPDATE remediation_cases SET release_id=? WHERE id=?', (release_id, case_id))
     persist_clocks(service, db, case, state)
     record(service, db, case, 'incident_recorded', {**identity, **state['incident']}, now, identity['operator'], 'decisions')
     return case_id
@@ -68,13 +70,17 @@ def clock_status(deadlines, now=None):
     return {stage: 'pending' if not value else 'overdue' if dt.datetime.fromisoformat(value.replace('Z', '+00:00')) <= now else 'scheduled' for stage, value in deadlines.items()}
 
 
-def prepare_report(service, db, case, body):
+def prepare_report(service, db, case, body, amends_submission_id=None):
     from .case_service import required
     from .case_review import attestation, record
     identity = attestation(body)
     stage = required(body, 'stage')
     if stage not in STAGES:
         raise CaseError('unknown reporting stage')
+    if not amends_submission_id and case['report'] and case['report']['payload'].get('stage') == stage:
+        amends_submission_id = case['report']['payload'].get('amends_submission_id')
+    if not amends_submission_id and any(s['payload']['stage'] == stage and s['payload']['result'] == 'submitted' and s['payload']['simulated'] == case['state'].get('simulated', False) for s in case['submissions']):
+        raise CaseError('this stage was submitted; use amend to link the earlier submission')
     fields = body.get('fields', {})
     if not isinstance(fields, dict):
         raise CaseError('fields must be an object')
@@ -88,6 +94,9 @@ def prepare_report(service, db, case, body):
         'measure_details': case['measure_details'],
         'fields': fields, 'field_definition': {key: definition[key] for key in ('version', 'source', 'retrieved_at')}, 'review_status': 'unreviewed',
         'submission_status': 'prepared - not submitted',
+        'simulated': case['state'].get('simulated', False),
     }
+    if amends_submission_id:
+        payload['amends_submission_id'] = amends_submission_id
     revision = service.revision(db, case['id'], payload)
-    record(service, db, case, 'report_prepared', {**identity, 'stage': stage, 'revision': revision}, _utc_now(), identity['operator'])
+    record(service, db, case, 'amendment_prepared' if amends_submission_id else 'report_prepared', {**identity, 'stage': stage, 'revision': revision, 'amends_submission_id': amends_submission_id, 'reason': body.get('reason')}, _utc_now(), identity['operator'])

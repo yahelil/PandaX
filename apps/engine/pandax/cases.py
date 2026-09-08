@@ -93,7 +93,7 @@ class CaseStore:
                 """
             )
 
-    def create(self, source_run_id: str, finding: dict[str, Any], db=None) -> dict[str, Any]:
+    def create(self, source_run_id: str, finding: dict[str, Any], db=None, simulated=False) -> dict[str, Any]:
         required = ("cve", "component", "version", "purl")
         if any(not finding.get(key) for key in required):
             raise CaseError("finding requires cve, component, version and purl")
@@ -116,6 +116,8 @@ class CaseStore:
                     finding["version"], finding["purl"], _json(finding), now, now,
                 ),
             )
+            if simulated:
+                db.execute('UPDATE remediation_cases SET state_json=? WHERE id=?', (_json({'simulated': True}), case_id))
             self._event(db, case_id, "finding_recorded", now, "PandaX", finding)
             return self.get(case_id, db)
 
@@ -179,6 +181,7 @@ class CaseStore:
         authority_attestation: str,
         measure_details: str,
         db=None,
+        create_report=True,
     ) -> dict[str, Any]:
         if not operator.strip():
             raise CaseError("named operator is required")
@@ -209,6 +212,8 @@ class CaseStore:
             }
             self._event(db, case_id, "measure_confirmed", available_utc, operator.strip(), payload)
             updated = self.get(case_id, db)
+            if not create_report:
+                return updated
             report = self._report_payload(updated)
             report_json = _json(report)
             revision = db.execute(
@@ -230,6 +235,8 @@ class CaseStore:
         owns_connection = db is None
         db = db or self._connect()
         try:
+            if owns_connection:
+                db.execute('BEGIN')
             row = db.execute("SELECT * FROM remediation_cases WHERE id=?", (case_id,)).fetchone()
             if not row:
                 raise CaseNotFound(f"case not found: {case_id}")
@@ -261,6 +268,9 @@ class CaseStore:
         self, db: sqlite3.Connection, case_id: str, event_type: str,
         occurred_at: str, actor: str, payload: dict[str, Any],
     ) -> None:
+        state = db.execute('SELECT state_json FROM remediation_cases WHERE id=?', (case_id,)).fetchone()
+        if state and json.loads(state['state_json']).get('simulated'):
+            payload = {**payload, 'simulated': True}
         db.execute(
             "INSERT INTO case_events (case_id, event_type, occurred_at, recorded_at, actor, payload_json) VALUES (?, ?, ?, ?, ?, ?)",
             (case_id, event_type, occurred_at, _utc_now(), actor, _json(payload)),

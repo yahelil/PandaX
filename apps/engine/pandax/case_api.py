@@ -16,6 +16,27 @@ def fields(case_type: str, stage: str):
     return call(lambda: definitions(case_type, stage))
 
 
+@router.get('/api/cases/{case_id}/snapshots/{snapshot_id}')
+def download_snapshot(case_id: str, snapshot_id: str):
+    from .case_snapshot import snapshot_bytes
+    content = call(lambda: snapshot_bytes(service(), case_id, snapshot_id))
+    return Response(content, media_type='application/zip', headers={'Content-Disposition': 'attachment; filename="case-snapshot.zip"'})
+
+
+@router.get('/api/cases/{case_id}/receipts/{receipt_id}')
+def download_receipt(case_id: str, receipt_id: str):
+    def read():
+        import hashlib
+        with service().store._connect() as db:
+            row = db.execute('SELECT r.content, r.sha256 FROM receipts r JOIN submissions s ON r.submission_id=s.id WHERE r.id=? AND s.case_id=?', (receipt_id, case_id)).fetchone()
+            if not row:
+                raise CaseNotFound('receipt not found')
+            if hashlib.sha256(row['content']).hexdigest() != row['sha256']:
+                raise CaseError('receipt digest mismatch')
+            return row['content']
+    return Response(call(read), media_type='application/octet-stream', headers={'Content-Disposition': 'attachment; filename="receipt.bin"'})
+
+
 @router.get('/api/cases/{case_id}/export')
 def export(case_id: str, revision: int | None = None, format: str = 'json'):
     from .case_export import render

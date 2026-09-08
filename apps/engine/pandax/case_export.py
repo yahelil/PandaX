@@ -23,8 +23,13 @@ def pack(case, revision=None):
     missing = missing_fields(report['payload'])
     approved = any(a['revision'] == report['revision'] and a['report_hash'] == report['report_hash'] for a in case['approvals'])
     current = report['revision'] == case['report']['revision']
-    ready = approved and current and not missing
-    return {'format': 'PandaX internal manual submission pack', 'case_id': case['id'], 'revision': report['revision'], 'report_hash': report['report_hash'], 'ready': ready, 'status': 'Ready for manual submission — not submitted' if ready else 'INCOMPLETE / REVIEW REQUIRED — not ready', 'missing': missing, 'approved': approved, 'current_revision': current, 'report': report['payload'], 'checklist': CHECKLIST}
+    simulated = case['state'].get('simulated', False)
+    submitted = [s for s in case.get('submissions', []) if s['revision'] == report['revision'] and s['payload']['result'] == 'submitted' and s['payload']['simulated'] == simulated]
+    ready = approved and current and not missing and not submitted
+    status = ('Acknowledged' if any(s['receipts'] for s in submitted) else 'Operator-recorded submitted') if submitted else 'Ready for manual submission — not submitted' if ready else 'INCOMPLETE / REVIEW REQUIRED — not ready'
+    if simulated:
+        status = 'SIMULATED — ' + status
+    return {'format': 'PandaX internal manual submission pack', 'case_id': case['id'], 'revision': report['revision'], 'report_hash': report['report_hash'], 'ready': ready, 'status': status, 'simulated': simulated, 'submissions': submitted, 'missing': missing, 'approved': approved, 'current_revision': current, 'report': report['payload'], 'checklist': CHECKLIST}
 
 
 def render(case, revision=None, format='json'):

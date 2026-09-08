@@ -26,7 +26,7 @@
   </div>
   <div class="appbar-right">
     <span class="seal-pill" id="seal-pill" hidden></span>
-    <span class="run-id" id="appbar-run">no run yet</span>
+    <span class="run-id" id="appbar-run">no result selected</span>
   </div>
 </header>
 
@@ -69,31 +69,31 @@
       <div class="view-head">
         <div>
           <h1>Dashboard</h1>
-          <p class="sub" id="product-line">Run the pipeline to produce a sealed evidence bundle.</p>
+          <p class="sub" id="product-line">Choose a saved result or start a new analysis.</p>
         </div>
         <div class="run-switcher">
-          <label for="run-history">Selected run</label>
-          <select id="run-history" aria-label="Selected run"></select>
-          <button id="open-run-history" class="btn" type="button">All runs</button>
-          <button id="new-scan" class="btn primary" type="button">New scan</button>
+          <label for="run-history">Viewing saved result</label>
+          <select id="run-history" aria-label="Saved analysis result"></select>
+          <button id="open-run-history" class="btn" type="button">All saved results</button>
+          <button id="new-scan" class="btn primary" type="button">Start analysis</button>
         </div>
       </div>
 
       <details id="scan-panel" class="card disclosure scan-panel">
-        <summary>Start new scan</summary>
+        <summary>Start new analysis</summary>
         <div class="scan-body">
-          <p class="sub">Choose a product artifact or upload an existing JSON SBOM. Progress appears in Execution details.</p>
+          <p class="sub">Analyze a software package, compare two releases, or upload an existing component inventory (SBOM). Progress appears in Execution details.</p>
           <div class="runner">
           <div class="source-toggle" role="group" aria-label="Pipeline input">
-            <button type="button" id="mode-artifact" class="source-option active" aria-pressed="true">Product artifact</button>
-            <button type="button" id="mode-sbom" class="source-option" aria-pressed="false">SBOM file</button>
+            <button type="button" id="mode-artifact" class="source-option active" aria-pressed="true">Package or release pair</button>
+            <button type="button" id="mode-sbom" class="source-option" aria-pressed="false">Existing SBOM</button>
           </div>
-          <select id="artifact" aria-label="Artifact to scan"></select>
+          <select id="artifact" aria-label="Software package or release comparison"></select>
           <label id="sbom-picker" class="file-picker" hidden>
             <input id="sbom-file" type="file" accept=".json,application/json">
-            <span id="sbom-filename">Choose JSON SBOM</span>
+            <span id="sbom-filename">Choose an SBOM JSON file</span>
           </label>
-          <button id="run" class="btn primary">Run pipeline</button>
+          <button id="run" class="btn primary">Start analysis</button>
           </div>
           <p id="artifact-note" class="sub"></p>
         </div>
@@ -102,21 +102,21 @@
       <article id="decision-card" class="card decision-card" aria-live="polite">
         <div>
           <p class="decision-kicker" id="decision-kicker">Release readiness</p>
-          <h2 id="decision-title">Awaiting a run</h2>
-          <p id="decision-detail">Select an existing run or start a new scan.</p>
+          <h2 id="decision-title">No result selected</h2>
+          <p id="decision-detail">Choose a saved result above or start a new analysis.</p>
         </div>
         <div class="decision-side">
           <p id="decision-deadline" class="decision-deadline"></p>
-          <button id="decision-primary" class="btn primary" type="button">Start scan</button>
+          <button id="decision-primary" class="btn primary" type="button">Start analysis</button>
         </div>
       </article>
 
-      <h2 class="section">Selected run</h2>
+      <h2 class="section">Result summary</h2>
       <div class="cards metrics">
         <article class="card stat">
           <h3 id="s-components-label">Components</h3>
           <div class="figure"><span class="dot blue" id="s-components-dot"></span><b id="s-components">—</b></div>
-          <p class="note" id="s-components-note">awaiting first run</p>
+          <p class="note" id="s-components-note">no result selected</p>
         </article>
 
         <article class="card stat">
@@ -134,7 +134,7 @@
         <article class="card stat">
           <h3 id="s-dossiers-label">Signed files</h3>
           <div class="figure"><span class="dot green" id="s-dossiers-dot"></span><b id="s-dossiers">—</b></div>
-          <p class="note" id="s-dossiers-note">in selected run</p>
+          <p class="note" id="s-dossiers-note">in this saved result</p>
         </article>
       </div>
 
@@ -180,7 +180,7 @@
             </summary>
             <ol class="steps" id="steps"></ol>
             <div class="console" id="log">
-              <p class="placeholder">Start a scan to stream stage inputs, outputs, and SHA-256 digests.</p>
+              <p class="placeholder">Start an analysis to stream stage inputs, outputs, and SHA-256 digests.</p>
             </div>
           </details>
         </div>
@@ -247,7 +247,7 @@
     <section class="view" data-view="cases" hidden>
       <div class="view-head"><div>
         <h1>Remediation Cases</h1>
-        <p class="sub">PandaX detects and compares. A named manufacturer operator confirms when a measure is available. Scan bundles remain immutable.</p>
+        <p class="sub">PandaX detects and compares. A named manufacturer operator confirms when a measure is available. Saved analysis results remain immutable.</p>
       </div>
         <button id="refresh-cases" class="btn">Refresh cases</button>
       </div>
@@ -259,7 +259,7 @@
     <section class="view" data-view="reports" hidden>
       <div class="view-head"><div>
         <h1>Documents</h1>
-        <p class="sub">Documents produced by this run. Every one is covered by the signed manifest.</p>
+        <p class="sub">Documents in this saved result. Every file is covered by the signed manifest.</p>
       </div></div>
       <div class="cards docs" id="reports-body"></div>
     </section>
@@ -293,17 +293,17 @@
 <dialog id="run-dialog" class="run-dialog" aria-labelledby="run-dialog-title">
   <form method="dialog" class="dialog-head">
     <div>
-      <h2 id="run-dialog-title">All saved runs</h2>
-      <p class="sub">Search by product, result, run ID, or date.</p>
+      <h2 id="run-dialog-title">All saved results</h2>
+      <p class="sub">Each result is a package analysis or a release comparison.</p>
     </div>
     <button class="btn" value="close">Close</button>
   </form>
-  <label class="search-field" for="run-search">Search runs
-    <input id="run-search" type="search" autocomplete="off" placeholder="Search saved runs">
+  <label class="search-field" for="run-search">Search saved results
+    <input id="run-search" type="search" autocomplete="off" placeholder="Search by product, result ID, or date">
   </label>
   <div id="run-list" class="run-list"></div>
 </dialog>
 
-<script src="/app.js?v=dashboard-clarity-5"></script>
+<script src="/app.js?v=dashboard-terminology-6"></script>
 </body>
 </html>

@@ -1,0 +1,14 @@
+{
+  "38940a585577dd145858648e849786602c847bac964569548319a3afe889dc87": {
+    "name": "tomcat-catalina",
+    "version": "9.0.98",
+    "purl": "pkg:maven/org.apache.tomcat/tomcat-catalina@9.0.98",
+    "url": "https://repo.maven.apache.org/maven2/org/apache/tomcat/tomcat-catalina/9.0.98/tomcat-catalina-9.0.98.jar"
+  },
+  "cb2d036af587c69220d3248af73edbb8e39228e0b0920b3e49f6f0c09ce08e26": {
+    "name": "tomcat-catalina",
+    "version": "9.0.99",
+    "purl": "pkg:maven/org.apache.tomcat/tomcat-catalina@9.0.99",
+    "url": "https://repo.maven.apache.org/maven2/org/apache/tomcat/tomcat-catalina/9.0.99/tomcat-catalina-9.0.99.jar"
+  }
+}

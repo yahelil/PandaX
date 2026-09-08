@@ -389,6 +389,11 @@ def run(ctx: RunContext) -> ev.Stream:
         raise SbomError(f"syft failed (exit {proc.returncode}): {proc.stderr.strip()}")
 
     sbom = json.loads(out_path.read_text(encoding="utf-8"))
+    raw_path = ctx.path("sbom.syft.json")
+    shutil.copyfile(out_path, raw_path)
+    from ..package_identity import enrich
+    resolved = enrich(sbom, ctx.extracted_dir)
+    yield ev.log(STAGE, f"publisher binary identities verified by SHA-256: {resolved}")
     from ..native import inventory, enrich_sbom
     ctx.native_inventory = inventory(ctx.extracted_dir)
     enrich_sbom(sbom, ctx.native_inventory)
@@ -450,8 +455,9 @@ def run(ctx: RunContext) -> ev.Stream:
         tool="syft",
         tool_version=version,
         inputs=[ctx.ledger.ref(ctx.path("ingest_tree.json"))],
-        outputs=[ctx.ledger.ref(out_path), ctx.ledger.ref(native_path)],
+        outputs=[ctx.ledger.ref(out_path), ctx.ledger.ref(raw_path), ctx.ledger.ref(native_path)],
         params={"format": f"cyclonedx-json@{CDX_VERSION}", "source_name": name,
+                "publisher_identity": "pandax.package_identity/1",
                 "native_adapter": "pandax.native/1"},
     )
     yield ev.done(STAGE, f"{len(components)} components inventoried")

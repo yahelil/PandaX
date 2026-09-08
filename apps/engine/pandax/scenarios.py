@@ -65,6 +65,9 @@ def check_release(ctx, release: dict) -> dict:
             continue
         before = release['id'] == scenario['before']
         for cve in scenario['cves']:
+            if scenario.get('package'):
+                checks.append(_check_package(ctx, release, scenario, cve, before))
+                continue
             rows = [a for a in assessments if a['component'] == scenario['component'] and a['cve'] == cve]
             state = rows[0]['state'] if len(rows) == 1 else 'unknown'
             expected = 'affected' if before else 'fixed'
@@ -81,6 +84,27 @@ def check_release(ctx, release: dict) -> dict:
                 detail=rows[0]['detail'] if len(rows) == 1 else 'Required component was not identified unambiguously.'))
     return {'release': release, 'checks': checks, 'passed': bool(checks) and all(c['passed'] for c in checks),
             'scope': 'Vendor advisory and component evidence. Not a runtime exploit test or a claim that the release has no other CVEs.'}
+
+
+def _check_package(ctx, release: dict, scenario: dict, cve: str, before: bool) -> dict:
+    """Compare OSV findings with vendor expectations, without changing matching."""
+    def identity(purl):
+        return purl.split('#', 1)[0].split('?', 1)[0].rpartition('@')
+
+    components = [c for c in ctx.components if identity(c.get('purl', ''))[0] == scenario['package']]
+    versions = {identity(c['purl'])[2] for c in components}
+    identified = versions == {release['version']} and all(
+        c['version'] == release['version'] for c in components)
+    present = any(f.cve == cve and identity(f.purl)[0] == scenario['package'] for f in ctx.findings)
+    expected = 'affected' if before else 'fixed'
+    state = ('affected' if present else 'not_detected' if before else 'fixed') if identified else 'unknown'
+    detail = scenario['note'] + ' '
+    detail += ('Component revision verified in the SBOM; checked-source finding ' +
+               ('present.' if present else 'absent.')) if identified else 'Required component revision is missing or ambiguous.'
+    return dict(scenario=scenario['id'], cve=cve, expected=expected, observed=state,
+                component=scenario['component'], component_version=', '.join(sorted(versions)),
+                finding_present=present, passed=state == expected,
+                source=scenario['source'], patch=scenario['patch'], detail=detail)
 
 
 def comparison_report(scenario: dict, bundles: list[Path | None], errors: list[str] | None = None) -> dict:

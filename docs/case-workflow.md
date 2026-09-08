@@ -40,3 +40,11 @@ fields object, plus operator/authority_attestation. Preparation is not submissio
 Awareness starts 24h/72h clocks; actual measure availability starts the vulnerability
 14-day final clock. Missing dates remain pending. Corrections record old/new clocks;
 review does not change factual trigger dates. See ENISA's CRA SRP FAQ (2026-09-08).
+
+`create-incident` (POST `/api/cases/create-incident`) accepts title, product_name,
+product_version, severity, impact, operator and authority_attestation; a source
+run is optional. `assess-incident` updates severity/impact/mitigation/root_cause
+with evidence and reason. Incidents have no required CVE. Their final clock stays
+pending until notification submission, then adds one calendar month in UTC,
+clamping to the last day for short months. Vulnerability measure dates never
+drive incident clocks. Submission records supply this trigger, not draft dates.

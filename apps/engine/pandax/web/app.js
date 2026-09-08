@@ -250,14 +250,41 @@ async function loadRun(id) {
   renderArticle14();
   renderReports();
   renderLedger();
-  $("run-history").value = runId;
-  ["tamper", "tamper2"].forEach((id) => {
-    if ($(id)) $(id).disabled = Boolean(DATA.comparison);
-  });
+  populateRecentRuns();
+  $("tamper2").disabled = Boolean(DATA.comparison);
   runVerify();
 }
 
 // ----------------------------------------------------------------- overview
+
+function setMetric(name, label, value, note, tone = "blue") {
+  $(`s-${name}-label`).textContent = label;
+  $(`s-${name}`).textContent = value;
+  $(`s-${name}-note`).textContent = note;
+  const dot = name === "kev" ? $("kev-dot") : $(`s-${name}-dot`);
+  dot.className = `dot ${tone}`;
+  $(`s-${name}-note`).className = `note${tone === "red" ? " danger" : ""}`;
+}
+
+function nearestDeadline() {
+  const now = new Date();
+  const dates = DATA.incidents.flatMap((incident) =>
+    Object.values(incident.deadlines || {}).filter(Boolean).map((value) => new Date(value))
+  ).filter((date) => !Number.isNaN(date.valueOf())).sort((a, b) => a - b);
+  if (!dates.length) return "";
+  const next = dates.find((date) => date >= now) || dates[dates.length - 1];
+  return `${next < now ? "Latest deadline was" : "Next deadline"} ${fmtDateTime(next)}`;
+}
+
+function setDecision(tone, kicker, title, detail, deadline, action, actionLabel) {
+  $("decision-card").className = `card decision-card ${tone}`;
+  $("decision-kicker").textContent = kicker;
+  $("decision-title").textContent = title;
+  $("decision-detail").textContent = detail;
+  $("decision-deadline").textContent = deadline;
+  $("decision-primary").dataset.action = action;
+  $("decision-primary").textContent = actionLabel;
+}
 
 function renderOverview() {
   const s = DATA.stats;
@@ -267,40 +294,18 @@ function renderOverview() {
     ? `${p.name} ${p.version || ""} · ${p.type || "product with digital elements"} · ${(p.risk_tier || "default").toUpperCase()} tier · ${p.conformity_route || ""}`
     : "Sealed evidence bundle.";
 
-  const banner = $("blocked-banner");
-  if (banner && s.kev) {
-    banner.hidden = false;
-    banner.innerHTML =
-      `<b>EU Declaration of Conformity blocked.</b> ${s.kev} actively exploited ` +
-      `${s.kev === 1 ? "vulnerability is" : "vulnerabilities are"} present. ` +
-      `Annex I Part I(2)(a) requires products to be placed on the market without ` +
-      `known exploitable vulnerabilities.`;
-  } else if (banner) {
-    banner.hidden = true;
-  }
-
-  $("s-components").textContent = s.components;
   const source = s.input_type === "sbom"
     ? `${s.sbom_source_format} ${s.sbom_source_version} · ${s.matchable_components} matchable` +
       (s.skipped_components ? ` · ${s.skipped_components} not scanned` : "")
     : (s.ecosystems || "inventoried from the artifact");
-  $("s-components-note").textContent = source;
 
-  $("s-complete").textContent = s.completeness + "%";
-  if ($("ring-fg")) $("ring-fg").style.strokeDasharray = `${s.completeness} ${100 - s.completeness}`;
-  $("s-complete-note").textContent =
-    `${s.derived} derived + ${s.attested} attested of ${s.total_fields} Annex fields`;
-
-  $("s-kev").textContent = s.kev;
-  $("kev-dot").className = "dot " + (s.kev ? "red" : "green");
-  const kevNote = $("s-kev-note");
-  kevNote.textContent = s.kev
-    ? "Article 14 reporting engaged"
-    : "no actively exploited vulnerabilities";
-  kevNote.className = "note" + (s.kev ? " danger" : "");
-
-  $("s-dossiers").textContent = s.sealed_bundles;
-  $("s-dossiers-note").textContent = `${s.manifest_files} files sealed in this run`;
+  setMetric("components", "Components", s.components, source);
+  setMetric("complete", "Annex VII completeness", `${s.completeness}%`,
+    `${s.derived} derived + ${s.attested} attested of ${s.total_fields} fields`);
+  setMetric("kev", "Active threats (KEV)", s.kev,
+    s.kev ? "Article 14 reporting engaged" : "none returned by checked sources",
+    s.kev ? "red" : "green");
+  setMetric("dossiers", "Signed files", s.manifest_files, "in selected run", "green");
 
   // A run restored from disk shows its stages already complete.
   if (!$("log").classList.contains("running")) {
@@ -314,7 +319,6 @@ function renderOverview() {
       el("span", "", `restored sealed run ${DATA.run_id} — press Run pipeline to stream a new one`));
   }
   $("chain-root").textContent = s.ledger_root || "—";
-  if ($("seal-card")) $("seal-card").hidden = false;
   $("console-hint").textContent = `${s.ledger_records} chained records`;
 
   // Vulnerability Monitor preview: the exploited ones first.
@@ -324,19 +328,88 @@ function renderOverview() {
   $("monitor-table").innerHTML = vulnTable(rows.slice(0, 6), true);
   $("monitor-card").hidden = false;
 
-  if (DATA.comparison) {
-    $("product-line").textContent = DATA.comparison.scenario.name + " — signed release comparison";
-    for (const id of ["s-components", "s-complete", "s-kev"]) $(id).textContent = "—";
-    for (const id of ["s-components-note", "s-complete-note", "s-kev-note"])
-      $(id).textContent = "Inspect an individual release for scan results";
-    $("monitor-card").hidden = true;
-  } else if (DATA.release_checks) {
-    const r = DATA.release_checks.release;
-    $("product-line").textContent = r.name + " " + r.version + " — " + r.kind;
+  if (DATA.comparison || DATA.release_checks) {
+    const report = DATA.comparison;
+    const checks = DATA.release_checks;
+    const passed = report ? report.passed : checks.passed;
+    const items = report?.rows || checks.checks || [];
+    const passing = items.filter((item) => item.passed).length;
+    const affectedBefore = items.filter((item) => item.before?.observed === "affected" || item.observed === "affected").length;
+    const affectedAfter = items.filter((item) => item.after?.observed === "affected").length;
+    const inputs = report?.runs?.filter((item) => item.run_id && !item.error).length || 1;
+
+    if (report) {
+      $("product-line").textContent = `${report.scenario.name} — signed release comparison`;
+    } else {
+      const release = checks.release;
+      $("product-line").textContent = `${release.name} ${release.version} — ${release.kind}`;
+    }
+    setMetric("components", "Checks passed", `${passing}/${items.length}`, "expected release observations", passed ? "green" : "red");
+    if (report) {
+      setMetric("complete", "Affected findings", `${affectedBefore} → ${affectedAfter}`, "before and after checked release", affectedAfter ? "red" : "green");
+      setMetric("kev", "Evidence inputs", inputs, "verified release bundles", "blue");
+      setMetric("dossiers", "Signed files", s.manifest_files, "in selected comparison", "green");
+    } else {
+      setMetric("complete", "Components", s.components, source);
+      setMetric("kev", "Active threats (KEV)", s.kev,
+        s.kev ? "Article 14 reporting engaged" : "none returned by checked sources",
+        s.kev ? "red" : "green");
+      setMetric("dossiers", "Signed files", s.manifest_files, "in selected run", "green");
+    }
+    setDecision(
+      passed ? "good" : "danger",
+      report ? "Release comparison" : "Release check",
+      passed ? "Evidence checks passed" : "Evidence checks need review",
+      `${passing} of ${items.length} expected observations passed. Review evidence before relying on this result.`,
+      report ? "Signed comparison evidence available" : "Signed release evidence available",
+      "comparison",
+      "Review evidence"
+    );
+    if (report) $("monitor-card").hidden = true;
+  } else if (s.kev) {
+    const hasFixes = DATA.verdict?.upgrades?.some((item) => item.target);
+    setDecision(
+      "danger",
+      "Release readiness",
+      `Blocked — ${s.kev} actively exploited ${s.kev === 1 ? "vulnerability" : "vulnerabilities"}`,
+      "EU Declaration of Conformity remains blocked under Annex I Part I(2)(a).",
+      nearestDeadline(),
+      hasFixes ? "fixes" : "deadlines",
+      hasFixes ? "Review required actions" : "Review deadlines"
+    );
+  } else {
+    setDecision(
+      "good",
+      "Release readiness",
+      "No active-exploitation blocker found",
+      "Checked sources returned no actively exploited vulnerabilities. Manufacturer review and missing attestations still apply.",
+      `${s.completeness}% Annex evidence complete`,
+      "findings",
+      "Review findings"
+    );
   }
   renderFixPlan();
   renderTimeline();
 }
+
+$("decision-primary").addEventListener("click", () => {
+  const action = $("decision-primary").dataset.action;
+  if (action === "comparison") {
+    $("comparison-panel").open = true;
+    $("comparison-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+  } else if (action === "fixes") {
+    $("fix-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  } else if (action === "deadlines") {
+    routeTo("article14");
+  } else if (action === "findings") {
+    routeTo("vulns");
+  } else if (action === "execution") {
+    $("console-card").open = true;
+    $("console-card").scrollIntoView({ behavior: "smooth", block: "start" });
+  } else {
+    $("new-scan").click();
+  }
+});
 
 // The remediation plan is the answer to "what do I actually do?" - a handful of
 // upgrades rather than a hundred CVE rows.
@@ -349,13 +422,14 @@ function renderFixPlan() {
   }
   const cleared = upgrades.reduce((n, u) => n + u.clears, 0);
   $("fix-hint").textContent =
-    `${actionable.length} upgrades clear ${cleared} findings`;
+    `Top ${Math.min(5, actionable.length)} of ${actionable.length} upgrades · ${cleared} findings covered`;
   $("fix-table").innerHTML = `
     <thead><tr>
       <th>Package</th><th>Installed</th><th></th><th>Upgrade to</th>
       <th style="text-align:right">Clears</th><th>Exploited</th>
     </tr></thead>
     <tbody>${actionable
+      .slice(0, 5)
       .map(
         (u) => `<tr>
         <td><b>${esc(u.component)}</b></td>
@@ -516,8 +590,12 @@ function renderVulns() {
 
 document.querySelectorAll("#vuln-filters .chip").forEach((chip) =>
   chip.addEventListener("click", () => {
-    document.querySelectorAll("#vuln-filters .chip").forEach((c) => c.classList.remove("active"));
+    document.querySelectorAll("#vuln-filters .chip").forEach((c) => {
+      c.classList.remove("active");
+      c.setAttribute("aria-pressed", "false");
+    });
     chip.classList.add("active");
+    chip.setAttribute("aria-pressed", "true");
     vulnFilter = chip.dataset.filter;
     if (DATA) renderVulns();
   })
@@ -864,14 +942,12 @@ async function runVerify() {
   if (!runId) return;
   const res = await fetch(`/api/verify/${runId}`);
   const result = await res.json();
-  // Both panels show the same verdict, so neither view can go stale.
-  ["checks", "checks2"].forEach((id) => {
-    if ($(id)) renderChecks($(id), result);
-  });
+  renderChecks($("checks2"), result);
 }
 
 async function runTamper() {
   if (!runId) return;
+  if (!window.confirm("Simulate a one-byte change in this local evidence bundle? Verification will fail until the run is regenerated.")) return;
   const res = await fetch(`/api/tamper/${runId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -883,8 +959,8 @@ async function runTamper() {
   await runVerify();
 }
 
-["verify", "verify2"].forEach((id) => $(id)?.addEventListener("click", runVerify));
-["tamper", "tamper2"].forEach((id) => $(id)?.addEventListener("click", runTamper));
+$("verify2").addEventListener("click", runVerify);
+$("tamper2").addEventListener("click", runTamper);
 
 // --------------------------------------------------------------------- run
 
@@ -894,6 +970,8 @@ function syncRunner() {
   $("sbom-picker").hidden = !sbom;
   $("mode-artifact").classList.toggle("active", !sbom);
   $("mode-sbom").classList.toggle("active", sbom);
+  $("mode-artifact").setAttribute("aria-pressed", String(!sbom));
+  $("mode-sbom").setAttribute("aria-pressed", String(sbom));
   $("run").disabled = sbom ? !$("sbom-file").files.length : !$("artifact").value;
 }
 
@@ -915,12 +993,29 @@ $("sbom-file").addEventListener("change", () => {
   syncRunner();
 });
 
+$("new-scan").addEventListener("click", () => {
+  $("scan-panel").open = true;
+  $("scan-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+  $(inputMode === "sbom" ? "sbom-file" : "artifact").focus();
+});
+
 $("run").addEventListener("click", async () => {
   const artifact = $("artifact").value;
   const sbomFile = $("sbom-file").files[0];
   $("comparison-panel").hidden = true;
   if (inputMode === "artifact" && !artifact) return;
   if (inputMode === "sbom" && !sbomFile) return;
+  $("scan-panel").open = false;
+  $("console-card").open = true;
+  setDecision(
+    "warn",
+    "Pipeline",
+    "Scan in progress",
+    "PandaX is producing a sealed evidence bundle. Stage details stream below.",
+    "",
+    "execution",
+    "View progress"
+  );
   setRunnerDisabled(true);
   $("log").innerHTML = "";
   $("log").classList.add("running");
@@ -1011,9 +1106,20 @@ function attachStream() {
   // page mid-scan shows the live stream rather than an empty console.
   const job = await (await fetch("/api/job")).json();
   if (job.running) {
+    await refreshHistory();
     setRunnerDisabled(true);
     $("log").innerHTML = "";
     $("log").classList.add("running");
+    $("console-card").open = true;
+    setDecision(
+      "warn",
+      "Pipeline",
+      "Scan in progress",
+      "PandaX is producing a sealed evidence bundle. Stage details stream below.",
+      "",
+      "execution",
+      "View progress"
+    );
     attachStream();
     return;
   }
@@ -1079,19 +1185,63 @@ function renderComparison() {
 }
 
 
-async function refreshHistory() {
-  const runs = await (await fetch("/api/runs")).json();
-  RUNS = runs;
+function runTitle(run) {
+  const status = run.comparison_passed === null ? "" : run.comparison_passed ? "PASS — " : "FAIL — ";
+  return status + (run.product || run.run_id) + " · " + run.created;
+}
+
+function populateRecentRuns() {
   const select = $("run-history");
   select.replaceChildren();
-  for (const run of runs) {
-    const status = run.comparison_passed === null ? "" : run.comparison_passed ? "PASS — " : "FAIL — ";
-    const option = el("option", "", status + (run.product || run.run_id) + " · " + run.created);
+  const recent = RUNS.slice(0, 5);
+  const selected = RUNS.find((run) => run.run_id === runId);
+  if (selected && !recent.some((run) => run.run_id === runId)) recent.push(selected);
+  for (const run of recent) {
+    const option = el("option", "", runTitle(run));
     option.value = run.run_id;
     select.append(option);
   }
   if (runId) select.value = runId;
-  return runs;
 }
+
+function renderRunList(query = "") {
+  const host = $("run-list");
+  const needle = query.trim().toLowerCase();
+  const matches = RUNS.filter((run) => `${runTitle(run)} ${run.run_id}`.toLowerCase().includes(needle));
+  host.replaceChildren();
+  if (!matches.length) {
+    host.append(el("p", "empty-state", "No saved runs match this search."));
+    return;
+  }
+  for (const run of matches) {
+    const button = el("button");
+    button.type = "button";
+    button.append(
+      el("span", "run-name", run.product || "Unnamed run"),
+      el("span", "run-date", new Date(run.created).toLocaleString()),
+      el("span", "run-id-small", run.run_id)
+    );
+    button.addEventListener("click", async () => {
+      $("run-dialog").close();
+      await loadRun(run.run_id);
+    });
+    host.append(button);
+  }
+}
+
+async function refreshHistory() {
+  RUNS = await (await fetch("/api/runs")).json();
+  populateRecentRuns();
+  renderRunList($("run-search").value);
+  return RUNS;
+}
+
+$("open-run-history").addEventListener("click", () => {
+  $("run-search").value = "";
+  renderRunList();
+  $("run-dialog").showModal();
+  $("run-search").focus();
+});
+$("run-search").addEventListener("input", () => renderRunList($("run-search").value));
 $("run-history").addEventListener("change", () => loadRun($("run-history").value));
 $("clock-preview").addEventListener("change", renderArticle14);

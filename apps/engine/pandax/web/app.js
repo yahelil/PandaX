@@ -524,7 +524,7 @@ function renderArticle14() {
     const filings = [
       ["early_warning", "24h early warning", "Art.14(2)(a)", incident.deadlines.early_warning],
       ["notification", "72h vulnerability notification", "Art.14(2)(b)", incident.deadlines.notification],
-      ["final_report", "Final report (14d after measure availability)", "Art.14(2)(c)", null],
+      ["final_report", "Final report (14d after measure availability)", "Art.14(2)(c)", incident.deadlines.final_report],
     ];
     table.innerHTML = `
       <thead><tr><th>Filing</th><th>Article</th><th>Due (UTC)</th><th>Remaining</th><th>Draft</th></tr></thead>
@@ -533,7 +533,7 @@ function renderArticle14() {
           if (!due) return `<tr>
             <td><b>${label}</b></td>
             <td class="mono dim">${article}</td>
-            <td class="mono">Awaiting confirmed measure availability</td>
+            <td class="mono">Awaiting corrective measure availability</td>
             <td><span class="pill medium">INPUT REQUIRED</span></td>
             <td><a class="link" target="_blank" rel="noopener"
                    href="/api/run/${runId}/file/filings/${esc(incident.cve)}/${file}.json">Open JSON</a></td>

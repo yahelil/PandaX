@@ -350,6 +350,8 @@ def clock(
     ),
 ) -> None:
     """Show live Article 14 countdowns for every open incident."""
+    from .stages.clock import PENDING_FINAL_REPORT, parse_timestamp, remaining_seconds
+
     target = _resolve_run(run_dir)
     incidents_path = target / "incidents.json"
     if not incidents_path.exists():
@@ -371,9 +373,11 @@ def clock(
     incidents = json.loads(incidents_path.read_text(encoding="utf-8"))
     now = dt.datetime.now(dt.timezone.utc)
 
-    def _remaining(aware: dt.datetime, due_iso: str, elapsed: dt.timedelta) -> Text:
-        due = dt.datetime.fromisoformat(due_iso.replace("Z", "+00:00"))
-        seconds = int(((due - aware) - elapsed).total_seconds())
+    def _remaining(due_iso: str | None, display_now: dt.datetime) -> Text:
+        remaining = remaining_seconds(due_iso, display_now)
+        if remaining is None:
+            return Text(PENDING_FINAL_REPORT, style="yellow")
+        seconds = int(remaining)
         if seconds <= 0:
             return Text(f"OVERDUE {abs(seconds) // 3600}h", style="bold white on red")
         hours, rest = divmod(seconds, 3600)
@@ -394,25 +398,24 @@ def clock(
     table.add_column("Component", max_width=16, overflow="ellipsis", no_wrap=True)
     table.add_column("24h (a)", justify="right", no_wrap=True)
     table.add_column("72h (b)", justify="right", no_wrap=True)
-    table.add_column("14d (c)", justify="right", no_wrap=True)
+    table.add_column("14d (c)", justify="right")
 
     for incident in incidents:
-        aware = dt.datetime.fromisoformat(incident["aware_at"].replace("Z", "+00:00"))
-        elapsed = (now - aware) * speed
+        aware = parse_timestamp(incident["aware_at"])
+        # Simulation affects display only; stored timestamps remain untouched.
+        display_now = now if speed == 1.0 else aware + (now - aware) * speed
         due = incident["deadlines"]
         table.add_row(
             incident["cve"],
             incident["component"],
-            _remaining(aware, due["early_warning"], elapsed),
-            _remaining(aware, due["notification"], elapsed),
-            _remaining(aware, due["final_report"], elapsed),
+            _remaining(due.get("early_warning"), display_now),
+            _remaining(due.get("notification"), display_now),
+            _remaining(due.get("final_report"), display_now),
         )
 
     console.print()
-    if speed != 1.0:
-        aware0 = dt.datetime.fromisoformat(
-            incidents[0]["aware_at"].replace("Z", "+00:00")
-        )
+    if speed != 1.0 and incidents:
+        aware0 = parse_timestamp(incidents[0]["aware_at"])
         scaled_hours = (now - aware0).total_seconds() * speed / 3600
         console.print(
             f"[yellow]demo clock x{speed:,.0f}: "

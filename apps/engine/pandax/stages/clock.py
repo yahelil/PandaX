@@ -40,6 +40,7 @@ STAGE = "S5 CLOCK"
 EARLY_WARNING_HOURS = 24
 NOTIFICATION_HOURS = 72
 FINAL_REPORT_DAYS = 14
+PENDING_FINAL_REPORT = "Awaiting corrective measure availability"
 
 
 def _iso(moment: dt.datetime) -> str:
@@ -55,12 +56,37 @@ def _short(iso: str) -> str:
     )
 
 
-def deadlines(aware_at: dt.datetime) -> dict[str, str]:
-    """Deadlines triggered by awareness. Final-report timing needs another fact."""
-    return {
+def deadlines(
+    aware_at: dt.datetime, measure_available_at: dt.datetime | None = None
+) -> dict[str, str]:
+    """Statutory UTC dates; an unknown measure date leaves the final report pending."""
+    due = {
         "early_warning": _iso(aware_at + dt.timedelta(hours=EARLY_WARNING_HOURS)),
         "notification": _iso(aware_at + dt.timedelta(hours=NOTIFICATION_HOURS)),
     }
+    if measure_available_at is not None:
+        due["final_report"] = _iso(
+            measure_available_at + dt.timedelta(days=FINAL_REPORT_DAYS)
+        )
+    return due
+
+
+def parse_timestamp(value: str) -> dt.datetime:
+    """Read UTC/offset timestamps, treating historical naive timestamps as UTC."""
+    moment = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=dt.timezone.utc)
+    return moment.astimezone(dt.timezone.utc)
+
+
+def deadline_sort_key(due: str | None) -> dt.datetime:
+    """Order known dates chronologically, with pending reports last."""
+    return parse_timestamp(due) if due else dt.datetime.max.replace(tzinfo=dt.timezone.utc)
+
+
+def remaining_seconds(due: str | None, now: dt.datetime) -> float | None:
+    """Countdown at a caller-supplied time; never infer an absent deadline."""
+    return (parse_timestamp(due) - now).total_seconds() if due else None
 
 
 def _srp_common(finding: Finding, ctx: RunContext, aware_at: dt.datetime, level: str) -> dict:

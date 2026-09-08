@@ -19,6 +19,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable
 
+from .stages.clock import deadline_sort_key
+
 # --- versions ---------------------------------------------------------------
 
 
@@ -241,7 +243,7 @@ def _deadlines(incidents: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "component": incident.get("component", ""),
                     "filing": label,
                     "article": article,
-                    "due": incident["deadlines"][key],
+                    "due": incident.get("deadlines", {}).get(key),
                 }
             )
-    return sorted(rows, key=lambda r: r["due"])
+    return sorted(rows, key=lambda r: deadline_sort_key(r["due"]))

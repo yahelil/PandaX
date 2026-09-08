@@ -173,10 +173,11 @@ def artifacts() -> list[dict[str, Any]]:
     from .scenarios import SCENARIOS, RELEASES
     found = [dict(path='scenario:' + s['id'], name=s['name'] + ' — ' +
                   RELEASES[s['before']]['version'] + ' → ' + RELEASES[s['after']]['version'],
-                  bytes=0, note=s['note'], group='Release comparisons') for s in SCENARIOS.values()]
+                  bytes=0, note='Runs two complete package analyses, then creates a signed before/after comparison. ' + s['note'],
+                  group='Before/after comparisons — two analyses') for s in SCENARIOS.values()]
     found += [dict(path='release:' + r['id'], name=r['name'] + ' ' + r['version'],
-                   bytes=0, note='Single release scan. Official download verified by SHA-256.',
-                   group='Individual releases') for r in RELEASES.values()]
+                   bytes=0, note='Runs one complete analysis of this official software package. Download verified by SHA-256.',
+                   group='Single software packages — one analysis') for r in RELEASES.values()]
     fixtures = ROOT / "fixtures"
     if fixtures.exists():
         for path in sorted(fixtures.iterdir()):
@@ -324,11 +325,16 @@ def runs() -> list[dict[str, Any]]:
         data = json.loads(manifest.read_text(encoding="utf-8"))
         source = path / "release-source.json"
         release = json.loads(source.read_text(encoding="utf-8")) if source.exists() else {}
+        dossier_path = path / "dossier.json"
+        dossier = json.loads(dossier_path.read_text(encoding="utf-8")) if dossier_path.exists() else {}
         comparison_path = path / "comparison.json"
         comparison = json.loads(comparison_path.read_text(encoding="utf-8")) if comparison_path.exists() else None
+        input_type = dossier.get("summary", {}).get("input_type", "artifact")
         out.append(
             {
                 "comparison_passed": comparison['passed'] if comparison else None,
+                "result_type": "release_comparison" if comparison else
+                               "sbom_analysis" if input_type == "sbom" else "package_analysis",
                 "run_id": data.get("run_id"),
                 "created": data.get("created"),
                 "product": data.get("product", {}).get("name", "") or

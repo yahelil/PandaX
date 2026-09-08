@@ -297,7 +297,7 @@ function renderOverview() {
   const source = s.input_type === "sbom"
     ? `${s.sbom_source_format} ${s.sbom_source_version} · ${s.matchable_components} matchable` +
       (s.skipped_components ? ` · ${s.skipped_components} not scanned` : "")
-    : (s.ecosystems || "inventoried from the artifact");
+    : (s.ecosystems || "inventoried from the software package");
 
   setMetric("components", "Components", s.components, source);
   setMetric("complete", "Annex VII completeness", `${s.completeness}%`,
@@ -305,9 +305,9 @@ function renderOverview() {
   setMetric("kev", "Active threats (KEV)", s.kev,
     s.kev ? "Article 14 reporting engaged" : "none returned by checked sources",
     s.kev ? "red" : "green");
-  setMetric("dossiers", "Signed files", s.manifest_files, "in selected run", "green");
+  setMetric("dossiers", "Signed files", s.manifest_files, "in this saved result", "green");
 
-  // A run restored from disk shows its stages already complete.
+  // A result restored from disk shows its stages already complete.
   if (!$("log").classList.contains("running")) {
     STAGES.forEach(([code]) => stepOf(code)?.classList.add("done"));
     if (s.input_type === "sbom") {
@@ -316,7 +316,7 @@ function renderOverview() {
     }
     $("log").innerHTML = "";
     logRow("info", el("span", "mark", "·"),
-      el("span", "", `restored sealed run ${DATA.run_id} — press Run pipeline to stream a new one`));
+      el("span", "", `loaded saved result ${DATA.run_id} — select Start analysis to create another`));
   }
   $("chain-root").textContent = s.ledger_root || "—";
   $("console-hint").textContent = `${s.ledger_records} chained records`;
@@ -347,14 +347,14 @@ function renderOverview() {
     setMetric("components", "Checks passed", `${passing}/${items.length}`, "expected release observations", passed ? "green" : "red");
     if (report) {
       setMetric("complete", "Affected findings", `${affectedBefore} → ${affectedAfter}`, "before and after checked release", affectedAfter ? "red" : "green");
-      setMetric("kev", "Evidence inputs", inputs, "verified release bundles", "blue");
-      setMetric("dossiers", "Signed files", s.manifest_files, "in selected comparison", "green");
+      setMetric("kev", "Evidence inputs", inputs, "verified package analysis results", "blue");
+      setMetric("dossiers", "Signed files", s.manifest_files, "in this comparison result", "green");
     } else {
       setMetric("complete", "Components", s.components, source);
       setMetric("kev", "Active threats (KEV)", s.kev,
         s.kev ? "Article 14 reporting engaged" : "none returned by checked sources",
         s.kev ? "red" : "green");
-      setMetric("dossiers", "Signed files", s.manifest_files, "in selected run", "green");
+      setMetric("dossiers", "Signed files", s.manifest_files, "in this package analysis", "green");
     }
     setDecision(
       passed ? "good" : "danger",
@@ -716,7 +716,7 @@ function laterRunOptions(item) {
       const label = status + (run.product || run.run_id) + " · " + run.created;
       return `<option value="${esc(run.run_id)}" ${run.run_id === item.candidate?.target_run_id ? "selected" : ""}>${esc(label)}</option>`;
     })
-    .join("") || '<option value="">Scan a newer release of this product to compare</option>',
+    .join("") || '<option value="">Analyze a newer release of this product first</option>',
   };
 }
 
@@ -795,7 +795,7 @@ function renderCases(cases) {
 
     const compare = el("div", "case-actions");
     const options = laterRunOptions(item);
-    compare.innerHTML = `<label>Later scanned release<select id="target-${esc(item.id)}">${options.html}</select></label>`;
+    compare.innerHTML = `<label>Later analyzed release<select id="target-${esc(item.id)}">${options.html}</select></label>`;
     const compareButton = el("button", "btn", "Analyze release");
     compareButton.disabled = !options.available;
     compareButton.addEventListener("click", () => observeCase(item.id));
@@ -854,7 +854,7 @@ const REPORT_META = [
   ["release-checks.json", "Release checks", "Expected and observed outcomes, with missing detections shown as failures."],
   ["native-inventory.json", "Native component evidence", "Package revisions, source-header evidence and declared dependencies."],
   ["native-assessments.json", "Vendor advisory determinations", "Affected, fixed, unknown and variant exclusions. Bounded coverage for the requested native CVEs."],
-  ["release-source.json", "Official artifact provenance", "Source URL, release type and pinned SHA-256 digest."],
+  ["release-source.json", "Official package provenance", "Source URL, release type and pinned SHA-256 digest."],
   ["archive-links.json", "Archive links", "Links recorded from the official archive; none are created or followed on the host."],
   ["AnnexVII_Technical_Documentation.pdf", "Annex VII technical documentation",
    "The eight items required by Annex VII, each labelled machine-derived, manufacturer-attested, or input required. PDF/A-2b."],
@@ -989,7 +989,7 @@ $("mode-sbom").addEventListener("click", () => { inputMode = "sbom"; syncRunner(
 $("artifact").addEventListener("change", syncRunner);
 $("sbom-file").addEventListener("change", () => {
   const file = $("sbom-file").files[0];
-  $("sbom-filename").textContent = file ? file.name : "Choose JSON SBOM";
+  $("sbom-filename").textContent = file ? file.name : "Choose an SBOM JSON file";
   syncRunner();
 });
 
@@ -1010,8 +1010,8 @@ $("run").addEventListener("click", async () => {
   setDecision(
     "warn",
     "Pipeline",
-    "Scan in progress",
-    "PandaX is producing a sealed evidence bundle. Stage details stream below.",
+    "Analysis in progress",
+    "PandaX is analyzing the selected input and creating a sealed result. Stage details stream below.",
     "",
     "execution",
     "View progress"
@@ -1081,8 +1081,8 @@ function attachStream() {
     const option = el("option", "",
       item.name + (item.bytes ? `  (${(item.bytes / 1024).toFixed(0)} KB)` : ""));
     option.value = item.path;
-    option.dataset.note = item.note || "Local fixture";
-    const groupName = item.group || "Local fixtures";
+    option.dataset.note = item.note || "Runs one complete analysis of this local test package.";
+    const groupName = item.group || "Local test packages — one analysis";
     if (!groups.has(groupName)) {
       const group = document.createElement("optgroup");
       group.label = groupName;
@@ -1097,7 +1097,7 @@ function attachStream() {
   select.addEventListener("change", selectionNote);
   selectionNote();
   if (!artifacts.length) {
-    select.append(el("option", "", "no artifacts — run tools/bootstrap.py"));
+    select.append(el("option", "", "No software packages available — run tools/bootstrap.py"));
     select.value = "";
   }
   syncRunner();
@@ -1114,8 +1114,8 @@ function attachStream() {
     setDecision(
       "warn",
       "Pipeline",
-      "Scan in progress",
-      "PandaX is producing a sealed evidence bundle. Stage details stream below.",
+      "Analysis in progress",
+      "PandaX is analyzing the selected input and creating a sealed result. Stage details stream below.",
       "",
       "execution",
       "View progress"
@@ -1187,7 +1187,10 @@ function renderComparison() {
 
 function runTitle(run) {
   const status = run.comparison_passed === null ? "" : run.comparison_passed ? "PASS — " : "FAIL — ";
-  return status + (run.product || run.run_id) + " · " + run.created;
+  const type = run.result_type === "sbom_analysis" ? "SBOM analysis"
+    : run.result_type === "release_comparison" ? "Release comparison" : "Package analysis";
+  const subject = (run.product || run.run_id).replace(/ comparison$/i, "");
+  return `${type} — ${status}${subject} · ${run.created}`;
 }
 
 function populateRecentRuns() {
@@ -1210,14 +1213,14 @@ function renderRunList(query = "") {
   const matches = RUNS.filter((run) => `${runTitle(run)} ${run.run_id}`.toLowerCase().includes(needle));
   host.replaceChildren();
   if (!matches.length) {
-    host.append(el("p", "empty-state", "No saved runs match this search."));
+    host.append(el("p", "empty-state", "No saved results match this search."));
     return;
   }
   for (const run of matches) {
     const button = el("button");
     button.type = "button";
     button.append(
-      el("span", "run-name", run.product || "Unnamed run"),
+      el("span", "run-name", runTitle(run).replace(` · ${run.created}`, "")),
       el("span", "run-date", new Date(run.created).toLocaleString()),
       el("span", "run-id-small", run.run_id)
     );

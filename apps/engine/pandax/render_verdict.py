@@ -10,11 +10,16 @@ from rich.table import Table
 from rich.text import Text
 
 from .verdict import Verdict
+from .stages.clock import (
+    PENDING_FINAL_REPORT, deadline_sort_key, parse_timestamp, remaining_seconds,
+)
 
 
-def _countdown(due_iso: str, now: dt.datetime) -> Text:
-    due = dt.datetime.fromisoformat(due_iso.replace("Z", "+00:00"))
-    seconds = int((due - now).total_seconds())
+def _countdown(due_iso: str | None, now: dt.datetime) -> Text:
+    remaining = remaining_seconds(due_iso, now)
+    if remaining is None:
+        return Text(PENDING_FINAL_REPORT, style="yellow")
+    seconds = int(remaining)
     if seconds <= 0:
         return Text(f"OVERDUE by {abs(seconds) // 3600}h", style="bold white on red")
     hours, rest = divmod(seconds, 3600)
@@ -75,7 +80,7 @@ def render(console: Console, product: dict, verdict: Verdict) -> None:
     if verdict.deadlines:
         now = dt.datetime.now(dt.timezone.utc)
         console.print()
-        console.print(Text("  DEADLINES RUNNING NOW", style="bold red"))
+        console.print(Text("  REPORTING DEADLINES", style="bold red"))
         table = Table(
             box=None, pad_edge=False, show_header=True, header_style="dim", padding=(0, 2)
         )
@@ -83,26 +88,26 @@ def render(console: Console, product: dict, verdict: Verdict) -> None:
         table.add_column("Article", style="dim", no_wrap=True)
         table.add_column("Covers", style="dim", no_wrap=True)
         table.add_column("Due (UTC)", style="dim", no_wrap=True)
-        table.add_column("", justify="right", no_wrap=True)
+        table.add_column("", justify="right")
 
         # Incidents detected in one scan share a deadline, so one row per filing
         # type reads better than one per CVE.
-        grouped: dict[tuple[str, str, str], list[str]] = {}
+        grouped: dict[tuple[str, str, str | None], list[str]] = {}
         for row in verdict.deadlines:
             grouped.setdefault(
                 (row["filing"], row["article"], row["due"]), []
             ).append(row["cve"])
 
         for (filing, article, due_iso), cves in sorted(
-            grouped.items(), key=lambda kv: kv[0][2]
+            grouped.items(), key=lambda kv: deadline_sort_key(kv[0][2])
         ):
-            due = dt.datetime.fromisoformat(due_iso.replace("Z", "+00:00"))
+            due = parse_timestamp(due_iso) if due_iso else None
             covers = cves[0] if len(cves) == 1 else f"{len(cves)} incidents"
             table.add_row(
                 "  " + filing,
                 article,
                 covers,
-                due.strftime("%d %b %H:%M"),
+                due.strftime("%d %b %H:%M") if due else "Pending",
                 _countdown(due_iso, now),
             )
         console.print(table)

@@ -26,3 +26,11 @@ and confirm-measure. Incomplete or historical drafts are never approvals.
 
 Unknown legacy product identity stays blank until evidence supplies it. Cases
 remain readable even if a referenced source bundle is temporarily unavailable.
+
+Review commands: `record-awareness` accepts occurred_at/detected_at/aware_at,
+evidence, and reason (required for corrections). `record-decision` accepts
+reportability (under_review/reportable/not_reportable), evidence and reason.
+`revise` accepts a payload object and reason. `approve` requires revision,
+report_hash and approved_at. All require operator and authority_attestation.
+Factual timestamps require Z or an explicit offset. Approvals authorize only
+the exact latest revision; new content never inherits an earlier approval.

@@ -61,6 +61,11 @@ class CaseService:
         row = db.execute('SELECT p.name, r.version FROM case_runs cr JOIN releases r ON cr.release_id=r.id JOIN products p ON r.product_id=p.id WHERE cr.case_id=? AND cr.role=\'source\'', (case_id,)).fetchone()
         case['source_product'] = dict(row) if row else {'name': '', 'version': ''}
         case['runs'] = [dict(r) for r in db.execute('SELECT run_id, release_id, role FROM case_runs WHERE case_id=?', (case_id,))]
+        case['revisions'] = [{**dict(r), 'payload': json.loads(r['payload_json'])} for r in db.execute('SELECT revision, created_at, report_hash, payload_json FROM report_revisions WHERE case_id=? ORDER BY revision', (case_id,))]
+        for revision in case['revisions']:
+            revision.pop('payload_json')
+        case['approvals'] = [dict(r) for r in db.execute('SELECT * FROM approvals WHERE case_id=? ORDER BY id', (case_id,))]
+        case['approved'] = bool(case['report'] and any(a['revision'] == case['report']['revision'] and a['report_hash'] == case['report']['report_hash'] for a in case['approvals']))
         return case
 
     def list(self):
@@ -115,6 +120,9 @@ class CaseService:
             return case['id']
         if case is None:
             raise CaseError('case ID required')
+        from .case_review import apply_review, timestamp
+        if apply_review(self, db, action, body, case):
+            return case['id']
         if action == 'observe-release':
             run_id = required(body, 'target_run_id')
             source, source_time = self.product(case['source_run_id'])
@@ -125,8 +133,14 @@ class CaseService:
                 raise CaseError('target release scan must be newer than source evidence')
             self.store.observe_release(case['id'], run_id, self.run_json(run_id, 'findings.json', []), self.run_json(run_id, 'sbom.cdx.json', {}).get('components', []), db=db)
             self.link_run(db, case['id'], run_id, 'observed')
+            if case['report']:
+                self.revision(db, case['id'], self.store._report_payload(self.get(case['id'], db)))
         elif action == 'confirm-measure':
-            self.store.confirm_measure(case['id'], required(body, 'measure_available_at'), required(body, 'operator'), required(body, 'authority_attestation'), required(body, 'measure_details'), db=db)
+            if case['measure_available_at'] and timestamp(body.get('measure_available_at')) != case['measure_available_at']:
+                required(body, 'reason')
+            self.store.confirm_measure(case['id'], timestamp(required(body, 'measure_available_at')), required(body, 'operator'), required(body, 'authority_attestation'), required(body, 'measure_details'), db=db)
+            from .case_review import record
+            record(self, db, case, 'measure_decision', {key: body.get(key) for key in ('operator', 'authority_attestation', 'measure_details', 'reason')}, timestamp(body['measure_available_at']), body['operator'], 'decisions')
         else:
             raise CaseError(f'unknown case operation: {action}')
         return case['id']

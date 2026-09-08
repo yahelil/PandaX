@@ -66,7 +66,7 @@ def test_concurrent_writers(service):
     with ThreadPoolExecutor(2) as pool:
         results = list(pool.map(update, range(2)))
     assert sum(r is not None for r in results) == 1
-    assert len(service.get(case['id'])['events']) == 2
+    assert sum(e['event_type'] == 'measure_confirmed' for e in service.get(case['id'])['events']) == 1
 
 
 def test_explicit_import_and_api_contract(service):

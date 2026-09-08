@@ -115,7 +115,7 @@ def extract(src: Path, dest: Path) -> tuple[int, int]:
     try:
         return firmware.extract(src, dest)
     except firmware.FirmwareError as exc:
-        raise UnsafeArtifact(str(exc)) from exc
+        raise UnsafeArtifact(f"{exc.status} firmware extraction: {exc}") from exc
 
 
 def run(ctx: RunContext) -> ev.Stream:

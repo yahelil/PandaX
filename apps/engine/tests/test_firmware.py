@@ -88,6 +88,31 @@ def test_ingestion_preserves_contract_inventory_and_provenance(tmp_path, ctx, mo
     assert "etc/openwrt_release" in tree["files"]
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows sharing locks")
+@pytest.mark.parametrize("persistent", [False, True])
+def test_windows_publish_retries_are_bounded(tmp_path, monkeypatch, persistent):
+    fake_docker(monkeypatch)
+    src = tmp_path / "firmware.bin"
+    src.write_bytes(b"hsqs")
+    original = Path.replace
+    attempts = []
+    def replace(path, target):
+        attempts.append(path)
+        if persistent or len(attempts) == 1:
+            raise PermissionError("file temporarily locked")
+        return original(path, target)
+    monkeypatch.setattr(Path, "replace", replace)
+    monkeypatch.setattr(fw.time, "sleep", lambda _: None)
+    if persistent:
+        with pytest.raises(fw.FirmwareError, match="locked"):
+            fw.extract(src, tmp_path / "extracted")
+        assert len(attempts) == 6
+        assert not (tmp_path / "extracted").exists()
+    else:
+        assert fw.extract(src, tmp_path / "extracted")[0] == 2
+        assert len(attempts) == 2
+
+
 @pytest.mark.parametrize("status", ["partial", "encrypted", "unsupported", "failed"])
 def test_incomplete_extraction_never_reaches_inventory(tmp_path, ctx, monkeypatch, status):
     fake_docker(monkeypatch, status)
@@ -169,6 +194,7 @@ def test_worker_child_logs_cannot_corrupt_binary_transport():
     script = """
 import importlib.metadata, os, runpy, sys, types
 importlib.metadata.version = lambda _: '26.6.4'
+os.statvfs = lambda _: types.SimpleNamespace(f_bavail=100, f_favail=100)
 def process_file(*args):
     os.write(1, b'extractor child log\\n')
     return types.SimpleNamespace(to_json=lambda: '[]')

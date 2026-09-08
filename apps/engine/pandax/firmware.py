@@ -228,7 +228,15 @@ def extract(src: Path, dest: Path) -> tuple[int, int]:
                 raise FirmwareError(report["status"], report.get("reason", "incomplete firmware extraction"))
             if dest.exists():
                 dest.rmdir()  # Only an empty destination is permitted.
-            staging.replace(dest)
+            for attempt in range(6):
+                try:
+                    staging.replace(dest)
+                    break
+                except PermissionError:
+                    # Windows scanners may briefly hold newly written files open.
+                    if os.name != "nt" or attempt == 5:
+                        raise
+                    time.sleep(0.1 * (attempt + 1))
             return count, total
     except (OSError, ValueError, tarfile.TarError, subprocess.SubprocessError) as exc:
         report.update(status=getattr(exc, "status", "failed"), reason=str(exc))

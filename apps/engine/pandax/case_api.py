@@ -2,12 +2,25 @@
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 
 from .case_service import CaseService
 from .cases import CaseError, CaseConflict, CaseNotFound
 
 router = APIRouter()
+
+
+@router.get('/api/case-fields/{case_type}/{stage}')
+def fields(case_type: str, stage: str):
+    from .case_fields import definitions
+    return call(lambda: definitions(case_type, stage))
+
+
+@router.get('/api/cases/{case_id}/export')
+def export(case_id: str, revision: int | None = None, format: str = 'json'):
+    from .case_export import render
+    content = call(lambda: render(service().get(case_id), revision, format))
+    return Response(content, media_type={'json': 'application/json', 'html': 'text/html', 'checklist': 'text/plain'}[format])
 
 
 def service():
@@ -29,6 +42,11 @@ def call(operation):
 @router.get('/cases.js')
 def javascript():
     return FileResponse(Path(__file__).parent / 'web' / 'cases.js', media_type='text/javascript')
+
+
+@router.get('/cases.css')
+def stylesheet():
+    return FileResponse(Path(__file__).parent / 'web' / 'cases.css', media_type='text/css')
 
 
 @router.get('/api/cases')

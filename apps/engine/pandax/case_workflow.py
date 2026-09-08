@@ -78,13 +78,15 @@ def prepare_report(service, db, case, body):
     fields = body.get('fields', {})
     if not isinstance(fields, dict):
         raise CaseError('fields must be an object')
+    from .case_fields import fields_for
+    definition, fields = fields_for(case, stage, fields)
     payload = {
         'case_id': case['id'], 'case_type': case['case_type'], 'stage': stage,
         'case_facts': case['state'], 'source_run_id': case['source_run_id'],
         'product': case['source_product'], 'finding': case['finding'],
         'measure_available_at': case['measure_available_at'],
         'measure_details': case['measure_details'],
-        'fields': fields, 'review_status': 'unreviewed',
+        'fields': fields, 'field_definition': {key: definition[key] for key in ('version', 'source', 'retrieved_at')}, 'review_status': 'unreviewed',
         'submission_status': 'prepared - not submitted',
     }
     revision = service.revision(db, case['id'], payload)

@@ -48,3 +48,28 @@ with evidence and reason. Incidents have no required CVE. Their final clock stay
 pending until notification submission, then adds one calendar month in UTC,
 clamping to the last day for short months. Vulnerability measure dates never
 drive incident clocks. Submission records supply this trigger, not draft dates.
+
+## Field definitions and packs
+
+Source: https://www.enisa.europa.eu/topics/product-security/single-reporting-platform-srp/cra-srp-glossary2
+ENISA glossary 1.1 (2026-09-05), retrieved 2026-09-08. Internal definition version:
+`enisa-1.1-2026-09-05/pandax-1`. All 38 glossary rows map to stable internal keys
+and source row IDs; `GET /api/case-fields/{type}/{stage}` exposes applicable fields.
+The glossary's AEV awareness field is marked for a future portal release; retain
+factual awareness in PandaX regardless of portal availability. Incident awareness
+currently appears in the portal under its detection label; do not conflate the
+two factual timestamps locally.
+
+Field inputs are strings or `{ "value": null, "available": false }` for an
+explicit unavailable-information attestation. Provenance is server-owned;
+carried values keep their origin and prior revision number. Unknown applicability
+of a conditional field blocks readiness until the operator supplies information
+or attests it unavailable. Drafts may remain incomplete, but only a complete,
+approved latest revision is ready. Placeholders never satisfy a required field.
+
+Export: `GET /api/cases/{id}/export?format=html|json|checklist&revision=N` or
+`pandax case export CASE_ID --format html --destination pack.html`.
+CLI export refuses to overwrite an existing file. HTML escapes supplied values;
+JSON is PandaX internal interchange, not an SRP API schema. Packs are prepared
+artifacts, never proof of submission. Older approved revisions remain readable
+but cannot be presented as the latest ready pack.

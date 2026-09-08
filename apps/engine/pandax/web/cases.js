@@ -10,11 +10,14 @@ const caseMessage = (message, failed = false) => {
 };
 
 async function caseRequest(path, options = {}) {
+  let pendingKey;
   if (options.method === "POST") {
     const body = JSON.parse(options.body || "{}");
-    body.request_id ||= crypto.randomUUID();
     const id = path.split("/")[3];
-    if (id) body.expected_version = CASE_VERSIONS.get(id);
+    if (CASE_VERSIONS.has(id)) body.expected_version = CASE_VERSIONS.get(id);
+    pendingKey = 'case-request:' + path + ':' + JSON.stringify(body);
+    body.request_id ||= sessionStorage.getItem(pendingKey) || crypto.randomUUID();
+    sessionStorage.setItem(pendingKey, body.request_id);
     options.body = JSON.stringify(body);
   }
   const response = await fetch(path, {
@@ -22,7 +25,8 @@ async function caseRequest(path, options = {}) {
     ...options,
   });
   const payload = await response.json();
-  if (!response.ok) throw new Error(payload.detail || `Request failed (${response.status})`);
+  if (pendingKey) sessionStorage.removeItem(pendingKey);
+  if (!response.ok) throw new Error((typeof payload.detail === 'string' ? payload.detail : JSON.stringify(payload.detail)) || `Request failed (${response.status})`);
   return payload;
 }
 
@@ -175,6 +179,15 @@ function renderCases(cases) {
     history.append(events);
     card.append(history);
     card.append(reviewForm(item));
+    card.append(reportBuilder(item));
+    card.append(el('p', 'sub', item.readiness.status + (item.readiness.missing.length ? ': ' + item.readiness.missing.join(', ') : '')));
+    if (item.report) {
+      for (const format of ['html', 'json', 'checklist']) {
+        const link = el('a', 'btn', `Export ${format}`);
+        link.href = `/api/cases/${item.id}/export?format=${format}`;
+        link.target = '_blank'; link.rel = 'noopener'; card.append(link);
+      }
+    }
     host.append(card);
   }
 }
@@ -200,8 +213,6 @@ function reviewForm(item) {
       <option value="record-awareness">Record or correct factual dates</option>
       <option value="assess-incident">Update incident assessment</option>
       <option value="record-decision">Decide reportability</option>
-      <option value="revise">Save report revision</option>
-      <option value="prepare-report">Prepare reporting stage</option>
       <option value="approve">Approve latest exact revision</option>
     </select></label>
     <label>Named operator<input name="operator" required></label>
@@ -213,8 +224,6 @@ function reviewForm(item) {
     <label>Reason / correction reason<textarea name="reason"></textarea></label>
     <label>Reportability<select name="reportability"><option>under_review</option><option>reportable</option><option>not_reportable</option></select></label>
     <label>Incident assessment (severity, impact, mitigation, root_cause JSON)<textarea name="incident">{}</textarea></label>
-    <label>Report content (JSON)<textarea name="payload">{}</textarea></label>
-    <label>Reporting stage<select name="stage"><option>early_warning</option><option>notification</option><option>final_report</option></select></label>
     <button class="btn primary">Save reviewed action</button>`;
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -230,8 +239,6 @@ function reviewForm(item) {
     }
     try {
       if (action === 'assess-incident') Object.assign(body, JSON.parse(values.incident), {evidence: values.evidence, reason: values.reason});
-      if (action === 'revise') Object.assign(body, {payload: JSON.parse(values.payload), reason: values.reason});
-      if (action === 'prepare-report') Object.assign(body, {stage: values.stage, fields: JSON.parse(values.payload)});
       await caseRequest(`/api/cases/${item.id}/${action}`, {method: 'POST', body: JSON.stringify(body)});
       await loadCases();
       caseMessage('Recorded. Earlier evidence and revisions remain in history.');
@@ -265,3 +272,60 @@ incidentForm.addEventListener('submit', async event => {
 });
 incidentIntake.append(incidentForm);
 $('cases-body').before(incidentIntake);
+
+function reportBuilder(item) {
+  const details = el('details');
+  details.append(el('summary', '', 'Prepare or revise a submission pack'));
+  const form = el('form', 'case-grid');
+  form.innerHTML = `<label>Stage<select name="stage"><option>early_warning</option><option>notification</option><option>final_report</option></select></label>
+    <label>Named operator<input name="operator" required></label>
+    <label>Authority attestation<input name="authority_attestation" required></label>`;
+  const fields = el('div', 'case-grid');
+  fields.style.gridColumn = '1 / -1'; form.append(fields);
+  const button = el('button', 'btn primary', 'Save unreviewed revision'); form.append(button);
+  let definition;
+  async function loadFields() {
+    try {
+      button.disabled = true;
+      definition = await caseRequest(`/api/case-fields/${item.case_type}/${form.elements.stage.value}`);
+      fields.replaceChildren();
+      for (const field of definition.fields) {
+        const previous = item.report?.payload?.fields?.[field.key];
+        const label = el('label', '', `${field.label} · ${field.requirement.replaceAll('_', ' ')}`);
+        const input = el(field.choices ? 'select' : field.max_length > 255 ? 'textarea' : 'input');
+        input.name = 'field-' + field.key;
+        if (field.choices) {
+          input.append(new Option('Not supplied', ''));
+          for (const choice of field.choices) input.append(new Option(choice, choice));
+        } else input.maxLength = field.max_length;
+        const factual = {notification_type: item.case_type === 'incident' ? 'Incident' : 'Vulnerability', aware_at: item.state.aware_at, occurred_at: item.state.occurred_at, measure_available_at: item.measure_available_at};
+        const seeds = {product_name: item.source_product.name, product_version: item.source_product.version, cve: item.cve, component: item.component};
+        input.value = (field.factual ? factual[field.key] : previous?.value ?? seeds[field.key]) || '';
+        if (field.factual) { input.disabled = true; label.append(el('small', '', ' Change through factual case actions.')); }
+        label.append(input);
+        if (field.requirement === 'if_available') {
+          const unavailable = el('input'); unavailable.type = 'checkbox'; unavailable.name = 'unavailable-' + field.key;
+          unavailable.checked = previous?.available === false;
+          const check = el('label', 'attestation', 'I attest this information is unavailable'); check.prepend(unavailable); label.append(check);
+        }
+        fields.append(label);
+      }
+      button.disabled = false;
+    } catch (error) { caseMessage(error.message, true); }
+  }
+  form.elements.stage.addEventListener('change', loadFields);
+  details.addEventListener('toggle', () => { if (details.open && !definition) loadFields(); });
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    const values = new FormData(form); const supplied = {};
+    for (const field of definition.fields) {
+      if (field.factual) continue;
+      supplied[field.key] = values.has('unavailable-' + field.key) ? {value: null, available: false} : {value: values.get('field-' + field.key) || null};
+    }
+    try {
+      await caseRequest(`/api/cases/${item.id}/prepare-report`, {method: 'POST', body: JSON.stringify({stage: values.get('stage'), fields: supplied, operator: values.get('operator'), authority_attestation: values.get('authority_attestation')})});
+      await loadCases(); caseMessage('Revision saved. Review missing inputs and approve the exact completed revision.');
+    } catch (error) { caseMessage(error.message, true); }
+  });
+  details.append(form); return details;
+}

@@ -69,6 +69,8 @@ class CaseService:
         from .case_workflow import clocks, clock_status
         case['deadlines'] = case['state'].get('deadlines', clocks(case, case['state']))
         case['clock_status'] = clock_status(case['deadlines'])
+        from .case_export import pack
+        case['readiness'] = {key: value for key, value in pack(case).items() if key in ('ready', 'missing', 'status')} if case['report'] else {'ready': False, 'missing': ['report revision'], 'status': 'No draft prepared'}
         return case
 
     def list(self):

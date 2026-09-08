@@ -46,6 +46,8 @@ The working-space limit includes intermediate unblob files and filesystem
 overhead; the inode ceiling includes directories and links as well as files.
 These intentionally conservative bounds can trigger before the final inventory
 reaches the nominal limit. The adapter also checks transferred bytes/files.
+An exhausted working filesystem is rejected even if the external extractor
+exits successfully: UBIFS tools can otherwise leave empty files after ENOSPC.
 Docker needs sufficient available memory/swap for the job; the container's
 memory cap is the output limit plus 512 MiB (a cap, not a reservation).
 
@@ -74,6 +76,8 @@ Firmware is never booted or executed. Input and worker mounts are read-only;
 the container root is read-only, its network and capabilities are disabled, and
 extraction space is `noexec`. Host output is validated before publishing the
 root. A timeout removes the container, not just the Docker client.
+Publishing retries transient Windows file locks for at most 1.5 seconds;
+persistent permission errors still fail without publishing a root.
 
 Failed jobs retain a status/reason and available diagnostics; a process crash,
 timeout, or resource exhaustion may prevent unblob from finishing its JSON
@@ -107,11 +111,19 @@ The pinned public fixtures are downloaded into ignored `.cache/firmware/`:
 - ONEKEY unblob 26.6.4 `banana.ubifs`, SHA-256
   `87b05f653d717736b766a9cca10b75656cc14c1d9442c61fdc514cc275a8a634`.
   Verify its four regular files and upstream expected content hashes.
-- Repeat UBIFS extraction with an 8 KiB working-space ceiling; it must fail
+- Repeat UBIFS with a 4 KiB and OpenWrt with a 1 MiB working-space ceiling; both must fail
   without publishing an extracted root.
 
 No firmware binaries are committed and no unseen acceptance image is selected.
 Container integration passing is required before marking the Trello card Done.
+
+## Recorded validation — 2026-09-08
+
+Windows 11, Docker Desktop 4.90.0 / Linux Engine 29.7.2, pinned unblob 26.6.4:
+`PANDAX_FIRMWARE_INTEGRATION=1 python -m pytest -m 'not slow' -q` passed
+**164 tests**, including all four real-container cases. The ten pre-existing
+`slow` tests were excluded. Both fixture download digests were verified.
+No PandaX extraction containers remained running after the suite.
 
 References: [Docker tmpfs limits](https://docs.docker.com/engine/storage/tmpfs/),
 [unblob 26.6.4](https://github.com/onekey-sec/unblob/tree/26.6.4),

@@ -115,6 +115,11 @@ def main() -> None:
                                   max_depth=MAX_DEPTH, process_num=1)
         result = process_file(config, Path("/input/firmware.bin"))
         raw = result.to_json()
+        space = os.statvfs(work)
+        # ubireader may exit zero after ENOSPC and leave empty/truncated files.
+        # Treat a full working filesystem as incomplete even without tool errors.
+        if space.f_bavail == 0 or space.f_favail == 0:
+            raise ValueError("extraction working-space or file-entry limit reached")
         filesystem_handlers = {h.NAME for h in BUILTIN_HANDLERS
                                if h.DOC and h.DOC.handler_type == HandlerType.FILESYSTEM}
         selection, root = select_root(json.loads(raw), work, filesystem_handlers)

@@ -72,9 +72,10 @@ def test_real_ubifs_files(tmp_path):
     assert firmware.sha256_file(root / "banana2.txt") == "cec01facc588f339e757822825743d16fae68d80ddf9b5e9e08f2862644f7733"
 
 
-def test_real_container_output_ceiling(tmp_path, monkeypatch):
+@pytest.mark.parametrize("fixture,ceiling", [(UBIFS, "4096"), (OPENWRT, "1048576")])
+def test_real_container_output_ceiling(tmp_path, monkeypatch, fixture, ceiling):
     # A kernel-enforced tmpfs ceiling, not a mock or an after-extraction counter.
-    monkeypatch.setenv("PANDAX_FIRMWARE_MAX_OUTPUT_BYTES", "8192")
+    monkeypatch.setenv("PANDAX_FIRMWARE_MAX_OUTPUT_BYTES", ceiling)
     with pytest.raises(firmware.FirmwareError):
-        firmware.extract(download_fixture(*UBIFS), tmp_path / "extracted")
+        firmware.extract(download_fixture(*fixture), tmp_path / "extracted")
     assert not (tmp_path / "extracted").exists()

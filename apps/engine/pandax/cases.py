@@ -243,7 +243,8 @@ class CaseStore:
             result = dict(row)
             result['state'] = json.loads(result.pop('state_json'))
             result["finding"] = json.loads(result.pop("finding_json"))
-            result["candidate"] = json.loads(result.pop("candidate_json")) if result["candidate_json"] else None
+            candidate_json = result.pop("candidate_json")
+            result["candidate"] = json.loads(candidate_json) if candidate_json else None
             result["events"] = [
                 {**dict(event), "payload": json.loads(event["payload_json"])}
                 for event in db.execute("SELECT * FROM case_events WHERE case_id=? ORDER BY id", (case_id,))

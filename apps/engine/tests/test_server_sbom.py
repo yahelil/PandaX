@@ -71,3 +71,27 @@ def test_upload_rejects_concurrent_run():
         "/api/scan/sbom", files={"file": ("bom.json", valid_sbom(), "application/json")}
     )
     assert response.status_code == 409
+
+
+def test_job_unsubscribe_releases_listener():
+    job = server.Job()
+    _, listener = job.subscribe()
+
+    job.unsubscribe(listener)
+
+    assert listener not in job.listeners
+
+
+def test_tamper_cannot_escape_run_directory(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run-test"
+    run_dir.mkdir()
+    outside = tmp_path / "outside.txt"
+    outside.write_text("unchanged", encoding="utf-8")
+    monkeypatch.setattr(server, "OUT_DIR", tmp_path)
+
+    response = TestClient(server.api).post(
+        "/api/tamper/run-test", json={"target": "../outside.txt"}
+    )
+
+    assert response.status_code == 404
+    assert outside.read_text(encoding="utf-8") == "unchanged"

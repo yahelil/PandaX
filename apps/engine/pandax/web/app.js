@@ -513,6 +513,7 @@ function renderArticle14() {
     return;
   }
 
+  const preview = $("clock-preview").value;
   for (const incident of DATA.incidents) {
     const card = el("article", "card");
     const head = el("div", "card-head");
@@ -521,10 +522,15 @@ function renderArticle14() {
     card.append(head);
 
     const table = el("table", "grid");
+    const previewFinal = preview === "pending"
+      ? null
+      : preview === "overdue"
+        ? new Date(Date.now() - 3600000).toISOString()
+        : incident.deadlines.final_report;
     const filings = [
       ["early_warning", "24h early warning", "Art.14(2)(a)", incident.deadlines.early_warning],
       ["notification", "72h vulnerability notification", "Art.14(2)(b)", incident.deadlines.notification],
-      ["final_report", "Final report (14d after measure availability)", "Art.14(2)(c)", incident.deadlines.final_report],
+      ["final_report", "Final report (14d after measure availability)", "Art.14(2)(c)", previewFinal],
     ];
     table.innerHTML = `
       <thead><tr><th>Filing</th><th>Article</th><th>Due (UTC)</th><th>Remaining</th><th>Draft</th></tr></thead>
@@ -882,3 +888,4 @@ async function refreshHistory() {
   return runs;
 }
 $("run-history").addEventListener("change", () => loadRun($("run-history").value));
+$("clock-preview").addEventListener("change", renderArticle14);

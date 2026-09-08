@@ -66,6 +66,9 @@ class CaseService:
             revision.pop('payload_json')
         case['approvals'] = [dict(r) for r in db.execute('SELECT * FROM approvals WHERE case_id=? ORDER BY id', (case_id,))]
         case['approved'] = bool(case['report'] and any(a['revision'] == case['report']['revision'] and a['report_hash'] == case['report']['report_hash'] for a in case['approvals']))
+        from .case_workflow import clocks, clock_status
+        case['deadlines'] = case['state'].get('deadlines', clocks(case, case['state']))
+        case['clock_status'] = clock_status(case['deadlines'])
         return case
 
     def list(self):
@@ -123,6 +126,10 @@ class CaseService:
         from .case_review import apply_review, timestamp
         if apply_review(self, db, action, body, case):
             return case['id']
+        if action == 'prepare-report':
+            from .case_workflow import prepare_report
+            prepare_report(self, db, case, body)
+            return case['id']
         if action == 'observe-release':
             run_id = required(body, 'target_run_id')
             source, source_time = self.product(case['source_run_id'])
@@ -138,6 +145,8 @@ class CaseService:
         elif action == 'confirm-measure':
             if case['measure_available_at'] and timestamp(body.get('measure_available_at')) != case['measure_available_at']:
                 required(body, 'reason')
+            from .case_workflow import persist_clocks
+            persist_clocks(self, db, {**case, 'measure_available_at': timestamp(required(body, 'measure_available_at'))}, dict(case['state']))
             self.store.confirm_measure(case['id'], timestamp(required(body, 'measure_available_at')), required(body, 'operator'), required(body, 'authority_attestation'), required(body, 'measure_details'), db=db)
             from .case_review import record
             record(self, db, case, 'measure_decision', {key: body.get(key) for key in ('operator', 'authority_attestation', 'measure_details', 'reason')}, timestamp(body['measure_available_at']), body['operator'], 'decisions')

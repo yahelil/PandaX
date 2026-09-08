@@ -34,3 +34,9 @@ reportability (under_review/reportable/not_reportable), evidence and reason.
 report_hash and approved_at. All require operator and authority_attestation.
 Factual timestamps require Z or an explicit offset. Approvals authorize only
 the exact latest revision; new content never inherits an earlier approval.
+
+`prepare-report` takes stage early_warning/notification/final_report and a
+fields object, plus operator/authority_attestation. Preparation is not submission.
+Awareness starts 24h/72h clocks; actual measure availability starts the vulnerability
+14-day final clock. Missing dates remain pending. Corrections record old/new clocks;
+review does not change factual trigger dates. See ENISA's CRA SRP FAQ (2026-09-08).

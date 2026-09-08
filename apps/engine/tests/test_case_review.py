@@ -28,7 +28,8 @@ def test_awareness_approval_and_correction_history(service):
     assert not case['approved']
     assert case['revisions'][0] == original
     assert len(case['approvals']) == 1
-    assert case['events'][-1]['payload']['previous']['aware_at'] == '2026-09-08T09:00:00Z'
+    correction = next(e for e in case['events'] if e['event_type'] == 'awareness_corrected')
+    assert correction['payload']['previous']['aware_at'] == '2026-09-08T09:00:00Z'
     with service.store._connect() as db:
         for table in ('report_revisions', 'case_events', 'approvals'):
             with pytest.raises(sqlite3.IntegrityError, match='immutable'):

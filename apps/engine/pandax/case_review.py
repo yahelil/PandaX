@@ -29,7 +29,8 @@ def record(service, db, case, event_type, payload, occurred_at, actor, table=Non
 
 
 def save_state(service, db, case, state):
-    db.execute('UPDATE remediation_cases SET state_json=? WHERE id=?', (_json(state), case['id']))
+    from .case_workflow import persist_clocks
+    persist_clocks(service, db, case, state)
     # A changed factual record cannot retain approval of an earlier snapshot.
     if case['report']:
         payload = dict(case['report']['payload'])

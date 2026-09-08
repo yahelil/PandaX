@@ -45,3 +45,9 @@ fixtures/*.zip
 # against pinned digests. Results are reproducible, so neither is committed.
 evaluation/corpus/
 evaluation/results/
+
+# Presentation artifacts (kept local)
+.presentation-build/
+presentation-assets/
+presentation-output/
+*.pptx

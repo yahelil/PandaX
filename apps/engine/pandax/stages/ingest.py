@@ -1,14 +1,4 @@
-"""S1 INGEST - unpack the product artifact under explicit safety limits.
-
-The blueprint called for Firecracker microVMs here. That control does not fit
-the threat: Syft *parses* metadata, it never executes the artifact, so kernel
-isolation defends against something that does not happen. The real risk in
-accepting a customer archive is the archive itself - path traversal (zip slip),
-decompression bombs, and pathological nesting.
-
-So the sandbox is replaced with the three controls that actually match the
-threat, each of which has a test proving it fires.
-"""
+"""S1 INGEST - bounded ZIP/TAR extraction and isolated Linux firmware extraction."""
 
 from __future__ import annotations
 
@@ -19,6 +9,7 @@ import zipfile
 from pathlib import Path
 
 from .. import events as ev
+from .. import firmware
 from ..context import RunContext
 from ..evidence import sha256_file
 
@@ -121,7 +112,10 @@ def extract(src: Path, dest: Path) -> tuple[int, int]:
         return _extract_zip(src, dest)
     if tarfile.is_tarfile(src):
         return _extract_tar(src, dest)
-    raise UnsafeArtifact(f"unsupported artifact format: {src.name}")
+    try:
+        return firmware.extract(src, dest)
+    except firmware.FirmwareError as exc:
+        raise UnsafeArtifact(str(exc)) from exc
 
 
 def run(ctx: RunContext) -> ev.Stream:
@@ -140,14 +134,25 @@ def run(ctx: RunContext) -> ev.Stream:
         local_input = work
         yield ev.log(STAGE, "source is a directory - copied, nothing to unpack")
     else:
+        is_archive = zipfile.is_zipfile(ctx.artifact) or tarfile.is_tarfile(ctx.artifact)
+        if not is_archive:
+            # Refuse oversized firmware before making an input copy.
+            try:
+                firmware_limits = firmware.Limits.from_env()
+                firmware.check_input(ctx.artifact, firmware_limits)
+            except firmware.FirmwareError as exc:
+                ctx.path(firmware.REPORT).write_text(
+                    json.dumps({"status": exc.status, "reason": str(exc)}), encoding="utf-8")
+                raise UnsafeArtifact(str(exc)) from exc
         local_input = inputs_dir / ctx.artifact.name
         shutil.copy2(ctx.artifact, local_input)
         digest = sha256_file(local_input)
         yield ev.log(STAGE, f"artifact sha256:{digest[:16]}... verified", ev.GOOD)
         yield ev.log(
             STAGE,
-            f"limits: <={MAX_TOTAL_BYTES // (1024 * 1024)} MiB uncompressed, "
-            f"<={MAX_ENTRIES:,} entries, <={MAX_DEPTH} path depth",
+            (f"limits: <={MAX_TOTAL_BYTES // (1024 * 1024)} MiB uncompressed, "
+             f"<={MAX_ENTRIES:,} entries, <={MAX_DEPTH} path depth")
+            if is_archive else f"firmware limits: {firmware_limits}",
         )
         from ..scenarios import identify
         release = identify(local_input)
@@ -160,9 +165,17 @@ def run(ctx: RunContext) -> ev.Stream:
             yield ev.log(STAGE, f"verified official {release['kind']}; {len(links)} links recorded, not created")
         else:
             count, total = extract(local_input, work)
-        yield ev.log(STAGE, "zip-slip / bomb / depth checks passed", ev.GOOD)
+        yield ev.log(STAGE, "extraction safety checks passed", ev.GOOD)
 
     ctx.extracted_dir = work
+    extraction_params = {"max_total_bytes": MAX_TOTAL_BYTES,
+                         "max_entries": MAX_ENTRIES, "max_depth": MAX_DEPTH}
+    firmware_report = ctx.path(firmware.REPORT)
+    if firmware_report.exists():
+        extraction = json.loads(firmware_report.read_text(encoding="utf-8"))
+        extraction_params = extraction["limits"]
+        ctx.tool_versions["unblob"] = extraction["unblob_version"]
+        yield ev.log(STAGE, f"firmware: {extraction['handler']}; one filesystem root accepted", ev.GOOD)
 
     # Hash every extracted file: this is the baseline the dossier rests on.
     tree = sorted(p for p in work.rglob("*") if p.is_file())
@@ -198,11 +211,8 @@ def run(ctx: RunContext) -> ev.Stream:
         tool_version="0.1.0",
         inputs=[ctx.ledger.ref(local_input)] if local_input.is_file() else [],
         outputs=[ctx.ledger.ref(tree_path)] + [ctx.ledger.ref(ctx.path(n)) for n in
-                 ("archive-links.json", "release-source.json") if ctx.path(n).exists()],
-        params={
-            "max_total_bytes": MAX_TOTAL_BYTES,
-            "max_entries": MAX_ENTRIES,
-            "max_depth": MAX_DEPTH,
-        },
+                 ("archive-links.json", "release-source.json", firmware.REPORT,
+                  firmware.RAW_REPORT, firmware.LOG) if ctx.path(n).exists()],
+        params=extraction_params,
     )
     yield ev.done(STAGE, f"{count} files unpacked safely")

@@ -31,6 +31,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({
 let runId = "";
 let source = null;
 let DATA = null;
+let RUNS = [];
 let vulnFilter = "all";
 let inputMode = "artifact";
 
@@ -38,14 +39,15 @@ let inputMode = "artifact";
 
 const PAGE_TITLES = {
   overview: "Dashboard",
-  artifacts: "Artifacts",
-  vulns: "Vulnerability Monitor",
-  article14: "Article 14",
-  reports: "Reports",
-  audit: "Audit Trail",
+  artifacts: "Inventory",
+  vulns: "Findings",
+  article14: "Deadlines",
+  cases: "Cases",
+  reports: "Documents",
+  audit: "Evidence",
 };
 
-function showView(name) {
+function showView(name, moveFocus = false) {
   if (!PAGE_TITLES[name]) name = "overview";
   document.querySelectorAll(".view").forEach((v) => {
     v.hidden = v.dataset.view !== name;
@@ -55,7 +57,16 @@ function showView(name) {
     else b.removeAttribute("aria-current");
   });
   $("page-title").textContent = PAGE_TITLES[name];
+  $("primary-nav").classList.remove("open");
+  $("nav-toggle").setAttribute("aria-expanded", "false");
   window.scrollTo(0, 0);
+  if (moveFocus) {
+    const heading = document.querySelector(`.view[data-view="${name}"] h1`);
+    if (heading) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
+  }
 }
 
 // Views are addressable (#vulns, #audit...), so links are shareable and the
@@ -64,14 +75,26 @@ const routeTo = (name) => {
   if (location.hash.slice(1) === name) showView(name);
   else location.hash = name;
 };
-window.addEventListener("hashchange", () => showView(location.hash.slice(1) || "overview"));
+window.addEventListener("hashchange", () => {
+  const view = location.hash.slice(1) || "overview";
+  showView(view, true);
+  if (view === "cases") loadCases();
+});
 
 document.querySelectorAll(".nav").forEach((b) =>
-  b.addEventListener("click", () => routeTo(b.dataset.view))
+  b.addEventListener("click", () => {
+    routeTo(b.dataset.view);
+    if (b.dataset.view === "cases") loadCases();
+  })
 );
 document.querySelectorAll("[data-goto]").forEach((b) =>
   b.addEventListener("click", () => routeTo(b.dataset.goto))
 );
+
+$("nav-toggle").addEventListener("click", () => {
+  const open = $("primary-nav").classList.toggle("open");
+  $("nav-toggle").setAttribute("aria-expanded", String(open));
+});
 
 // ------------------------------------------------------------------- steps
 
@@ -228,7 +251,9 @@ async function loadRun(id) {
   renderReports();
   renderLedger();
   $("run-history").value = runId;
-  $("tamper").disabled = $("tamper2").disabled = Boolean(DATA.comparison);
+  ["tamper", "tamper2"].forEach((id) => {
+    if ($(id)) $(id).disabled = Boolean(DATA.comparison);
+  });
   runVerify();
 }
 
@@ -243,14 +268,14 @@ function renderOverview() {
     : "Sealed evidence bundle.";
 
   const banner = $("blocked-banner");
-  if (s.kev) {
+  if (banner && s.kev) {
     banner.hidden = false;
     banner.innerHTML =
       `<b>EU Declaration of Conformity blocked.</b> ${s.kev} actively exploited ` +
       `${s.kev === 1 ? "vulnerability is" : "vulnerabilities are"} present. ` +
       `Annex I Part I(2)(a) requires products to be placed on the market without ` +
       `known exploitable vulnerabilities.`;
-  } else {
+  } else if (banner) {
     banner.hidden = true;
   }
 
@@ -262,7 +287,7 @@ function renderOverview() {
   $("s-components-note").textContent = source;
 
   $("s-complete").textContent = s.completeness + "%";
-  $("ring-fg").style.strokeDasharray = `${s.completeness} ${100 - s.completeness}`;
+  if ($("ring-fg")) $("ring-fg").style.strokeDasharray = `${s.completeness} ${100 - s.completeness}`;
   $("s-complete-note").textContent =
     `${s.derived} derived + ${s.attested} attested of ${s.total_fields} Annex fields`;
 
@@ -289,7 +314,7 @@ function renderOverview() {
       el("span", "", `restored sealed run ${DATA.run_id} — press Run pipeline to stream a new one`));
   }
   $("chain-root").textContent = s.ledger_root || "—";
-  $("seal-card").hidden = false;
+  if ($("seal-card")) $("seal-card").hidden = false;
   $("console-hint").textContent = `${s.ledger_records} chained records`;
 
   // Vulnerability Monitor preview: the exploited ones first.
@@ -518,7 +543,9 @@ function renderArticle14() {
     const card = el("article", "card");
     const head = el("div", "card-head");
     head.append(el("h3", "", `${incident.cve} — ${incident.component}`));
-    head.append(el("span", "hint", `coordinating CSIRT: ${incident.coordinating_csirt_member_state || "unknown"} · Art.14(7)`));
+    const track = el("button", "btn", "Track remediation");
+    track.addEventListener("click", () => trackRemediation(incident.cve));
+    head.append(el("span", "hint", `coordinating CSIRT: ${incident.coordinating_csirt_member_state || "unknown"} · Art.14(7)`), track);
     card.append(head);
 
     const table = el("table", "grid");
@@ -563,6 +590,184 @@ function renderArticle14() {
     host.append(card);
   }
 }
+
+// -------------------------------------------------------- remediation cases
+
+const caseMessage = (message, failed = false) => {
+  const box = $("case-message");
+  box.hidden = !message;
+  box.textContent = message || "";
+  box.style.background = failed ? "var(--danger-bg)" : "var(--good-bg)";
+  box.style.color = failed ? "var(--danger)" : "var(--good)";
+};
+
+async function caseRequest(path, options = {}) {
+  const response = await fetch(path, {
+    headers: {"Content-Type": "application/json"},
+    ...options,
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.detail || `Request failed (${response.status})`);
+  return payload;
+}
+
+async function trackRemediation(cve) {
+  try {
+    await caseRequest("/api/cases", {
+      method: "POST",
+      body: JSON.stringify({source_run_id: runId, cve}),
+    });
+    routeTo("cases");
+    caseMessage(`${cve} is now tracked. PandaX has not changed the product.`);
+    await loadCases();
+  } catch (error) {
+    caseMessage(error.message, true);
+  }
+}
+
+function laterRunOptions(item) {
+  const sourceRun = RUNS.find((run) => run.run_id === item.source_run_id);
+  const matches = RUNS
+    .filter((run) => run.product === item.source_product.name && run.run_id !== item.source_run_id)
+    .filter((run) => !sourceRun || run.created > sourceRun.created);
+  return {
+    available: Boolean(matches.length),
+    html: matches
+    .map((run) => {
+      const status = run.comparison_passed === null ? "" : run.comparison_passed ? "PASS — " : "FAIL — ";
+      const label = status + (run.product || run.run_id) + " · " + run.created;
+      return `<option value="${esc(run.run_id)}" ${run.run_id === item.candidate?.target_run_id ? "selected" : ""}>${esc(label)}</option>`;
+    })
+    .join("") || '<option value="">Scan a newer release of this product to compare</option>',
+  };
+}
+
+async function observeCase(caseId) {
+  try {
+    const target = $(`target-${caseId}`).value;
+    await caseRequest(`/api/cases/${caseId}/observe-release`, {
+      method: "POST",
+      body: JSON.stringify({target_run_id: target}),
+    });
+    caseMessage("Release compared. Any resolution remains a candidate until manufacturer confirmation.");
+    await loadCases();
+  } catch (error) {
+    caseMessage(error.message, true);
+  }
+}
+
+async function confirmCase(caseId) {
+  if (!$(`attest-${caseId}`).checked) {
+    caseMessage("Confirm that the named operator is authorised by the manufacturer.", true);
+    return;
+  }
+  try {
+    await caseRequest(`/api/cases/${caseId}/confirm-measure`, {
+      method: "POST",
+      body: JSON.stringify({
+        measure_available_at: $(`available-${caseId}`).value,
+        operator: $(`operator-${caseId}`).value,
+        authority_attestation: "I am authorised by the manufacturer to confirm this measure.",
+        measure_details: $(`measure-${caseId}`).value,
+      }),
+    });
+    caseMessage("Availability confirmed. The 14-day deadline and review draft were created.");
+    await loadCases();
+  } catch (error) {
+    caseMessage(error.message, true);
+  }
+}
+
+function renderCases(cases) {
+  const host = $("cases-body");
+  host.replaceChildren();
+  if (!cases.length) {
+    host.append(el("article", "card empty-state", "No remediation cases yet. Open Article 14 and choose Track remediation on a finding."));
+    return;
+  }
+  for (const item of cases) {
+    const card = el("article", "card case-card");
+    const head = el("div", "card-head");
+    head.append(el("h3", "", `${item.cve} — ${item.component} ${item.component_version}`));
+    const statusClass = item.status === "measure_confirmed" ? "good" : item.status === "candidate_resolution" ? "blue" : "medium";
+    head.append(el("span", `pill ${statusClass}`, item.status.replaceAll("_", " ")));
+    card.append(head);
+    card.append(el("p", "sub", `Source evidence: ${item.source_run_id} · PandaX detects and documents; it never patches or deploys.`));
+    if (item.finding.summary) card.append(el("p", "", item.finding.summary));
+    const correction = el("p", "sub");
+    correction.append(el("b", "", item.finding.fixed_version
+      ? `Published correction found: ${item.finding.fixed_version}`
+      : "No published correction found in the checked source."));
+    if (item.finding.source_url) {
+      correction.append(document.createTextNode(" "));
+      const sourceLink = el("a", "link", "Open source");
+      sourceLink.href = item.finding.source_url;
+      sourceLink.target = "_blank";
+      sourceLink.rel = "noopener";
+      correction.append(sourceLink);
+    }
+    card.append(correction);
+
+    if (item.candidate) {
+      const candidate = el("div", "candidate");
+      candidate.append(el("b", "", item.candidate.coverage_statement));
+      candidate.append(el("p", "", item.candidate.explanation));
+      card.append(candidate);
+    }
+
+    const compare = el("div", "case-actions");
+    const options = laterRunOptions(item);
+    compare.innerHTML = `<label>Later scanned release<select id="target-${esc(item.id)}">${options.html}</select></label>`;
+    const compareButton = el("button", "btn", "Analyze release");
+    compareButton.disabled = !options.available;
+    compareButton.addEventListener("click", () => observeCase(item.id));
+    compare.append(compareButton);
+    card.append(compare);
+
+    if (item.final_deadline) {
+      const deadline = el("div", "deadline");
+      deadline.append(el("b", "", `Final report due ${item.final_deadline}`));
+      deadline.append(el("p", "", `Confirmed by ${item.operator}: ${item.measure_details}`));
+      const report = el("a", "link", "Open review draft");
+      report.href = `/api/cases/${item.id}/report`;
+      report.target = "_blank";
+      report.rel = "noopener";
+      deadline.append(report);
+      card.append(deadline);
+    } else {
+      const form = el("div", "case-grid");
+      form.innerHTML = `
+        <label>Named operator<input id="operator-${esc(item.id)}" autocomplete="name" placeholder="Manufacturer representative"></label>
+        <label>Measure available at (UTC)<input id="available-${esc(item.id)}" type="datetime-local"></label>
+        <label>Corrective or mitigating measure<textarea id="measure-${esc(item.id)}" placeholder="What users can obtain or apply, product release, and distribution channel"></textarea></label>`;
+      card.append(form);
+      const attest = el("label", "attestation");
+      attest.innerHTML = `<input id="attest-${esc(item.id)}" type="checkbox"> I am authorised by the manufacturer to confirm this measure is available to affected users.`;
+      card.append(attest);
+      const confirm = el("button", "btn primary", "Confirm availability and calculate deadline");
+      confirm.addEventListener("click", () => confirmCase(item.id));
+      card.append(confirm);
+    }
+
+    const history = el("details");
+    history.append(el("summary", "", `${item.events.length} recorded event(s)`));
+    const events = el("ul");
+    item.events.forEach((event) => events.append(el("li", "", `${event.recorded_at} · ${event.event_type} · ${event.actor || "system"}`)));
+    history.append(events);
+    card.append(history);
+    host.append(card);
+  }
+}
+
+async function loadCases() {
+  try {
+    renderCases(await caseRequest("/api/cases"));
+  } catch (error) {
+    caseMessage(error.message, true);
+  }
+}
+
+$("refresh-cases").addEventListener("click", loadCases);
 
 // ------------------------------------------------------------------ reports
 
@@ -660,8 +865,9 @@ async function runVerify() {
   const res = await fetch(`/api/verify/${runId}`);
   const result = await res.json();
   // Both panels show the same verdict, so neither view can go stale.
-  renderChecks($("checks"), result);
-  renderChecks($("checks2"), result);
+  ["checks", "checks2"].forEach((id) => {
+    if ($(id)) renderChecks($(id), result);
+  });
 }
 
 async function runTamper() {
@@ -677,10 +883,8 @@ async function runTamper() {
   await runVerify();
 }
 
-$("verify").addEventListener("click", runVerify);
-$("verify2").addEventListener("click", runVerify);
-$("tamper").addEventListener("click", runTamper);
-$("tamper2").addEventListener("click", runTamper);
+["verify", "verify2"].forEach((id) => $(id)?.addEventListener("click", runVerify));
+["tamper", "tamper2"].forEach((id) => $(id)?.addEventListener("click", runTamper));
 
 // --------------------------------------------------------------------- run
 
@@ -817,6 +1021,7 @@ function attachStream() {
   // Otherwise load the most recent sealed run so the dashboard is never empty.
   const runs = await refreshHistory();
   if (runs.length) await loadRun(runs[0].run_id);
+  if ((location.hash.slice(1) || "overview") === "cases") await loadCases();
 })();
 
 
@@ -876,6 +1081,7 @@ function renderComparison() {
 
 async function refreshHistory() {
   const runs = await (await fetch("/api/runs")).json();
+  RUNS = runs;
   const select = $("run-history");
   select.replaceChildren();
   for (const run of runs) {

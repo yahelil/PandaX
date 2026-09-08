@@ -8,6 +8,7 @@ over server-sent events instead of printing them.
 from __future__ import annotations
 
 import json
+import os
 import queue
 import re
 import shutil
@@ -20,6 +21,8 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from . import events as ev
+from .cases import CaseError, CaseStore
+from .stages.clock import parse_timestamp
 from .context import OUT_DIR, ROOT
 from .evidence import verify_run
 from .stages.sbom import is_matchable_purl
@@ -28,6 +31,35 @@ WEB = Path(__file__).resolve().parent / "web"
 MAX_SBOM_BYTES = 50 * 1024 * 1024
 
 api = FastAPI(title="PandaX CRA Compliance Engine", docs_url="/api/docs")
+
+
+def _case_store() -> CaseStore:
+    data_dir = Path(os.environ.get("PANDAX_DATA_DIR", OUT_DIR / ".pandax"))
+    return CaseStore(data_dir / "cases.sqlite3")
+
+
+def _run_json(run_id: str, name: str, default: Any) -> Any:
+    target = (OUT_DIR / run_id).resolve()
+    if not target.is_relative_to(OUT_DIR.resolve()) or not target.exists():
+        raise HTTPException(404, f"run not found: {run_id}")
+    path = target / name
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
+
+
+def _run_product(run_id: str) -> dict[str, str]:
+    dossier = _run_json(run_id, "dossier.json", {})
+    product = dossier.get("product") or _run_json(run_id, "manifest.json", {}).get("product", {})
+    return {"name": str(product.get("name", "")), "version": str(product.get("version", ""))}
+
+
+def _run_created(run_id: str) -> str:
+    dossier = _run_json(run_id, "dossier.json", {})
+    return str(dossier.get("generated") or _run_json(run_id, "manifest.json", {}).get("created", ""))
+
+
+def _with_source_product(case: dict[str, Any]) -> dict[str, Any]:
+    case["source_product"] = _run_product(case["source_run_id"])
+    return case
 
 
 class Job:
@@ -464,3 +496,79 @@ def get_file(run_id: str, path: str) -> FileResponse:
         raise HTTPException(404, "not found")
     media = "application/pdf" if target.suffix == ".pdf" else "text/plain"
     return FileResponse(target, media_type=media)
+
+
+@api.get("/api/cases")
+def list_cases() -> list[dict[str, Any]]:
+    return [_with_source_product(case) for case in _case_store().list()]
+
+
+@api.post("/api/cases")
+def create_case(body: dict[str, str]) -> dict[str, Any]:
+    run_id = body.get("source_run_id", "")
+    cve = body.get("cve", "")
+    finding = next(
+        (item for item in _run_json(run_id, "findings.json", []) if item.get("cve") == cve),
+        None,
+    )
+    if not finding:
+        raise HTTPException(404, f"finding not found in {run_id}: {cve}")
+    try:
+        return _with_source_product(_case_store().create(run_id, finding))
+    except CaseError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@api.post("/api/cases/{case_id}/observe-release")
+def observe_case_release(case_id: str, body: dict[str, str]) -> dict[str, Any]:
+    run_id = body.get("target_run_id", "")
+    sbom = _run_json(run_id, "sbom.cdx.json", {})
+    try:
+        case = _case_store().get(case_id)
+        source_product = _run_product(case["source_run_id"])
+        target_product = _run_product(run_id)
+        if not source_product["name"] or not target_product["name"]:
+            raise CaseError("both releases require an identified product")
+        if source_product["name"].casefold() != target_product["name"].casefold():
+            raise CaseError(
+                f"release product mismatch: {source_product['name']} != {target_product['name']}"
+            )
+        source_created = _run_created(case["source_run_id"])
+        target_created = _run_created(run_id)
+        if not source_created or not target_created:
+            raise CaseError("both releases require a recorded scan time")
+        if parse_timestamp(target_created) <= parse_timestamp(source_created):
+            raise CaseError("target release scan must be newer than source evidence")
+        return _with_source_product(_case_store().observe_release(
+            case_id,
+            run_id,
+            _run_json(run_id, "findings.json", []),
+            sbom.get("components", []),
+        ))
+    except CaseError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@api.post("/api/cases/{case_id}/confirm-measure")
+def confirm_case_measure(case_id: str, body: dict[str, str]) -> dict[str, Any]:
+    try:
+        return _case_store().confirm_measure(
+            case_id,
+            body.get("measure_available_at", ""),
+            body.get("operator", ""),
+            body.get("authority_attestation", ""),
+            body.get("measure_details", ""),
+        )
+    except CaseError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@api.get("/api/cases/{case_id}/report")
+def case_report(case_id: str) -> dict[str, Any]:
+    try:
+        case = _case_store().get(case_id)
+    except CaseError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    if not case["report"]:
+        raise HTTPException(409, "measure confirmation is required before report generation")
+    return case["report"]

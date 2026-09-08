@@ -36,6 +36,10 @@ def save_state(service, db, case, state):
         payload = dict(case['report']['payload'])
         payload['case_facts'] = state
         payload['review_status'] = 'unreviewed'
+        if payload.get('field_definition'):
+            from .case_fields import fields_for
+            updated = service.get(case['id'], db)
+            _, payload['fields'] = fields_for(updated, payload['stage'], {})
         service.revision(db, case['id'], payload)
 
 
@@ -80,6 +84,13 @@ def apply_review(service, db, action, body, case):
         payload = body.get('payload')
         if not isinstance(payload, dict):
             raise CaseError('report payload must be an object')
+        if case['report'] and case['report']['payload'].get('field_definition'):
+            from .case_workflow import prepare_report
+            required(body, 'reason')
+            prepare_report(service, db, case, {**body, 'stage': case['report']['payload']['stage'], 'fields': payload.get('fields', payload)})
+            return True
+        if set(payload) & {'field_definition', 'case_type', 'stage', 'fields'}:
+            raise CaseError('structured reports must use prepare-report')
         payload = {**payload, 'case_id': case['id'], 'case_facts': state, 'review_status': 'unreviewed'}
         revision = service.revision(db, case['id'], payload)
         record(service, db, case, 'report_revised', {**identity, 'revision': revision, 'reason': required(body, 'reason')}, _utc_now(), identity['operator'])

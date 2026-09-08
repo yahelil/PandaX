@@ -1,4 +1,4 @@
-"""Durable remediation cases kept outside immutable scan bundles."""
+﻿"""Durable remediation cases kept outside immutable scan bundles."""
 
 from __future__ import annotations
 
@@ -7,7 +7,9 @@ import hashlib
 import json
 import sqlite3
 import uuid
+from contextlib import nullcontext
 from pathlib import Path
+from .case_storage import Connection, migrate
 from typing import Any
 
 from .stages.clock import deadlines, parse_timestamp
@@ -25,6 +27,14 @@ class CaseError(ValueError):
     pass
 
 
+class CaseNotFound(CaseError):
+    pass
+
+
+class CaseConflict(CaseError):
+    pass
+
+
 class CaseStore:
     """Persist and advance remediation cases through one small interface."""
 
@@ -34,14 +44,14 @@ class CaseStore:
         self._migrate()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path)
+        connection = sqlite3.connect(self.path, factory=Connection)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         return connection
 
     def _migrate(self) -> None:
         with self._connect() as db:
-            db.executescript(
+            migrate(db,
                 """
                 CREATE TABLE IF NOT EXISTS remediation_cases (
                     id TEXT PRIMARY KEY,
@@ -83,13 +93,13 @@ class CaseStore:
                 """
             )
 
-    def create(self, source_run_id: str, finding: dict[str, Any]) -> dict[str, Any]:
+    def create(self, source_run_id: str, finding: dict[str, Any], db=None) -> dict[str, Any]:
         required = ("cve", "component", "version", "purl")
         if any(not finding.get(key) for key in required):
             raise CaseError("finding requires cve, component, version and purl")
         now = _utc_now()
         case_id = "case-" + uuid.uuid4().hex[:12]
-        with self._connect() as db:
+        with (nullcontext(db) if db is not None else self._connect()) as db:
             existing = db.execute(
                 "SELECT id FROM remediation_cases WHERE source_run_id=? AND cve=? AND purl=?",
                 (source_run_id, finding["cve"], finding["purl"]),
@@ -115,8 +125,9 @@ class CaseStore:
         target_run_id: str,
         findings: list[dict[str, Any]],
         components: list[dict[str, Any]],
+        db=None,
     ) -> dict[str, Any]:
-        case = self.get(case_id)
+        case = self.get(case_id, db)
         same_findings = [
             item for item in findings
             if item.get("cve") == case["cve"]
@@ -152,7 +163,7 @@ class CaseStore:
         }
         now = _utc_now()
         status = "detected" if same_findings else "candidate_resolution"
-        with self._connect() as db:
+        with (nullcontext(db) if db is not None else self._connect()) as db:
             db.execute(
                 "UPDATE remediation_cases SET candidate_json=?, status=?, updated_at=? WHERE id=?",
                 (_json(candidate), status, now, case_id),
@@ -167,6 +178,7 @@ class CaseStore:
         operator: str,
         authority_attestation: str,
         measure_details: str,
+        db=None,
     ) -> dict[str, Any]:
         if not operator.strip():
             raise CaseError("named operator is required")
@@ -181,7 +193,7 @@ class CaseStore:
         final_deadline = deadlines(availability, availability)["final_report"]
         available_utc = availability.isoformat(timespec="seconds").replace("+00:00", "Z")
         now = _utc_now()
-        with self._connect() as db:
+        with (nullcontext(db) if db is not None else self._connect()) as db:
             case = self.get(case_id, db)
             db.execute(
                 """UPDATE remediation_cases SET status='measure_confirmed', measure_available_at=?,
@@ -220,8 +232,9 @@ class CaseStore:
         try:
             row = db.execute("SELECT * FROM remediation_cases WHERE id=?", (case_id,)).fetchone()
             if not row:
-                raise CaseError(f"case not found: {case_id}")
+                raise CaseNotFound(f"case not found: {case_id}")
             result = dict(row)
+            result['state'] = json.loads(result.pop('state_json'))
             result["finding"] = json.loads(result.pop("finding_json"))
             result["candidate"] = json.loads(result.pop("candidate_json")) if result["candidate_json"] else None
             result["events"] = [
@@ -278,3 +291,4 @@ class CaseStore:
             "next_action": "Manufacturer reviews and improves this draft before approval and manual submission.",
             "automation_limit": "PandaX detected and documented evidence; it did not patch or deploy the product.",
         }
+

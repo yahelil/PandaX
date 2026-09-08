@@ -108,6 +108,7 @@ function renderCases(cases) {
     const statusClass = item.status === "measure_confirmed" ? "good" : item.status === "candidate_resolution" ? "blue" : "medium";
     head.append(el("span", `pill ${statusClass}`, item.status.replaceAll("_", " ")));
     card.append(head);
+    card.append(el('p', 'sub', Object.entries(item.deadlines).map(([stage, due]) => `${stage}: ${due || 'pending'} (${item.clock_status[stage]})`).join(' · ')));
     card.append(el("p", "sub", `Source evidence: ${item.source_run_id} · PandaX detects and documents; it never patches or deploys.`));
     if (item.finding.summary) card.append(el("p", "", item.finding.summary));
     const correction = el("p", "sub");
@@ -197,6 +198,7 @@ function reviewForm(item) {
       <option value="record-awareness">Record or correct factual dates</option>
       <option value="record-decision">Decide reportability</option>
       <option value="revise">Save report revision</option>
+      <option value="prepare-report">Prepare reporting stage</option>
       <option value="approve">Approve latest exact revision</option>
     </select></label>
     <label>Named operator<input name="operator" required></label>
@@ -208,6 +210,7 @@ function reviewForm(item) {
     <label>Reason / correction reason<textarea name="reason"></textarea></label>
     <label>Reportability<select name="reportability"><option>under_review</option><option>reportable</option><option>not_reportable</option></select></label>
     <label>Report content (JSON)<textarea name="payload">{}</textarea></label>
+    <label>Reporting stage<select name="stage"><option>early_warning</option><option>notification</option><option>final_report</option></select></label>
     <button class="btn primary">Save reviewed action</button>`;
   form.addEventListener('submit', async event => {
     event.preventDefault();
@@ -223,6 +226,7 @@ function reviewForm(item) {
     }
     try {
       if (action === 'revise') Object.assign(body, {payload: JSON.parse(values.payload), reason: values.reason});
+      if (action === 'prepare-report') Object.assign(body, {stage: values.stage, fields: JSON.parse(values.payload)});
       await caseRequest(`/api/cases/${item.id}/${action}`, {method: 'POST', body: JSON.stringify(body)});
       await loadCases();
       caseMessage('Recorded. Earlier evidence and revisions remain in history.');

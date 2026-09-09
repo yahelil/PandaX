@@ -1,21 +1,6 @@
-Cyber resilience should not end in a spreadsheet. Meet PandaX!
-
-It turns a product release into a live C R A evidence trail you can inspect in seconds.
-
-It inventories every shipped component, matches vulnerabilities against independent intelligence, and pushes actively exploited threats straight to the top.
-
-No wall of C V E rows. PandaX highlights the upgrades that clear the most risk, fast.
-
-Article fourteen reporting clocks stay visible from the moment an incident is engaged.
-
-Then comes the payoff: open the generated EU Declaration of Conformity and see EU market readiness immediately!
-
-Here, one actively exploited vulnerability blocks the declaration. PandaX names the legal reason, marks the draft, and shows exactly what must change before release.
-
-Annex seven documentation, the declaration, S B O M, VEX, and supporting records all stay together.
-
-Every stage writes to a hash-chained ledger. Every output is sealed and independently verifiable!
-
-No invented certainty. The result says exactly what the evidence supports.
-
-From artifact to a review-ready, tamper-evident C R A dossier, in one exciting workflow.
+Ready? Watch PandaX turn one product into EU evidence!
+Tomcat selected. One click launches the full PandaX pipeline: inventory, vulnerability intelligence, deadlines, documents, and cryptographic proof!
+And there it is: one actively exploited threat. PandaX pushes the real release blocker straight to the top!
+Now the fix! Upgrade Tomcat Catalina to version eleven point zero point twenty-five, clearing twenty-two findings in one move.
+Open the generated EU Declaration of Conformity. PandaX states the truth clearly: this draft is blocked until the exploited vulnerability is remediated. That is EU readiness backed by evidence, not a guess!
+From product, to action, to legal proof. That is PandaX!

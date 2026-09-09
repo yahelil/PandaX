@@ -146,15 +146,37 @@ def assess(data: dict) -> list[dict]:
         for cve, state, fixed, source, detail in rows:
             results.append(dict(cve=cve, state=state, component=name, version=version,
                                 purl=c['purl'], bom_ref=c['bom-ref'], fixed_version=fixed,
-                                source=source, detail=detail))
+                                source=source, source_name='Vendor advisory',
+                                source_url=source, ruleset='pandax.native/1',
+                                affectedness_evidence=detail, detail=detail))
+    for result in results:
+        validate_assessment(result)
     return results
+
+
+def validate_assessment(assessment: dict) -> None:
+    """A conclusive affectedness decision must point to its supporting advisory."""
+    allowed = {'affected', 'fixed', 'variant_excluded', 'unknown'}
+    state = assessment.get('state')
+    if state not in allowed:
+        raise ValueError(f'unsupported native affectedness state: {state}')
+    if state in {'affected', 'fixed', 'variant_excluded'}:
+        if not assessment.get('source_url') or not assessment.get('affectedness_evidence'):
+            raise ValueError(
+                f'{state} native assessment requires advisory-specific source and evidence'
+            )
 
 
 def findings(assessments: list[dict]) -> list[Finding]:
     return [Finding(cve=a['cve'], osv_id='', purl=a['purl'], component=a['component'],
                     version=a['version'], summary=a['detail'], fixed_version=a['fixed_version'],
-                    bom_ref=a['bom_ref'], source='Vendor advisory', source_url=a['source'],
-                    applicability=a['detail']) for a in assessments if a['state'] == 'affected']
+                    bom_ref=a['bom_ref'], source=a.get('source_name', 'Vendor advisory'),
+                    source_url=a.get('source_url', a['source']), applicability=a['detail'],
+                    coverage_status='completed', affectedness='affected',
+                    affectedness_evidence=a.get('affectedness_evidence', a['detail']),
+                    reachability='unknown', query_source=a.get('ruleset', 'pandax.native/1'),
+                    query_value=f"{a['component']}@{a['version']}:{a['cve']}")
+            for a in assessments if a['state'] == 'affected']
 
 
 def enrich_sbom(sbom: dict, data: dict) -> None:

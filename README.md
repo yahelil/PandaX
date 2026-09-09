@@ -269,6 +269,11 @@ Use `pandax verify RUN --trusted-key KEY.pem` for a one-off trusted check, or
 that its signer is trusted. See [trusted verification](docs/trusted-verification.md)
 for provisioning and status meanings.
 
+Vulnerability results keep [coverage, affectedness, KEV signals and product
+reachability](docs/vulnerability-coverage.md) separate. A completed source with
+no result is shown as “no finding in checked sources,” never as proof that the
+product is clean.
+
 Evidence recipients can instead install the independent offline verifier from
 [`apps/verifier`](apps/verifier/README.md). It accepts a folder or ZIP and does
 not import the PandaX product:

@@ -231,4 +231,11 @@ def test_run_from_sbom_skips_syft_and_seals_original(monkeypatch, tmp_path: Path
     assert (run_dir / "input" / "uploaded.json").exists()
     assert (run_dir / "sbom.cdx.json").exists()
     assert "syft" not in json.loads((run_dir / "manifest.json").read_text())["tool_versions"]
+    assert summary["coverage_summary"] == {
+        "completed": 1,
+        "unsupported": 0,
+        "unscanned": 0,
+        "failed": 0,
+        "unknown": 0,
+    }
     assert all(check.ok for check in verify_run(run_dir))

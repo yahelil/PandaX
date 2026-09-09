@@ -407,6 +407,56 @@ def summary(run_id: str) -> dict[str, Any]:
     dossier = load("dossier.json", {})
     manifest = load("manifest.json", {})
     sbom = load("sbom.cdx.json", {})
+    coverage = load("coverage.json", {})
+    triage_coverage = load("triage-coverage.json", {})
+
+    # Historical bundles predate Card 09. Missing facts remain unknown rather
+    # than being inferred from the presence or absence of a finding.
+    for finding in findings:
+        finding.setdefault("coverage_status", "unknown")
+        finding.setdefault("affectedness", "unknown")
+        finding.setdefault("affectedness_evidence", "")
+        finding.setdefault("reachability", "unknown")
+        finding.setdefault("reachability_evidence", "")
+        finding.setdefault("query_source", "")
+        finding.setdefault("query_value", "")
+        finding.setdefault("source_retrieved_at", "")
+        finding.setdefault("kev_check_status", "unknown")
+        finding.setdefault("kev_source_url", "")
+        finding.setdefault("kev_checked_at", "")
+        finding.setdefault("epss_check_status", "unknown")
+        finding.setdefault("epss_source_url", "")
+        finding.setdefault("epss_checked_at", "")
+        if not finding.get("source_url") and finding.get("osv_id"):
+            finding["source_url"] = (
+                f"https://osv.dev/vulnerability/{finding['osv_id']}"
+            )
+
+    coverage_checks = coverage.get("checks", []) if isinstance(coverage, dict) else []
+    checks_by_ref: dict[str, list[dict[str, Any]]] = {}
+    checks_by_purl: dict[str, list[dict[str, Any]]] = {}
+    for check in coverage_checks:
+        if not isinstance(check, dict):
+            continue
+        checks_by_ref.setdefault(str(check.get("component_ref", "")), []).append(check)
+        checks_by_purl.setdefault(str(check.get("purl", "")), []).append(check)
+
+    def combined_coverage(checks: list[dict[str, Any]]) -> str:
+        statuses = {str(check.get("status", "unknown")) for check in checks}
+        for status in ("failed", "unknown", "completed", "unsupported", "unscanned"):
+            if status in statuses:
+                return status
+        return "unknown"
+
+    def combined_reachability(rows: list[dict[str, Any]]) -> str:
+        states = {str(row.get("reachability", "unknown")) for row in rows}
+        if "reachable" in states:
+            return "reachable"
+        if states == {"not_reachable"}:
+            return "not_reachable"
+        if "not_assessed" in states:
+            return "not_assessed"
+        return "unknown"
 
     components = [
         {
@@ -420,6 +470,7 @@ def summary(run_id: str) -> dict[str, Any]:
             ),
             "type": c.get("type", "library"),
             "matchable": is_matchable_purl(c.get("purl")),
+            "bom_ref": c.get("bom-ref", ""),
         }
         for c in sbom.get("components", [])
     ]
@@ -428,9 +479,25 @@ def summary(run_id: str) -> dict[str, Any]:
     kev_purls = {f["purl"] for f in findings if f.get("kev")}
     finding_counts = Counter(f["purl"] for f in findings)
     for component in components:
+        component_findings = [
+            finding for finding in findings if finding.get("purl") == component["purl"]
+        ]
+        component_checks = checks_by_ref.get(component["bom_ref"])
+        if component_checks is None:
+            component_checks = checks_by_purl.get(component["purl"], [])
         component["findings"] = finding_counts[component["purl"]]
         component["affected"] = component["purl"] in affected
         component["kev"] = component["purl"] in kev_purls
+        component["coverage_status"] = combined_coverage(component_checks)
+        component["coverage_checks"] = component_checks
+        affected_states = {
+            str(finding.get("affectedness", "unknown"))
+            for finding in component_findings
+        }
+        component["affectedness"] = (
+            "affected" if "affected" in affected_states else "unknown"
+        )
+        component["reachability"] = combined_reachability(component_findings)
 
     ledger = [
         json.loads(line)
@@ -454,6 +521,8 @@ def summary(run_id: str) -> dict[str, Any]:
         "comparison": load("comparison.json", None),
         "release_checks": load("release-checks.json", None),
         "native_assessments": load("native-assessments.json", []),
+        "coverage": coverage,
+        "triage_coverage": triage_coverage,
         "manufacturer": dossier.get("manufacturer", {}),
         "generated": dossier.get("generated", manifest.get("created", "")),
         "stats": {
@@ -483,6 +552,9 @@ def summary(run_id: str) -> dict[str, Any]:
             "manifest_files": len(manifest.get("files", [])),
             "ledger_root": manifest.get("ledger_root", ""),
             "tool_versions": manifest.get("tool_versions", {}),
+            "coverage_summary": (
+                coverage.get("summary", {}) if isinstance(coverage, dict) else {}
+            ),
         },
         "verdict": decision.as_dict(),
         "components": components,

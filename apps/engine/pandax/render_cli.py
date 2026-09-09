@@ -258,7 +258,9 @@ class CliRenderer:
         console.print()
         console.print(
             Text("  next: ", style="dim")
-            + Text(f"pandax verify {run_dir}", style="bold cyan")
+            + Text(f"pandax verify {run_dir} --trusted-key KEY.pem", style="bold cyan")
+            + Text("   or inspect with   ", style="dim")
+            + Text(f"pandax verify {run_dir} --inspect-only", style="bold cyan")
             + Text("   then   ", style="dim")
             + Text(f"pandax tamper {run_dir}", style="bold yellow")
             + Text(" to watch it fail", style="dim")
@@ -266,13 +268,18 @@ class CliRenderer:
         console.print()
 
 
-def render_checks(console: Console, checks, title: str) -> bool:
-    """Render verification results. Returns True if everything passed."""
-    all_ok = all(c.ok for c in checks)
+def render_checks(console: Console, result, title: str, inspect_only: bool = False) -> bool:
+    """Render integrity and trust without presenting one as the other."""
+    checks = result.checks
+    inspection_ok = result.integrity_ok and result.signature_valid
+    all_ok = inspection_ok if inspect_only else result.ok
+    if any(c.category != "trust" and not c.ok for c in checks):
+        all_ok = False
+    untrusted = result.status == "untrusted"
     table = Table(
         title=title,
         title_style="bold",
-        border_style="green" if all_ok else "red",
+        border_style="green" if all_ok and not inspect_only else "yellow" if untrusted or inspect_only else "red",
         header_style="bold",
         expand=False,
     )
@@ -280,47 +287,71 @@ def render_checks(console: Console, checks, title: str) -> bool:
     table.add_column("Check")
     table.add_column("Detail", style="dim", overflow="fold", max_width=70)
     for check in checks:
+        warning = check.category == "trust" and not check.ok and inspection_ok
         table.add_row(
-            "[green]✔[/]" if check.ok else "[bold red]✘[/]",
-            Text(check.name, style="" if check.ok else "bold red"),
+            "[green]✔[/]" if check.ok else "[bold yellow]![/]" if warning else "[bold red]✘[/]",
+            Text(check.name, style="" if check.ok else "bold yellow" if warning else "bold red"),
             check.detail,
         )
     console.print()
     console.print(table)
     console.print()
-    if all_ok:
+    if result.status == "trusted" and all_ok:
         console.print(
             Panel(
                 Text(
                     "All checks passed. Every digest was recomputed, every chain "
-                    "link re-derived, and the Ed25519 signature verified against "
-                    "the bundled public key.\n\nThis proves the bundle has not "
-                    "been altered since it was sealed. It does not prove the "
-                    "legal identity of the signer — that requires an eIDAS "
-                    "qualified electronic seal.",
+                    "link re-derived, and the signature verified against the "
+                    "independently supplied trusted key.\n\nThis establishes the "
+                    "configured signing installation, not a person's legal identity "
+                    "or an eIDAS-qualified electronic seal.",
                     style="green",
                 ),
-                title="VERIFIED",
+                title="TRUSTED",
                 border_style="green",
+                padding=(1, 2),
+            )
+        )
+    elif inspection_ok and (inspect_only or result.status == "untrusted"):
+        body = Text(
+            "The bundle is internally intact, but signer trust was not established.\n\n",
+            style="yellow",
+        )
+        body.append(result.reason, style="dim")
+        if inspect_only:
+            body.append(
+                "\n\nInspection-only mode never claims that the signer is trusted.",
+                style="dim",
+            )
+        console.print(
+            Panel(
+                body,
+                title="INTACT — TRUST NOT ESTABLISHED",
+                border_style="yellow",
                 padding=(1, 2),
             )
         )
     else:
         failed = [c for c in checks if not c.ok]
         body = Text(
-            "The evidence bundle does not match its seal. Failed checks:\n\n",
+            "The evidence bundle is invalid or incomplete. Failed checks:\n\n",
             style="bold red",
         )
         for check in failed:
             body.append(f"  ✘ {check.name}\n", style="bold red")
             body.append(f"    {check.detail}\n", style="red")
         body.append(
-            "\nA regulator reading this bundle would reject it: the documents "
-            "on disk are not the documents that were signed.",
+            "\nDo not rely on this bundle until the missing information or "
+            "integrity failure has been resolved.",
             style="dim",
         )
         console.print(
-            Panel(body, title="TAMPERING DETECTED", border_style="red", padding=(1, 2))
+            Panel(
+                body,
+                title="INCOMPLETE" if result.status == "incomplete" else "INVALID OR TAMPERED",
+                border_style="red",
+                padding=(1, 2),
+            )
         )
     console.print()
     return all_ok

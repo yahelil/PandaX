@@ -16,7 +16,9 @@ from pandax.evidence import (
     canonical,
     load_or_create_key,
     record_digest,
+    verify_bundle,
     verify_run,
+    write_public_key,
     write_manifest,
 )
 
@@ -176,3 +178,93 @@ def test_manifest_excludes_its_own_signature_files(run_dir: Path):
     _, manifest = seal(run_dir, {"a.json": "{}"})
     listed = {f["path"] for f in manifest["files"]}
     assert listed.isdisjoint({"manifest.json", "manifest.sig", "pubkey.pem"})
+
+
+# --- external trust --------------------------------------------------------
+
+
+def test_correct_external_key_establishes_trust(run_dir: Path, tmp_path: Path):
+    seal(run_dir, {"a.json": "{}"})
+    trusted = tmp_path / "trusted.pem"
+    key = load_or_create_key(run_dir / "key.pem")
+    fingerprint = write_public_key(key, trusted)
+
+    result = verify_bundle(run_dir, trusted)
+
+    assert result.status == "trusted"
+    assert result.ok and result.integrity_ok and result.signature_valid
+    assert result.signer_trust == "trusted"
+    assert result.bundle_key_fingerprint == result.trusted_key_fingerprint == fingerprint
+
+
+def test_missing_external_key_never_claims_trust(run_dir: Path):
+    seal(run_dir, {"a.json": "{}"})
+
+    result = verify_bundle(run_dir)
+
+    assert result.status == "untrusted"
+    assert not result.ok
+    assert result.integrity_ok and result.signature_valid
+    assert result.signer_trust == "not_configured"
+
+
+def test_wrong_external_key_is_untrusted_not_tampered(run_dir: Path, tmp_path: Path):
+    seal(run_dir, {"a.json": "{}"})
+    wrong = tmp_path / "wrong.pem"
+    write_public_key(Ed25519PrivateKey.generate(), wrong)
+
+    result = verify_bundle(run_dir, wrong)
+
+    assert result.status == "untrusted"
+    assert result.integrity_ok and result.signature_valid
+    assert result.signer_trust == "untrusted"
+
+
+def test_attacker_resealed_bundle_fails_external_trust(run_dir: Path, tmp_path: Path):
+    seal(run_dir, {"a.json": '{"owner":"original"}'})
+    trusted = tmp_path / "trusted.pem"
+    original = load_or_create_key(run_dir / "key.pem")
+    write_public_key(original, trusted)
+
+    (run_dir / "a.json").write_text('{"owner":"attacker"}', encoding="utf-8")
+    (run_dir / evidence.LEDGER_NAME).unlink()
+    ledger = Ledger(run_dir)
+    ledger.append("S0", "attacker", "1.0", [], [ledger.ref(run_dir / "a.json")])
+    attacker = Ed25519PrivateKey.generate()
+    write_manifest(run_dir, "run-test", {}, {"tool": "attacker"}, ledger, attacker)
+
+    result = verify_bundle(run_dir, trusted)
+
+    assert result.integrity_ok and result.signature_valid
+    assert result.status == "untrusted"
+    assert result.signer_trust == "untrusted"
+
+
+def test_missing_required_bundle_file_is_incomplete(run_dir: Path):
+    seal(run_dir, {"a.json": "{}"})
+    (run_dir / "manifest.sig").unlink()
+
+    result = verify_bundle(run_dir)
+
+    assert result.status == "incomplete"
+
+
+def test_malformed_manifest_is_incomplete_instead_of_crashing(run_dir: Path):
+    (run_dir / "manifest.json").write_text("{not-json", encoding="utf-8")
+
+    result = verify_bundle(run_dir)
+
+    assert result.status == "incomplete"
+    assert not result.ok
+
+
+def test_changed_evidence_is_invalid_even_with_trusted_key(run_dir: Path, tmp_path: Path):
+    seal(run_dir, {"a.json": "{}"})
+    trusted = tmp_path / "trusted.pem"
+    write_public_key(load_or_create_key(run_dir / "key.pem"), trusted)
+    (run_dir / "a.json").write_text('{"changed":true}', encoding="utf-8")
+
+    result = verify_bundle(run_dir, trusted)
+
+    assert result.status == "invalid"
+    assert not result.integrity_ok

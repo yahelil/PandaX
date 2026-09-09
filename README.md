@@ -105,22 +105,26 @@ into ~10 package upgrades, which is the whole backlog.
 **1 · The seal holds**
 
 ```bash
-uv run pandax verify
+uv run pandax key export-public trusted-pandax-key.pem
+uv run pandax verify --trusted-key trusted-pandax-key.pem
 ```
 Recomputes every file digest, re-derives every chain link, and checks the
-Ed25519 signature. Seven checks, all green.
+Ed25519 signature against the public key supplied outside the bundle. Integrity,
+signature validity and signer trust are reported separately.
 
 **2 · The seal actually catches tampering** — the important one
 
 ```bash
 uv run pandax tamper --target sbom.cdx.json   # flips ONE byte; file stays valid JSON
-uv run pandax verify                          # now fails, naming S2_SBOM as the source
+uv run pandax verify --trusted-key trusted-pandax-key.pem
+# now fails, naming S2_SBOM as the source
 ```
 
 **3 · The findings reproduce against the live feed**
 
 ```bash
-uv run pandax verify --online     # re-queries OSV.dev and compares the advisory set
+uv run pandax verify --trusted-key trusted-pandax-key.pem --online
+# re-queries OSV.dev and compares the advisory set
 ```
 
 **4 · The statutory clocks**
@@ -251,11 +255,23 @@ The chain head is committed in `manifest.json`, which is signed with Ed25519.
 
 Changing any file breaks its digest. Editing a ledger record breaks that link.
 Re-linking the whole chain to hide the edit still fails, because the head no
-longer matches the signed manifest. `pandax verify` reports which of those
-happened.
+longer matches the signed manifest. Trusted verification additionally checks
+the signature against a public key supplied separately from the bundle:
 
-> The signing key is generated locally and proves **integrity, not legal
-> identity**. A production deployment needs an eIDAS qualified electronic seal.
+```powershell
+pandax key export-public trusted-pandax-key.pem
+$env:PANDAX_TRUSTED_KEY = "C:\secure-config\trusted-pandax-key.pem"
+pandax verify out\run-example
+```
+
+Use `pandax verify RUN --trusted-key KEY.pem` for a one-off trusted check, or
+`pandax verify RUN --inspect-only` to inspect an old bundle without claiming
+that its signer is trusted. See [trusted verification](docs/trusted-verification.md)
+for provisioning and status meanings.
+
+> External-key verification establishes that the bundle came from the
+> pre-approved PandaX signing installation. It does not prove **legal identity**;
+> that requires an appropriate identity-backed or eIDAS-qualified seal.
 
 ### Honest documents
 
@@ -289,7 +305,8 @@ exploitable vulnerabilities").
 ## Known gaps
 
 1. No reachability analysis — non-KEV findings are `in_triage`, never `not_affected`.
-2. Ed25519 proves integrity, not legal identity (eIDAS seal needed).
+2. Externally trusted Ed25519 verification identifies the configured signing
+   installation, not a legal person (an identity-backed/eIDAS seal is still needed).
 3. PDF/A-2b is requested via Typst, not independently validated with veraPDF.
 4. Filings are generated, not submitted — the ENISA platform is not live.
 5. Squashfs/UBIFS images are not unpacked. The added OpenWrt scenarios use official rootfs tar archives; see the scenario guide.

@@ -20,6 +20,7 @@ from .context import (
     KEY_PATH,
     RunContext,
     new_run_dir,
+    signing_key_path,
 )
 from .evidence import Ledger, load_or_create_key, sha256_file, write_manifest
 from .feeds import Feeds
@@ -176,7 +177,8 @@ def _run(
 
     # --- seal the bundle -----------------------------------------------------
     yield ev.start(STAGE_SEAL, "hash-chaining and signing the evidence bundle")
-    key = load_or_create_key(KEY_PATH)
+    configured_key_path = signing_key_path(KEY_PATH)
+    key = load_or_create_key(configured_key_path)
     manifest = write_manifest(
         run_dir=run_dir,
         run_id=run_id,
@@ -190,7 +192,7 @@ def _run(
     yield ev.log(
         STAGE_SEAL, f"manifest covers {len(manifest['files'])} files", ev.GOOD
     )
-    yield ev.log(STAGE_SEAL, f"signing key: {KEY_PATH}")
+    yield ev.log(STAGE_SEAL, f"signing key: {configured_key_path}")
     yield ev.artifact(
         STAGE_SEAL, "manifest.json", sha256_file(run_dir / "manifest.json")
     )

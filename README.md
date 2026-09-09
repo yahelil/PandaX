@@ -269,6 +269,14 @@ Use `pandax verify RUN --trusted-key KEY.pem` for a one-off trusted check, or
 that its signer is trusted. See [trusted verification](docs/trusted-verification.md)
 for provisioning and status meanings.
 
+Evidence recipients can instead install the independent offline verifier from
+[`apps/verifier`](apps/verifier/README.md). It accepts a folder or ZIP and does
+not import the PandaX product:
+
+```powershell
+pandax-verify evidence.zip --trusted-key trusted-pandax-key.pem
+```
+
 > External-key verification establishes that the bundle came from the
 > pre-approved PandaX signing installation. It does not prove **legal identity**;
 > that requires an appropriate identity-backed or eIDAS-qualified seal.
@@ -324,6 +332,7 @@ apps/engine/pandax/
   render_cli.py  server.py        # two renderers, one event stream
   stages/{ingest,sbom,match,triage,clock,dossier}.py  # generate or import at S2
   templates/*.typ  web/           # Typst dossier, dashboard
+apps/verifier/                     # independent offline evidence verifier
 tools/bootstrap.py                # digest-pinned syft + log4j, builds the artifact
 fixtures/smarthub-sh100/          # the demo product
 ```

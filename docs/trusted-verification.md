@@ -55,6 +55,30 @@ The server reads the public key path from `PANDAX_TRUSTED_KEY`. Its
 `signer_trust`; `ok` is true only for a fully `trusted` result. A malformed
 configured key is an installation error and returns HTTP 503.
 
+## Independent verifier for recipients
+
+Auditors and other recipients do not need to install or trust the PandaX
+product. The separate application in `apps/verifier` reads an evidence folder
+or ZIP directly, works offline, and does not import PandaX code:
+
+```powershell
+cd apps\verifier
+python -m pip install .
+pandax-verify C:\evidence\case-snapshot.zip --trusted-key C:\secure-config\pandax-public.pem
+```
+
+For machine-readable output, add `--json`. For historical evidence where no
+separately delivered key is available, use `--inspect-only`; this may confirm
+internal integrity but never labels the signer trusted.
+
+The standalone verifier independently checks the manifest, every listed file,
+unexpected files, ledger file digest, record count and order, hash-chain links,
+chain head, stage outputs, bundled signature, and separately trusted signature.
+ZIP files are read without extraction and are rejected when their names or
+declared sizes could make them unsafe. See
+[`apps/verifier/README.md`](../apps/verifier/README.md) for distribution,
+plain-language results, and exit codes.
+
 This first version supports one active key per installation. Rotation, revoked
 keys, multiple simultaneous keys, and identity-backed/eIDAS seals are separate
 future work.

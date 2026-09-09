@@ -33,6 +33,8 @@ LEDGER_NAME = "ledger.jsonl"
 MANIFEST_NAME = "manifest.json"
 SIG_NAME = "manifest.sig"
 PUBKEY_NAME = "pubkey.pem"
+MANIFEST_SCHEMA = "pandax/manifest/v1"
+CONTROL_FILES = {MANIFEST_NAME, SIG_NAME, PUBKEY_NAME}
 
 SIGNING_NOTE = (
     "Ed25519 over the canonical JSON of manifest.json (UTF-8, sorted keys, no "
@@ -69,6 +71,47 @@ def record_digest(record: dict[str, Any]) -> str:
     """Hash of a ledger record with its own hash field excluded."""
     trimmed = {k: v for k, v in record.items() if k != "record_hash"}
     return sha256_bytes(canonical(trimmed))
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def _load_json_object(blob: str, label: str) -> dict[str, Any]:
+    value = json.loads(blob, object_pairs_hook=_unique_json_object)
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    return value
+
+
+def _validate_manifest_structure(manifest: dict[str, Any]) -> None:
+    required_types: dict[str, type] = {
+        "schema": str,
+        "run_id": str,
+        "created": str,
+        "product": dict,
+        "tool_versions": dict,
+        "ledger_root": str,
+        "ledger_sha256": str,
+        "ledger_records": int,
+        "files": list,
+    }
+    for field, expected in required_types.items():
+        if field not in manifest:
+            raise ValueError(f"manifest is missing {field}")
+        if not isinstance(manifest[field], expected) or (
+            expected is int and isinstance(manifest[field], bool)
+        ):
+            raise ValueError(f"manifest field {field} must be {expected.__name__}")
+    if manifest["schema"] != MANIFEST_SCHEMA:
+        raise ValueError(f"unsupported manifest schema: {manifest['schema']}")
+    if manifest["ledger_records"] < 0:
+        raise ValueError("manifest ledger_records cannot be negative")
 
 
 # --- ledger -----------------------------------------------------------------
@@ -338,9 +381,9 @@ def verify_run(run_dir: Path) -> list[Check]:
             )
         ]
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if not isinstance(manifest, dict):
-            raise ValueError("manifest must be a JSON object")
+        manifest = _load_json_object(
+            manifest_path.read_text(encoding="utf-8"), MANIFEST_NAME
+        )
     except (OSError, ValueError, TypeError) as exc:
         return [
             Check(
@@ -351,6 +394,23 @@ def verify_run(run_dir: Path) -> list[Check]:
             )
         ]
     checks.append(Check("manifest present", True, f"run {manifest.get('run_id', '?')}"))
+    try:
+        _validate_manifest_structure(manifest)
+    except (TypeError, ValueError) as exc:
+        return [
+            *checks,
+            Check(
+                "manifest structure",
+                False,
+                str(exc),
+                problem=(
+                    "unsupported"
+                    if "unsupported manifest schema" in str(exc)
+                    else "malformed"
+                ),
+            ),
+        ]
+    checks.append(Check("manifest structure", True, f"schema {MANIFEST_SCHEMA}"))
 
     # 1. Ed25519 signature against the key advertised by the bundle. This is
     # useful inspection evidence, but it is deliberately not a trust decision.
@@ -401,6 +461,8 @@ def verify_run(run_dir: Path) -> list[Check]:
     listed = manifest.get("files")
     bad_files: list[str] = []
     file_problem = ""
+    listed_paths: set[str] = set()
+    listed_casefolded: set[str] = set()
     if not isinstance(listed, list):
         listed = []
         bad_files.append("manifest files must be a list")
@@ -409,7 +471,15 @@ def verify_run(run_dir: Path) -> list[Check]:
         try:
             if not isinstance(entry, dict) or not isinstance(entry.get("sha256"), str):
                 raise ValueError("entry must contain path and sha256 strings")
-            target = _safe_bundle_path(run_dir, entry.get("path"))
+            relative = entry.get("path")
+            if not isinstance(relative, str):
+                raise ValueError("entry path must be a string")
+            folded = relative.casefold()
+            if folded in listed_casefolded:
+                raise ValueError(f"duplicate or case-colliding file path: {relative}")
+            listed_casefolded.add(folded)
+            listed_paths.add(relative)
+            target = _safe_bundle_path(run_dir, relative)
             if not target.is_file():
                 bad_files.append(f"{entry.get('path')} (missing)")
                 file_problem = "missing"
@@ -425,6 +495,21 @@ def verify_run(run_dir: Path) -> list[Check]:
             not bad_files,
             "all match" if not bad_files else "; ".join(bad_files),
             problem=file_problem,
+        )
+    )
+
+    actual_files = {
+        path.relative_to(run_dir).as_posix()
+        for path in run_dir.rglob("*")
+        if path.is_file()
+    }
+    unexpected = sorted(actual_files - listed_paths - CONTROL_FILES)
+    checks.append(
+        Check(
+            "unexpected files",
+            not unexpected,
+            "none" if not unexpected else "; ".join(unexpected),
+            problem="" if not unexpected else "mismatch",
         )
     )
 
@@ -453,6 +538,29 @@ def verify_run(run_dir: Path) -> list[Check]:
         broken = [f"ledger.jsonl is unreadable: {exc}"]
     else:
         broken = []
+    record_count_ok = len(records) == manifest.get("ledger_records")
+    checks.append(
+        Check(
+            "ledger record count",
+            record_count_ok,
+            f"expected {manifest.get('ledger_records')}, found {len(records)}",
+            problem="" if record_count_ok else "mismatch",
+        )
+    )
+    sequence_bad: list[str] = []
+    for index, record in enumerate(records):
+        if not isinstance(record, dict):
+            sequence_bad.append(f"record {index} is not an object")
+        elif record.get("seq") != index:
+            sequence_bad.append(f"record {index} says seq {record.get('seq')!r}")
+    checks.append(
+        Check(
+            "ledger sequence",
+            not sequence_bad,
+            "contiguous from zero" if not sequence_bad else "; ".join(sequence_bad),
+            problem="" if not sequence_bad else "mismatch",
+        )
+    )
     prev = GENESIS
     for rec in records:
         try:
@@ -534,7 +642,9 @@ def verify_bundle(
     signature_checks = [check for check in checks if check.category == "signature"]
     integrity_ok = bool(integrity_checks) and all(check.ok for check in integrity_checks)
     signature_valid = bool(signature_checks) and all(check.ok for check in signature_checks)
-    incomplete = any(check.problem in {"missing", "malformed"} for check in checks)
+    incomplete = any(
+        check.problem in {"missing", "malformed", "unsupported"} for check in checks
+    )
 
     bundle_fingerprint = ""
     try:

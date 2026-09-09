@@ -3,7 +3,6 @@ from __future__ import annotations
 import urllib.request
 from pathlib import Path
 
-import numpy as np
 import soundfile as sf
 from kokoro_onnx import Kokoro
 
@@ -33,18 +32,13 @@ paragraphs = [
     if line.strip()
 ]
 kokoro = Kokoro(str(MODEL), str(VOICES))
-chunks: list[np.ndarray] = []
-sample_rate = 24000
-
-for paragraph in paragraphs:
-    samples, sample_rate = kokoro.create(
-        paragraph,
-        voice="af_heart",
-        speed=1.08,
-        lang="en-us",
-    )
-    chunks.extend((samples, np.zeros(int(sample_rate * 0.16), dtype=np.float32)))
+samples, sample_rate = kokoro.create(
+    " ".join(paragraphs),
+    voice="af_heart",
+    speed=1.24,
+    lang="en-us",
+)
 
 OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-sf.write(OUTPUT, np.concatenate(chunks), sample_rate, subtype="PCM_16")
+sf.write(OUTPUT, samples, sample_rate, subtype="PCM_16")
 print(f"Generated {OUTPUT}")

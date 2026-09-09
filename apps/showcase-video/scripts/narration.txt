@@ -1,17 +1,21 @@
-Cyber resilience should not end in a spreadsheet.
+Cyber resilience should not end in a spreadsheet. Meet PandaX!
 
-PandaX turns a product release into a compliance evidence trail you can inspect.
+It turns a product release into a live C R A evidence trail you can inspect in seconds.
 
-It inventories shipped components, matches vulnerabilities against independent intelligence, and puts actively exploited issues first.
+It inventories every shipped component, matches vulnerabilities against independent intelligence, and pushes actively exploited threats straight to the top.
 
-Instead of handing teams a wall of C V E rows, it compresses findings into the upgrades that clear the most risk.
+No wall of C V E rows. PandaX highlights the upgrades that clear the most risk, fast.
 
-Article fourteen deadlines stay visible from the moment reporting is engaged.
+Article fourteen reporting clocks stay visible from the moment an incident is engaged.
 
-Annex seven documentation, the declaration, S B O M, VEX, and supporting records stay together.
+Then comes the payoff: open the generated EU Declaration of Conformity and see EU market readiness immediately!
 
-Every stage writes to a hash-chained ledger. Every output is sealed and independently verifiable.
+Here, one actively exploited vulnerability blocks the declaration. PandaX names the legal reason, marks the draft, and shows exactly what must change before release.
 
-PandaX does not hide missing manufacturer input or invent certainty. It shows what the evidence supports.
+Annex seven documentation, the declaration, S B O M, VEX, and supporting records all stay together.
 
-From artifact to a review-ready, tamper-evident C R A dossier, in one workflow.
+Every stage writes to a hash-chained ledger. Every output is sealed and independently verifiable!
+
+No invented certainty. The result says exactly what the evidence supports.
+
+From artifact to a review-ready, tamper-evident C R A dossier, in one exciting workflow.

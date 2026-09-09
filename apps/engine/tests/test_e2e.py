@@ -78,13 +78,18 @@ def test_log4shell_is_attributed_to_the_bundled_jar(completed):
     assert log4shell["fixed_version"] == "2.15.0"
 
 
-def test_vex_marks_kev_exploitable_and_nothing_not_affected(completed):
+def test_vex_keeps_kev_separate_and_nothing_not_affected(completed):
     run_dir, _ = completed
     vex = json.loads((run_dir / "findings.cdx-vex.json").read_text(encoding="utf-8"))
     assert vex["specVersion"] == "1.6"
     states = {v["analysis"]["state"] for v in vex["vulnerabilities"]}
-    assert "exploitable" in states
+    assert "in_triage" in states
+    assert "exploitable" not in states
     assert "not_affected" not in states
+    kev = next(v for v in vex["vulnerabilities"] if v["id"] in EXPECTED_KEV)
+    properties = {item["name"]: item["value"] for item in kev["properties"]}
+    assert properties["pandax:kev-signal"] == "true"
+    assert properties["pandax:reachability"] == "not_assessed"
 
 
 def test_article_14_filings_exist_for_every_kev_hit(completed):

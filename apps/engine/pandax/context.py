@@ -48,6 +48,22 @@ class Finding:
     source: str = "OSV"
     source_url: str = ""
     applicability: str = ""
+    # Coverage, affectedness, exploitation signals and product reachability are
+    # separate facts. Defaults keep historical/in-memory findings conservative.
+    coverage_status: str = "unknown"
+    affectedness: str = "unknown"
+    affectedness_evidence: str = ""
+    reachability: str = "unknown"
+    reachability_evidence: str = ""
+    query_source: str = ""
+    query_value: str = ""
+    source_retrieved_at: str = ""
+    kev_check_status: str = "unknown"
+    kev_source_url: str = ""
+    kev_checked_at: str = ""
+    epss_check_status: str = "unknown"
+    epss_source_url: str = ""
+    epss_checked_at: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return dict(self.__dict__)
@@ -70,6 +86,7 @@ class RunContext:
     tool_versions: dict[str, str] = field(default_factory=dict)
     started: str = ""
     native_inventory: dict[str, Any] = field(default_factory=dict)
+    vulnerability_coverage: list[dict[str, Any]] = field(default_factory=list)
 
     # A run can begin from a product artifact or from a pre-built SBOM.  These
     # fields make that provenance available to the dossier and both renderers.

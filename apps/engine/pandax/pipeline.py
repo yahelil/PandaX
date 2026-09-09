@@ -212,6 +212,14 @@ def _run(
         sbom_version=ctx.sbom_source_version,
         matchable_components=ctx.matchable_components,
         skipped_components=ctx.skipped_components,
+        coverage_summary={
+            status: sum(
+                1
+                for check in ctx.vulnerability_coverage
+                if check.get("status") == status
+            )
+            for status in ("completed", "failed", "unknown", "unsupported", "unscanned")
+        },
     )
 
 

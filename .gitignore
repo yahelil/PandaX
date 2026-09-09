@@ -51,3 +51,6 @@ evaluation/results/
 presentation-assets/
 presentation-output/
 *.pptx
+
+# Local neural voice model cache
+apps/showcase-video/.models/

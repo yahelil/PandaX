@@ -5,7 +5,7 @@
   "description": "PandaX Monorepo",
   "scripts": {
     "video:capture": "node apps/showcase-video/scripts/capture.mjs",
-    "video:voiceover": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File apps/showcase-video/scripts/generate-voiceover.ps1",
+    "video:voiceover": "uv run --with kokoro-onnx --with soundfile python apps/showcase-video/scripts/generate_voiceover.py",
     "video:render": "remotion render apps/showcase-video/src/index.tsx PandaXShowcase output/video/pandax-poc-showcase.mp4 --public-dir=apps/showcase-video/public --codec=h264 --crf=18 --audio-codec=aac --overwrite",
     "video:studio": "remotion studio apps/showcase-video/src/index.tsx --public-dir=apps/showcase-video/public"
   },

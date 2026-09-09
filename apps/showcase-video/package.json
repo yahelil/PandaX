@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "capture": "node scripts/capture.mjs",
-    "voiceover": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/generate-voiceover.ps1",
+    "voiceover": "uv run --with kokoro-onnx --with soundfile python scripts/generate_voiceover.py",
     "studio": "remotion studio src/index.tsx",
     "render": "remotion render src/index.tsx PandaXShowcase ../../output/video/pandax-poc-showcase.mp4 --codec=h264 --crf=18 --audio-codec=aac"
   },

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import random
 from pathlib import Path
 from typing import Optional
@@ -15,8 +16,13 @@ from rich.table import Table
 from rich.text import Text
 
 from . import events as ev
-from .context import CACHE_DIR, OUT_DIR
-from .evidence import verify_run
+from .context import CACHE_DIR, OUT_DIR, signing_key_path
+from .evidence import (
+    TrustedKeyConfigurationError,
+    load_or_create_key,
+    verify_bundle,
+    write_public_key,
+)
 from .render_cli import CliRenderer, banner, render_checks
 
 def _force_utf8() -> None:
@@ -43,10 +49,37 @@ app = typer.Typer(
 )
 from .case_cli import app as case_app
 app.add_typer(case_app, name="case")
+key_app = typer.Typer(add_completion=False, help="Manage the installation signing identity.")
+app.add_typer(key_app, name="key")
 
 # legacy_windows=False keeps Rich off the win32 console API, which cannot
 # render UTF-8 and is never needed on a modern terminal.
 console = Console(legacy_windows=False)
+
+
+@key_app.command("export-public")
+def export_public_key(
+    output: Path = typer.Argument(..., help="Destination for the public PEM key"),
+    signing_key: Optional[Path] = typer.Option(
+        None, "--signing-key", help="Private signing key (default: PANDAX_SIGNING_KEY)"
+    ),
+    force: bool = typer.Option(False, "--force", help="Replace an existing public-key file"),
+) -> None:
+    """Export the public verification key without exposing the private key."""
+    source = signing_key or signing_key_path()
+    try:
+        key = load_or_create_key(source)
+        fingerprint = write_public_key(key, output, force=force)
+    except FileExistsError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    except (OSError, TypeError, ValueError) as exc:
+        raise typer.BadParameter(f"signing key cannot be used: {exc}") from exc
+    console.print(f"[green]public key exported:[/] {output}")
+    console.print(f"[dim]SHA-256 fingerprint:[/] [bold cyan]{fingerprint}[/]")
+    console.print(
+        "[yellow]Distribute this key separately from evidence bundles and confirm "
+        "the fingerprint through a trusted administrator channel.[/]"
+    )
 
 
 def _latest_run() -> Path:
@@ -201,19 +234,31 @@ def verdict(
 @app.command()
 def verify(
     run_dir: Optional[Path] = typer.Argument(None, help="Run directory (default: latest)"),
+    trusted_key: Optional[Path] = typer.Option(
+        None,
+        "--trusted-key",
+        help="Independently supplied Ed25519 public key (default: PANDAX_TRUSTED_KEY)",
+    ),
+    inspect_only: bool = typer.Option(
+        False,
+        "--inspect-only",
+        help="Inspect internal integrity without claiming that the signer is trusted",
+    ),
     online: bool = typer.Option(
         False, "--online", help="Also re-query OSV.dev to confirm findings reproduce"
     ),
 ) -> None:
-    """Independently re-derive every digest, chain link and signature."""
+    """Verify bundle integrity and signer trust as separate claims."""
+    if trusted_key is not None and inspect_only:
+        raise typer.BadParameter("--trusted-key and --inspect-only cannot be used together")
     target = _resolve_run(run_dir)
     console.print()
     console.print(
         Panel(
             Text(
-                "Recomputing every hash from the files on disk. Nothing is taken "
-                "on trust: digests, chain links and the Ed25519 signature are all "
-                "re-derived, then compared with the sealed manifest.",
+                "Recomputing every hash and chain link from the files on disk. "
+                "Signer trust is checked only against a public key supplied "
+                "separately from this evidence bundle.",
                 style="dim",
             ),
             title=f"Verifying {target.name}",
@@ -222,12 +267,28 @@ def verify(
         )
     )
 
-    checks = verify_run(target)
+    configured = None
+    if not inspect_only:
+        configured = trusted_key or (
+            Path(os.environ["PANDAX_TRUSTED_KEY"])
+            if os.environ.get("PANDAX_TRUSTED_KEY")
+            else None
+        )
+    try:
+        result = verify_bundle(target, configured)
+    except TrustedKeyConfigurationError as exc:
+        console.print(f"[bold red]Trusted-key configuration error:[/] {exc}")
+        raise typer.Exit(code=2) from exc
 
     if online:
-        checks.append(_reproduce_findings(target))
+        result.checks.append(_reproduce_findings(target))
 
-    ok = render_checks(console, checks, f"Verification — {target}")
+    ok = render_checks(
+        console,
+        result,
+        f"Verification — {target}",
+        inspect_only=inspect_only,
+    )
     raise typer.Exit(code=0 if ok else 1)
 
 

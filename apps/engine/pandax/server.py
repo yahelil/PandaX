@@ -25,7 +25,7 @@ from . import events as ev
 from .cases import CaseError, CaseStore
 from .stages.clock import parse_timestamp
 from .context import OUT_DIR, ROOT
-from .evidence import verify_run
+from .evidence import TrustedKeyConfigurationError, verify_bundle
 from .stages.sbom import is_matchable_purl
 
 WEB = Path(__file__).resolve().parent / "web"
@@ -360,12 +360,12 @@ def verify(run_id: str) -> dict[str, Any]:
     target = OUT_DIR / run_id
     if not target.exists():
         raise HTTPException(404, f"run not found: {run_id}")
-    checks = verify_run(target)
-    return {
-        "run_id": run_id,
-        "ok": all(c.ok for c in checks),
-        "checks": [{"name": c.name, "ok": c.ok, "detail": c.detail} for c in checks],
-    }
+    configured = os.environ.get("PANDAX_TRUSTED_KEY")
+    try:
+        result = verify_bundle(target, Path(configured) if configured else None)
+    except TrustedKeyConfigurationError as exc:
+        raise HTTPException(503, f"trusted-key configuration error: {exc}") from exc
+    return {"run_id": run_id, **result.as_dict()}
 
 
 @api.post("/api/tamper/{run_id}")

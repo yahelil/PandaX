@@ -1,0 +1,17 @@
+Cyber resilience should not end in a spreadsheet.
+
+PandaX turns a product release into a compliance evidence trail you can inspect.
+
+It inventories shipped components, matches vulnerabilities against independent intelligence, and puts actively exploited issues first.
+
+Instead of handing teams a wall of C V E rows, it compresses findings into the upgrades that clear the most risk.
+
+Article fourteen deadlines stay visible from the moment reporting is engaged.
+
+Annex seven documentation, the declaration, S B O M, VEX, and supporting records stay together.
+
+Every stage writes to a hash-chained ledger. Every output is sealed and independently verifiable.
+
+PandaX does not hide missing manufacturer input or invent certainty. It shows what the evidence supports.
+
+From artifact to a review-ready, tamper-evident C R A dossier, in one workflow.

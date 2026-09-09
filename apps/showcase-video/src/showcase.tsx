@@ -97,50 +97,96 @@ type ShotProps = {
   kicker: string;
   cursorFrom: [number, number];
   cursorTo: [number, number];
+  secondCursorTarget?: [number, number];
+  documentImage?: string;
+  orbitRadius?: number;
   zoom?: number;
   accent?: string;
 };
 
 const Cursor: React.FC<{x: number; y: number; click: number; color: string; scale: number}> = ({x, y, click, color, scale}) => (
-  <div style={{position: 'absolute', left: x, top: y, width: 26, height: 32, zIndex: 8, transform: `scale(${scale})`, transformOrigin: 'top left'}}>
+  <div style={{position: 'absolute', left: x, top: y, width: 66, height: 72, zIndex: 8, transform: `scale(${scale})`, transformOrigin: '5px 4px'}}>
     <div
       style={{
         position: 'absolute',
-        width: 28 + click * 36,
-        height: 28 + click * 36,
-        left: -9 - click * 18,
-        top: -9 - click * 18,
-        border: `2px solid ${color}`,
+        width: 30 + click * 54,
+        height: 30 + click * 54,
+        left: -11 - click * 27,
+        top: -11 - click * 27,
+        border: `3px solid ${color}`,
         borderRadius: '50%',
-        opacity: 0.68 - click * 0.68,
+        opacity: 0.82 - click * 0.82,
       }}
     />
-    <svg width="25" height="31" viewBox="0 0 25 31" style={{filter: 'drop-shadow(0 3px 3px rgba(0,0,0,.55))'}}>
-      <path d="M2 1.5L22 20H13.5L9.5 29L5.5 27L9 18H2Z" fill="#fff" stroke="#071017" strokeWidth="2" strokeLinejoin="round" />
+    <svg width="66" height="72" viewBox="0 0 740 740" style={{overflow: 'visible', filter: 'drop-shadow(0 7px 5px rgba(0,0,0,.48))'}}>
+      <path d="M92 47L645 310L425 386L615 638L500 692L335 457L204 648Z" fill="#fff" stroke="#05080a" strokeWidth="42" strokeLinejoin="miter" />
     </svg>
   </div>
 );
 
-const BrowserShot: React.FC<ShotProps> = ({duration, image, title, kicker, cursorFrom, cursorTo, zoom = 1.85, accent = COLORS.cyan}) => {
+const orbit = (frame: number, start: number, duration: number, radius: number): [number, number] => {
+  const progress = Math.max(0, Math.min(1, (frame - start) / duration));
+  if (progress === 0 || progress === 1) return [0, 0];
+  const envelope = Math.sin(Math.PI * progress);
+  const angle = -Math.PI / 2 + progress * Math.PI * 2.5;
+  return [Math.cos(angle) * radius * envelope, Math.sin(angle) * radius * 0.64 * envelope];
+};
+
+const BrowserShot: React.FC<ShotProps> = ({
+  duration,
+  image,
+  title,
+  kicker,
+  cursorFrom,
+  cursorTo,
+  secondCursorTarget,
+  documentImage,
+  orbitRadius = 92,
+  zoom = 1.85,
+  accent = COLORS.cyan,
+}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
+  const isDocumentShot = image === 'documents.png';
+  const activeCursorTo: [number, number] = isDocumentShot ? [1240, 550] : cursorTo;
+  const activeSecondTarget = secondCursorTarget ?? (isDocumentShot ? [910, 300] as [number, number] : undefined);
+  const activeDocumentImage = documentImage ?? (isDocumentShot ? 'eu-declaration.png' : undefined);
+  const activeOrbitRadius = isDocumentShot ? 108 : orbitRadius;
+  const activeKicker = isDocumentShot ? 'EU market readiness' : kicker;
+  const activeTitle = isDocumentShot ? 'Open the declaration. See the blocker instantly.' : title;
+  const activeAccent = isDocumentShot ? COLORS.red : accent;
+  const activeZoom = isDocumentShot ? 1.92 : zoom;
   const enter = spring({fps, frame, config: {damping: 18, stiffness: 90}});
   const exit = ease(frame, [duration - 20, duration], [1, 0]);
   const cameraIn = spring({fps, frame: frame - 12, config: {damping: 20, stiffness: 64, mass: 1.1}});
-  const progress = interpolate(frame, [28, duration - 36], [0, 1], {
+  const firstMove = interpolate(frame, [12, 36], [0, 1], {
+    easing: Easing.out(Easing.cubic),
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const [firstOrbitX, firstOrbitY] = orbit(frame, 42, 54, activeOrbitRadius);
+  const secondMove = interpolate(frame, [108, 132], [0, 1], {
     easing: Easing.inOut(Easing.cubic),
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const cursorX = ease(progress, [0, 1], [cursorFrom[0], cursorTo[0]]);
-  const cursorY = ease(progress, [0, 1], [cursorFrom[1], cursorTo[1]]);
-  const cameraZoom = 1 + (zoom - 1) * cameraIn;
+  const [secondOrbitX, secondOrbitY] = orbit(frame, activeSecondTarget ? 138 : 142, 62, activeOrbitRadius * (activeSecondTarget ? 0.8 : 0.72));
+  const firstX = ease(firstMove, [0, 1], [cursorFrom[0], activeCursorTo[0]]);
+  const firstY = ease(firstMove, [0, 1], [cursorFrom[1], activeCursorTo[1]]);
+  const targetX = activeSecondTarget ? ease(secondMove, [0, 1], [activeCursorTo[0], activeSecondTarget[0]]) : activeCursorTo[0];
+  const targetY = activeSecondTarget ? ease(secondMove, [0, 1], [activeCursorTo[1], activeSecondTarget[1]]) : activeCursorTo[1];
+  const cursorX = frame < 108 ? firstX + firstOrbitX : targetX + secondOrbitX;
+  const cursorY = frame < 108 ? firstY + firstOrbitY : targetY + secondOrbitY;
+  const cameraZoom = 1 + (activeZoom - 1) * cameraIn;
   const focusX = 1130;
   const focusY = 450;
   const cameraX = (focusX - cursorX * cameraZoom) * cameraIn;
   const cameraY = (focusY - cursorY * cameraZoom) * cameraIn;
-  const click = ease(frame % 92, [57, 63, 85], [0, 1, 0]);
+  const firstClick = ease(frame, [34, 39, 56], [0, 1, 0]);
+  const secondClick = activeSecondTarget ? ease(frame, [130, 135, 152], [0, 1, 0]) : 0;
+  const click = Math.max(firstClick, secondClick);
   const titleIn = spring({fps, frame: frame - 9, config: {damping: 18, stiffness: 110}});
+  const documentIn = spring({fps, frame: frame - 104, config: {damping: 18, stiffness: 105}});
 
   return (
     <AbsoluteFill style={{color: COLORS.white, opacity: exit, overflow: 'hidden'}}>
@@ -175,7 +221,30 @@ const BrowserShot: React.FC<ShotProps> = ({duration, image, title, kicker, curso
           </div>
           <Img src={staticFile(`captures/${image}`)} style={{width: '100%', height: 934, objectFit: 'cover', objectPosition: 'top'}} />
         </div>
-        <Cursor x={cursorX} y={cursorY} click={click} color={accent} scale={1 / cameraZoom} />
+        {activeDocumentImage ? (
+          <>
+            <div style={{position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(3,8,12,.82)', opacity: documentIn}} />
+            <div
+              style={{
+                position: 'absolute',
+                left: 500,
+                top: 28,
+                width: 820,
+                zIndex: 6,
+                borderRadius: 8,
+                overflow: 'hidden',
+                background: '#fff',
+                boxShadow: '0 38px 100px rgba(0,0,0,.68)',
+                opacity: documentIn,
+                transform: `translate(${(1 - documentIn) * 315}px, ${(1 - documentIn) * 250}px) scale(${0.42 + documentIn * 0.58})`,
+                transformOrigin: '72% 45%',
+              }}
+            >
+              <Img src={staticFile(`captures/${activeDocumentImage}`)} style={{display: 'block', width: '100%'}} />
+            </div>
+          </>
+        ) : null}
+        <Cursor x={cursorX} y={cursorY} click={click} color={activeAccent} scale={1 / cameraZoom} />
       </div>
       <div
         style={{
@@ -185,8 +254,8 @@ const BrowserShot: React.FC<ShotProps> = ({duration, image, title, kicker, curso
           width: 770,
           padding: '27px 34px 30px',
           background: 'rgba(5,13,19,.9)',
-          border: `1px solid ${accent}55`,
-          borderLeft: `7px solid ${accent}`,
+          border: `1px solid ${activeAccent}55`,
+          borderLeft: `7px solid ${activeAccent}`,
           borderRadius: 18,
           backdropFilter: 'blur(18px)',
           transform: `translateX(${(1 - titleIn) * -90}px)`,
@@ -194,10 +263,10 @@ const BrowserShot: React.FC<ShotProps> = ({duration, image, title, kicker, curso
           zIndex: 12,
         }}
       >
-        <div style={{color: accent, fontWeight: 800, fontSize: 18, textTransform: 'uppercase', letterSpacing: 3}}>{kicker}</div>
-        <div style={{fontSize: 44, fontWeight: 780, lineHeight: 1.08, letterSpacing: -1.4, marginTop: 9}}>{title}</div>
+        <div style={{color: activeAccent, fontWeight: 800, fontSize: 18, textTransform: 'uppercase', letterSpacing: 3}}>{activeKicker}</div>
+        <div style={{fontSize: 44, fontWeight: 780, lineHeight: 1.08, letterSpacing: -1.4, marginTop: 9}}>{activeTitle}</div>
       </div>
-      <div style={{position: 'absolute', inset: 0, boxShadow: `inset 0 0 180px ${accent}12`, pointerEvents: 'none'}} />
+      <div style={{position: 'absolute', inset: 0, boxShadow: `inset 0 0 180px ${activeAccent}12`, pointerEvents: 'none'}} />
     </AbsoluteFill>
   );
 };
@@ -244,6 +313,6 @@ export const PandaXShowcase: React.FC = () => (
       <BrowserShot duration={300} image="evidence.png" kicker="Cryptographic proof" title="Every stage chained. Every output sealed." cursorFrom={[120, 470]} cursorTo={[980, 565]} accent={COLORS.cyan} zoom={1.9} />
     </Sequence>
     <Sequence from={1605} durationInFrames={255}><Outro /></Sequence>
-    <Audio src={staticFile('audio/pandax-voiceover.wav')} startFrom={0} playbackRate={0.94} volume={0.92} />
+    <Audio src={staticFile('audio/pandax-voiceover.wav')} startFrom={0} playbackRate={1.04} volume={0.94} />
   </AbsoluteFill>
 );

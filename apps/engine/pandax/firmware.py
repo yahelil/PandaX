@@ -10,16 +10,20 @@ import tempfile
 import time
 import uuid
 from dataclasses import asdict, dataclass
-from pathlib import Path, PurePosixPath, PureWindowsPath
+from pathlib import Path, PurePosixPath
 
 from .evidence import sha256_file
 
 # Official unblob 26.6.4 multi-platform image; upgrade the digest and tests together.
 IMAGE = "ghcr.io/onekey-sec/unblob@sha256:0779adc4fc7751c601eaaa2eaae1ad04279a8afadecb36af4315752b72f5e2f9"
+UNBLOB_VERSION = "26.6.4"
 REPORT = "firmware-extraction.json"
 RAW_REPORT = "unblob-report.json"
 LOG = "firmware-extraction.log"
 DIAGNOSTIC_BYTES = 16 * 1024 * 1024
+WINDOWS_RESERVED = {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"} | {
+    prefix + digit for prefix in ("COM", "LPT") for digit in "123456789¹²³"
+}
 
 
 class FirmwareError(ValueError):
@@ -57,6 +61,30 @@ def check_input(src: Path, limits: Limits) -> None:
         raise FirmwareError("failed", "firmware input must be a regular file, not a symlink")
     if src.stat().st_size > limits.max_input_bytes:
         raise FirmwareError("failed", f"firmware exceeds max_input_bytes={limits.max_input_bytes}")
+
+
+def check_format(src: Path) -> None:
+    """Cheap candidate gate; unblob still validates the actual structure.
+
+    Scan bounded input for embedded filesystems; accept common compressed
+    wrappers at offset zero without decompressing anything on the host.
+    """
+    magics = (b"hsqs", b"sqsh", b"shsq", b"qshs", b"UBI#", b"\x31\x18\x10\x06", b"\x06\x10\x18\x31")
+    with src.open("rb") as source:
+        header = source.read(6)
+        if header.startswith((b"\x1f\x8b", b"BZh", b"\xfd7zXZ\x00", b"\x28\xb5\x2f\xfd", b"\x5d\x00\x00")):
+            return
+        tail = header
+        remaining = max(0, src.stat().st_size - len(header))
+        while remaining and (chunk := source.read(min(remaining, 64 * 1024))):
+            remaining -= len(chunk)
+            data = tail + chunk
+            if any(magic in data for magic in magics):
+                return
+            tail = data[-3:]
+        if any(magic in header for magic in magics):
+            return
+    raise FirmwareError("unsupported", f"unsupported artifact format: {src.name}")
 
 
 def command(docker: str, src: Path, name: str, limits: Limits) -> list[str]:
@@ -98,6 +126,9 @@ def _run_container(docker: str, src: Path, archive: Path, log: Path, limits: Lim
                 time.sleep(0.05)
             if archive.stat().st_size > transfer_limit or log.stat().st_size > DIAGNOSTIC_BYTES:
                 raise FirmwareError("failed", "firmware extraction exceeded transfer/diagnostic limit")
+            if proc.returncode == 137:
+                raise FirmwareError("failed", "Docker extraction was killed (exit 137), possibly out of memory. "
+                                    "Increase Docker VM RAM or lower PANDAX_FIRMWARE_MAX_OUTPUT_BYTES; swap is disabled.")
             if proc.returncode:
                 raise FirmwareError("failed", "Docker/unblob failed; see firmware-extraction.log. "
                                     "Start Docker Desktop in Linux-container mode and pull the pinned image "
@@ -107,6 +138,9 @@ def _run_container(docker: str, src: Path, archive: Path, log: Path, limits: Lim
             try:
                 # Killing the docker client alone would leave its container running.
                 subprocess.run([docker, "rm", "-f", name], capture_output=True, timeout=15)
+            except (OSError, subprocess.SubprocessError) as cleanup_error:
+                with log.open("ab") as errors:
+                    errors.write(f"\nContainer cleanup failed: {cleanup_error}\n".encode())
             finally:
                 if proc.poll() is None:
                     proc.kill()
@@ -115,13 +149,13 @@ def _run_container(docker: str, src: Path, archive: Path, log: Path, limits: Lim
 
 def _target(root: Path, name: str) -> Path:
     parts = PurePosixPath(name).parts
-    if (not parts or name.startswith("/") or "\\" in name or ":" in name
+    if (not parts or name.startswith("/")
             or ".." in parts or len(parts) > 128):
         raise FirmwareError("failed", f"unsafe extraction path: {name!r}")
     # Refuse names Windows aliases or cannot represent, on every host.
     for part in parts:
-        if (part.endswith((".", " ")) or PureWindowsPath(part).is_reserved()
-                or any(ord(c) < 32 or c in '<>"|?*' for c in part)):
+        if (part.endswith((".", " ")) or part.split(".", 1)[0].rstrip().upper() in WINDOWS_RESERVED
+                or any(ord(c) < 32 or c in '<>"|?*:\\' for c in part)):
             raise FirmwareError("unsupported", f"filesystem path is not portable to Windows: {name!r}")
     target = root.joinpath(*parts)
     if not target.resolve().is_relative_to(root.resolve()):
@@ -185,7 +219,7 @@ def _receive(archive: Path, staging: Path, evidence: Path, limits: Limits) -> tu
     ):
         raise FirmwareError("failed", "filesystem transfer does not match extractor totals")
     if report["status"] == "completed" and (
-        report.get("unblob_version") != "26.6.4"
+        report.get("unblob_version") != UNBLOB_VERSION
         or not isinstance(report.get("root"), str)
         or not (str(report.get("handler", "")).startswith("squashfs") or report.get("handler") == "ubifs")
     ):
@@ -203,6 +237,7 @@ def extract(src: Path, dest: Path) -> tuple[int, int]:
         limits = Limits.from_env()
         report["limits"] = asdict(limits)
         check_input(src, limits)
+        check_format(src)
         report["source_sha256"] = sha256_file(src)
         if dest.is_symlink() or (dest.exists() and any(dest.iterdir())):
             raise FirmwareError("failed", "firmware destination must be empty")
@@ -211,7 +246,11 @@ def extract(src: Path, dest: Path) -> tuple[int, int]:
             raise FirmwareError("unsupported", "unsupported artifact format without Docker: install Docker "
                                 "Desktop, enable Linux containers, and pull the pinned image "
                                 "in docs/firmware-ingestion.md")
-        with tempfile.TemporaryDirectory(prefix=".firmware-", dir=evidence) as temporary:
+        required_disk = 2 * limits.max_output_bytes + limits.max_files * 4096 + 2 * DIAGNOSTIC_BYTES
+        if shutil.disk_usage(evidence).free < required_disk:
+            raise FirmwareError("failed", f"insufficient host disk space: need {required_disk:,} bytes "
+                                "for firmware transport and extraction; free space or lower the output limit")
+        with tempfile.TemporaryDirectory(prefix=".firmware-", dir=evidence, ignore_cleanup_errors=True) as temporary:
             scratch = Path(temporary)
             staging = scratch / "root"
             staging.mkdir()
@@ -239,7 +278,7 @@ def extract(src: Path, dest: Path) -> tuple[int, int]:
                     time.sleep(0.1 * (attempt + 1))
             return count, total
     except (OSError, ValueError, tarfile.TarError, subprocess.SubprocessError) as exc:
-        report.update(status=getattr(exc, "status", "failed"), reason=str(exc))
+        report.update(status=getattr(exc, "status", "failed"), reason=str(exc), file_count=0, uncompressed_bytes=0)
         raise FirmwareError(report["status"], str(exc)) from exc
     finally:
         (evidence / REPORT).write_text(json.dumps(report, indent=2), encoding="utf-8")

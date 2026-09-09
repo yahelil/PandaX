@@ -194,7 +194,7 @@ def test_worker_child_logs_cannot_corrupt_binary_transport():
     script = """
 import importlib.metadata, os, runpy, sys, types
 importlib.metadata.version = lambda _: '26.6.4'
-os.statvfs = lambda _: types.SimpleNamespace(f_bavail=100, f_favail=100)
+os.statvfs = lambda _: types.SimpleNamespace(f_bavail=10000, f_favail=10000, f_blocks=20000, f_frsize=4096, f_files=20000)
 def process_file(*args):
     os.write(1, b'extractor child log\\n')
     return types.SimpleNamespace(to_json=lambda: '[]')
@@ -209,6 +209,10 @@ sys.modules['unblob.handlers'] = handlers
 models = types.ModuleType('unblob.models')
 models.HandlerType = types.SimpleNamespace(FILESYSTEM='filesystem')
 sys.modules['unblob.models'] = models
+ubi = types.ModuleType('unblob.handlers.filesystem.ubi')
+ubi.UBIHandler = types.SimpleNamespace(EXTRACTOR=types.SimpleNamespace(_command_template=['ubi']))
+ubi.UBIFSHandler = types.SimpleNamespace(EXTRACTOR=types.SimpleNamespace(_command_template=['ubifs']))
+sys.modules['unblob.handlers.filesystem.ubi'] = ubi
 runpy.run_path(sys.argv[1], run_name='__main__')
 """
     result = subprocess.run([sys.executable, "-c", script, str(worker)],
@@ -270,3 +274,145 @@ def test_worker_fails_closed_even_when_extractor_exit_was_zero(tmp_path, problem
     report, root = select_root(results, tmp_path)
     assert report["status"] == status
     assert root is None
+
+
+@pytest.mark.parametrize("content", [b"plain text", b'{"sbom": true}', b""])
+def test_unrelated_files_never_start_docker(tmp_path, monkeypatch, content):
+    src = tmp_path / "input"
+    src.write_bytes(content)
+    monkeypatch.setattr(fw, "_run_container", lambda *a: pytest.fail("Docker was called"))
+    with pytest.raises(ingest.UnsafeArtifact, match="unsupported artifact format"):
+        ingest.extract(src, tmp_path / "root")
+
+
+@pytest.mark.parametrize("content", [b"hsqs", b"vendor" + b"x" * 65528 + b"UBI#", b"\x1f\x8bwrapped", b"\x31\x18\x10\x06"], ids=["squashfs", "embedded-ubi", "gzip", "ubifs"])
+def test_candidate_gate_preserves_wrapped_firmware(tmp_path, content):
+    src = tmp_path / "firmware"
+    src.write_bytes(content)
+    fw.check_format(src)
+
+
+@pytest.mark.parametrize("kind", ["zip", "tar"])
+def test_archive_paths_never_call_docker(tmp_path, monkeypatch, kind):
+    import zipfile
+    src = tmp_path / kind
+    if kind == "zip":
+        with zipfile.ZipFile(src, "w") as archive:
+            archive.writestr("file", b"ok")
+    else:
+        with tarfile.open(src, "w") as archive:
+            entry = tarfile.TarInfo("file")
+            entry.size = 2
+            archive.addfile(entry, io.BytesIO(b"ok"))
+    monkeypatch.setattr(fw, "extract", lambda *a: pytest.fail("firmware fallback was called"))
+    assert ingest.extract(src, tmp_path / "root") == (1, 2)
+
+
+@pytest.mark.parametrize("directory,free", [("/work", 0), ("/tmp", 0), ("/work", 1)])
+def test_worker_checks_both_filesystems_with_margin(monkeypatch, directory, free):
+    from types import SimpleNamespace
+    from pandax import firmware_worker as worker
+    monkeypatch.setattr(worker.os, "statvfs", lambda path: SimpleNamespace(
+        f_bavail=free if path == directory else 10000, f_frsize=4096,
+        f_blocks=20000, f_favail=10000, f_files=20000), raising=False)
+    with pytest.raises(ValueError, match="limit reached"):
+        worker.check_space()
+
+
+def test_ubireader_zero_exit_enospc_is_failure():
+    worker = Path(fw.__file__).with_name("firmware_worker.py")
+    result = subprocess.run([sys.executable, str(worker), "--checked-extractor", sys.executable,
+                             "-c", "print('[Errno 28] No space left on device')"], capture_output=True)
+    assert result.returncode == 1
+    assert b"No space left" in result.stdout
+
+
+@pytest.mark.parametrize("name", ["NUL.txt", "COM1", "LPT9.log", "con .txt", "file:stream", "file\\name"])
+def test_portability_rejections_have_unsupported_status(tmp_path, name):
+    with pytest.raises(fw.FirmwareError) as error:
+        fw._target(tmp_path, name)
+    assert error.value.status == "unsupported"
+
+
+@pytest.mark.parametrize("change", [{"file_count": 4}, {"uncompressed_bytes": 999},
+    {"unblob_version": "wrong"}, {"handler": "extfs"}, {"root": None}])
+def test_transport_report_must_match_files_and_provenance(tmp_path, change):
+    archive = tmp_path / "transport.tar"
+    transport(archive)
+    with tarfile.open(archive) as source:
+        entries = [(m.name, source.extractfile(m).read()) for m in source]
+    data = json.loads(entries[0][1])
+    data.update(change)
+    entries[0] = (fw.REPORT, json.dumps(data).encode())
+    with tarfile.open(archive, "w") as out:
+        for name, content in entries:
+            entry = tarfile.TarInfo(name)
+            entry.size = len(content)
+            out.addfile(entry, io.BytesIO(content))
+    with pytest.raises(fw.FirmwareError, match="totals|provenance"):
+        fw._receive(archive, tmp_path / "root", tmp_path, fw.Limits())
+
+
+def test_insufficient_disk_space_fails_before_docker(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    fake_docker(monkeypatch)
+    monkeypatch.setattr(fw.shutil, "disk_usage", lambda _: SimpleNamespace(free=1))
+    monkeypatch.setattr(fw, "_run_container", lambda *a: pytest.fail("Docker was called"))
+    src = tmp_path / "firmware"
+    src.write_bytes(b"hsqs")
+    with pytest.raises(fw.FirmwareError, match="host disk space"):
+        fw.extract(src, tmp_path / "root")
+
+
+@pytest.mark.parametrize("failure", ["destination", "source"])
+def test_no_publication_after_destination_or_source_change(tmp_path, monkeypatch, failure):
+    fake_docker(monkeypatch)
+    src, dest = tmp_path / "firmware", tmp_path / "root"
+    src.write_bytes(b"hsqs")
+    if failure == "destination":
+        dest.mkdir()
+        (dest / "keep").write_bytes(b"original")
+    else:
+        original = fw._run_container
+        def run(*args):
+            original(*args)
+            src.write_bytes(b"changed")
+        monkeypatch.setattr(fw, "_run_container", run)
+    with pytest.raises(fw.FirmwareError, match="destination must be empty|input changed"):
+        fw.extract(src, dest)
+    if failure == "destination":
+        assert (dest / "keep").read_bytes() == b"original"
+    else:
+        assert not dest.exists()
+
+
+@pytest.mark.parametrize("kind", ["transfer", "diagnostic", "oom"])
+def test_container_failures_are_specific_and_cleanup_cannot_mask_them(tmp_path, monkeypatch, kind):
+    class Process:
+        returncode = 137 if kind == "oom" else 0
+        def poll(self): return self.returncode
+        def wait(self, **kwargs): return self.returncode
+    def start(*args, **kwargs):
+        if kind == "transfer":
+            kwargs["stdout"].write(b"x" * 5000)
+        elif kind == "diagnostic":
+            kwargs["stderr"].write(b"x" * 20)
+        kwargs["stdout"].flush()
+        kwargs["stderr"].flush()
+        return Process()
+    def cleanup(*args, **kwargs):
+        raise subprocess.TimeoutExpired("docker rm", 15)
+    monkeypatch.setattr(fw, "DIAGNOSTIC_BYTES", 10)
+    monkeypatch.setattr(fw.subprocess, "Popen", start)
+    monkeypatch.setattr(fw.subprocess, "run", cleanup)
+    with pytest.raises(fw.FirmwareError, match="exit 137|transfer/diagnostic limit"):
+        fw._run_container("docker", tmp_path / "input", tmp_path / "out.tar",
+                          tmp_path / "log", fw.Limits(max_output_bytes=1, max_files=1))
+
+
+def test_missing_reports_fail_closed(tmp_path):
+    archive = tmp_path / "empty.tar"
+    with tarfile.open(archive, "w"):
+        pass
+    with pytest.raises(fw.FirmwareError, match="missing extraction reports"):
+        fw._receive(archive, tmp_path / "root", tmp_path, fw.Limits())

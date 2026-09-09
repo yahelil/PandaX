@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -79,3 +80,6 @@ def test_real_container_output_ceiling(tmp_path, monkeypatch, fixture, ceiling):
     with pytest.raises(firmware.FirmwareError):
         firmware.extract(download_fixture(*fixture), tmp_path / "extracted")
     assert not (tmp_path / "extracted").exists()
+    report = json.loads((tmp_path / firmware.REPORT).read_text())
+    assert report["status"] == "failed"
+    assert "working-space or file-entry limit reached" in report["reason"]

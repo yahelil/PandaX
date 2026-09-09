@@ -73,6 +73,7 @@ button, select, input, textarea, summary { touch-action: manipulation; }
   padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, .18);
 }
 .seal-pill.ok { background: #157f42; }
+.seal-pill.warn { background: #a16207; }
 .seal-pill.bad { background: #b81f1f; }
 
 /* --------------------------------------------------------------- layout */
@@ -392,13 +393,17 @@ td.num { text-align: right; font-family: var(--mono); }
 .check:last-of-type { border-bottom: none; }
 .check .m { flex: none; width: 13px; font-weight: 700; }
 .check.ok .m { color: var(--good); }
+.check.warn .m { color: var(--warn); }
+.check.warn .n { color: #92400e; font-weight: 700; }
 .check.bad .m { color: var(--danger); }
 .check.bad .n { color: var(--danger); font-weight: 700; }
 .check .d { color: var(--muted); font-size: 11.3px; }
 
 .verdict { margin-top: 11px; padding: 11px 13px; border-radius: 8px; font-size: 12.3px; line-height: 1.5; }
 .verdict.ok { background: var(--good-bg); color: #14532d; border: 1px solid #b7e4c7; }
+.verdict.warn { background: #fffaf0; color: #92400e; border: 1px solid #ecd9a8; }
 .verdict.bad { background: var(--danger-bg); color: #7f1d1d; border: 1px solid #f5c2c2; }
+.trust-fingerprint { margin-top: 6px; font-family: var(--mono); font-size: 10.5px; overflow-wrap: anywhere; }
 
 /* -------------------------------------------------------------- reports */
 

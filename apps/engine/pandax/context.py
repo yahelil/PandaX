@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +17,12 @@ TOOLS_DIR = ROOT / ".tools"
 OUT_DIR = ROOT / "out"
 CACHE_DIR = ROOT / ".cache"
 KEY_PATH = Path.home() / ".pandax" / "dev_signing_key.pem"
+
+
+def signing_key_path(fallback: Path | None = None) -> Path:
+    """Resolve the installation signing key without caching environment state."""
+    configured = os.environ.get("PANDAX_SIGNING_KEY")
+    return Path(configured) if configured else Path(fallback or KEY_PATH)
 
 
 @dataclass

@@ -742,28 +742,51 @@ function renderLedger() {
 function renderChecks(host, result) {
   host.innerHTML = "";
   for (const c of result.checks) {
-    const row = el("div", "check " + (c.ok ? "ok" : "bad"));
+    const warning = c.category === "trust" && !c.ok && result.integrity_ok && result.signature_valid;
+    const row = el("div", "check " + (c.ok ? "ok" : warning ? "warn" : "bad"));
     const body = el("div");
     body.append(el("div", "n", c.name), el("div", "d", c.detail));
-    row.append(el("span", "m", c.ok ? "✔" : "✘"), body);
+    row.append(el("span", "m", c.ok ? "✔" : warning ? "!" : "✘"), body);
     host.append(row);
   }
-  const verdict = el("div", "verdict " + (result.ok ? "ok" : "bad"));
-  verdict.textContent = result.ok
-    ? "VERIFIED — every digest recomputed, every chain link re-derived, signature valid. Proves integrity, not legal identity."
-    : "TAMPERING DETECTED — the files on disk are not the files that were signed. A regulator would reject this bundle.";
+  const presentations = {
+    trusted: ["ok", "TRUSTED — bundle integrity and signer trust were independently verified."],
+    untrusted: ["warn", "INTACT, TRUST NOT ESTABLISHED — internal checks passed, but no independently trusted signer was confirmed."],
+    incomplete: ["bad", "INCOMPLETE — required evidence or signature information is missing or malformed."],
+    invalid: ["bad", "INVALID OR TAMPERED — the evidence does not match its integrity seal."],
+  };
+  const presentation = presentations[result.status] || presentations.invalid;
+  const verdict = el("div", "verdict " + presentation[0]);
+  verdict.append(el("div", "", presentation[1]));
+  if (result.trusted_key_fingerprint) {
+    verdict.append(el("div", "trust-fingerprint", `Trusted key SHA-256: ${result.trusted_key_fingerprint}`));
+  }
+  if (result.bundle_key_fingerprint) {
+    verdict.append(el("div", "trust-fingerprint", `Bundle key SHA-256: ${result.bundle_key_fingerprint}`));
+  }
   host.append(verdict);
 
   const pill = $("seal-pill");
   pill.hidden = false;
-  pill.textContent = result.ok ? "SEALED" : "TAMPERED";
-  pill.className = "seal-pill " + (result.ok ? "ok" : "bad");
+  pill.textContent = result.status === "trusted" ? "TRUSTED"
+    : result.status === "untrusted" ? "TRUST NOT ESTABLISHED"
+    : result.status === "incomplete" ? "INCOMPLETE" : "INVALID";
+  pill.className = "seal-pill " + presentation[0];
 }
 
 async function runVerify() {
   if (!runId) return;
   const res = await fetch(`/api/verify/${runId}`);
   const result = await res.json();
+  if (!res.ok) {
+    renderChecks($("checks2"), {
+      status: "incomplete",
+      integrity_ok: false,
+      signature_valid: false,
+      checks: [{name: "trusted-key configuration", ok: false, category: "trust", detail: result.detail || "Verification is unavailable."}],
+    });
+    return;
+  }
   renderChecks($("checks2"), result);
 }
 

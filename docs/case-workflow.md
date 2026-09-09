@@ -105,7 +105,9 @@ manifest. The immutable ZIP and digest commit together in SQLite; request replay
 does not generate another snapshot. Download through
 `/api/cases/{id}/snapshots/{snapshot_id}` or
 `pandax case download-snapshot CASE_ID SNAPSHOT_ID output.zip`.
-The existing PoC signer uses a separate key at `PANDAX_DATA_DIR/case_signing_key.pem`.
-Snapshot integrity/signature checks are not external signer trust; establish
-that trust separately. No original scan is rewritten and no network submission
-is performed. Snapshot temporary files are cleaned after generation.
+Scans and snapshots use the installation key selected by `PANDAX_SIGNING_KEY`
+(default `~/.pandax/dev_signing_key.pem`). External signer trust is established
+only when verification receives the corresponding public key separately through
+`PANDAX_TRUSTED_KEY` or `--trusted-key`. No original scan is rewritten and no
+network submission is performed. Snapshot temporary files are cleaned after
+generation.

@@ -140,6 +140,7 @@ def run(ctx: RunContext) -> ev.Stream:
             try:
                 firmware_limits = firmware.Limits.from_env()
                 firmware.check_input(ctx.artifact, firmware_limits)
+                firmware.check_format(ctx.artifact)
             except firmware.FirmwareError as exc:
                 ctx.path(firmware.REPORT).write_text(
                     json.dumps({"status": exc.status, "reason": str(exc)}), encoding="utf-8")

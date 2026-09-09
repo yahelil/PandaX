@@ -100,6 +100,9 @@ type ShotProps = {
   secondCursorTarget?: [number, number];
   documentImage?: string;
   orbitRadius?: number;
+  pipeline?: boolean;
+  circle?: boolean;
+  circleSecond?: boolean;
   zoom?: number;
   accent?: string;
 };
@@ -115,7 +118,7 @@ const Cursor: React.FC<{x: number; y: number; click: number; color: string; scal
         top: -11 - click * 27,
         border: `3px solid ${color}`,
         borderRadius: '50%',
-        opacity: 0.82 - click * 0.82,
+        opacity: click * 0.82,
       }}
     />
     <svg width="66" height="72" viewBox="0 0 740 740" style={{overflow: 'visible', filter: 'drop-shadow(0 7px 5px rgba(0,0,0,.48))'}}>
@@ -126,10 +129,8 @@ const Cursor: React.FC<{x: number; y: number; click: number; color: string; scal
 
 const orbit = (frame: number, start: number, duration: number, radius: number): [number, number] => {
   const progress = Math.max(0, Math.min(1, (frame - start) / duration));
-  if (progress === 0 || progress === 1) return [0, 0];
-  const envelope = Math.sin(Math.PI * progress);
-  const angle = -Math.PI / 2 + progress * Math.PI * 2.5;
-  return [Math.cos(angle) * radius * envelope, Math.sin(angle) * radius * 0.64 * envelope];
+  const angle = -Math.PI / 2 + progress * Math.PI * 2;
+  return [Math.cos(angle) * radius, Math.sin(angle) * radius * 0.64];
 };
 
 const BrowserShot: React.FC<ShotProps> = ({
@@ -142,6 +143,9 @@ const BrowserShot: React.FC<ShotProps> = ({
   secondCursorTarget,
   documentImage,
   orbitRadius = 92,
+  pipeline = false,
+  circle = true,
+  circleSecond = true,
   zoom = 1.85,
   accent = COLORS.cyan,
 }) => {
@@ -156,37 +160,39 @@ const BrowserShot: React.FC<ShotProps> = ({
   const activeTitle = isDocumentShot ? 'Open the declaration. See the blocker instantly.' : title;
   const activeAccent = isDocumentShot ? COLORS.red : accent;
   const activeZoom = isDocumentShot ? 1.92 : zoom;
+  const activeDuration = isDocumentShot ? 390 : duration;
   const enter = spring({fps, frame, config: {damping: 18, stiffness: 90}});
-  const exit = ease(frame, [duration - 20, duration], [1, 0]);
+  const exit = ease(frame, [activeDuration - 20, activeDuration], [1, 0]);
   const cameraIn = spring({fps, frame: frame - 12, config: {damping: 20, stiffness: 64, mass: 1.1}});
   const firstMove = interpolate(frame, [12, 36], [0, 1], {
     easing: Easing.out(Easing.cubic),
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const [firstOrbitX, firstOrbitY] = orbit(frame, 42, 54, activeOrbitRadius);
+  const [firstOrbitX, firstOrbitY] = orbit(frame, 42, 54, activeSecondTarget || !circle ? 0 : activeOrbitRadius);
   const secondMove = interpolate(frame, [108, 132], [0, 1], {
     easing: Easing.inOut(Easing.cubic),
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
-  const [secondOrbitX, secondOrbitY] = orbit(frame, activeSecondTarget ? 138 : 142, 62, activeOrbitRadius * (activeSecondTarget ? 0.8 : 0.72));
-  const firstX = ease(firstMove, [0, 1], [cursorFrom[0], activeCursorTo[0]]);
-  const firstY = ease(firstMove, [0, 1], [cursorFrom[1], activeCursorTo[1]]);
-  const targetX = activeSecondTarget ? ease(secondMove, [0, 1], [activeCursorTo[0], activeSecondTarget[0]]) : activeCursorTo[0];
-  const targetY = activeSecondTarget ? ease(secondMove, [0, 1], [activeCursorTo[1], activeSecondTarget[1]]) : activeCursorTo[1];
-  const cursorX = frame < 108 ? firstX + firstOrbitX : targetX + secondOrbitX;
-  const cursorY = frame < 108 ? firstY + firstOrbitY : targetY + secondOrbitY;
+  const [secondOrbitX, secondOrbitY] = activeSecondTarget ? orbit(frame, 138, 62, circleSecond ? activeOrbitRadius * 0.8 : 0) : [0, 0];
+  const firstX = ease(firstMove, [0, 1], [cursorFrom[0], activeCursorTo[0] + firstOrbitX]);
+  const firstY = ease(firstMove, [0, 1], [cursorFrom[1], activeCursorTo[1] + firstOrbitY]);
+  const targetX = activeSecondTarget ? ease(secondMove, [0, 1], [activeCursorTo[0], activeSecondTarget[0] + secondOrbitX]) : activeCursorTo[0];
+  const targetY = activeSecondTarget ? ease(secondMove, [0, 1], [activeCursorTo[1], activeSecondTarget[1] + secondOrbitY]) : activeCursorTo[1];
+  const cursorX = activeSecondTarget && frame >= 108 ? targetX : firstX;
+  const cursorY = activeSecondTarget && frame >= 108 ? targetY : firstY;
   const cameraZoom = 1 + (activeZoom - 1) * cameraIn;
   const focusX = 1130;
   const focusY = 450;
   const cameraX = (focusX - cursorX * cameraZoom) * cameraIn;
   const cameraY = (focusY - cursorY * cameraZoom) * cameraIn;
   const firstClick = ease(frame, [34, 39, 56], [0, 1, 0]);
-  const secondClick = activeSecondTarget ? ease(frame, [130, 135, 152], [0, 1, 0]) : 0;
+  const secondClick = activeSecondTarget && circleSecond ? ease(frame, [130, 135, 152], [0, 1, 0]) : 0;
   const click = Math.max(firstClick, secondClick);
   const titleIn = spring({fps, frame: frame - 9, config: {damping: 18, stiffness: 110}});
   const documentIn = spring({fps, frame: frame - 104, config: {damping: 18, stiffness: 105}});
+  const pipelineOut = ease(frame, [166, 190], [1, 0]);
 
   return (
     <AbsoluteFill style={{color: COLORS.white, opacity: exit, overflow: 'hidden'}}>
@@ -221,6 +227,39 @@ const BrowserShot: React.FC<ShotProps> = ({
           </div>
           <Img src={staticFile(`captures/${image}`)} style={{width: '100%', height: 934, objectFit: 'cover', objectPosition: 'top'}} />
         </div>
+        {pipeline ? (
+          <div
+            style={{
+              position: 'absolute',
+              left: 438,
+              top: 282,
+              width: 1280,
+              height: 530,
+              zIndex: 4,
+              borderRadius: 18,
+              background: '#f7f9fc',
+              border: '1px solid #d9e1ec',
+              boxShadow: '0 18px 50px rgba(7,16,23,.16)',
+              opacity: pipelineOut,
+              padding: '42px 48px',
+              color: '#071017',
+            }}
+          >
+            <div style={{fontSize: 19, fontWeight: 800, color: COLORS.blue, letterSpacing: 2.4, textTransform: 'uppercase'}}>Analysis running</div>
+            <div style={{fontSize: 38, fontWeight: 820, marginTop: 8}}>Building the CRA evidence chain</div>
+            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginTop: 34}}>
+              {['Inventory product', 'Match vulnerabilities', 'Check active exploitation', 'Generate and seal documents'].map((label, index) => {
+                const active = frame >= 48 + index * 27;
+                return (
+                  <div key={label} style={{display: 'flex', alignItems: 'center', gap: 15, padding: '19px 22px', borderRadius: 13, background: '#fff', border: `1px solid ${active ? '#8ad8ca' : '#e4e9ef'}`, color: active ? '#08715f' : '#7d8994', fontSize: 21, fontWeight: 720}}>
+                    <span style={{width: 28, height: 28, borderRadius: '50%', display: 'grid', placeItems: 'center', color: '#fff', background: active ? '#0aa386' : '#c9d1da'}}>{active ? '✓' : index + 1}</span>
+                    {label}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
         {activeDocumentImage ? (
           <>
             <div style={{position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(3,8,12,.82)', opacity: documentIn}} />
@@ -293,26 +332,31 @@ const Outro: React.FC = () => {
 
 export const PandaXShowcase: React.FC = () => (
   <AbsoluteFill style={{fontFamily: 'Segoe UI, Arial, sans-serif', background: COLORS.ink}}>
-    <Sequence durationInFrames={145}><Intro /></Sequence>
-    <Sequence from={125} durationInFrames={285}>
-      <BrowserShot duration={285} image="overview.png" kicker="Release readiness" title="One screen. Risk, evidence, next action." cursorFrom={[1570, 190]} cursorTo={[1190, 590]} zoom={1.78} />
+    <Sequence durationInFrames={110}><Intro /></Sequence>
+    <Sequence from={100} durationInFrames={300}>
+      <BrowserShot duration={300} image="overview.png" kicker="Run the product" title="One click starts the full evidence pipeline." cursorFrom={[1220, 235]} cursorTo={[1650, 235]} secondCursorTarget={[1050, 570]} zoom={1.72} pipeline circle={false} circleSecond={false} />
     </Sequence>
-    <Sequence from={390} durationInFrames={260}>
-      <BrowserShot duration={260} image="findings.png" kicker="Exploit-aware triage" title="Active threats rise above the CVE noise." cursorFrom={[120, 250]} cursorTo={[990, 335]} accent={COLORS.red} zoom={1.95} />
+    <Sequence from={380} durationInFrames={225}>
+      <BrowserShot duration={225} image="overview.png" kicker="Immediate alert" title="One exploited threat becomes the release blocker." cursorFrom={[930, 535]} cursorTo={[1250, 535]} accent={COLORS.red} zoom={2.02} orbitRadius={96} />
     </Sequence>
-    <Sequence from={630} durationInFrames={250}>
-      <BrowserShot duration={250} image="inventory.png" kicker="Real release inventory" title="Every shipped component stays traceable." cursorFrom={[120, 195]} cursorTo={[910, 390]} accent={COLORS.blue} zoom={1.88} />
+    <Sequence from={585} durationInFrames={240}>
+      <BrowserShot duration={240} image="overview.png" kicker="Clear next action" title="Upgrade once. Clear twenty-two findings." cursorFrom={[680, 765]} cursorTo={[930, 765]} accent={COLORS.blue} zoom={2.05} orbitRadius={118} />
     </Sequence>
-    <Sequence from={860} durationInFrames={270}>
+    <Sequence from={2000} durationInFrames={270}>
       <BrowserShot duration={270} image="deadlines.png" kicker="Article 14" title="24h, 72h, 14d—deadlines stay visible." cursorFrom={[120, 300]} cursorTo={[920, 500]} accent="#ffc55f" zoom={2.02} />
     </Sequence>
-    <Sequence from={1110} durationInFrames={245}>
+    <Sequence from={805} durationInFrames={390}>
       <BrowserShot duration={245} image="documents.png" kicker="Review-ready output" title="Dossier, declaration, SBOM and VEX—together." cursorFrom={[120, 410]} cursorTo={[900, 500]} zoom={1.82} />
     </Sequence>
-    <Sequence from={1335} durationInFrames={300}>
+    <Sequence from={2000} durationInFrames={300}>
       <BrowserShot duration={300} image="evidence.png" kicker="Cryptographic proof" title="Every stage chained. Every output sealed." cursorFrom={[120, 470]} cursorTo={[980, 565]} accent={COLORS.cyan} zoom={1.9} />
     </Sequence>
-    <Sequence from={1605} durationInFrames={255}><Outro /></Sequence>
-    <Audio src={staticFile('audio/pandax-voiceover.wav')} startFrom={0} playbackRate={1.04} volume={0.94} />
+    <Sequence from={1175} durationInFrames={235}><Outro /></Sequence>
+    <Sequence><Audio src={staticFile('audio/intro.wav')} volume={0.98} /></Sequence>
+    <Sequence from={105}><Audio src={staticFile('audio/pipeline.wav')} volume={0.98} /></Sequence>
+    <Sequence from={383}><Audio src={staticFile('audio/alert.wav')} volume={0.98} /></Sequence>
+    <Sequence from={588}><Audio src={staticFile('audio/upgrade.wav')} volume={0.98} /></Sequence>
+    <Sequence from={808}><Audio src={staticFile('audio/document.wav')} volume={0.98} /></Sequence>
+    <Sequence from={1185}><Audio src={staticFile('audio/outro.wav')} volume={0.98} /></Sequence>
   </AbsoluteFill>
 );

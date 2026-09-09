@@ -6,7 +6,7 @@ export const Root: React.FC = () => (
   <Composition
     id="PandaXShowcase"
     component={PandaXShowcase}
-    durationInFrames={1860}
+    durationInFrames={1410}
     fps={30}
     width={1920}
     height={1080}

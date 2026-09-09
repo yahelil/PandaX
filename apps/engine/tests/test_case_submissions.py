@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from pandax.case_service import CaseService
 from pandax.case_snapshot import snapshot_bytes
 from pandax.cases import CaseConflict, CaseError
-from pandax.evidence import verify_run
+from pandax.evidence import load_or_create_key, verify_bundle, verify_run, write_public_key
 from test_case_service import service
 from test_case_review import command, IDENTITY
 from test_case_fields import ready_case
@@ -70,6 +70,9 @@ def test_failure_retry_receipt_amendment_restart_snapshot(service, kind, tmp_pat
         archive.extractall(extracted)
         assert b'not been established externally' in archive.read('trust.txt')
     assert all(check.ok for check in verify_run(extracted))
+    trusted = tmp_path / 'trusted-case-key.pem'
+    write_public_key(load_or_create_key(service.store.path.parent / 'installation-signing-key.pem'), trusted)
+    assert verify_bundle(extracted, trusted).status == 'trusted'
     assert service.execute('snapshot', body, case['id']) == case
     assert CaseService(runs_dir=service.runs_dir).get(case['id']) == case
     assert (service.runs_dir / 'run-source' / 'findings.json').read_bytes() == source

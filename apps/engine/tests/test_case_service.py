@@ -19,6 +19,7 @@ def service(tmp_path, monkeypatch):
     (run / 'dossier.json').write_text(json.dumps({'product': {'name': 'Device', 'version': '1'}, 'generated': '2026-09-01T00:00:00Z'}))
     monkeypatch.setattr(server, 'OUT_DIR', tmp_path)
     monkeypatch.setenv('PANDAX_DATA_DIR', str(tmp_path / 'data'))
+    monkeypatch.setenv('PANDAX_SIGNING_KEY', str(tmp_path / 'data' / 'installation-signing-key.pem'))
     return CaseService(runs_dir=tmp_path)
 
 

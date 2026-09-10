@@ -1,453 +1,365 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>PandaX — CRA compliance for device makers</title>
-<meta name="description" content="PandaX helps companies that build smart, connected products meet the EU Cyber Resilience Act — vulnerability checks, compliance tracking and the full technical file, without hiring a security team." />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PandaX</title>
+<meta name="description" content="PandaX turns firmware analysis into the technical file the Cyber Resilience Act asks for — component inventory, risk decisions, and the reasoning behind them, sealed to the release that shipped.">
+<link rel="canonical" href="https://pandax.online/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="PandaX — CRA compliance evidence for connected products">
+<meta property="og:description" content="PandaX turns firmware analysis into the technical file the Cyber Resilience Act asks for — component inventory, risk decisions, and the reasoning behind them, sealed to the release that shipped.">
+<meta property="og:image" content="https://pandax.online/assets/favicon-512.png">
+<meta name="theme-color" content="#F2F2F0">
 
-<link rel="icon" href="assets/pandax-logo.png" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..125,400..900&family=Cormorant+Garamond:ital,wght@0,300;1,300&family=IBM+Plex+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="assets/favicon-dark-32.png" sizes="32x32" type="image/png" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="assets/favicon-180.png">
 
-<link rel="stylesheet" href="pandax.css" />
+<link rel="preload" as="font" type="font/woff2" href="assets/fonts/archivo-var.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="assets/fonts/inter-var.woff2" crossorigin>
+<link rel="stylesheet" href="pandax.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "PandaX",
+  "url": "https://pandax.online/",
+  "description": "CRA compliance evidence for connected products",
+  "logo": "https://pandax.online/assets/favicon-512.png"
+}
+</script>
 </head>
 <body>
-
-<!-- ============ BOOT — lid opens, logo lands, camera flies through the X ============ -->
-<section class="boot" id="boot">
-  <div class="boot-stick">
-    <div class="boot-bg" aria-hidden="true"></div>
-
-    <div class="boot-meta">
-      <span class="bm-l"><i class="bm-d"></i> PandaX · Venture Studio</span>
-      <span class="bm-r">EU Cyber Resilience Act · Compliance platform</span>
-    </div>
-
-    <div class="laptop" id="laptop">
-      <div class="laptop-lid" id="laptopLid">
-        <div class="laptop-lid-back" aria-hidden="true">
-          <div class="lid-mark">
-            <div class="lid-glyph"></div>
-            <div class="lid-word">Panda<i>X</i></div>
-          </div>
-        </div>
-        <div class="laptop-bezel">
-          <div class="laptop-camera"></div>
-          <div class="laptop-screen" aria-hidden="true">
-            <div class="sh">
-              <div class="sh-bg"></div>
-              <div class="sh-grade"></div>
-              <div class="sh-noise"></div>
-              <div class="sh-nav">
-                <span class="sh-mark"><span class="sh-glyph"></span> Panda<i>X</i></span>
-                <span class="sh-menu">
-                  <span>Platform</span><span>Products</span><span>Documents</span><span>Pricing</span><span>Sign in</span>
-                </span>
-                <span class="sh-status"><i></i> 2026</span>
-              </div>
-              <div class="sh-stage">
-                <div class="lp-img" id="lpImg" role="img" aria-label="PandaX"></div>
-                <div class="swm">
-                  <div class="swm-name">Panda<i>X</i></div>
-                  <div class="swm-rule"></div>
-                  <div class="swm-tag">Venture Studio · Tel Aviv</div>
-                </div>
-              </div>
-            </div>
-            <div class="laptop-glare" aria-hidden="true"></div>
-          </div>
-        </div>
-      </div>
-      <div class="laptop-base">
-        <div class="laptop-keys" aria-hidden="true">
-          <div class="lk-row lk-fn">
-            <span>esc</span><span>F1</span><span>F2</span><span>F3</span><span>F4</span><span>F5</span><span>F6</span><span>F7</span><span>F8</span><span>F9</span><span>F10</span><span>F11</span><span>F12</span><span>⏻</span>
-          </div>
-          <div class="lk-row lk-num">
-            <span>~</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>0</span><span>-</span><span>=</span><span class="lk-w">delete</span>
-          </div>
-          <div class="lk-row lk-q">
-            <span class="lk-w">tab</span><span>Q</span><span>W</span><span>E</span><span>R</span><span>T</span><span>Y</span><span>U</span><span>I</span><span>O</span><span>P</span><span>[</span><span>]</span><span>\</span>
-          </div>
-          <div class="lk-row lk-a">
-            <span class="lk-w">caps</span><span>A</span><span>S</span><span>D</span><span>F</span><span>G</span><span>H</span><span>J</span><span>K</span><span>L</span><span>;</span><span>'</span><span class="lk-w">return</span>
-          </div>
-          <div class="lk-row lk-z">
-            <span class="lk-w2">shift</span><span>Z</span><span>X</span><span>C</span><span>V</span><span>B</span><span>N</span><span>M</span><span>,</span><span>.</span><span>/</span><span class="lk-w2">shift</span>
-          </div>
-          <div class="lk-row lk-sp">
-            <span>fn</span><span>⌃</span><span>⌥</span><span>⌘</span><span class="lk-bar"></span><span>⌘</span><span>⌥</span><span>◀</span><span>▲▼</span><span>▶</span>
-          </div>
-        </div>
-      </div>
-      <div class="laptop-shadow"></div>
-    </div>
-
-    <div class="boot-hint" id="bootHint">
-      <span>Scroll to open</span>
-      <span class="bh-arrow">↓</span>
-    </div>
-  </div>
-</section>
-
-
-<div class="progress" id="progress" aria-hidden="true"></div>
-
-<!-- ============ NAV ============ -->
-<nav class="nav" id="nav">
-  <a href="#top" class="nav-mark"><span class="mk-glyph"></span><span>PandaX</span></a>
-  <ul class="nav-links">
-    <li><a href="#platform">Platform</a></li>
-    <li><a href="#how">How it works</a></li>
-    <li><a href="#check">Does it apply?</a></li>
-    <li><a href="#pricing">Pricing</a></li>
-    <li><a href="#faq">FAQ</a></li>
-  </ul>
-  <a class="btn btn--go btn--sm" href="#check"><span class="lbl-lg">Check my product</span><span class="lbl-sm">Free check</span></a>
-</nav>
-
-<!-- ============ HERO ============ -->
-<header class="hero wrap" id="top">
-  <div class="eyebrow">
-    <span class="rule"></span> EU Cyber Resilience Act · <b>reporting starts 11 Sep 2026</b>
-  </div>
-  <h1 class="hero-h">Cyber compliance<br/><em>without a cyber team</em></h1>
-  <p class="hero-sub">
-    If your product has a chip in it and connects to anything, a new EU law now makes
-    security your legal responsibility. <b>PandaX handles it</b> — we read your product's
-    software, find the vulnerabilities, and produce the paperwork Brussels asks for.
-    Built for people who make devices, not for security engineers.
-  </p>
-  <div class="hero-acts">
-    <a class="btn btn--go" href="#check">Check my product — free</a>
-    <a class="btn btn--ghost" href="#platform">See the platform</a>
+<a class="skip" href="#main">Skip to content</a>
+<header class="head">
+  <div class="wrap head-in">
+    <a class="mark" href="#top">
+      <img src="assets/favicon-512.png" alt="" width="26" height="26">
+      <span>PandaX</span>
+    </a>
+    <nav class="head-nav" aria-label="Sections">
+        <a href="#gap">The gap</a>
+        <a href="#how">How it works</a>
+        <a href="#export">The export</a>
+        <a href="#labs">For labs</a>
+        <a href="#faq">Questions</a>
+    </nav>
+    <a class="btn btn-sm" href="#contact">Book a walkthrough</a>
   </div>
 </header>
-
-<!-- ============ TICKER ============ -->
-<div class="tick" aria-hidden="true">
-  <div class="tick-track">
-    <span>Smart home</span><s>/</s><span>Industrial sensors</span><s>/</s>
-    <span><b>Wearables</b></span><s>/</s><span>EV chargers</span><s>/</s>
-    <span>Medical accessories</span><s>/</s><span><i>Routers</i></span><s>/</s>
-    <span>Toys</span><s>/</s><span>Kitchen appliances</span><s>/</s>
-    <span>Security cameras</span><s>/</s><span><b>Access control</b></span><s>/</s>
-    <span>Smart home</span><s>/</s><span>Industrial sensors</span><s>/</s>
-    <span><b>Wearables</b></span><s>/</s><span>EV chargers</span><s>/</s>
-    <span>Medical accessories</span><s>/</s><span><i>Routers</i></span><s>/</s>
-    <span>Toys</span><s>/</s><span>Kitchen appliances</span><s>/</s>
-    <span>Security cameras</span><s>/</s><span><b>Access control</b></span><s>/</s>
-  </div>
-</div>
-
-<!-- ============ PROBLEM ============ -->
-<section class="sec">
-  <div class="wrap">
-    <div class="sec-top">
-      <h2 class="sec-h">You build products.<br/><em>Not threat models.</em></h2>
-      <div class="sec-note">The problem</div>
-    </div>
-    <div class="tri">
-      <div class="tri-i" data-reveal>
-        <div class="tri-n">01</div>
-        <div class="tri-h">A law you didn't ask for</div>
-        <div class="tri-p">The Cyber Resilience Act covers anything with software that connects — Wi-Fi, Bluetooth, USB, a cloud app. Sell it in the EU and security documentation is no longer optional.</div>
-      </div>
-      <div class="tri-i" data-reveal>
-        <div class="tri-n">02</div>
-        <div class="tri-h">Nobody in-house to do it</div>
-        <div class="tri-p">It asks for a software bill of materials, vulnerability monitoring, incident reporting and a technical file. Most hardware teams have never written one, and hiring for it is expensive.</div>
-      </div>
-      <div class="tri-i" data-reveal>
-        <div class="tri-n">03</div>
-        <div class="tri-h">Getting it wrong <em>is expensive</em></div>
-        <div class="tri-p">Penalties reach €15 million or 2.5% of worldwide turnover — and regulators can order a product off the shelves entirely.</div>
+<main id="main">
+<section class="hero" id="top">
+  <div class="wrap hero-in">
+    <div class="hero-copy">
+      <h1>Every release, audit-ready.</h1>
+      <p class="lede">PandaX turns firmware analysis into the technical file the Cyber Resilience Act asks for — component inventory, risk decisions, and the reasoning behind them, sealed to the release that shipped.</p>
+      <div class="acts">
+        <a class="btn" href="#contact">See a sample evidence package</a>
+        <a class="btn btn-q" href="#contact">Book a 30-minute walkthrough</a>
       </div>
     </div>
-  </div>
-</section>
 
-<!-- ============ PLATFORM ============ -->
-<section class="sec sec--sf" id="platform">
-  <div class="wrap">
-    <div class="sec-top">
-      <h2 class="sec-h">Everything the law asks for. <em>Handled.</em></h2>
-      <div class="sec-note">The platform</div>
-    </div>
-    <p class="sec-lead" style="margin:-36px 0 52px">
-      The Cyber Resilience Act sets out a long list of duties for anyone selling a connected
-      product in Europe. This is that list — and what PandaX takes off your desk for each one.
-    </p>
-    <div class="caps">
-      <div class="cap" data-reveal>
-        <span class="cap-n">01</span>
-        <span class="cap-h">Your software list</span>
-        <span class="cap-p">The law wants an inventory of every software component inside your product. If you don't have one, we build it from your firmware — you don't have to produce anything.</span>
+    <div class="hero-stage">
+      <div class="lap" id="lap">
+        <div class="lap-lid">
+          <div class="lap-back" aria-hidden="true"><span class="lap-mark"></span></div>
+          <div class="lap-bezel">
+            <span class="lap-cam" aria-hidden="true"></span>
+            <div class="lap-screen">
+              <div class="rec" id="rec" aria-label="Example evidence record">
+        <div class="rec-top">
+          <span class="rec-flag">Example record</span>
+          <span class="rec-seal" id="recSeal"><span class="seal-dot" aria-hidden="true"></span>Sealed</span>
+        </div>
+
+        <div class="rec-head">
+          <div class="rec-title">Gateway controller <span class="rec-rel">4.2.1</span></div>
+          <dl class="rec-ids">
+            <div><dt>Run</dt><dd><span class="id">run-20260910-084417-c31f0a</span></dd></div>
+            <div><dt>Sealed</dt><dd><time datetime="2026-09-10T08:44:17Z"><span class="id">2026-09-10T08:44:17Z</span></time></dd></div>
+            <div class="rec-wide"><dt>Image</dt><dd><span class="id">openwrt-23.05.5-ath79-generic-squashfs-sysupgrade.bin</span></dd></div>
+            <div class="rec-wide"><dt>SHA-256</dt><dd><span class="id">3f7c1d9a5b0e482c6a1f9d3b7e0c2a48d5f61b93ac7e284f0d6b1c53a97e40f2</span></dd></div>
+          </dl>
+        </div>
+
+        <div class="rec-stats">
+        <div class="rec-stat" data-i="0">
+          <span class="rec-stat-v" data-count="412">412</span>
+          <span class="rec-stat-l">components</span>
+        </div>
+        <div class="rec-stat" data-i="1">
+          <span class="rec-stat-v" data-count="7">7</span>
+          <span class="rec-stat-l">findings</span>
+        </div>
+        <div class="rec-stat" data-i="2">
+          <span class="rec-stat-v" data-count="1">1</span>
+          <span class="rec-stat-l">actively exploited</span>
+        </div>
+        <div class="rec-stat" data-i="3">
+          <span class="rec-stat-v" data-count="6 of 6">6 of 6</span>
+          <span class="rec-stat-l">checks passed</span>
+        </div>
+        </div>
+
+        <div class="rec-split">
+          <div class="rec-checks">
+            <h3>Release checks</h3>
+            <ul class="checks">
+            <li data-i="0"><span class="tick" aria-hidden="true"></span>Inventory tied to image digest</li>
+            <li data-i="1"><span class="tick" aria-hidden="true"></span>Findings reproduced against source feeds</li>
+            <li data-i="2"><span class="tick" aria-hidden="true"></span>Risk decisions recorded with rationale</li>
+            <li data-i="3"><span class="tick" aria-hidden="true"></span>Reporting timeline complete</li>
+            <li data-i="4"><span class="tick" aria-hidden="true"></span>Documents validated</li>
+            <li data-i="5"><span class="tick" aria-hidden="true"></span>Bundle sealed and countersigned</li>
+            </ul>
+          </div>
+          <div class="rec-finding">
+            <h3>Open finding</h3>
+            <p class="fx-id"><span class="id">CVE-2023-46218</span> <span class="fx-comp"><span class="id">curl 8.3.0</span></span></p>
+            <p class="fx-note">Cookie leak across domains.</p>
+            <p class="fx-fix"><span class="fx-arrow" aria-hidden="true"></span>Upgrade to curl 8.5.0</p>
+            <p class="fx-dec">Accepted for 4.2.1 — not reachable in this build. Cleared in 4.3.0.</p>
+          </div>
+        </div>
       </div>
-      <div class="cap" data-reveal>
-        <span class="cap-n">02</span>
-        <span class="cap-h">Daily vulnerability checks</span>
-        <span class="cap-p">Every component is watched against the world's vulnerability databases, every day. You hear about a problem long before your customers or a regulator do.</span>
-      </div>
-      <div class="cap" data-reveal>
-        <span class="cap-n">03</span>
-        <span class="cap-h">Alerts in plain language</span>
-        <span class="cap-p">No jargon and no security background needed. You get told which part of which product needs updating, why it matters, and what to do about it.</span>
-      </div>
-      <div class="cap" data-reveal>
-        <span class="cap-n">04</span>
-        <span class="cap-h">The technical file</span>
-        <span class="cap-p">The core compliance document the regulation demands, generated from what we already know about your product — and re-versioned every time the product changes.</span>
-      </div>
-      <div class="cap" data-reveal>
-        <span class="cap-n">05</span>
-        <span class="cap-h">Declaration of Conformity</span>
-        <span class="cap-p">The signed statement and the CE marking checklist that let you keep selling in the EU, ready to hand to a distributor or a customer who asks.</span>
-      </div>
-      <div class="cap" data-reveal>
-        <span class="cap-n">06</span>
-        <span class="cap-h">Incident reporting</span>
-        <span class="cap-p">If something in your product is actively exploited the law gives you 24 hours, then 72. We start the clocks, draft the wording and file to the right authorities.</span>
-      </div>
-      <div class="cap" data-reveal>
-        <span class="cap-n">07</span>
-        <span class="cap-h">Ten-year retention</span>
-        <span class="cap-p">Everything kept, dated and exportable for as long as the regulation requires — so an audit years from now is a download, not a panic.</span>
+            </div>
+            <div class="lap-glare" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="lap-base" aria-hidden="true"><span class="lap-notch"></span></div>
+        <div class="lap-shadow" aria-hidden="true"></div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ HOW IT WORKS ============ -->
+<section class="sec" id="dates">
+  <div class="wrap">
+    <h2>The dates are already running.</h2>
+    <table class="tbl dl">
+      <caption class="vh">Cyber Resilience Act application dates</caption>
+      <tbody>
+      <tr class="dl-past">
+        <th scope="row"><time datetime="2026-06-11">11 June 2026</time></th>
+        <td>Conformity assessment bodies can be designated</td>
+        <td class="dl-state">Passed</td>
+      </tr>
+      <tr class="dl-active dl-soon">
+        <th scope="row"><time datetime="2026-09-11">11 September 2026</time></th>
+        <td>Article 14 reporting obligations apply</td>
+        <td class="dl-state"><span class="live"><span class="live-dot" aria-hidden="true"></span>Applies soon</span><span class="since" data-since="2026-09-11"></span></td>
+      </tr>
+      <tr class="dl-future">
+        <th scope="row"><time datetime="2027-12-11">11 December 2027</time></th>
+        <td>Full obligations: Annex I requirements, Annex VII technical documentation, CE marking</td>
+        <td class="dl-state">Upcoming</td>
+      </tr>
+      </tbody>
+    </table>
+    <p class="note">Penalties reach €15M or 2.5% of global annual turnover.</p>
+  </div>
+</section>
+
+<section class="sec" id="gap">
+  <div class="wrap">
+    <h2>A scanner answers a different question.</h2>
+    <div class="gap">
+      <div class="gap-col">
+        <h3>What a scanner gives you</h3>
+        <ul class="rule-list"><li>A CVE list per build</li><li>Severity scores</li><li>A report regenerated from scratch each time</li><li>No record of why a risk was accepted</li><li>No link to the release that shipped</li></ul>
+      </div>
+      <div class="gap-col">
+        <h3>What a reviewer asks for</h3>
+        <ul class="rule-list"><li>Annex VII technical documentation</li><li>The risk assessment and how it was resolved</li><li>Evidence the vulnerability handling process actually ran</li><li>An inventory tied to the shipped image</li><li>A timeline that still holds up two years later</li></ul>
+      </div>
+    </div>
+    <p class="closer">Between the two sits weeks of manual reconstruction, repeated for every release.</p>
+  </div>
+</section>
+
+<section class="sec sec-dark" id="clock">
+  <div class="wrap">
+    <h2>Article 14 runs on a clock.</h2>
+    <div class="cks" id="cks">
+      <div class="ck" data-stage="0">
+        <div class="ck-at">24 hours</div>
+        <div class="ck-title">Early warning</div>
+        <div class="ck-run" data-countdown="0" aria-hidden="true"></div>
+      </div>
+      <div class="ck" data-stage="1">
+        <div class="ck-at">72 hours</div>
+        <div class="ck-title">Notification</div>
+        <div class="ck-run" data-countdown="1" aria-hidden="true"></div>
+      </div>
+      <div class="ck" data-stage="2">
+        <div class="ck-at">14 days</div>
+        <div class="ck-title">Final report</div>
+        <div class="ck-run" data-countdown="2" aria-hidden="true"></div>
+      </div>
+    </div>
+    <p class="note note-dark">Recipients are the national CSIRT and ENISA, through the single reporting platform of Article 16.</p>
+    <p class="closer closer-dark">The evidence has to exist before the legal review starts.</p>
+  </div>
+</section>
+
 <section class="sec" id="how">
   <div class="wrap">
-    <div class="sec-top">
-      <h2 class="sec-h">Three steps.<br/><em>That's the job.</em></h2>
-      <div class="sec-note">How it works</div>
-    </div>
-
-    <div class="steps">
-      <div class="step" data-reveal>
-        <div class="step-k"><span class="step-n">01</span><span class="step-h">Tell us what you built</span></div>
-        <p class="step-p">Upload your software list if you have one, or point us at the firmware and we'll build it for you. No command line, no pipeline setup, no integration project.</p>
-      </div>
-      <div class="step" data-reveal>
-        <div class="step-k"><span class="step-n">02</span><span class="step-h">We watch it for you</span></div>
-        <p class="step-p">PandaX checks every software part against the world's vulnerability databases, every day, and tells you in plain words when something in your product needs attention.</p>
-      </div>
-      <div class="step" data-reveal>
-        <div class="step-k"><span class="step-n">03</span><span class="step-h">Export the proof</span></div>
-        <p class="step-p">One click produces the technical file, the EU Declaration of Conformity and the CE checklist — the pack you hand to a regulator, a customer or a distributor.</p>
-      </div>
-    </div>
-
+    <h2>Four stages.</h2>
+    <ol class="stages" id="stages">
+      <span class="stage-line" aria-hidden="true"><i id="stageFill"></i></span>
+      <li class="stage" data-i="0">
+        <span class="stage-n">1</span>
+        <h3>Extraction</h3>
+        <p>A build or firmware package goes in. PandaX unpacks it and records the digest of the file it read.</p>
+      </li>
+      <li class="stage" data-i="1">
+        <span class="stage-n">2</span>
+        <h3>Detection</h3>
+        <p>The inventory is matched against public advisory sources. Sources that failed are shown as failed, not as clean.</p>
+      </li>
+      <li class="stage" data-i="2">
+        <span class="stage-n">3</span>
+        <h3>Evidence</h3>
+        <p>Each risk decision is recorded as it is made, with its rationale, its author and its date.</p>
+      </li>
+      <li class="stage" data-i="3">
+        <span class="stage-n">4</span>
+        <h3>Sealed release file</h3>
+        <p>The result is sealed to the release and timestamped, so a reviewer can check that nothing changed afterwards.</p>
+      </li>
+    </ol>
+    <p class="note">No source code required. The build never leaves the customer's control.</p>
+  </div>
 </section>
 
-<!-- ============ CHECKER ============ -->
-<section class="sec sec--sf" id="check">
+<section class="sec" id="export">
   <div class="wrap">
-    <div class="sec-top">
-      <h2 class="sec-h">Does this law<br/><em>apply to you?</em></h2>
-      <div class="sec-note">30-second check · no signup</div>
-    </div>
+    <h2>What is in the export.</h2>
+    <table class="tbl">
+      <caption class="vh">Contents of a PandaX evidence export</caption>
+      <tbody>
+      <tr><th scope="row">Component inventory</th><td>An SBOM tied to the image that shipped.</td></tr>
+      <tr><th scope="row">Findings</th><td>Each one with the upgrade that clears it.</td></tr>
+      <tr><th scope="row">Risk decisions</th><td>With the rationale, the author and the date.</td></tr>
+      <tr><th scope="row">Release check</th><td>Sealed and timestamped.</td></tr>
+      <tr><th scope="row">Reporting timeline pack</th><td>The Article 14 record, stage by stage.</td></tr>
+      <tr><th scope="row">Case file per incident</th><td>One file per case, kept whole.</td></tr>
+      </tbody>
+    </table>
+    <p class="closer">One export, open format. The customer owns it.</p>
+  </div>
+</section>
 
-    <div class="chk">
-      <div class="chk-q">
-        <div class="chk-i">
-          <div class="chk-l"><span>Question 01</span>Does your product contain software, firmware or a chip that runs code?</div>
-          <div class="chk-opts" role="group">
-            <button class="chk-b" type="button" data-q="0" data-v="1" aria-pressed="true">Yes</button>
-            <button class="chk-b" type="button" data-q="0" data-v="0" aria-pressed="false">No</button>
-          </div>
-        </div>
-        <div class="chk-i">
-          <div class="chk-l"><span>Question 02</span>Can it connect to anything — Wi-Fi, Bluetooth, a cable, a phone app or a cloud service?</div>
-          <div class="chk-opts" role="group">
-            <button class="chk-b" type="button" data-q="1" data-v="1" aria-pressed="true">Yes</button>
-            <button class="chk-b" type="button" data-q="1" data-v="0" aria-pressed="false">No</button>
-          </div>
-        </div>
-        <div class="chk-i">
-          <div class="chk-l"><span>Question 03</span>Do you sell, import or distribute it in the European Union?</div>
-          <div class="chk-opts" role="group">
-            <button class="chk-b" type="button" data-q="2" data-v="1" aria-pressed="true">Yes</button>
-            <button class="chk-b" type="button" data-q="2" data-v="0" aria-pressed="false">No</button>
-          </div>
-        </div>
-      </div>
-      <div class="chk-out" id="chkOut">
-        <div class="chk-badge">Result</div>
-        <div class="chk-v yes" id="chkV">The CRA applies</div>
-        <p class="chk-p" id="chkP">Your product almost certainly falls in scope, and most likely on the <b>self-check</b> route — the lightest one. That still means a software list, ongoing vulnerability monitoring and a technical file.</p>
-        <div class="chk-fine">Guidance, not legal advice</div>
-        <a class="btn btn--go" href="#pricing" style="margin-top:8px">Start with PandaX</a>
-      </div>
+<section class="sec" id="proof">
+  <div class="wrap">
+    <h2>The working product.</h2>
+    <p class="lede lede-sm">A proof of concept runs today: it ingests a package, produces an inventory and findings, records decisions, and seals the result.</p>
+    <div class="shot-todo">
+      <span class="shot-todo-t">Screenshot pending</span>
+      <span class="shot-todo-b">A dashboard image of a firmware run goes here, labelled with the image it analysed.</span>
     </div>
   </div>
 </section>
 
-<!-- ============ DEADLINE ============ -->
-<section class="sec">
+<section class="sec" id="who">
   <div class="wrap">
-    <div class="sec-top">
-      <h2 class="sec-h">The dates are<br/><em>already set</em></h2>
-      <div class="sec-note">Getting ready takes months, not days</div>
+    <h2>Who this is for.</h2>
+    <p class="lede lede-sm">Manufacturers of connected products with 50 to 1,000 employees.</p>
+    <ul class="rule-list rule-list-wide"><li>There is no compliance department. The regulation lands on an engineering or quality lead who already has a job.</li><li>A consultant-built file per release does not scale to a release cadence.</li><li>The €15M ceiling is the same as it is for a corporation with a legal team.</li></ul>
+  </div>
+</section>
+
+<section class="sec" id="labs">
+  <div class="wrap">
+    <h2>For labs and advisory firms.</h2>
+    <p class="lede lede-sm">PandaX does not compete with the assessor. It prepares the file the assessor reads.</p>
+    <table class="tbl">
+      <caption class="vh">Guardrails for testing, inspection and certification firms</caption>
+      <tbody>
+      <tr><th scope="row">Scanner-neutral</th><td>PandaX ingests any scanner's output and does not replace anyone's tooling.</td></tr>
+      <tr><th scope="row">No opinions issued</th><td>PandaX never issues conformity opinions, certificates or verdicts. The judgement stays with the assessor.</td></tr>
+      <tr><th scope="row">Portable export</th><td>The manufacturer owns the package and can take it to any reviewer.</td></tr>
+      <tr><th scope="row">Pricing independent of outcome</th><td>Pricing is never tied to the outcome of an assessment.</td></tr>
+      </tbody>
+    </table>
+    <p><a class="lnk" href="/partners/">Read the partner page</a></p>
+  </div>
+</section>
+
+<section class="sec" id="faq">
+  <div class="wrap">
+    <h2>Questions worth asking.</h2>
+    <div class="qas">
+      <details class="qa">
+        <summary><span>How is this different from a firmware scanner?</span></summary>
+        <div class="qa-a"><p>A scanner produces findings. PandaX produces the file a reviewer asks for: the inventory tied to the shipped image, the decision made about each finding, who made it and when, and the reasoning. A scan is an input to that file, not a substitute for it.</p></div>
+      </details>
+      <details class="qa">
+        <summary><span>Do you need our source code?</span></summary>
+        <div class="qa-a"><p>No. PandaX works from a build or firmware package. Source code is never required and the build never leaves your control.</p></div>
+      </details>
+      <details class="qa">
+        <summary><span>Where does our data sit, and who can read it?</span></summary>
+        <div class="qa-a"><p>The proof of concept runs locally, on your machine. The hosted workspace is being built and will be EU-hosted; the access model is not settled yet, and we would rather say so than describe something that does not exist.</p></div>
+      </details>
+      <details class="qa">
+        <summary><span>What happens to our evidence if we stop being a customer?</span></summary>
+        <div class="qa-a"><p>The export is an open format and it is yours. It is designed to be read without PandaX installed, which is also what makes it useful to a reviewer.</p></div>
+      </details>
+      <details class="qa">
+        <summary><span>Does this make us CRA-compliant?</span></summary>
+        <div class="qa-a"><p>No. PandaX produces the documentation and records the process. Conformity is assessed by a body, not by a tool. Any vendor that tells you otherwise is selling you a problem.</p></div>
+      </details>
+      <details class="qa">
+        <summary><span>What exists today, and what is still being built?</span></summary>
+        <div class="qa-a"><p>Today: ingest, component inventory, findings from public sources, recorded decisions, the Article 14 timeline, document generation and a sealed, independently verifiable export. Being built: the hosted multi-user workspace, scheduled advisory monitoring and broader firmware format coverage.</p></div>
+      </details>
     </div>
-    <div class="dl-grid" data-reveal>
-      <div class="dl dl--near" data-countdown="2026-09-11T00:00:00Z">
-        <div class="dl-k"><i></i> Reporting starts</div>
-        <div class="dl-date">11 Sep <em>2026</em></div>
-        <div class="dl-what">From this date you must report actively-exploited vulnerabilities to the authorities within 24 hours.</div>
-        <div class="dl-clock">
-          <div class="dl-u"><span class="dl-n" data-cd="d">—</span><span class="dl-uu">Days</span></div>
-          <div class="dl-u"><span class="dl-n" data-cd="h">—</span><span class="dl-uu">Hrs</span></div>
-          <div class="dl-u"><span class="dl-n" data-cd="m">—</span><span class="dl-uu">Min</span></div>
-          <div class="dl-u"><span class="dl-n" data-cd="s">—</span><span class="dl-uu">Sec</span></div>
+  </div>
+</section>
+
+<section class="sec sec-close" id="contact">
+  <div class="wrap close-in">
+    <div>
+      <h2>See what the file looks like.</h2>
+      <p class="lede lede-sm">The fastest way to judge this is to read one. Ask for the sample evidence package, or take thirty minutes and we will walk through a real run.</p>
+    </div>
+    <div class="form-wrap">
+      <h2>Get in touch.</h2>
+      <p class="lede lede-sm">Tell us what you build and which release is next. We will reply with the sample package or a time.</p>
+      <form class="form" method="post" action="mailto:hello@pandax.online" enctype="text/plain">
+        <input type="hidden" name="kind" value="sample">
+        <p class="hp"><label>Leave this empty<input type="text" name="company_url" tabindex="-1" autocomplete="off"></label></p>
+        <div class="row">
+          <label>Name<input type="text" name="name" required autocomplete="name"></label>
+          <label>Work email<input type="email" name="email" required autocomplete="email"></label>
         </div>
-      </div>
-      <div class="dl dl--far" data-countdown="2027-12-11T00:00:00Z">
-        <div class="dl-k"><i></i> Everything applies</div>
-        <div class="dl-date">11 Dec <em>2027</em></div>
-        <div class="dl-what">After this date you cannot CE-mark or sell a connected product in the EU without the full compliance pack.</div>
-        <div class="dl-clock">
-          <div class="dl-u"><span class="dl-n" data-cd="d">—</span><span class="dl-uu">Days</span></div>
-          <div class="dl-u"><span class="dl-n" data-cd="h">—</span><span class="dl-uu">Hrs</span></div>
-          <div class="dl-u"><span class="dl-n" data-cd="m">—</span><span class="dl-uu">Min</span></div>
-          <div class="dl-u"><span class="dl-n" data-cd="s">—</span><span class="dl-uu">Sec</span></div>
-        </div>
-      </div>
+        <label>Company<input type="text" name="company" autocomplete="organization"></label>
+        <label>What do you build?<textarea name="message" rows="4"></textarea></label>
+        <button class="btn" type="submit">Send</button>
+      </form>
     </div>
   </div>
 </section>
-
-<!-- ============ PRICING ============ -->
-<section class="sec" id="pricing">
-  <div class="wrap">
-    <div class="sec-top">
-      <h2 class="sec-h">Priced like a tool. <em>Not a project.</em></h2>
-      <div class="sec-note">14-day free trial · no card</div>
-    </div>
-    <div class="plans">
-      <div class="plan" data-reveal>
-        <div class="plan-tag"><span>Single</span></div>
-        <div class="plan-n">One product</div>
-        <div class="plan-price"><b>€49</b><span>/ month</span></div>
-        <ul class="plan-list">
-          <li>One product, unlimited versions</li>
-          <li>Daily vulnerability monitoring</li>
-          <li>Technical file &amp; Declaration of Conformity</li>
-          <li>Incident reporting clocks</li>
-          <li>Email support</li>
-        </ul>
-        <a class="btn btn--ghost" href="#contact">Start free trial</a>
-      </div>
-      <div class="plan plan--best" data-reveal>
-        <div class="plan-tag"><span>Range</span><b>Most chosen</b></div>
-        <div class="plan-n">Up to 5 products</div>
-        <div class="plan-price"><b>€149</b><span>/ month</span></div>
-        <ul class="plan-list">
-          <li>Everything in One product</li>
-          <li>Firmware analysis included</li>
-          <li>Public security contact page</li>
-          <li>Distributor &amp; customer evidence packs</li>
-          <li>Onboarding call with a specialist</li>
-        </ul>
-        <a class="btn btn--go" href="#contact">Start free trial</a>
-      </div>
-      <div class="plan" data-reveal>
-        <div class="plan-tag"><span>Portfolio</span></div>
-        <div class="plan-n">Larger catalogue</div>
-        <div class="plan-price"><b>Talk</b><span>to us</span></div>
-        <ul class="plan-list">
-          <li>Unlimited products &amp; sub-brands</li>
-          <li>Multiple teams and sites</li>
-          <li>Importer &amp; distributor roles</li>
-          <li>Single sign-on</li>
-          <li>Named compliance contact</li>
-        </ul>
-        <a class="btn btn--ghost" href="#contact">Book a call</a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ FAQ ============ -->
-<section class="sec sec--sf" id="faq">
-  <div class="wrap">
-    <div class="sec-top">
-      <h2 class="sec-h">Straight <em>answers</em></h2>
-      <div class="sec-note">FAQ</div>
-    </div>
-    <div class="faq">
-      <div class="faq-i open">
-        <button class="faq-q" type="button" aria-expanded="true">My product is simple. Does this really apply?<span class="faq-s">+</span></button>
-        <div class="faq-a"><div><p>Almost certainly yes. The law covers <b>any product with digital elements</b> — a lamp with an app, a sensor with Bluetooth, a toy with firmware. Size doesn't exempt you, and neither does simplicity. A handful of categories are carved out because other rules already cover them, such as medical devices, cars and marine equipment. Our 30-second check above will tell you where you stand.</p></div></div>
-      </div>
-      <div class="faq-i">
-        <button class="faq-q" type="button" aria-expanded="false">What is a "software bill of materials", and do I need one?<span class="faq-s">+</span></button>
-        <div class="faq-a"><div><p>It's simply <b>a list of the software inside your product</b> — the open-source libraries and components your firmware is built from. The law requires you to keep one and to know when something on that list develops a security problem. If you don't have one, PandaX can generate it from your firmware; you don't need to produce it yourself.</p></div></div>
-      </div>
-      <div class="faq-i">
-        <button class="faq-q" type="button" aria-expanded="false">Do I have to hire an auditor?<span class="faq-s">+</span></button>
-        <div class="faq-a"><div><p>For roughly <b>nine out of ten products, no</b>. Most sit in the default category, where you're allowed to assess your own product and declare conformity yourself — provided you can show the evidence. That evidence is exactly what PandaX produces. Certain higher-risk categories, such as firewalls and password managers, do need an outside body, and we'll tell you clearly if that's you.</p></div></div>
-      </div>
-      <div class="faq-i">
-        <button class="faq-q" type="button" aria-expanded="false">We already have documentation. Do we start over?<span class="faq-s">+</span></button>
-        <div class="faq-a"><div><p>No. Bring what you have — existing risk assessments, test reports, update policies — and PandaX slots them into the structure the law expects, then shows you only <b>the gaps that are left</b>. Most teams find they're further along than they feared, and that what's missing is the ongoing monitoring rather than the paperwork.</p></div></div>
-      </div>
-      <div class="faq-i">
-        <button class="faq-q" type="button" aria-expanded="false">How long does setup take?<span class="faq-s">+</span></button>
-        <div class="faq-a"><div><p>Most customers are live on the <b>same day</b>. Upload a software list or a firmware image, answer three questions about your product, and the dashboard fills in. There's no build-system integration and nothing for your engineers to maintain — which is the whole point.</p></div></div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ============ CLOSE ============ -->
-<section class="close" id="contact">
-  <div class="wrap">
-    <div class="close-h">Find out where <em>you stand</em></div>
-    <p class="close-p">Two minutes, one product, no card. We'll show you exactly what the Cyber Resilience Act asks of you — and how much of it we can take off your desk.</p>
-    <div class="close-acts">
-      <a class="btn btn--go" href="mailto:contact@pandax.online?subject=PandaX%20%C2%B7%20free%20CRA%20check">Start free trial</a>
-      <a class="btn btn--ghost" href="#check">Check my product</a>
-    </div>
-  </div>
-</section>
-
-<!-- ============ FOOTER ============ -->
+</main>
 <footer class="foot">
-  <div class="wrap">
-    <div class="foot-grid">
-      <div class="foot-brand">
-        <span class="foot-mark"><span></span> PandaX</span>
-        <p class="foot-blurb">EU Cyber Resilience Act compliance for the companies that make connected products — without a security team of their own.</p>
-      </div>
-      <div class="foot-col">
-        <h4>Product</h4>
-        <a href="#platform">Platform</a>
-        <a href="#how">How it works</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#check">Applicability check</a>
-      </div>
-      <div class="foot-col">
-        <h4>Company</h4>
-        <a href="mailto:contact@pandax.online">contact@pandax.online</a>
-        <a href="#faq">FAQ</a>
-        <a href="https://eur-lex.europa.eu/eli/reg/2024/2847/oj" target="_blank" rel="noopener">The regulation ↗</a>
-      </div>
+  <div class="wrap foot-in">
+    <div class="foot-brand">
+      <img src="assets/favicon-512.png" alt="" width="22" height="22">
+      <span>PandaX</span>
+      <span class="foot-tag">CRA compliance evidence for connected products</span>
     </div>
-    <div class="foot-base">
-      <span>© <span id="yr">2026</span> PandaX</span>
-      <span>Guidance, not legal advice</span>
-    </div>
+    <nav class="foot-links" aria-label="Site">
+      <a href="/partners/">Partners</a>
+      <a href="/impressum/">Impressum</a>
+      <a href="/datenschutz/">Datenschutzerklärung</a>
+      <a href="/privacy/">Privacy</a>
+    </nav>
+    <p class="foot-legal">PandaX produces compliance documentation. It does not issue conformity opinions, certificates or verdicts.</p>
   </div>
 </footer>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
-<script src="pandax.js"></script>
+<script src="pandax.js" defer></script>
 </body>
 </html>

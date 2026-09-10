@@ -64,7 +64,7 @@ ${header(depth)}
 ${body}
 </main>
 ${footer(depth)}
-${script ? `<script src="${r}pandax.js" defer></script>` : ""}
+${script ? `<script src="${r}assets/js/gsap.min.js"></script>\n<script src="${r}assets/js/ScrollTrigger.min.js"></script>\n<script src="${r}pandax.js"></script>` : ""}
 </body>
 </html>
 `;
@@ -105,6 +105,61 @@ function footer(depth) {
     <p class="foot-legal">${esc(C.footer.legal)}</p>
   </div>
 </footer>`;
+}
+
+
+/* 0 ------------------------------------------------------------- boot --- */
+
+function bootSection() {
+  const b = C.boot;
+  const menu = b.screenNav.map((x) => `<span>${esc(x)}</span>`).join("");
+  return `<section class="boot" id="boot">
+  <div class="boot-stick">
+    <div class="boot-bg" aria-hidden="true"></div>
+
+    <div class="boot-meta" aria-hidden="true">
+      <span class="bm-l"><i class="bm-d"></i> ${esc(b.meta)}</span>
+      <span class="bm-r">${esc(b.metaRight)}</span>
+    </div>
+
+    <div class="laptop" id="laptop">
+      <div class="laptop-lid" id="laptopLid">
+        <div class="laptop-lid-back" aria-hidden="true">
+          <div class="lid-mark"><div class="lid-glyph"></div><div class="lid-word">Panda<i>X</i></div></div>
+        </div>
+        <div class="laptop-bezel">
+          <div class="laptop-camera" aria-hidden="true"></div>
+          <div class="laptop-screen" aria-hidden="true">
+            <div class="sh">
+              <div class="sh-bg"></div>
+              <div class="sh-grade"></div>
+              <div class="sh-nav">
+                <span class="sh-mark"><span class="sh-glyph"></span> Panda<i>X</i></span>
+                <span class="sh-menu">${menu}</span>
+                <span class="sh-status">${esc(b.screenYear)}</span>
+              </div>
+              <div class="sh-stage">
+                <div class="lp-img" id="lpImg" role="img" aria-label="${esc(C.meta.brand)}"></div>
+                <div class="swm">
+                  <div class="swm-name">Panda<i>X</i></div>
+                  <div class="swm-rule"></div>
+                  <div class="swm-tag">${esc(b.tag)}</div>
+                </div>
+              </div>
+            </div>
+            <div class="laptop-glare" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+      <div class="laptop-base">
+        ${keyboard()}
+      </div>
+      <div class="laptop-shadow" aria-hidden="true"></div>
+    </div>
+
+    <div class="boot-hint" id="bootHint" aria-hidden="true">${esc(b.hint)}</div>
+  </div>
+</section>`;
 }
 
 /* 1 ------------------------------------------------------------- hero --- */
@@ -175,27 +230,6 @@ function heroSection() {
     <div class="acts">
       <a class="btn" href="${h.primary.href}">${esc(h.primary.label)}</a>
       <a class="btn btn-q" href="${h.secondary.href}">${esc(h.secondary.label)}</a>
-    </div>
-  </div>
-
-  <div class="stage">
-    <div class="laptop" id="laptop">
-      <div class="laptop-lid" id="laptopLid">
-        <div class="laptop-lid-back" aria-hidden="true">
-          <div class="lid-mark"><div class="lid-glyph"></div><div class="lid-word">Panda<i>X</i></div></div>
-        </div>
-        <div class="laptop-bezel">
-          <div class="laptop-camera" aria-hidden="true"></div>
-          <div class="laptop-screen">
-            ${screen(h.record)}
-          </div>
-          <div class="laptop-glare" aria-hidden="true"></div>
-        </div>
-      </div>
-      <div class="laptop-base">
-        ${keyboard()}
-      </div>
-      <div class="laptop-shadow" aria-hidden="true"></div>
     </div>
   </div>
 </section>`;
@@ -499,7 +533,7 @@ const home = shell({
   ogTitle: `${C.meta.brand} — ${C.meta.tagline}`,
   description: `${C.hero.subhead} ${C.hero.body}`,
   body: [
-    heroSection(), obligationSection(), vectorsSection(), problemSection(),
+    bootSection(), heroSection(), obligationSection(), vectorsSection(), problemSection(),
     manualSection(), doesSection(), sourceSection(), usefulSection(),
     proofSection(), whoSection(), labsSection(), faqSection(), closingSection(),
   ].join("\n\n"),

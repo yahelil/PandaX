@@ -32,6 +32,23 @@ export const nav = {
   action: { label: "Book a walkthrough", href: "#contact" },
 };
 
+/* 0 ------------------------------------------------------------- boot --- */
+
+/**
+ * The entrance. The lid opens onto the PandaX mark, the camera pushes into the
+ * screen, and the page opens through the transparent counter of the X.
+ * Scroll-driven; skipped entirely for a deep link or reduced motion.
+ */
+export const boot = {
+  meta: "PandaX",
+  metaRight: "EU Cyber Resilience Act",
+  screenNav: ["Releases", "Findings", "Documents", "Submissions"],
+  screenYear: "2026",
+  name: "PandaX",
+  tag: "Evidence for the Cyber Resilience Act",
+  hint: "Scroll",
+};
+
 /* 1 ------------------------------------------------------------- hero --- */
 
 export const hero = {

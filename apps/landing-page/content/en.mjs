@@ -415,7 +415,7 @@ export const privacyBody = {
     },
     {
       title: "Hosting",
-      body: "TODO — name the hosting provider, the processing location and the data processing agreement in place.",
+      body: "This site is hosted by Cloudflare, Inc. and served from its global edge network, which means the server nearest the visitor answers the request. TODO — confirm the data processing agreement and the standard contractual clauses on the account.",
     },
     {
       title: "Your rights",

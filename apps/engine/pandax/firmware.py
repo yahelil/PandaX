@@ -265,10 +265,10 @@ def extract(src: Path, dest: Path) -> tuple[int, int]:
                           limits=asdict(limits), file_count=count, uncompressed_bytes=total)
             if report["status"] != "completed":
                 raise FirmwareError(report["status"], report.get("reason", "incomplete firmware extraction"))
-            if dest.exists():
-                dest.rmdir()  # Only an empty destination is permitted.
             for attempt in range(6):
                 try:
+                    if dest.exists():
+                        dest.rmdir()  # Only an empty destination is permitted.
                     staging.replace(dest)
                     break
                 except PermissionError:

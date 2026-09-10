@@ -814,7 +814,7 @@ function closingSection() {
   <div class="wrap">
     ${actionStage()}
     <div class="close-in close-one" id="contact">
-      ${formBlock(c.heading, c.body, "sample")}
+      ${formBlock(c.heading, c.body, "walkthrough")}
     </div>
   </div>
 </section>`;

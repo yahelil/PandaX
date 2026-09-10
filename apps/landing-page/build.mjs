@@ -1,44 +1,37 @@
 /**
  * Renders the static pages from content/en.mjs.
  *
- * The site ships as plain files to Cloudflare static assets — there is no
- * framework and no bundler. This script exists only so that all copy lives in
- * one editable file, per the brief. Generated HTML is committed alongside it.
+ * The site ships as plain files to Cloudflare static assets — no framework, no
+ * bundler. This script exists only so all copy lives in one editable file.
+ * Generated HTML is committed alongside it.
  *
  *   node build.mjs
- *
- * Never edit the generated .html files by hand; they are overwritten.
  */
 
 import { writeFileSync, mkdirSync } from "node:fs";
 import * as C from "./content/en.mjs";
 
-/** Set to post the forms somewhere. Empty string falls back to mailto. */
+/** Set to post the forms somewhere. Empty falls back to mailto. */
 const FORM_ENDPOINT = process.env.PANDAX_FORM_ENDPOINT ?? "";
 
 const esc = (s) =>
-  String(s).replace(/[&<>"]/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /** Mono is reserved for machine-generated identifiers. */
 const id = (s) => `<span class="id">${esc(s)}</span>`;
+const rel = (d) => (d ? "../".repeat(d) : "");
+const n2 = (i) => String(i + 1).padStart(2, "0");
 
-const rel = (depth) => (depth ? "../".repeat(depth) : "");
-
-function shell({ ogTitle, description, depth = 0, slug = "", body, script = "" }) {
-  // The browser tab shows the brand alone, by request. The descriptive
-  // title stays in og:title and the meta description.
-  const title = C.meta.brand;
-  const canonical = `https://${C.meta.domain}/${slug}`;
+function shell({ ogTitle, description, depth = 0, slug = "", body, script = false }) {
   const r = rel(depth);
   return `<!doctype html>
 <html lang="${C.meta.lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(title)}</title>
+<title>${esc(C.meta.brand)}</title>
 <meta name="description" content="${esc(description)}">
-<link rel="canonical" href="${canonical}">
+<link rel="canonical" href="https://${C.meta.domain}/${slug}">
 <meta property="og:type" content="website">
 <meta property="og:title" content="${esc(ogTitle)}">
 <meta property="og:description" content="${esc(description)}">
@@ -79,13 +72,10 @@ ${script ? `<script src="${r}pandax.js" defer></script>` : ""}
 
 function header(depth) {
   const r = rel(depth);
-  const home = depth ? `${r}index.html` : "#top";
-  const links = depth
-    ? ""
-    : C.nav.links.map((l) => `<a href="${l.href}">${esc(l.label)}</a>`).join("\n        ");
+  const links = depth ? "" : C.nav.links.map((l) => `<a href="${l.href}">${esc(l.label)}</a>`).join("\n        ");
   return `<header class="head">
   <div class="wrap head-in">
-    <a class="mark" href="${home}">
+    <a class="mark" href="${depth ? `${r}index.html` : "#top"}">
       <img src="${r}assets/favicon-512.png" alt="" width="26" height="26">
       <span>${esc(C.meta.brand)}</span>
     </a>
@@ -100,7 +90,7 @@ function header(depth) {
 function footer(depth) {
   const r = rel(depth);
   const links = C.footer.links
-    .map((l) => `<a href="${l.href === "/partners/" && depth ? `${r}partners/` : l.href}">${esc(l.label)}</a>`)
+    .map((l) => `<a href="${depth && l.href.startsWith("/") ? r + l.href.slice(1) : l.href}">${esc(l.label)}</a>`)
     .join("\n      ");
   return `<footer class="foot">
   <div class="wrap foot-in">
@@ -117,243 +107,306 @@ function footer(depth) {
 </footer>`;
 }
 
-/* ---------------------------------------------------------------- hero ---- */
+/* 1 ------------------------------------------------------------- hero --- */
 
-function heroRecord(rec) {
+function screen(rec) {
   const stats = rec.stats
-    .map(
-      (s, i) => `<div class="rec-stat" data-i="${i}">
-          <span class="rec-stat-v" data-count="${esc(s.value)}">${esc(s.value)}</span>
-          <span class="rec-stat-l">${esc(s.label)}</span>
-        </div>`)
-    .join("\n        ");
-
+    .map((s, i) => `<div class="sc-stat"${i === 2 ? ' data-mark="1"' : ""}>
+              <span class="sc-v" data-count="${esc(s.value)}">${esc(s.value)}</span>
+              <span class="sc-l">${esc(s.label)}</span>
+            </div>`).join("\n            ");
   const checks = rec.checks
-    .map(
-      (c, i) => `<li data-i="${i}"><span class="tick" aria-hidden="true"></span>${esc(c)}</li>`)
-    .join("\n            ");
-
-  return `<div class="rec" id="rec" aria-label="Example evidence record">
-        <div class="rec-top">
-          <span class="rec-flag">${esc(rec.label)}</span>
-          <span class="rec-seal" id="recSeal"><span class="seal-dot" aria-hidden="true"></span>Sealed</span>
-        </div>
-
-        <div class="rec-head">
-          <div class="rec-title">${esc(rec.product)} <span class="rec-rel">${esc(rec.release)}</span></div>
-          <dl class="rec-ids">
-            <div><dt>Run</dt><dd>${id(rec.runId)}</dd></div>
-            <div><dt>Sealed</dt><dd><time datetime="${esc(rec.sealed)}">${id(rec.sealed)}</time></dd></div>
-            <div class="rec-wide"><dt>Image</dt><dd>${id(rec.image)}</dd></div>
-            <div class="rec-wide"><dt>SHA-256</dt><dd>${id(rec.sha256)}</dd></div>
-          </dl>
-        </div>
-
-        <div class="rec-stats">
-        ${stats}
-        </div>
-
-        <div class="rec-split">
-          <div class="rec-checks">
-            <h3>Release checks</h3>
-            <ul class="checks">
-            ${checks}
-            </ul>
+    .map((c, i) => `<li data-i="${i}"><span class="tick" aria-hidden="true"></span>${esc(c)}</li>`).join("");
+  return `<div class="sc" id="sc">
+          <div class="sc-bar" aria-hidden="true">
+            <span class="sc-dots"><i></i><i></i><i></i></span>
+            <span class="sc-app">${esc(C.meta.brand)}</span>
           </div>
-          <div class="rec-finding">
-            <h3>Open finding</h3>
-            <p class="fx-id">${id(rec.finding.cve)} <span class="fx-comp">${id(rec.finding.component)}</span></p>
-            <p class="fx-note">${esc(rec.finding.note)}</p>
-            <p class="fx-fix"><span class="fx-arrow" aria-hidden="true"></span>${esc(rec.finding.fix)}</p>
-            <p class="fx-dec">${esc(rec.finding.decision)}</p>
+          <div class="sc-body">
+            <div class="sc-head">
+              <span class="sc-flag">${esc(rec.label)}</span>
+              <span class="sc-seal" id="scSeal"><span class="seal-dot" aria-hidden="true"></span>Sealed</span>
+            </div>
+            <div class="sc-title">${esc(rec.product)} <span>${esc(rec.release)}</span></div>
+            <div class="sc-run">${id(rec.runId)}</div>
+            <div class="sc-stats">
+            ${stats}
+            </div>
+            <ul class="sc-checks">${checks}</ul>
+            <div class="sc-fix">
+              <span class="fx-arrow" aria-hidden="true"></span>
+              ${id(rec.finding.cve)} in ${id(rec.finding.component)} — ${esc(rec.finding.fix)}
+            </div>
           </div>
-        </div>
-      </div>`;
+        </div>`;
+}
+
+const KEYS = [
+  ["lk-fn", "esc F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 ⏻"],
+  ["lk-num", "~ 1 2 3 4 5 6 7 8 9 0 - = |delete"],
+  ["lk-q", "|tab Q W E R T Y U I O P [ ] \\"],
+  ["lk-a", "|caps A S D F G H J K L ; ' |return"],
+  ["lk-z", "!shift Z X C V B N M , . / !shift"],
+  ["lk-sp", "fn ⌃ ⌥ ⌘ = ⌘ ⌥ ◀ ▲▼ ▶"],
+];
+
+function keyboard() {
+  const rows = KEYS.map(([cls, keys]) => {
+    const cells = keys.split(" ").map((k) => {
+      if (k === "=") return `<span class="lk-bar"></span>`;
+      if (k.startsWith("|")) return `<span class="lk-w">${esc(k.slice(1))}</span>`;
+      if (k.startsWith("!")) return `<span class="lk-w2">${esc(k.slice(1))}</span>`;
+      return `<span>${esc(k)}</span>`;
+    }).join("");
+    return `<div class="lk-row ${cls}">${cells}</div>`;
+  }).join("\n          ");
+  return `<div class="laptop-keys" aria-hidden="true">
+          ${rows}
+        </div>`;
 }
 
 function heroSection() {
   const h = C.hero;
   return `<section class="hero" id="top">
-  <div class="wrap hero-in">
-    <div class="hero-copy">
-      <h1>${esc(h.headline)}</h1>
-      <p class="lede">${esc(h.subhead)}</p>
-      <div class="acts">
-        <a class="btn" href="${h.primary.href}">${esc(h.primary.label)}</a>
-        <a class="btn btn-q" href="${h.secondary.href}">${esc(h.secondary.label)}</a>
-      </div>
+  <div class="wrap">
+    <h1>${esc(h.headline)}</h1>
+    <p class="lede">${esc(h.subhead)}</p>
+    <p class="lede lede-sm">${esc(h.body)}</p>
+    <div class="acts">
+      <a class="btn" href="${h.primary.href}">${esc(h.primary.label)}</a>
+      <a class="btn btn-q" href="${h.secondary.href}">${esc(h.secondary.label)}</a>
     </div>
+  </div>
 
-    <div class="hero-stage">
-      <div class="lap" id="lap">
-        <div class="lap-lid">
-          <div class="lap-back" aria-hidden="true"><span class="lap-mark"></span></div>
-          <div class="lap-bezel">
-            <span class="lap-cam" aria-hidden="true"></span>
-            <div class="lap-screen">
-              ${heroRecord(h.record)}
-            </div>
-            <div class="lap-glare" aria-hidden="true"></div>
-          </div>
+  <div class="stage">
+    <div class="laptop" id="laptop">
+      <div class="laptop-lid" id="laptopLid">
+        <div class="laptop-lid-back" aria-hidden="true">
+          <div class="lid-mark"><div class="lid-glyph"></div><div class="lid-word">Panda<i>X</i></div></div>
         </div>
-        <div class="lap-base" aria-hidden="true"><span class="lap-notch"></span></div>
-        <div class="lap-shadow" aria-hidden="true"></div>
+        <div class="laptop-bezel">
+          <div class="laptop-camera" aria-hidden="true"></div>
+          <div class="laptop-screen">
+            ${screen(h.record)}
+          </div>
+          <div class="laptop-glare" aria-hidden="true"></div>
+        </div>
       </div>
+      <div class="laptop-base">
+        ${keyboard()}
+      </div>
+      <div class="laptop-shadow" aria-hidden="true"></div>
     </div>
   </div>
 </section>`;
 }
 
-/* ------------------------------------------------------------ sections ---- */
+/* 2 -------------------------------------------------------- obligation --- */
 
-function deadlinesSection() {
-  const d = C.deadlines;
-  // Derived, not asserted: whichever day this is built, the label is true.
-  const today = new Date().toISOString().slice(0, 10);
-  const rows = d.rows
-    .map(
-      (r) => `<tr class="dl-${r.state === "active" && r.iso > today ? "active dl-soon" : r.state}">
-        <th scope="row"><time datetime="${esc(r.iso)}">${esc(r.date)}</time></th>
-        <td>${esc(r.title)}</td>
-        <td class="dl-state">${
-          r.state === "active"
-            ? `<span class="live"><span class="live-dot" aria-hidden="true"></span>${esc(r.iso <= today ? r.stateLabel : "Applies soon")}</span><span class="since" data-since="${esc(r.iso)}"></span>`
-            : r.state === "past"
-            ? "Passed"
-            : "Upcoming"
-        }</td>
-      </tr>`)
-    .join("\n      ");
-
-  return `<section class="sec" id="dates">
+function obligationSection() {
+  const o = C.obligation;
+  const points = o.points.map((p) => `<li>${esc(p)}</li>`).join("\n        ");
+  return `<section class="sec" id="obligation">
   <div class="wrap">
-    <h2>${esc(d.heading)}</h2>
-    <table class="tbl dl">
-      <caption class="vh">Cyber Resilience Act application dates</caption>
-      <tbody>
-      ${rows}
-      </tbody>
-    </table>
-    <p class="note">${esc(d.note)}</p>
+    <h2>${esc(o.heading)}</h2>
+    <p class="lede">${esc(o.lede)}</p>
+    <ul class="rule-list">
+        ${points}
+    </ul>
+    <p class="live-row">
+      <span class="live"><span class="live-dot" aria-hidden="true"></span>${esc(o.live.label)}</span>
+      <span class="live-date">${esc(o.live.date)}</span>
+      <span class="since" data-since="${esc(o.live.iso)}"></span>
+    </p>
+    <p class="closer">${esc(o.closing)}</p>
+    <p class="src">${esc(o.source)}</p>
   </div>
 </section>`;
 }
 
-function gapSection() {
-  const g = C.gap;
-  const col = (c) => `<div class="gap-col">
-        <h3>${esc(c.title)}</h3>
-        <ul class="rule-list">${c.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
-      </div>`;
-  return `<section class="sec" id="gap">
+/* 3 ----------------------------------------------------------- vectors --- */
+
+function vectorsSection() {
+  const v = C.vectors;
+  const max = Math.max(...v.bars.map((b) => b.value));
+  const bars = v.bars
+    .map((b, i) => `<div class="bar-row${b.mark ? " is-mark" : ""}" data-i="${i}">
+          <span class="bar-label">${esc(b.label)}</span>
+          <span class="bar-track"><span class="bar-fill" style="--w:${((b.value / max) * 100).toFixed(1)}%"></span></span>
+          <span class="bar-value">${b.value}%</span>
+        </div>`).join("\n        ");
+
+  // The data also exists as a real table: relief for the recessive greys, and
+  // the reading anyone with a screen reader gets.
+  const rows = v.bars.map((b) => `<tr><th scope="row">${esc(b.label)}</th><td>${b.value}%</td></tr>`).join("");
+
+  const facts = v.facts.map((f) => `<li>${esc(f)}</li>`).join("");
+
+  return `<section class="sec" id="vectors">
   <div class="wrap">
-    <h2>${esc(g.heading)}</h2>
-    <div class="gap">
-      ${g.columns.map(col).join("\n      ")}
-    </div>
-    <p class="closer">${esc(g.closing)}</p>
+    <h2>${esc(v.heading)}</h2>
+    <p class="lede">${esc(v.lede)}</p>
+
+    <figure class="chart" id="chart">
+      <figcaption class="vh">Initial access vectors, Verizon 2025 DBIR</figcaption>
+      <div class="bars">
+        ${bars}
+      </div>
+      <table class="vh">
+        <caption>Initial access vectors</caption>
+        <tbody>${rows}</tbody>
+      </table>
+    </figure>
+
+    <ul class="facts">${facts}</ul>
+    <p class="src">${esc(v.source)}</p>
   </div>
 </section>`;
 }
 
-function clockSection() {
-  const c = C.clock;
-  const rows = c.rows
-    .map(
-      (r, i) => `<div class="ck" data-stage="${i}">
-        <div class="ck-at">${esc(r.at)}</div>
-        <div class="ck-title">${esc(r.title)}</div>
-        <div class="ck-run" data-countdown="${i}" aria-hidden="true"></div>
-      </div>`)
-    .join("\n      ");
-  return `<section class="sec sec-dark" id="clock">
-  <div class="wrap">
-    <h2>${esc(c.heading)}</h2>
-    <div class="cks" id="cks">
-      ${rows}
-    </div>
-    <p class="note note-dark">${esc(c.recipients)}</p>
-    <p class="closer closer-dark">${esc(c.closing)}</p>
-  </div>
-</section>`;
-}
+/* 4 ----------------------------------------------------------- problem --- */
 
-function howSection() {
-  const h = C.how;
-  const stages = h.stages
-    .map(
-      (s, i) => `<li class="stage" data-i="${i}">
-        <span class="stage-n">${i + 1}</span>
-        <h3>${esc(s.title)}</h3>
-        <p>${esc(s.body)}</p>
-      </li>`)
-    .join("\n      ");
-  return `<section class="sec" id="how">
-  <div class="wrap">
-    <h2>${esc(h.heading)}</h2>
-    <ol class="stages" id="stages">
-      <span class="stage-line" aria-hidden="true"><i id="stageFill"></i></span>
-      ${stages}
-    </ol>
-    <p class="note">${h.notes.map(esc).join(" ")}</p>
-  </div>
-</section>`;
-}
-
-function exportSection() {
-  const e = C.exportPack;
-  const rows = e.items
-    .map(
-      (i) => `<tr><th scope="row">${esc(i.title)}</th><td>${esc(i.body)}</td></tr>`)
-    .join("\n      ");
-  return `<section class="sec" id="export">
-  <div class="wrap">
-    <h2>${esc(e.heading)}</h2>
-    <table class="tbl">
-      <caption class="vh">Contents of a PandaX evidence export</caption>
-      <tbody>
-      ${rows}
-      </tbody>
-    </table>
-    <p class="closer">${esc(e.closing)}</p>
-  </div>
-</section>`;
-}
-
-function proofSection() {
-  const p = C.proof;
-  return `<section class="sec" id="proof">
+function problemSection() {
+  const p = C.problem;
+  const lines = p.lines
+    .map((l) => `<li><strong>${esc(l.lead)}</strong> ${esc(l.rest)}</li>`).join("\n        ");
+  return `<section class="sec" id="problem">
   <div class="wrap">
     <h2>${esc(p.heading)}</h2>
-    <p class="lede lede-sm">${esc(p.body)}</p>
-    <div class="shot-todo">
-      <span class="shot-todo-t">${esc(p.placeholder.title)}</span>
-      <span class="shot-todo-b">${esc(p.placeholder.body)}</span>
-    </div>
+    <p class="lede">${esc(p.lede)}</p>
+    <ul class="rule-list rule-list-lead">
+        ${lines}
+    </ul>
   </div>
 </section>`;
 }
 
-function audienceSection() {
-  const a = C.audience;
-  return `<section class="sec" id="who">
+/* 5 ------------------------------------------------------------ manual --- */
+
+function manualSection() {
+  const m = C.manual;
+  const steps = m.steps
+    .map((s, i) => `<li class="step" data-i="${i}">
+        <span class="step-n">${n2(i)}</span>
+        <h3>${esc(s.title)}</h3>
+        <p>${esc(s.body)}</p>
+      </li>`).join("\n      ");
+  return `<section class="sec" id="manual">
   <div class="wrap">
-    <h2>${esc(a.heading)}</h2>
-    <p class="lede lede-sm">${esc(a.body)}</p>
-    <ul class="rule-list rule-list-wide">${a.points.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>
+    <h2>${esc(m.heading)}</h2>
+    <p class="lede">${esc(m.lede)}</p>
+    <ol class="steps" id="steps">
+      <span class="step-line" aria-hidden="true"><i id="stepFill"></i></span>
+      ${steps}
+    </ol>
+    <p class="note">${esc(m.clock)}</p>
+    <p class="closer">${esc(m.closing)}</p>
   </div>
 </section>`;
 }
+
+/* 6 -------------------------------------------------------------- does --- */
+
+function doesSection() {
+  const d = C.does;
+  const points = d.points.map((p) => `<li>${esc(p)}</li>`).join("\n        ");
+  return `<section class="sec sec-dark" id="does">
+  <div class="wrap">
+    <h2>${esc(d.heading)}</h2>
+    <p class="lede lede-dark">${esc(d.lede)}</p>
+
+    <div class="flow" id="flow" aria-hidden="true">
+      <div class="flow-in">
+        <span class="fl-src" data-i="0">Jira</span>
+        <span class="fl-src" data-i="1">CI/CD</span>
+        <span class="fl-src" data-i="2">SBOM</span>
+        <span class="fl-src" data-i="3">Documents</span>
+        <span class="fl-src" data-i="4">Legal</span>
+      </div>
+      <div class="flow-wires"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="flow-core">${esc(C.meta.brand)}</div>
+      <div class="flow-out">
+        <span class="fl-doc" data-i="0">Record</span>
+        <span class="fl-doc" data-i="1">Documents</span>
+        <span class="fl-doc" data-i="2">Audit trail</span>
+      </div>
+    </div>
+
+    <ul class="rule-list rule-list-dark">
+        ${points}
+    </ul>
+    <p class="closer closer-dark">${esc(d.closing)}</p>
+  </div>
+</section>`;
+}
+
+/* 7 ------------------------------------------------------------ source --- */
+
+function sourceSection() {
+  const s = C.source;
+  const points = s.points.map((p) => `<li>${esc(p)}</li>`).join("\n        ");
+  return `<section class="sec" id="source">
+  <div class="wrap">
+    <h2>${esc(s.heading)}</h2>
+    <p class="lede">${esc(s.lede)}</p>
+    <ul class="rule-list">
+        ${points}
+    </ul>
+    <p class="closer">${esc(s.closing)}</p>
+  </div>
+</section>`;
+}
+
+/* 8 ------------------------------------------------------------ useful --- */
+
+function usefulSection() {
+  const u = C.useful;
+  const items = u.items
+    .map((it, i) => `<li class="use" data-i="${i}">
+        <span class="use-n">${n2(i)}</span>
+        <h3>${esc(it.title)}</h3>
+        <p>${esc(it.body)}</p>
+      </li>`).join("\n      ");
+  return `<section class="sec" id="useful">
+  <div class="wrap">
+    <h2>${esc(u.heading)}</h2>
+    <ol class="uses">
+      ${items}
+    </ol>
+  </div>
+</section>`;
+}
+
+/* 9 --------------------------------------------------------------- who --- */
+
+function whoSection() {
+  const w = C.who;
+  const rows = w.rows
+    .map((r) => `<tr><th scope="row">${esc(r.title)}</th><td>${esc(r.body)}</td></tr>`).join("\n      ");
+  return `<section class="sec" id="who">
+  <div class="wrap">
+    <h2>${esc(w.heading)}</h2>
+    <p class="lede">${esc(w.lede)}</p>
+    <table class="tbl">
+      <caption class="vh">Who PandaX is built for</caption>
+      <tbody>
+      ${rows}
+      </tbody>
+    </table>
+    <p class="closer">${esc(w.closing)}</p>
+  </div>
+</section>`;
+}
+
+/* 10 -------------------------------------------------------------- labs --- */
 
 function labsSection() {
   const l = C.labs;
   const rows = l.points
-    .map((p) => `<tr><th scope="row">${esc(p.title)}</th><td>${esc(p.body)}</td></tr>`)
-    .join("\n      ");
+    .map((p) => `<tr><th scope="row">${esc(p.title)}</th><td>${esc(p.body)}</td></tr>`).join("\n      ");
   return `<section class="sec" id="labs">
   <div class="wrap">
     <h2>${esc(l.heading)}</h2>
-    <p class="lede lede-sm">${esc(l.body)}</p>
     <table class="tbl">
       <caption class="vh">Guardrails for testing, inspection and certification firms</caption>
       <tbody>
@@ -365,15 +418,31 @@ function labsSection() {
 </section>`;
 }
 
+/* proof ------------------------------------------------------------------ */
+
+function proofSection() {
+  const p = C.proof;
+  return `<section class="sec" id="proof">
+  <div class="wrap">
+    <h2>${esc(p.heading)}</h2>
+    <p class="lede">${esc(p.lede)}</p>
+    <div class="shot-todo">
+      <span class="shot-todo-t">${esc(p.placeholder.title)}</span>
+      <span class="shot-todo-b">${esc(p.placeholder.body)}</span>
+    </div>
+  </div>
+</section>`;
+}
+
+/* 11 --------------------------------------------------------------- faq --- */
+
 function faqSection() {
   const f = C.faq;
   const items = f.items
-    .map(
-      (i) => `<details class="qa">
+    .map((i) => `<details class="qa">
         <summary><span>${esc(i.q)}</span></summary>
         <div class="qa-a"><p>${esc(i.a)}</p></div>
-      </details>`)
-    .join("\n      ");
+      </details>`).join("\n      ");
   return `<section class="sec" id="faq">
   <div class="wrap">
     <h2>${esc(f.heading)}</h2>
@@ -383,6 +452,8 @@ function faqSection() {
   </div>
 </section>`;
 }
+
+/* 12 ------------------------------------------------------------- close --- */
 
 function formBlock(heading, body, kind) {
   const c = C.contact;
@@ -412,29 +483,25 @@ function closingSection() {
     <div>
       <h2>${esc(cl.heading)}</h2>
       <p class="lede lede-sm">${esc(cl.body)}</p>
+      <div class="acts">
+        <a class="btn" href="${cl.primary.href}">${esc(cl.primary.label)}</a>
+        <a class="btn btn-q" href="${cl.secondary.href}">${esc(cl.secondary.label)}</a>
+      </div>
     </div>
     ${formBlock(c.heading, c.body, "sample")}
   </div>
 </section>`;
 }
 
-/* --------------------------------------------------------------- pages ---- */
+/* --------------------------------------------------------------- pages --- */
 
 const home = shell({
-  ogTitle: `${C.meta.brand} — CRA compliance evidence for connected products`,
-  description: C.hero.subhead,
+  ogTitle: `${C.meta.brand} — ${C.meta.tagline}`,
+  description: `${C.hero.subhead} ${C.hero.body}`,
   body: [
-    heroSection(),
-    deadlinesSection(),
-    gapSection(),
-    clockSection(),
-    howSection(),
-    exportSection(),
-    proofSection(),
-    audienceSection(),
-    labsSection(),
-    faqSection(),
-    closingSection(),
+    heroSection(), obligationSection(), vectorsSection(), problemSection(),
+    manualSection(), doesSection(), sourceSection(), usefulSection(),
+    proofSection(), whoSection(), labsSection(), faqSection(), closingSection(),
   ].join("\n\n"),
   script: true,
 });
@@ -455,24 +522,18 @@ const partnersPage = shell({
 <section class="sec">
   <div class="wrap">
     <h2>${esc(p.guardrails.heading)}</h2>
-    <table class="tbl">
-      <caption class="vh">Guardrails</caption>
-      <tbody>
+    <table class="tbl"><caption class="vh">Guardrails</caption><tbody>
       ${p.guardrails.items.map((i) => `<tr><th scope="row">${esc(i.title)}</th><td>${esc(i.body)}</td></tr>`).join("\n      ")}
-      </tbody>
-    </table>
+    </tbody></table>
   </div>
 </section>
 
 <section class="sec">
   <div class="wrap">
     <h2>${esc(p.models.heading)}</h2>
-    <table class="tbl">
-      <caption class="vh">Ways to work together</caption>
-      <tbody>
+    <table class="tbl"><caption class="vh">Ways to work together</caption><tbody>
       ${p.models.items.map((i) => `<tr><th scope="row">${esc(i.title)}</th><td>${esc(i.body)}</td></tr>`).join("\n      ")}
-      </tbody>
-    </table>
+    </tbody></table>
   </div>
 </section>
 
@@ -501,20 +562,15 @@ function legalPage(key, extra) {
 }
 
 const impressumBody = C.legalPages.impressum.sections
-  .map(
-    (s) => `<h2>${esc(s.title)}</h2>
+  .map((s) => `<h2>${esc(s.title)}</h2>
     <table class="tbl tbl-legal"><tbody>
     ${s.rows.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${v.startsWith("TODO") ? `<span class="todo">${esc(v)}</span>` : esc(v)}</td></tr>`).join("\n    ")}
-    </tbody></table>`)
-  .join("\n\n    ");
+    </tbody></table>`).join("\n\n    ");
 
 const privacySections = C.privacyBody.sections
-  .map(
-    (s) => `<h2>${esc(s.title)}</h2>
-    <p>${s.body.split(/(TODO[^.]*\.)/).map((part) => (part.startsWith("TODO") ? `<span class="todo">${esc(part)}</span>` : esc(part))).join("")}</p>`)
+  .map((s) => `<h2>${esc(s.title)}</h2>
+    <p>${s.body.split(/(TODO[^.]*\.)/).map((x) => (x.startsWith("TODO") ? `<span class="todo">${esc(x)}</span>` : esc(x))).join("")}</p>`)
   .join("\n\n    ");
-
-/* --------------------------------------------------------------- write ---- */
 
 const pages = [
   ["index.html", home],

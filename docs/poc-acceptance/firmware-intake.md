@@ -18,6 +18,20 @@ vulnerabilities, interpret the CRA, or grant security approval.
 Track A shows the pipeline is stable. Track B is the one that carries
 credibility, and it only carries it if the anti-tuning rules below hold.
 
+## Which cards use this
+
+A completed intake record is a prerequisite for every card below. Pass and fail
+conditions for each are in `checklist.md`.
+
+| Card | Owner | Use of this document |
+|---|---|---|
+| **03** | Simon | Builds the ingest path. Records source digest, tool version and extraction report for each fixture it extracts |
+| **07** | Simon | Pins the Track A image — an official OpenWrt device release with URL, SHA256 and an independently produced expected inventory — plus a UBIFS fixture. Commits manifests and scripts, never binaries |
+| **19** | Eden | Runs Track A as rehearsal, then draws and runs the Track B unseen image. Files every intake record and result under `results/` |
+
+Track A is pinned once, in card 07, and reused. Track B is drawn at run time in
+card 19 and never before.
+
 ---
 
 ## Anti-tuning rules (Track B)
@@ -65,7 +79,7 @@ expected_inventory:
   source:                 # where the answer key came from
   produced_by:            # must differ from run_operator
   agreed_at:              # ISO 8601 — must precede run_started_at
-  path:                   # evidence/manifests/<image_id>.md
+  path:                   # results/manifests/<image_id>.md
 run_started_at:
 run_operator:
 ```

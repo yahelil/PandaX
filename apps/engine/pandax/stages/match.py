@@ -320,7 +320,13 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
     # Native vendor rules are recorded separately; OSV output keeps its meaning.
     osv_path = ctx.path("findings.osv.json")
     osv_path.write_text(json.dumps([f.as_dict() for f in findings], indent=2), encoding="utf-8")
-    from ..native import assess, findings as native_findings
+    from ..native import advisory_catalog, assess, findings as native_findings
+    native_catalog = advisory_catalog()
+    ctx.tool_versions["pandax_native_advisories"] = native_catalog["catalog_version"]
+    native_catalog_path = ctx.path("native-advisory-sources.json")
+    native_catalog_path.write_text(
+        json.dumps(native_catalog, indent=2), encoding="utf-8"
+    )
     assessments = assess(ctx.native_inventory)
     vendor_path = ctx.path("native-assessments.json")
     vendor_path.write_text(json.dumps(assessments, indent=2), encoding="utf-8")
@@ -334,7 +340,11 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
                 "cve": row["cve"],
                 "affectedness": row["state"],
                 "source_url": row.get("source_url", row.get("source", "")),
+                "source_retrieved_at": row.get("source_retrieved_at", ""),
                 "evidence": row.get("affectedness_evidence", row.get("detail", "")),
+                "ruleset": row.get("ruleset", ""),
+                "source_records": row.get("source_records", []),
+                "conflicting_sources": row.get("conflicting_sources", []),
             }
             for row in rows
         ]
@@ -349,6 +359,8 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
                 result_count=len(rows),
                 reason=(
                     "Recorded source-specific advisory determinations."
+                    if rows and any(row["state"] != "unknown" for row in rows)
+                    else "Rules were evaluated, but affectedness remains unknown."
                     if rows
                     else "No source-specific advisory rule covers this native component."
                 ),
@@ -356,8 +368,6 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
             )
         )
     native_matches = native_findings(assessments)
-    for finding in native_matches:
-        finding.source_retrieved_at = checked_at
     findings.extend(native_matches)
     yield ev.log(STAGE, f"vendor supplement: {len(assessments)} native determinations (bounded CVE coverage)")
 
@@ -412,10 +422,12 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
             ctx.ledger.ref(out_path),
             ctx.ledger.ref(osv_path),
             ctx.ledger.ref(vendor_path),
+            ctx.ledger.ref(native_catalog_path),
             ctx.ledger.ref(coverage_path),
         ],
         params={"endpoint": "https://api.osv.dev/v1/querybatch", "purls": len(purls),
-                "native_rules": "pandax.native/1", "native_coverage": "requested CVEs only",
+                "native_rules": native_catalog["catalog_version"],
+                "native_coverage": "versioned curated advisories only",
                 "coverage_schema": COVERAGE_SCHEMA},
     )
 

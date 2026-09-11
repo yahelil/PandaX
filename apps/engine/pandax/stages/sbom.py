@@ -395,7 +395,13 @@ def run(ctx: RunContext) -> ev.Stream:
     resolved = enrich(sbom, ctx.extracted_dir)
     yield ev.log(STAGE, f"publisher binary identities verified by SHA-256: {resolved}")
     from ..native import inventory, enrich_sbom
-    ctx.native_inventory = inventory(ctx.extracted_dir)
+    release_source = ctx.path("release-source.json")
+    source_identity = (
+        json.loads(release_source.read_text(encoding="utf-8"))
+        if release_source.exists()
+        else None
+    )
+    ctx.native_inventory = inventory(ctx.extracted_dir, source_identity)
     enrich_sbom(sbom, ctx.native_inventory)
     out_path.write_text(json.dumps(sbom, indent=2), encoding="utf-8")
     native_path = ctx.path("native-inventory.json")

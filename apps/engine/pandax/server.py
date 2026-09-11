@@ -26,10 +26,12 @@ from .cases import CaseError, CaseStore
 from .stages.clock import parse_timestamp
 from .context import OUT_DIR, ROOT
 from .evidence import TrustedKeyConfigurationError, verify_bundle
+from .monitoring import MonitoringError, MonitoringStore
 from .stages.sbom import is_matchable_purl
 
 WEB = Path(__file__).resolve().parent / "web"
 MAX_SBOM_BYTES = 50 * 1024 * 1024
+MAX_TELEMETRY_BYTES = 1024 * 1024
 
 api = FastAPI(title="PandaX CRA Compliance Engine", docs_url="/api/docs")
 
@@ -37,6 +39,11 @@ api = FastAPI(title="PandaX CRA Compliance Engine", docs_url="/api/docs")
 def _case_store() -> CaseStore:
     data_dir = Path(os.environ.get("PANDAX_DATA_DIR", OUT_DIR / ".pandax"))
     return CaseStore(data_dir / "cases.sqlite3")
+
+
+def _monitor_store() -> MonitoringStore:
+    data_dir = Path(os.environ.get("PANDAX_DATA_DIR", OUT_DIR / ".pandax"))
+    return MonitoringStore(data_dir / "monitoring.sqlite3")
 
 
 def _run_json(run_id: str, name: str, default: Any) -> Any:
@@ -108,6 +115,7 @@ class Job:
         artifact: Path | str,
         input_type: str = "artifact",
         cleanup_dir: Path | None = None,
+        telemetry_path: Path | None = None,
     ) -> None:
         from . import pipeline
 
@@ -116,7 +124,9 @@ class Job:
         def worker() -> None:
             try:
                 if input_type == "sbom":
-                    stream = pipeline.run_sbom(Path(artifact))
+                    stream = pipeline.run_sbom(
+                        Path(artifact), telemetry_path=telemetry_path
+                    )
                 else:
                     from .scenarios import download, run_scenario
 
@@ -129,9 +139,14 @@ class Job:
                                 "RUN", "Downloading / verifying official release"
                             ).as_dict()
                         )
-                        stream = pipeline.run(download(value.removeprefix("release:")))
+                        stream = pipeline.run(
+                            download(value.removeprefix("release:")),
+                            telemetry_path=telemetry_path,
+                        )
                     else:
-                        stream = pipeline.run(Path(artifact))
+                        stream = pipeline.run(
+                            Path(artifact), telemetry_path=telemetry_path
+                        )
                 for event in stream:
                     payload = event.as_dict()
                     if "run_dir" in event.data:
@@ -217,16 +232,42 @@ def start_scan(body: dict[str, str]) -> dict[str, Any]:
         artifact = Path(value)
         if not value or not artifact.exists():
             raise HTTPException(400, f'artifact not found: {value}')
+    telemetry_path = None
+    telemetry_value = str(body.get("telemetry", "")).strip()
+    if telemetry_value:
+        telemetry_path = Path(telemetry_value)
+        try:
+            from .telemetry import summary as telemetry_summary
+
+            telemetry_summary(telemetry_path)
+        except (OSError, ValueError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        if value.startswith("scenario:"):
+            raise HTTPException(
+                400,
+                "one telemetry file cannot be attached to a two-release comparison; "
+                "scan the matching release directly",
+            )
     with SCAN_LOCK:
         if CURRENT is not None and not CURRENT.finished:
             raise HTTPException(409, 'a scan is already running')
         CURRENT = Job()
-        CURRENT.start(artifact)
-    return {'started': True, 'artifact': str(artifact)}
+        if telemetry_path is None:
+            CURRENT.start(artifact)
+        else:
+            CURRENT.start(artifact, telemetry_path=telemetry_path)
+    return {
+        'started': True,
+        'artifact': str(artifact),
+        'telemetry_attached': telemetry_path is not None,
+    }
 
 
 @api.post("/api/scan/sbom")
-async def start_sbom_scan(file: UploadFile = File(...)) -> dict[str, Any]:
+async def start_sbom_scan(
+    file: UploadFile = File(...),
+    telemetry: UploadFile | None = File(None),
+) -> dict[str, Any]:
     """Validate and start a run from an uploaded CycloneDX or SPDX JSON SBOM."""
     global CURRENT
     with SCAN_LOCK:
@@ -237,6 +278,7 @@ async def start_sbom_scan(file: UploadFile = File(...)) -> dict[str, Any]:
     filename = Path(file.filename or "uploaded-sbom.json").name
     filename = re.sub(r"[^A-Za-z0-9._-]", "_", filename) or "uploaded-sbom.json"
     target = upload_dir / filename
+    telemetry_target: Path | None = None
     size = 0
     started = False
     try:
@@ -254,18 +296,47 @@ async def start_sbom_scan(file: UploadFile = File(...)) -> dict[str, Any]:
         except SbomError as exc:
             raise HTTPException(400, str(exc)) from exc
 
+        if telemetry is not None:
+            telemetry_target = upload_dir / "runtime-telemetry.json"
+            telemetry_size = 0
+            with open(telemetry_target, "wb") as out:
+                while chunk := await telemetry.read(256 * 1024):
+                    telemetry_size += len(chunk)
+                    if telemetry_size > MAX_TELEMETRY_BYTES:
+                        raise HTTPException(
+                            413, "telemetry upload exceeds the 1 MiB limit"
+                        )
+                    out.write(chunk)
+            try:
+                from .telemetry import summary as telemetry_summary
+
+                telemetry_summary(telemetry_target)
+            except (OSError, ValueError) as exc:
+                raise HTTPException(400, str(exc)) from exc
+
         with SCAN_LOCK:
             # A product scan may have started while this file was uploading and
             # being validated, so claim the single-run slot atomically here.
             if CURRENT is not None and not CURRENT.finished:
                 raise HTTPException(409, "a scan is already running")
             CURRENT = Job()
-            CURRENT.start(target, input_type="sbom", cleanup_dir=upload_dir)
+            if telemetry_target is None:
+                CURRENT.start(
+                    target, input_type="sbom", cleanup_dir=upload_dir
+                )
+            else:
+                CURRENT.start(
+                    target,
+                    input_type="sbom",
+                    cleanup_dir=upload_dir,
+                    telemetry_path=telemetry_target,
+                )
         started = True
         return {
             "started": True,
             "source_type": "sbom",
             "filename": filename,
+            "telemetry_attached": telemetry_target is not None,
             **info,
         }
     except Exception:
@@ -274,6 +345,19 @@ async def start_sbom_scan(file: UploadFile = File(...)) -> dict[str, Any]:
         raise
     finally:
         await file.close()
+        if telemetry is not None:
+            await telemetry.close()
+
+
+@api.post("/api/telemetry/validate")
+def validate_telemetry(body: dict[str, str]) -> dict[str, Any]:
+    """Validate a local telemetry summary without exposing its device rows."""
+    try:
+        from .telemetry import summary as telemetry_summary
+
+        return telemetry_summary(Path(str(body.get("path", ""))))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @api.get("/api/job")
@@ -288,6 +372,46 @@ def job_status() -> dict[str, Any]:
         "events": len(CURRENT.history),
         "input_type": CURRENT.input_type,
     }
+
+
+@api.get("/api/monitoring/policies")
+def monitoring_policies() -> list[dict[str, Any]]:
+    return _monitor_store().list_policies()
+
+
+@api.post("/api/monitoring/policies")
+def create_monitoring_policy(body: dict[str, Any]) -> dict[str, Any]:
+    try:
+        source = str(body.get("source", "")).strip()
+        if not source:
+            raise MonitoringError("monitoring source is required")
+        return _monitor_store().add_policy(
+            str(body.get("name", "")),
+            Path(source),
+            str(body.get("source_type", "artifact")),
+            int(body.get("interval_minutes", 360)),
+            Path(str(body["telemetry"])) if body.get("telemetry") else None,
+        )
+    except (MonitoringError, TypeError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@api.post("/api/monitoring/policies/{policy_id}/run")
+def run_monitoring_policy(policy_id: str) -> dict[str, Any]:
+    try:
+        return _monitor_store().run_policy(policy_id)
+    except MonitoringError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@api.post("/api/monitoring/run-due")
+def run_due_monitoring() -> list[dict[str, Any]]:
+    return _monitor_store().run_due()
+
+
+@api.get("/api/monitoring/alerts")
+def monitoring_alerts(policy_id: str | None = None) -> list[dict[str, Any]]:
+    return _monitor_store().list_alerts(policy_id)
 
 
 @api.get("/api/events")

@@ -1,0 +1,22 @@
+{
+  "schema": "pandax/runtime-telemetry/v1",
+  "product": {
+    "name": "SmartHub SH-100",
+    "version": "2.3.1",
+    "unique_id": "PDX-SH100-EU"
+  },
+  "approval": {
+    "operator": "Authorized company security reviewer",
+    "approved_at": "2026-09-11T08:00:00Z",
+    "authority_attestation": true
+  },
+  "observations": [
+    {
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+      "signal": "component_executed",
+      "observed_at": "2026-09-11T07:30:00Z",
+      "device_ref_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_ref": "collector-batch/2026-09-11-01"
+    }
+  ]
+}

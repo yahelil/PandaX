@@ -99,6 +99,13 @@ def build_vex(ctx: RunContext) -> dict:
                 if finding.kev
                 else ""
             )
+            telemetry_detail = (
+                f" Approved runtime evidence contains {len(finding.runtime_evidence)} "
+                "observation(s), but PandaX has not converted those observations into "
+                "a reachability or reporting decision."
+                if finding.runtime_evidence
+                else ""
+            )
             analysis = {
                 "state": "in_triage",
                 "detail": (
@@ -106,7 +113,9 @@ def build_vex(ctx: RunContext) -> dict:
                     + "The component is recorded as "
                     + f"{finding.affectedness or 'unknown'} and product reachability is "
                     + f"{finding.reachability or 'unknown'}. No not_affected "
-                    "determination is asserted. Requires manufacturer review."
+                    "determination is asserted."
+                    + telemetry_detail
+                    + " Requires manufacturer review."
                 ),
             }
 
@@ -126,6 +135,10 @@ def build_vex(ctx: RunContext) -> dict:
                 {"name": "pandax:kev-signal", "value": str(finding.kev).lower()},
                 {"name": "pandax:kev-check-status", "value": finding.kev_check_status},
                 {"name": "pandax:reachability", "value": finding.reachability},
+                {
+                    "name": "pandax:runtime-evidence-status",
+                    "value": finding.runtime_evidence_status,
+                },
             ],
         }
         if finding.applicability:
@@ -319,7 +332,12 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
         stage="S4_TRIAGE",
         tool="cisa-kev+epss",
         tool_version=ctx.tool_versions["cisa_kev"],
-        inputs=[ctx.ledger.ref(ctx.path("findings.matched.json"))],
+        inputs=[ctx.ledger.ref(ctx.path("findings.matched.json"))]
+        + (
+            [ctx.ledger.ref(ctx.telemetry_assessments_path)]
+            if ctx.telemetry_assessments_path is not None
+            else []
+        ),
         outputs=[
             ctx.ledger.ref(vex_path),
             ctx.ledger.ref(findings_path),

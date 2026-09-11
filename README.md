@@ -269,6 +269,48 @@ Use `pandax verify RUN --trusted-key KEY.pem` for a one-off trusted check, or
 that its signer is trusted. See [trusted verification](docs/trusted-verification.md)
 for provisioning and status meanings.
 
+### Continuous monitoring
+
+Register an artifact or SBOM once, then let PandaX recheck it on a saved schedule:
+
+```powershell
+uv run pandax monitor add "Product release" .\product.zip --every-minutes 360
+uv run pandax monitor watch
+```
+
+`pandax monitor list` shows source freshness and the next check. `pandax monitor
+alerts` reports new, changed, reappearing, and no-longer-detected findings plus
+source failures and recoveries. Repeated identical results do not create new
+alerts. If a required source cannot be checked, PandaX records monitoring as
+incomplete and does not treat missing results as resolved vulnerabilities.
+
+### Approved runtime evidence
+
+A software file or SBOM shows which components are included, but it cannot show
+whether a component is actually loaded, used, enabled, or exposed on a real
+device. PandaX can now attach a small approved telemetry summary to a scan:
+
+```powershell
+uv run pandax telemetry validate .\runtime-telemetry.json
+uv run pandax scan .\product.zip --telemetry .\runtime-telemetry.json
+uv run pandax monitor add "Product release" .\product.zip --telemetry .\runtime-telemetry.json
+```
+
+Start with [the example telemetry file](docs/runtime-telemetry-example.json).
+The JSON uses schema `pandax/runtime-telemetry/v1`. It names the exact product
+and version, records the authorized company reviewer and approval time, and
+contains component PURLs with one of these signals: `component_loaded`,
+`component_executed`, `network_exposed`, `feature_enabled`, or `not_observed`.
+An optional device reference must already be converted to a SHA-256 value.
+Hostnames, IP addresses, serial numbers, environment variables, command lines,
+and raw logs are rejected. The original source is represented by its digest;
+only the checked, minimal form is placed in the signed evidence bundle.
+
+Runtime signals remain **evidence for company review**. They do not automatically
+declare a component reachable, make a vulnerability reportable, or start a CRA
+deadline. `telemetry-assessments.json` clearly marks matched and unmatched
+observations and every decision that still needs a person.
+
 Vulnerability results keep [coverage, affectedness, KEV signals and product
 reachability](docs/vulnerability-coverage.md) separate. A completed source with
 no result is shown as “no finding in checked sources,” never as proof that the

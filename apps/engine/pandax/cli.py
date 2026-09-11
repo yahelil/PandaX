@@ -49,6 +49,10 @@ app = typer.Typer(
 )
 from .case_cli import app as case_app
 app.add_typer(case_app, name="case")
+from .monitor_cli import app as monitor_app
+app.add_typer(monitor_app, name="monitor")
+from .telemetry_cli import app as telemetry_app
+app.add_typer(telemetry_app, name="telemetry")
 key_app = typer.Typer(add_completion=False, help="Manage the installation signing identity.")
 app.add_typer(key_app, name="key")
 
@@ -156,13 +160,25 @@ def scan(
     out: Optional[Path] = typer.Option(None, "--out", help="Output base directory"),
     offline: bool = typer.Option(False, "--offline", help="Use cached feeds only"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress per-file detail"),
+    telemetry: Optional[Path] = typer.Option(
+        None,
+        "--telemetry",
+        help="Approved, privacy-minimised runtime evidence JSON",
+    ),
 ) -> None:
     """Run the full pipeline: ingest, SBOM, match, triage, Article 14, dossier."""
     from . import pipeline
 
+    stream = (
+        pipeline.run(
+            artifact, out_base=out, offline=offline, telemetry_path=telemetry
+        )
+        if telemetry is not None
+        else pipeline.run(artifact, out_base=out, offline=offline)
+    )
     _render_pipeline(
         artifact,
-        pipeline.run(artifact, out_base=out, offline=offline),
+        stream,
         quiet,
     )
 
@@ -173,13 +189,25 @@ def scan_sbom(
     out: Optional[Path] = typer.Option(None, "--out", help="Output base directory"),
     offline: bool = typer.Option(False, "--offline", help="Use cached feeds only"),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Suppress per-file detail"),
+    telemetry: Optional[Path] = typer.Option(
+        None,
+        "--telemetry",
+        help="Approved, privacy-minimised runtime evidence JSON",
+    ),
 ) -> None:
     """Run from an existing JSON SBOM, skipping artifact ingest and Syft."""
     from . import pipeline
 
+    stream = (
+        pipeline.run_sbom(
+            sbom_file, out_base=out, offline=offline, telemetry_path=telemetry
+        )
+        if telemetry is not None
+        else pipeline.run_sbom(sbom_file, out_base=out, offline=offline)
+    )
     _render_pipeline(
         sbom_file,
-        pipeline.run_sbom(sbom_file, out_base=out, offline=offline),
+        stream,
         quiet,
         input_label="SBOM",
         subtitle="format is detected automatically; input is preserved in the sealed bundle",

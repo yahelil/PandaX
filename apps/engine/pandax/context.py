@@ -55,6 +55,10 @@ class Finding:
     affectedness_evidence: str = ""
     reachability: str = "unknown"
     reachability_evidence: str = ""
+    # Approved runtime observations support a human review. They deliberately
+    # do not change reachability or legal reportability by themselves.
+    runtime_evidence_status: str = "not_supplied"
+    runtime_evidence: list[dict[str, Any]] = field(default_factory=list)
     query_source: str = ""
     query_value: str = ""
     source_retrieved_at: str = ""
@@ -87,6 +91,8 @@ class RunContext:
     started: str = ""
     native_inventory: dict[str, Any] = field(default_factory=dict)
     vulnerability_coverage: list[dict[str, Any]] = field(default_factory=list)
+    runtime_telemetry_path: Path | None = None
+    telemetry_assessments_path: Path | None = None
 
     # A run can begin from a product artifact or from a pre-built SBOM.  These
     # fields make that provenance available to the dossier and both renderers.

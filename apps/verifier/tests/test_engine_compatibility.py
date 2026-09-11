@@ -129,7 +129,10 @@ def test_cli_runs_when_product_package_is_not_importable(tmp_path):
     )
 
     completed = subprocess.run(
-        [sys.executable, "-c", script],
+        # -S prevents this subprocess from processing the project environment's
+        # editable .pth file. Only the verifier and cryptography paths supplied
+        # above remain available, which is the isolation this test promises.
+        [sys.executable, "-S", "-c", script],
         cwd=tmp_path,
         env=environment,
         capture_output=True,

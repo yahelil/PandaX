@@ -54,6 +54,8 @@ pnpm-debug.log*
 # Local development and manual verification workspaces
 .local-test/
 .uv-plan-cache/
+.codex-build/
+.codex-finalizer/
 tmp/
 
 # PandaX POC

@@ -721,6 +721,7 @@ const REPORT_META = [
   ["release-checks.json", "Release checks", "Expected and observed outcomes, with missing detections shown as failures."],
   ["native-inventory.json", "Native component evidence", "Package revisions, source-header evidence and declared dependencies."],
   ["native-assessments.json", "Vendor advisory determinations", "Affected, fixed, unknown and variant exclusions. Bounded coverage for the requested native CVEs."],
+  ["native-advisory-sources.json", "Native advisory source catalogue", "Versioned curl and OpenSSL advisory ranges, retrieval records, source precedence and retained conflicts."],
   ["coverage.json", "Vulnerability source coverage", "Per-component checks, exact queries, source addresses, completion states and bounded native-advisory determinations."],
   ["triage-coverage.json", "KEV and EPSS source checks", "Records whether the exploitation catalogue and prioritisation source were checked successfully."],
   ["release-source.json", "Official package provenance", "Source URL, release type and pinned SHA-256 digest."],

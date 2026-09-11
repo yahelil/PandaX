@@ -272,7 +272,9 @@ for provisioning and status meanings.
 Vulnerability results keep [coverage, affectedness, KEV signals and product
 reachability](docs/vulnerability-coverage.md) separate. A completed source with
 no result is shown as “no finding in checked sources,” never as proof that the
-product is clean.
+product is clean. The [native advisory coverage](docs/native-advisory-coverage.md)
+page lists the exact curl and OpenSSL release boundaries that are currently
+reviewed, explains source priority, and identifies what remains unknown.
 
 Evidence recipients can instead install the independent offline verifier from
 [`apps/verifier`](apps/verifier/README.md). It accepts a folder or ZIP and does

@@ -161,6 +161,13 @@ def run(ctx: RunContext) -> ev.Stream:
             links: list = []
             work.mkdir(parents=True, exist_ok=True)
             count, total = _extract_tar(local_input, work, links)
+            release = {
+                **release,
+                'status': 'verified',
+                'method': 'sha256',
+                'project': release.get('project', 'unknown'),
+                'verified_at': ev.now_iso(),
+            }
             ctx.path("archive-links.json").write_text(json.dumps(links, indent=2), encoding="utf-8")
             ctx.path("release-source.json").write_text(json.dumps(release, indent=2), encoding="utf-8")
             yield ev.log(STAGE, f"verified official {release['kind']}; {len(links)} links recorded, not created")

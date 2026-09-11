@@ -22,6 +22,7 @@ import shutil
 from pathlib import Path
 
 from .. import events as ev
+from .. import pdfa
 from ..context import RunContext
 from ..evidence import sha256_file
 
@@ -538,6 +539,9 @@ def run(ctx: RunContext) -> ev.Stream:
 
     # Templates are copied beside the data so Typst's root confinement is trivial.
     outputs = [data_path]
+    reports = ctx.path("pdf-validation")
+    reports.mkdir(parents=True, exist_ok=True)
+    failures = []
     for template, pdf_name, label in (
         ("annex_vii.typ", "AnnexVII_Technical_Documentation.pdf", "Annex VII"),
         ("annex_v_doc.typ", "EU_Declaration_of_Conformity.pdf", "Annex V DoC"),
@@ -552,12 +556,21 @@ def run(ctx: RunContext) -> ev.Stream:
         src = TEMPLATES / template
         local = ctx.run_dir / template
         shutil.copy2(src, local)
+        outputs.append(local)
         pdf_path = ctx.path(pdf_name)
         error = _compile(local, pdf_path, ctx.run_dir)
         if error:
+            (reports / f"{pdf_path.stem}.compile.txt").write_text(error, encoding="utf-8")
+            failures.append(f"{label}: compilation failed")
             yield ev.log(STAGE, f"{label} PDF failed: {error.splitlines()[0]}", ev.WARN)
             continue
-        outputs.extend([local, pdf_path])
+        outputs.append(pdf_path)
+        result = pdfa.validate_pdf(pdf_path, reports)
+        if not result["compliant"]:
+            failures.append(f"{label}: {result['error']}")
+            yield ev.log(STAGE, f"{label} PDF/A-2b validation failed: {result['error']}", ev.WARN)
+            continue
+        ctx.tool_versions["verapdf"] = result["validator_version"]
         size = pdf_path.stat().st_size
         yield ev.artifact(
             STAGE,
@@ -567,6 +580,7 @@ def run(ctx: RunContext) -> ev.Stream:
         )
 
     ctx.tool_versions["typst"] = _typst_version()
+    outputs.extend(sorted(reports.iterdir()))
 
     ctx.ledger.append(
         stage="S6_DOSSIER",
@@ -577,8 +591,13 @@ def run(ctx: RunContext) -> ev.Stream:
             ctx.ledger.ref(ctx.sbom_path) if ctx.sbom_path else ctx.ledger.ref(data_path),
         ],
         outputs=[ctx.ledger.ref(p) for p in outputs],
-        params={"pdf_standard": "a-2b", "annexes": ["VII", "V"]},
+        params={"pdf_standard": "a-2b", "annexes": ["VII", "V", "VI"],
+                "validator": "verapdf", "validator_version": pdfa.VERSION,
+                "validation_passed": not failures},
     )
+    if failures:
+        raise RuntimeError("Dossier not sealed: " + "; ".join(failures)
+                           + f". Diagnostics: {reports}")
     yield ev.done(STAGE, "technical dossier and declaration generated")
 
 

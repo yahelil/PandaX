@@ -90,24 +90,31 @@ def test_ingestion_preserves_contract_inventory_and_provenance(tmp_path, ctx, mo
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows sharing locks")
 @pytest.mark.parametrize("persistent", [False, True])
-def test_windows_publish_retries_are_bounded(tmp_path, monkeypatch, persistent):
+@pytest.mark.parametrize("operation", ["replace", "rmdir"])
+def test_windows_publish_retries_are_bounded(tmp_path, monkeypatch, persistent, operation):
     fake_docker(monkeypatch)
     src = tmp_path / "firmware.bin"
     src.write_bytes(b"hsqs")
-    original = Path.replace
+    dest = tmp_path / "extracted"
+    if operation == "rmdir":
+        dest.mkdir()
+    original = getattr(Path, operation)
     attempts = []
-    def replace(path, target):
+    def locked(path, *args):
+        if operation == "rmdir" and path != dest:
+            return original(path, *args)
         attempts.append(path)
         if persistent or len(attempts) == 1:
             raise PermissionError("file temporarily locked")
-        return original(path, target)
-    monkeypatch.setattr(Path, "replace", replace)
+        return original(path, *args)
+    monkeypatch.setattr(Path, operation, locked)
     monkeypatch.setattr(fw.time, "sleep", lambda _: None)
     if persistent:
         with pytest.raises(fw.FirmwareError, match="locked"):
             fw.extract(src, tmp_path / "extracted")
         assert len(attempts) == 6
-        assert not (tmp_path / "extracted").exists()
+        assert not list(dest.rglob("*"))
+        assert json.loads((tmp_path / fw.REPORT).read_text())["status"] == "failed"
     else:
         assert fw.extract(src, tmp_path / "extracted")[0] == 2
         assert len(attempts) == 2

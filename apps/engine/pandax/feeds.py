@@ -4,7 +4,7 @@ Three feeds, each chosen for a distinct job and each verified reachable
 without an API key:
 
   OSV.dev   deterministic PURL -> vulnerability matching, batched
-  CISA KEV  "actively exploited" - the fact that starts the Article 14 clock
+  CISA KEV  a strong active-exploitation signal for manufacturer review
   EPSS      probability of exploitation in the next 30 days, for ranking
 
 NVD was dropped: it needs an API key, is rate-limited, and OSV already
@@ -29,6 +29,7 @@ KEV_URL = (
 EPSS_URL = "https://api.first.org/data/v1/epss"
 
 OSV_BATCH_SIZE = 100
+OSV_DETAIL_MAX_AGE_SECONDS = 6 * 3600
 KEV_MAX_AGE_SECONDS = 6 * 3600
 TIMEOUT = httpx.Timeout(60.0, connect=20.0)
 
@@ -90,9 +91,13 @@ class Feeds:
         return result
 
     def vuln_detail(self, osv_id: str) -> dict[str, Any]:
-        """Fetch one OSV advisory, cached on disk by id."""
+        """Fetch one OSV advisory, refreshing stale online cache entries."""
         cached = self.vuln_cache / f"{osv_id}.json"
-        if cached.exists():
+        fresh = (
+            cached.exists()
+            and (time.time() - cached.stat().st_mtime) < OSV_DETAIL_MAX_AGE_SECONDS
+        )
+        if cached.exists() and (self.offline or fresh):
             return json.loads(cached.read_text(encoding="utf-8"))
         if self.offline:
             raise FeedError(f"{osv_id} not cached and feeds are offline")
@@ -120,8 +125,9 @@ class Feeds:
                 resp.raise_for_status()
                 cached.write_text(json.dumps(resp.json()), encoding="utf-8")
             except httpx.HTTPError as exc:
-                if not cached.exists():
-                    raise FeedError(f"CISA KEV fetch failed: {exc}") from exc
+                # A stale cache is useful only in explicit offline mode.  An
+                # online refresh failure must be visible as incomplete coverage.
+                raise FeedError(f"CISA KEV fetch failed: {exc}") from exc
         if not cached.exists():
             raise FeedError("CISA KEV feed unavailable and not cached")
         data = json.loads(cached.read_text(encoding="utf-8"))

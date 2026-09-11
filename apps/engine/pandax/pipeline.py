@@ -25,6 +25,7 @@ from .context import (
 from .evidence import Ledger, load_or_create_key, sha256_file, write_manifest
 from .feeds import Feeds
 from .stages import clock, dossier, ingest, match, sbom, triage
+from . import telemetry
 
 STAGE_SEAL = "SEAL"
 
@@ -51,6 +52,7 @@ def run(
     out_base: Path | None = None,
     clock_speed: float = 1.0,
     offline: bool = False,
+    telemetry_path: Path | None = None,
 ) -> ev.Stream:
     """Run from a product artifact, including ingest and SBOM synthesis."""
     yield from _run(
@@ -59,6 +61,7 @@ def run(
         out_base=out_base,
         clock_speed=clock_speed,
         offline=offline,
+        telemetry_path=telemetry_path,
     )
 
 
@@ -67,6 +70,7 @@ def run_sbom(
     out_base: Path | None = None,
     clock_speed: float = 1.0,
     offline: bool = False,
+    telemetry_path: Path | None = None,
 ) -> ev.Stream:
     """Run from a supplied JSON SBOM, skipping artifact ingest and Syft."""
     yield from _run(
@@ -75,6 +79,7 @@ def run_sbom(
         out_base=out_base,
         clock_speed=clock_speed,
         offline=offline,
+        telemetry_path=telemetry_path,
     )
 
 
@@ -84,6 +89,7 @@ def _run(
     out_base: Path | None,
     clock_speed: float,
     offline: bool,
+    telemetry_path: Path | None,
 ) -> ev.Stream:
     artifact = Path(artifact).resolve()
     if not artifact.exists():
@@ -156,6 +162,8 @@ def _run(
             )
 
         yield from match.run(ctx, feeds)
+        if telemetry_path is not None:
+            yield from telemetry.apply(ctx, telemetry_path)
         yield from triage.run(ctx, feeds)
         source_path = ctx.path("release-source.json")
         if source_path.exists():

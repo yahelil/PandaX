@@ -389,9 +389,17 @@ function manualSection() {
 
 function doesSection() {
   const d = C.does;
-  const points = d.points.map((p) => `<li>${esc(p)}</li>`).join("\n        ");
-  return `<section class="sec sec-dark" id="does">
+  const points = d.points.map((x) => `<li>${esc(x)}</li>`).join("\n        ");
+  return `<section class="sec sec-dark sec-product" id="does">
   <div class="wrap">
+    <div class="pname">
+      <img class="pname-mark" src="assets/artis-mark-light.png" alt="" width="84" height="84">
+      <div>
+        <span class="pname-eyebrow">${esc(d.eyebrow)}</span>
+        <span class="pname-word">${esc(d.name)}</span>
+      </div>
+    </div>
+
     <h2>${esc(d.heading)}</h2>
     <p class="lede lede-dark">${esc(d.lede)}</p>
 
@@ -403,8 +411,7 @@ function doesSection() {
         <span class="fl-src" data-i="3">Documents</span>
         <span class="fl-src" data-i="4">Legal</span>
       </div>
-      <div class="flow-wires"><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="flow-core">${esc(C.meta.brand)}</div>
+      <div class="flow-core">${esc(d.name)}</div>
       <div class="flow-out">
         <span class="fl-doc" data-i="0">Record</span>
         <span class="fl-doc" data-i="1">Documents</span>
@@ -416,6 +423,7 @@ function doesSection() {
         ${points}
     </ul>
     <p class="closer closer-dark">${esc(d.closing)}</p>
+    <div class="acts"><a class="btn btn-light" href="${d.action.href}">${esc(d.action.label)}</a></div>
   </div>
 </section>`;
 }

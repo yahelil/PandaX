@@ -56,7 +56,7 @@ export const boot = {
 export const hero = {
   headline: "Every release. Evidence ready.",
   subhead: "Product security evidence for the EU Cyber Resilience Act.",
-  body: "A release goes in. A reviewable record comes out.",
+  body: "Artis takes a release in. A reviewable record comes out.",
   primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
   secondary: { label: "See Artis", href: "/artis/" },
   /** Shown on the laptop screen. An example, labelled as one on the page. */
@@ -85,7 +85,7 @@ export const hero = {
 
 /** The engine, written the way it runs. Types itself out once, when reached. */
 export const pipeline = {
-  heading: "What runs",
+  heading: "Artis, running",
   lines: [
     { cmd: "ingest",  arg: "release-4.2.1",        out: "412 components" },
     { cmd: "match",   arg: "osv · kev · epss",     out: "7 findings" },
@@ -167,7 +167,9 @@ export const manual = {
 /* 6 --------------------------------------------------------------- does --- */
 
 export const does = {
-  heading: "PandaX makes every release evidence ready",
+  eyebrow: "Our product",
+  name: "Artis",
+  heading: "Every release, evidence ready",
   lede: "Connect the evidence. Generate the documents. Submit with approval.",
   points: [
     "Connects Jira, CI/CD, SBOM and documents to each release.",
@@ -175,6 +177,7 @@ export const does = {
     "Submits only after your approval, with a time-stamped trail.",
   ],
   closing: "Nothing is submitted without your authorization.",
+  action: { label: "See what Artis produces", href: "/artis/" },
 };
 
 /* 7 ------------------------------------------------------------- source --- */
@@ -283,7 +286,7 @@ export const contact = {
     message: "What do you build?",
     submit: "Send",
   },
-  fallbackAddress: "hello@pandax.online", // TODO(legal): confirm the real address
+  fallbackAddress: "contact@pandax.online",
 };
 
 export const footer = {

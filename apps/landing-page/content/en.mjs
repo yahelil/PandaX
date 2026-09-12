@@ -33,13 +33,8 @@ export const nav = {
       blurb: "Turns a release into a reviewable record",
     },
   ],
-  links: [
-    { label: "The obligation", href: "#obligation" },
-    { label: "What PandaX does", href: "#does" },
-    { label: "Source code", href: "#source" },
-    { label: "For labs", href: "#labs" },
-    { label: "Questions", href: "#faq" },
-  ],
+  links: [],
+
   action: { label: "Book a walkthrough", href: "#contact" },
 };
 

@@ -96,10 +96,10 @@ function header(depth) {
       <img src="${r}assets/favicon-512.png" alt="" width="26" height="26">
       <span>${esc(C.meta.brand)}</span>
     </a>
-    ${productsMenu(depth)}
     <nav class="head-nav" aria-label="Sections">
         ${links}
     </nav>
+    ${productsMenu(depth)}
     <a class="btn btn-sm" href="${depth ? `${r}index.html#contact` : C.nav.action.href}">${esc(C.nav.action.label)}</a>
   </div>
 </header>`;

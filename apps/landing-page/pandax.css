@@ -135,7 +135,7 @@ a { color: inherit; }
 /* ------------------------------------------------------------ header ---- */
 
 .head {
-  position: sticky; top: 0; z-index: 40;
+  position: sticky; top: 0; z-index: 100;
   background: rgba(242,242,240,0.86);
   backdrop-filter: saturate(1.4) blur(14px);
   border-bottom: 1px solid var(--line);
@@ -155,7 +155,6 @@ a { color: inherit; }
 
 .head-nav {
   display: flex; gap: 24px;
-  margin-left: auto;
   font-size: 14.5px;
 }
 .head-nav a {
@@ -170,7 +169,14 @@ a { color: inherit; }
 
 /* ------------------------------------------------------ products menu --- */
 
-.menu { position: relative; }
+.menu {
+  position: relative;
+  margin-left: auto;
+  /* The panel sits 10px below the button. Without this, moving the pointer
+     across that gap leaves .menu and the panel closes before it is reached. */
+  padding-bottom: 12px;
+  margin-bottom: -12px;
+}
 
 .menu-btn {
   display: inline-flex; align-items: center; gap: 7px;
@@ -193,7 +199,7 @@ a { color: inherit; }
 .menu-btn[aria-expanded="true"] .menu-chev { transform: rotate(225deg) translate(-2px, -2px); }
 
 .menu-panel {
-  position: absolute; top: calc(100% + 10px); left: -12px;
+  position: absolute; top: calc(100% - 2px); right: -8px; left: auto;
   min-width: 310px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1144,7 +1150,6 @@ a { color: inherit; }
   /* The brand, the products menu and a CTA do not fit on one line here. The
      CTA repeats immediately below in the hero, so it is the one that goes. */
   .head .btn-sm { display: none; }
-  .menu { margin-left: auto; }
   .lede { font-size: 19px; }
   .form .row { grid-template-columns: 1fr; }
   .foot-tag { border-left: 0; padding-left: 0; margin-left: 0; }
@@ -1205,12 +1210,20 @@ a { color: inherit; }
 /* ============ BOOT / laptop intro ============ */
 .boot {
   position: relative;
+  pointer-events: none;
   height: 100vh;
   background:
     radial-gradient(ellipse 90% 70% at 30% 25%, #11091f 0%, #0a0716 35%, #04030c 70%, #010104 100%);
   overflow: hidden;
   z-index: 90;
 }
+/* ScrollTrigger wraps a pinned element in its own spacer. That wrapper sits
+   outside .boot, inherits z-index 90, and kept taking pointer events after the
+   intro faded — so an invisible box covered the header and swallowed every
+   click on it. The intro has nothing interactive in it; neither takes a
+   pointer. The boot is the only pinned element on this site. */
+.boot, .pin-spacer { pointer-events: none; }
+
 .boot-stick {
   position: absolute;
   inset: 0;
@@ -1479,7 +1492,13 @@ body.has-boot .hero { margin-top: -100vh; }
 /* Small screens: a shorter overture, and the pull below it matched to it. */
 @media (max-width: 760px) {
   .boot { height: 64vh; min-height: 0; }
-  .boot-stick { padding-top: 3vh; perspective-origin: 50% 40%; }
+  /* ScrollTrigger wraps a pinned element in its own spacer. That wrapper sits
+   outside .boot, inherits z-index 90, and kept taking pointer events after the
+   intro faded — so an invisible box covered the header and swallowed every
+   click on it. The intro has nothing interactive in it; neither takes a
+   pointer. The boot is the only pinned element on this site. */
+
+.boot-stick { padding-top: 3vh; perspective-origin: 50% 40%; }
   .boot-meta { top: 18px; left: 18px; right: 18px; font-size: 9px; }
   .boot-hint { bottom: 18px; font-size: 9px; letter-spacing: 0.2em; }
   .lp-img { height: 60%; }
@@ -1499,10 +1518,8 @@ body.has-boot .hero { margin-top: -100vh; }
   .lp-img, .swm { opacity: 1; }
 }
 
-/* The header belongs to the page, not to the overture. */
-body.has-boot:not(.entered) .head {
-  position: fixed; top: 0; left: 0; right: 0;
-  opacity: 0; pointer-events: none;
-}
-body.has-boot .head { transition: opacity .4s; }
-body.entered .head, body:not(.has-boot) .head { opacity: 1; pointer-events: auto; }
+/* The header sits above the intro and stays usable through it. Hiding it was
+   tied to the intro's own progress, and when that fell out of step the whole
+   navigation became unclickable. A visible bar over the overture costs little;
+   navigation that does not respond costs a lot. */
+.head { z-index: 100; }

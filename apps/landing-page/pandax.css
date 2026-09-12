@@ -167,6 +167,67 @@ a { color: inherit; }
 }
 .head-nav a:hover { color: var(--ink); border-bottom-color: var(--bronze); }
 
+
+/* ------------------------------------------------------ products menu --- */
+
+.menu { position: relative; }
+
+.menu-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 34px; padding: 0 4px;
+  background: none; border: 0;
+  font-family: var(--text); font-size: 14.5px; color: var(--body);
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: color .16s, border-color .16s;
+}
+.menu-btn:hover, .menu:hover .menu-btn, .menu-btn[aria-expanded="true"] {
+  color: var(--ink); border-bottom-color: var(--bronze);
+}
+.menu-chev {
+  width: 6px; height: 6px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform .18s;
+}
+.menu-btn[aria-expanded="true"] .menu-chev { transform: rotate(225deg) translate(-2px, -2px); }
+
+.menu-panel {
+  position: absolute; top: calc(100% + 10px); left: -12px;
+  min-width: 310px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  box-shadow: 0 14px 34px rgba(22,24,27,0.13), 0 2px 6px rgba(22,24,27,0.06);
+  padding: 7px;
+  opacity: 0; visibility: hidden;
+  transform: translateY(-5px);
+  transition: opacity .18s, transform .18s, visibility .18s;
+  z-index: 60;
+}
+/* Pointer, keyboard and touch each open it: hover, focus-within, and the
+   button's own state for a tap. */
+.menu:hover .menu-panel,
+.menu:focus-within .menu-panel,
+.menu-btn[aria-expanded="true"] + .menu-panel {
+  opacity: 1; visibility: visible; transform: none;
+}
+
+.menu-item {
+  display: flex; align-items: center; gap: 13px;
+  padding: 11px 12px; border-radius: 4px;
+  text-decoration: none;
+  transition: background .14s;
+}
+.menu-item:hover { background: var(--bg); }
+.menu-item img { display: block; flex: 0 0 auto; }
+.menu-item strong {
+  display: block;
+  font-family: var(--disp); font-weight: 620; font-size: 16.5px;
+  letter-spacing: -0.018em; color: var(--ink);
+}
+.menu-item small { display: block; font-size: 13.5px; color: var(--body); margin-top: 1px; }
+
 /* ----------------------------------------------------------- buttons ---- */
 
 .btn {
@@ -789,11 +850,25 @@ a { color: inherit; }
   color: var(--d-body); margin-bottom: 2px;
 }
 .pname-word {
-  display: block;
+  display: block; margin: 0;
   font-family: var(--disp); font-weight: 700;
-  font-size: clamp(52px, 8.5vw, 108px);
+  font-size: clamp(56px, 10vw, 128px);
   letter-spacing: -0.045em; line-height: 0.92;
   color: var(--d-ink);
+}
+
+/* The product page is light: the name takes ink, not the graphite tokens. */
+.pname-lead { margin-bottom: 34px; }
+.pname-lead .pname-eyebrow { color: var(--body); margin-bottom: 8px; }
+.pname-lead .pname-word {
+  color: var(--ink);
+  display: flex; align-items: center;
+  gap: clamp(12px, 1.6vw, 22px);
+}
+/* Sized off the word, so the mark stays on its line at every width. */
+.pname-lead .pname-mark {
+  width: 0.62em; height: 0.62em;
+  margin-top: 0.06em;
 }
 
 /* On graphite the dark button disappears; invert it. */
@@ -1012,6 +1087,14 @@ a { color: inherit; }
 @media (max-width: 860px) {
   :root { --pad: 22px; }
   .head-nav { display: none; }
+  /* A hidden panel still occupies layout, so at this width an absolutely
+     positioned one pushed the page wider than the viewport. Pin it to the
+     viewport instead, where it cannot. */
+  .menu-panel {
+    position: fixed;
+    top: 58px; left: 12px; right: 12px;
+    min-width: 0; width: auto;
+  }
   .btn-sm { margin-left: auto; }
   .sec { padding: 62px 0; }
   .hero { padding-top: 52px; }
@@ -1049,7 +1132,6 @@ a { color: inherit; }
   .state { grid-template-columns: 1fr; gap: 30px; }
   .prod { gap: 18px; }
   .pname { gap: 15px; margin-bottom: 26px; }
-  .pname-mark { width: 56px; height: 56px; }
   .prod-mark { width: 64px; height: 64px; }
   .bound-gate { flex-direction: row; }
   .bound-wire { width: 24px; height: 1px; }
@@ -1059,6 +1141,10 @@ a { color: inherit; }
 
 @media (max-width: 560px) {
   body { font-size: 16px; }
+  /* The brand, the products menu and a CTA do not fit on one line here. The
+     CTA repeats immediately below in the hero, so it is the one that goes. */
+  .head .btn-sm { display: none; }
+  .menu { margin-left: auto; }
   .lede { font-size: 19px; }
   .form .row { grid-template-columns: 1fr; }
   .foot-tag { border-left: 0; padding-left: 0; margin-left: 0; }

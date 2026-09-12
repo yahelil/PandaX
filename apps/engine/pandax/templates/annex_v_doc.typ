@@ -87,8 +87,10 @@
     column-gutter: 2pt,
     align(left)[#text(weight: "bold", size: 10pt)[#n.]],
     [
-      #text(weight: "bold", size: 10pt)[#title]
-      #v(2.5pt)
+      #block(sticky: true)[
+        #text(weight: "bold", size: 10pt)[#title]
+        #v(2.5pt)
+      ]
       #if flagged [
         #text(fill: rgb("#b91c1c"), weight: "bold")[#body]
       ] else [
@@ -181,7 +183,7 @@
 #text(size: 7.4pt, fill: muted)[
   #data.retention.statement
   Supporting technical documentation: Annex VII dossier from evidence run
-  #data.run_id, SBOM digest #raw(data.summary.sbom_sha256.slice(0, 32)).
+  #data.run_id, SBOM digest #raw(data.summary.sbom_sha256.slice(0, calc.min(32, data.summary.sbom_sha256.len()))).
   Article 28(2): this declaration must be made available in the languages
   required by each Member State in which the product is placed on the market.
 ]

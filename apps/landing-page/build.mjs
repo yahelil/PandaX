@@ -235,23 +235,60 @@ function heroSection() {
 </section>`;
 }
 
+/* 1b --------------------------------------------------------- pipeline --- */
+
+function pipelineSection() {
+  const pl = C.pipeline;
+  const lines = pl.lines
+    .map((l, i) => `<li data-i="${i}">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">${esc(l.cmd)}</span>
+          <span class="t-a">${esc(l.arg)}</span>
+          <span class="t-o">${esc(l.out)}</span>
+        </li>`).join("\n        ");
+  return `<section class="sec sec-term" id="pipeline">
+  <div class="wrap">
+    <h2>${esc(pl.heading)}</h2>
+    <div class="term" id="term">
+      <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>pandax</span></div>
+      <ol class="term-lines">
+        ${lines}
+        <li class="t-caret" aria-hidden="true"><span class="t-p">&rsaquo;</span><span class="caret"></span></li>
+      </ol>
+    </div>
+    <p class="note note-dark">${esc(pl.note)}</p>
+  </div>
+</section>`;
+}
+
 /* 2 -------------------------------------------------------- obligation --- */
 
 function obligationSection() {
   const o = C.obligation;
-  const points = o.points.map((p) => `<li>${esc(p)}</li>`).join("\n        ");
+  const today = new Date().toISOString().slice(0, 10);
+  const marks = o.marks
+    .map((m) => {
+      const past = m.iso <= today;
+      const cls = m.live ? "tl-mark is-live" : past ? "tl-mark is-past" : "tl-mark";
+      return `<li class="${cls}">
+          <span class="tl-dot" aria-hidden="true"></span>
+          <time datetime="${esc(m.iso)}">${esc(m.date)}</time>
+          <span class="tl-label">${esc(m.label)}</span>
+          ${m.live ? `<span class="tl-live">${esc(o.liveLabel)}</span><span class="since" data-since="${esc(m.iso)}"></span>` : ""}
+        </li>`;
+    }).join("\n        ");
+  const points = o.points.map((x) => `<li>${esc(x)}</li>`).join("");
   return `<section class="sec" id="obligation">
   <div class="wrap">
     <h2>${esc(o.heading)}</h2>
     <p class="lede">${esc(o.lede)}</p>
-    <ul class="rule-list">
-        ${points}
-    </ul>
-    <p class="live-row">
-      <span class="live"><span class="live-dot" aria-hidden="true"></span>${esc(o.live.label)}</span>
-      <span class="live-date">${esc(o.live.date)}</span>
-      <span class="since" data-since="${esc(o.live.iso)}"></span>
-    </p>
+
+    <ol class="tl" id="tl">
+      <span class="tl-rail" aria-hidden="true"><i id="tlFill"></i></span>
+        ${marks}
+    </ol>
+
+    <ul class="rule-list">${points}</ul>
     <p class="closer">${esc(o.closing)}</p>
     <p class="src">${esc(o.source)}</p>
   </div>
@@ -304,10 +341,14 @@ function problemSection() {
   const p = C.problem;
   const lines = p.lines
     .map((l) => `<li><strong>${esc(l.lead)}</strong> ${esc(l.rest)}</li>`).join("\n        ");
+  // The same five sources that converge in section 6 — here, adrift.
+  const chips = ["Jira", "CI/CD", "SBOM", "Documents", "Legal"]
+    .map((x, i) => `<span class="chip" data-i="${i}">${esc(x)}</span>`).join("");
   return `<section class="sec" id="problem">
   <div class="wrap">
     <h2>${esc(p.heading)}</h2>
     <p class="lede">${esc(p.lede)}</p>
+    <div class="scatter" id="scatter" aria-hidden="true">${chips}</div>
     <ul class="rule-list rule-list-lead">
         ${lines}
     </ul>
@@ -378,11 +419,32 @@ function doesSection() {
 
 function sourceSection() {
   const s = C.source;
-  const points = s.points.map((p) => `<li>${esc(p)}</li>`).join("\n        ");
+  const points = s.points.map((x) => `<li>${esc(x)}</li>`).join("\n        ");
   return `<section class="sec" id="source">
   <div class="wrap">
     <h2>${esc(s.heading)}</h2>
     <p class="lede">${esc(s.lede)}</p>
+
+    <div class="bound" id="bound" aria-hidden="true">
+      <div class="bound-side">
+        <span class="bound-cap">Your environment</span>
+        <span class="bound-item">Source code</span>
+        <span class="bound-item">Build system</span>
+        <span class="bound-item">Signing keys</span>
+      </div>
+      <div class="bound-gate">
+        <span class="bound-wire"></span>
+        <span class="bound-pass">SBOM</span>
+        <span class="bound-wire"></span>
+      </div>
+      <div class="bound-side bound-side-x">
+        <span class="bound-cap">PandaX</span>
+        <span class="bound-item is-on">Inventory</span>
+        <span class="bound-item is-on">Findings</span>
+        <span class="bound-item is-on">Record</span>
+      </div>
+    </div>
+
     <ul class="rule-list">
         ${points}
     </ul>
@@ -436,17 +498,14 @@ function whoSection() {
 
 function labsSection() {
   const l = C.labs;
-  const rows = l.points
-    .map((p) => `<tr><th scope="row">${esc(p.title)}</th><td>${esc(p.body)}</td></tr>`).join("\n      ");
-  return `<section class="sec" id="labs">
+  const items = l.points
+    .map((p, i) => `<li data-i="${i}"><strong>${esc(p.title)}.</strong> ${esc(p.body)}</li>`).join("\n        ");
+  return `<section class="sec sec-rail" id="labs">
   <div class="wrap">
     <h2>${esc(l.heading)}</h2>
-    <table class="tbl">
-      <caption class="vh">Guardrails for testing, inspection and certification firms</caption>
-      <tbody>
-      ${rows}
-      </tbody>
-    </table>
+    <ul class="guards" id="guards">
+        ${items}
+    </ul>
     <p><a class="lnk" href="${l.action.href}">${esc(l.action.label)}</a></p>
   </div>
 </section>`;
@@ -533,7 +592,7 @@ const home = shell({
   ogTitle: `${C.meta.brand} — ${C.meta.tagline}`,
   description: `${C.hero.subhead} ${C.hero.body}`,
   body: [
-    bootSection(), heroSection(), obligationSection(), vectorsSection(), problemSection(),
+    bootSection(), heroSection(), pipelineSection(), obligationSection(), vectorsSection(), problemSection(),
     manualSection(), doesSection(), sourceSection(), usefulSection(),
     proofSection(), whoSection(), labsSection(), faqSection(), closingSection(),
   ].join("\n\n"),

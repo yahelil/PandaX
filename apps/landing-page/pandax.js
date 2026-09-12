@@ -194,8 +194,47 @@
     setInterval(tick, 30000);
   }
 
+  /** Reveal a list one item at a time, by transition-delay. */
+  function stagger(items, step, cls, host) {
+    items.forEach(function (el, i) { el.style.transitionDelay = i * step + "ms"; });
+    (host || items[0].parentNode).classList.add(cls);
+  }
+
   function page() {
     $$(".since").forEach(elapsed);
+
+    // The engine, typing itself out.
+    var term = $("#term");
+    onView(term, function () {
+      stagger($$(".term-lines li", term), 110, "ran", term);
+    }, 0.3);
+
+    // The rail fills to the date that is actually in effect.
+    var tl = $("#tl"), tlFill = $("#tlFill");
+    if (tl && tlFill) {
+      onView(tl, function () {
+        var marks = $$(".tl-mark", tl);
+        var live = marks.findIndex(function (m) { return m.classList.contains("is-live"); });
+        var reached = (live < 0 ? marks.length : live + 1) / marks.length;
+        var vertical = matchMedia("(max-width: 860px)").matches;
+        tlFill.style[vertical ? "height" : "width"] = reached * 100 + "%";
+      }, 0.3);
+    }
+
+    // Five sources, adrift. They converge again in the graphite section.
+    var scatter = $("#scatter");
+    onView(scatter, function () {
+      stagger($$(".chip", scatter), 70, "lit", scatter);
+    }, 0.4);
+
+    // Only the SBOM crosses the line.
+    var bound = $("#bound");
+    onView(bound, function () {
+      stagger($$(".bound-side-x .bound-item", bound), 130, "lit", bound);
+    }, 0.35);
+
+    var guards = $("#guards");
+    onView(guards, function () { stagger($$("li", guards), 90, "lit", guards); }, 0.3);
 
     var chart = $("#chart");
     onView(chart, function () { chart.classList.add("lit"); });

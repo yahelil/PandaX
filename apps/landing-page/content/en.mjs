@@ -16,6 +16,7 @@ export const meta = {
   lang: "en",
   domain: "pandax.online",
   brand: "PandaX",
+  product: "Artis",
   // The dashboard UI says "CRA Compliance Vault". The public site uses the
   // brand name only. Flagged for a decision rather than settled quietly.
   tagline: "Product security evidence for the EU Cyber Resilience Act",
@@ -23,6 +24,7 @@ export const meta = {
 
 export const nav = {
   links: [
+    { label: "Artis", href: "/artis/" },
     { label: "The obligation", href: "#obligation" },
     { label: "What PandaX does", href: "#does" },
     { label: "Source code", href: "#source" },
@@ -55,8 +57,8 @@ export const hero = {
   headline: "Every release. Evidence ready.",
   subhead: "Product security evidence for the EU Cyber Resilience Act.",
   body: "A release goes in. A reviewable record comes out.",
-  primary: { label: "See a sample record", href: "#contact" },
-  secondary: { label: "Book a 30-minute walkthrough", href: "#contact" },
+  primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
+  secondary: { label: "See Artis", href: "/artis/" },
   /** Shown on the laptop screen. An example, labelled as one on the page. */
   record: {
     label: "Example record",
@@ -267,8 +269,8 @@ export const faq = {
 export const closing = {
   heading: "See what the record looks like",
   body: "The fastest way to judge this is to read one.",
-  primary: { label: "See a sample record", href: "#contact" },
-  secondary: { label: "Book a 30-minute walkthrough", href: "#contact" },
+  primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
+  secondary: { label: "See Artis", href: "/artis/" },
 };
 
 export const contact = {
@@ -287,12 +289,67 @@ export const contact = {
 export const footer = {
   lines: ["PandaX", "Product security evidence for the EU Cyber Resilience Act"],
   links: [
+    { label: "Artis", href: "/artis/" },
     { label: "Partners", href: "/partners/" },
     { label: "Datenschutzerklärung", href: "/datenschutz/" },
     { label: "Privacy", href: "/privacy/" },
   ],
   legal:
     "PandaX produces compliance documentation. It does not issue conformity opinions, certificates or verdicts.",
+};
+
+/* ------------------------------------------------------------- /artis --- */
+
+export const artis = {
+  title: "Artis",
+  description:
+    "Artis is the PandaX product: it turns a product release into the record the Cyber Resilience Act asks for.",
+  heading: "Artis",
+  lede: "The product. A release goes in, a reviewable record comes out.",
+  body: "Artis is built by PandaX. It reads an SBOM, matches it against public advisory sources, records what you decide about each finding, generates the documents, and seals the result to the release that shipped.",
+
+  runs: {
+    heading: "What it does",
+    note: "One command. The record is the output, not a by-product.",
+  },
+
+  record: {
+    heading: "What a record looks like",
+    lede: "Every run produces one of these. This is an example, not a customer's.",
+  },
+
+  pack: {
+    heading: "What you get",
+    items: [
+      { title: "Component inventory", body: "An SBOM tied to the release that shipped." },
+      { title: "Findings", body: "Each with the upgrade that clears it." },
+      { title: "Decisions", body: "What you decided, who decided it, and why." },
+      { title: "Documents", body: "Annex VII technical documentation and the Annex V declaration." },
+      { title: "Reporting timeline", body: "The Article 14 record, stage by stage." },
+      { title: "Sealed bundle", body: "Timestamped, and verifiable without Artis installed." },
+    ],
+    closing: "Open format. You own it, and you can take it to any reviewer.",
+  },
+
+  state: {
+    heading: "What exists today",
+    now: [
+      "Ingest a release and build the component inventory.",
+      "Match against public advisory sources, with failed sources shown as failed.",
+      "Record decisions with their rationale, author and date.",
+      "Generate the documents and seal the result.",
+      "Verify a sealed bundle from a clean machine, with a key supplied separately.",
+    ],
+    building: [
+      "The hosted workspace, for more than one person.",
+      "Connectors into Jira, CI/CD and document systems.",
+      "Scheduled advisory monitoring that opens cases on its own.",
+    ],
+    nowLabel: "Working today",
+    buildingLabel: "Being built",
+  },
+
+  action: { label: "Book a 30-minute walkthrough", href: "/#contact" },
 };
 
 /* ---------------------------------------------------------- /partners --- */

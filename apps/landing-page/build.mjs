@@ -175,7 +175,7 @@ function screen(rec) {
   return `<div class="sc" id="sc">
           <div class="sc-bar" aria-hidden="true">
             <span class="sc-dots"><i></i><i></i><i></i></span>
-            <span class="sc-app">${esc(C.meta.brand)}</span>
+            <span class="sc-app">${esc(C.meta.product)}</span>
           </div>
           <div class="sc-body">
             <div class="sc-head">
@@ -237,7 +237,7 @@ function heroSection() {
 
 /* 1b --------------------------------------------------------- pipeline --- */
 
-function pipelineSection() {
+function terminal(depth) {
   const pl = C.pipeline;
   const lines = pl.lines
     .map((l, i) => `<li data-i="${i}">
@@ -246,16 +246,21 @@ function pipelineSection() {
           <span class="t-a">${esc(l.arg)}</span>
           <span class="t-o">${esc(l.out)}</span>
         </li>`).join("\n        ");
-  return `<section class="sec sec-term" id="pipeline">
-  <div class="wrap">
-    <h2>${esc(pl.heading)}</h2>
-    <div class="term" id="term">
-      <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>pandax</span></div>
+  return `<div class="term" id="term">
+      <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>artis</span></div>
       <ol class="term-lines">
         ${lines}
         <li class="t-caret" aria-hidden="true"><span class="t-p">&rsaquo;</span><span class="caret"></span></li>
       </ol>
-    </div>
+    </div>`;
+}
+
+function pipelineSection() {
+  const pl = C.pipeline;
+  return `<section class="sec sec-term" id="pipeline">
+  <div class="wrap">
+    <h2>${esc(pl.heading)}</h2>
+    ${terminal()}
     <p class="note note-dark">${esc(pl.note)}</p>
   </div>
 </section>`;
@@ -570,6 +575,81 @@ function closingSection() {
 </section>`;
 }
 
+
+/* --------------------------------------------------------- /artis --- */
+
+function artisPage() {
+  const a = C.artis;
+  const pack = a.pack.items
+    .map((i) => `<tr><th scope="row">${esc(i.title)}</th><td>${esc(i.body)}</td></tr>`).join("\n      ");
+  const now = a.state.now.map((x) => `<li>${esc(x)}</li>`).join("");
+  const building = a.state.building.map((x) => `<li>${esc(x)}</li>`).join("");
+
+  return shell({
+    slug: "artis/",
+    ogTitle: `${esc(C.meta.product)} — ${esc(C.meta.tagline)}`,
+    description: a.description,
+    depth: 1,
+    script: true,
+    body: `<section class="sec sec-lead" id="top">
+  <div class="wrap">
+    <div class="prod">
+      <img class="prod-mark" src="../assets/artis-mark.png" alt="" width="96" height="96">
+      <div class="prod-text">
+        <h1>${esc(a.heading)}</h1>
+        <p class="lede">${esc(a.lede)}</p>
+        <p class="lede lede-sm">${esc(a.body)}</p>
+        <div class="acts"><a class="btn" href="${a.action.href}">${esc(a.action.label)}</a></div>
+      </div>
+  </div>
+</section>
+
+<section class="sec sec-term">
+  <div class="wrap">
+    <h2>${esc(a.runs.heading)}</h2>
+    ${terminal()}
+    <p class="note note-dark">${esc(a.runs.note)}</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2>${esc(a.record.heading)}</h2>
+    <p class="lede">${esc(a.record.lede)}</p>
+    <div class="rec-frame">
+      ${screen(C.hero.record)}
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2>${esc(a.pack.heading)}</h2>
+    <table class="tbl"><caption class="vh">What an Artis export contains</caption><tbody>
+      ${pack}
+    </tbody></table>
+    <p class="closer">${esc(a.pack.closing)}</p>
+  </div>
+</section>
+
+<section class="sec sec-rail">
+  <div class="wrap">
+    <h2>${esc(a.state.heading)}</h2>
+    <div class="state">
+      <div class="state-col">
+        <h3 class="state-cap is-now">${esc(a.state.nowLabel)}</h3>
+        <ul class="rule-list">${now}</ul>
+      </div>
+      <div class="state-col">
+        <h3 class="state-cap">${esc(a.state.buildingLabel)}</h3>
+        <ul class="rule-list rule-list-soft">${building}</ul>
+      </div>
+    </div>
+  </div>
+</section>`,
+  });
+}
+
 /* --------------------------------------------------------------- pages --- */
 
 const home = shell({
@@ -644,6 +724,7 @@ const privacySections = C.privacyBody.sections
 
 const pages = [
   ["index.html", home],
+  ["artis/index.html", artisPage()],
   ["partners/index.html", partnersPage],
   ["datenschutz/index.html", legalPage("datenschutz", privacySections)],
   ["privacy/index.html", legalPage("privacy", privacySections)],

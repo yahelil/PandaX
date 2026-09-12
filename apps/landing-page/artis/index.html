@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PandaX</title>
+<meta name="description" content="Artis is the PandaX product: it turns a product release into the record the Cyber Resilience Act asks for.">
+<link rel="canonical" href="https://pandax.online/artis/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Artis — Product security evidence for the EU Cyber Resilience Act">
+<meta property="og:description" content="Artis is the PandaX product: it turns a product release into the record the Cyber Resilience Act asks for.">
+<meta property="og:image" content="https://pandax.online/assets/favicon-512.png">
+<meta name="theme-color" content="#F2F2F0">
+
+<link rel="icon" href="../assets/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="../assets/favicon-dark-32.png" sizes="32x32" type="image/png" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="../assets/favicon-180.png">
+
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/archivo-var.woff2" crossorigin>
+<link rel="preload" as="font" type="font/woff2" href="../assets/fonts/inter-var.woff2" crossorigin>
+<link rel="stylesheet" href="../pandax.css">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  "name": "PandaX",
+  "url": "https://pandax.online/",
+  "description": "Product security evidence for the EU Cyber Resilience Act",
+  "logo": "https://pandax.online/assets/favicon-512.png"
+}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="head">
+  <div class="wrap head-in">
+    <a class="mark" href="../index.html">
+      <img src="../assets/favicon-512.png" alt="" width="26" height="26">
+      <span>PandaX</span>
+    </a>
+    <nav class="head-nav" aria-label="Sections">
+        
+    </nav>
+    <a class="btn btn-sm" href="../index.html#contact">Book a walkthrough</a>
+  </div>
+</header>
+<main id="main">
+<section class="sec sec-lead" id="top">
+  <div class="wrap">
+    <div class="prod">
+      <img class="prod-mark" src="../assets/artis-mark.png" alt="" width="96" height="96">
+      <div class="prod-text">
+        <h1>Artis</h1>
+        <p class="lede">The product. A release goes in, a reviewable record comes out.</p>
+        <p class="lede lede-sm">Artis is built by PandaX. It reads an SBOM, matches it against public advisory sources, records what you decide about each finding, generates the documents, and seals the result to the release that shipped.</p>
+        <div class="acts"><a class="btn" href="/#contact">Book a 30-minute walkthrough</a></div>
+      </div>
+  </div>
+</section>
+
+<section class="sec sec-term">
+  <div class="wrap">
+    <h2>What it does</h2>
+    <div class="term" id="term">
+      <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>artis</span></div>
+      <ol class="term-lines">
+        <li data-i="0">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">ingest</span>
+          <span class="t-a">release-4.2.1</span>
+          <span class="t-o">412 components</span>
+        </li>
+        <li data-i="1">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">match</span>
+          <span class="t-a">osv · kev · epss</span>
+          <span class="t-o">7 findings</span>
+        </li>
+        <li data-i="2">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">assess</span>
+          <span class="t-a">reachability</span>
+          <span class="t-o">1 needs a decision</span>
+        </li>
+        <li data-i="3">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">record</span>
+          <span class="t-a">decision + rationale</span>
+          <span class="t-o">logged</span>
+        </li>
+        <li data-i="4">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">docs</span>
+          <span class="t-a">annex vii · annex v</span>
+          <span class="t-o">generated</span>
+        </li>
+        <li data-i="5">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">seal</span>
+          <span class="t-a">ed25519</span>
+          <span class="t-o">sealed</span>
+        </li>
+        <li class="t-caret" aria-hidden="true"><span class="t-p">&rsaquo;</span><span class="caret"></span></li>
+      </ol>
+    </div>
+    <p class="note note-dark">One command. The record is the output, not a by-product.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2>What a record looks like</h2>
+    <p class="lede">Every run produces one of these. This is an example, not a customer's.</p>
+    <div class="rec-frame">
+      <div class="sc" id="sc">
+          <div class="sc-bar" aria-hidden="true">
+            <span class="sc-dots"><i></i><i></i><i></i></span>
+            <span class="sc-app">Artis</span>
+          </div>
+          <div class="sc-body">
+            <div class="sc-head">
+              <span class="sc-flag">Example record</span>
+              <span class="sc-seal" id="scSeal"><span class="seal-dot" aria-hidden="true"></span>Sealed</span>
+            </div>
+            <div class="sc-title">Gateway controller <span>4.2.1</span></div>
+            <div class="sc-run"><span class="id">run-20260910-084417-c31f0a</span></div>
+            <div class="sc-stats">
+            <div class="sc-stat">
+              <span class="sc-v" data-count="412">412</span>
+              <span class="sc-l">components</span>
+            </div>
+            <div class="sc-stat">
+              <span class="sc-v" data-count="7">7</span>
+              <span class="sc-l">findings</span>
+            </div>
+            <div class="sc-stat" data-mark="1">
+              <span class="sc-v" data-count="1">1</span>
+              <span class="sc-l">needs a decision</span>
+            </div>
+            <div class="sc-stat">
+              <span class="sc-v" data-count="6 of 6">6 of 6</span>
+              <span class="sc-l">checks passed</span>
+            </div>
+            </div>
+            <ul class="sc-checks"><li data-i="0"><span class="tick" aria-hidden="true"></span>Inventory</li><li data-i="1"><span class="tick" aria-hidden="true"></span>Findings</li><li data-i="2"><span class="tick" aria-hidden="true"></span>Decisions</li><li data-i="3"><span class="tick" aria-hidden="true"></span>Timeline</li><li data-i="4"><span class="tick" aria-hidden="true"></span>Documents</li><li data-i="5"><span class="tick" aria-hidden="true"></span>Sealed</li></ul>
+            <div class="sc-fix">
+              <span class="fx-arrow" aria-hidden="true"></span>
+              <span class="id">CVE-2023-46218</span> in <span class="id">curl 8.3.0</span> — Upgrade to curl 8.5.0
+            </div>
+          </div>
+        </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="wrap">
+    <h2>What you get</h2>
+    <table class="tbl"><caption class="vh">What an Artis export contains</caption><tbody>
+      <tr><th scope="row">Component inventory</th><td>An SBOM tied to the release that shipped.</td></tr>
+      <tr><th scope="row">Findings</th><td>Each with the upgrade that clears it.</td></tr>
+      <tr><th scope="row">Decisions</th><td>What you decided, who decided it, and why.</td></tr>
+      <tr><th scope="row">Documents</th><td>Annex VII technical documentation and the Annex V declaration.</td></tr>
+      <tr><th scope="row">Reporting timeline</th><td>The Article 14 record, stage by stage.</td></tr>
+      <tr><th scope="row">Sealed bundle</th><td>Timestamped, and verifiable without Artis installed.</td></tr>
+    </tbody></table>
+    <p class="closer">Open format. You own it, and you can take it to any reviewer.</p>
+  </div>
+</section>
+
+<section class="sec sec-rail">
+  <div class="wrap">
+    <h2>What exists today</h2>
+    <div class="state">
+      <div class="state-col">
+        <h3 class="state-cap is-now">Working today</h3>
+        <ul class="rule-list"><li>Ingest a release and build the component inventory.</li><li>Match against public advisory sources, with failed sources shown as failed.</li><li>Record decisions with their rationale, author and date.</li><li>Generate the documents and seal the result.</li><li>Verify a sealed bundle from a clean machine, with a key supplied separately.</li></ul>
+      </div>
+      <div class="state-col">
+        <h3 class="state-cap">Being built</h3>
+        <ul class="rule-list rule-list-soft"><li>The hosted workspace, for more than one person.</li><li>Connectors into Jira, CI/CD and document systems.</li><li>Scheduled advisory monitoring that opens cases on its own.</li></ul>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+<footer class="foot">
+  <div class="wrap foot-in">
+    <div class="foot-brand">
+      <img src="../assets/favicon-512.png" alt="" width="22" height="22">
+      <span>PandaX</span>
+      <span class="foot-tag">Product security evidence for the EU Cyber Resilience Act</span>
+    </div>
+    <nav class="foot-links" aria-label="Site">
+      <a href="../artis/">Artis</a>
+      <a href="../partners/">Partners</a>
+      <a href="../datenschutz/">Datenschutzerklärung</a>
+      <a href="../privacy/">Privacy</a>
+    </nav>
+    <p class="foot-legal">PandaX produces compliance documentation. It does not issue conformity opinions, certificates or verdicts.</p>
+  </div>
+</footer>
+<script src="../assets/js/gsap.min.js"></script>
+<script src="../assets/js/ScrollTrigger.min.js"></script>
+<script src="../pandax.js"></script>
+</body>
+</html>

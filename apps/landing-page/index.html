@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PandaX</title>
-<meta name="description" content="Product security evidence for the EU Cyber Resilience Act. Upload a product release. PandaX turns it into a clear record for review.">
+<meta name="description" content="Product security evidence for the EU Cyber Resilience Act. A release goes in. A reviewable record comes out.">
 <link rel="canonical" href="https://pandax.online/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="PandaX — Product security evidence for the EU Cyber Resilience Act">
-<meta property="og:description" content="Product security evidence for the EU Cyber Resilience Act. Upload a product release. PandaX turns it into a clear record for review.">
+<meta property="og:description" content="Product security evidence for the EU Cyber Resilience Act. A release goes in. A reviewable record comes out.">
 <meta property="og:image" content="https://pandax.online/assets/favicon-512.png">
 <meta name="theme-color" content="#F2F2F0">
 
@@ -109,7 +109,7 @@
   <div class="wrap">
     <h1>Every release. Evidence ready.</h1>
     <p class="lede">Product security evidence for the EU Cyber Resilience Act.</p>
-    <p class="lede lede-sm">Upload a product release. PandaX turns it into a clear record for review.</p>
+    <p class="lede lede-sm">A release goes in. A reviewable record comes out.</p>
     <div class="acts">
       <a class="btn" href="#contact">See a sample record</a>
       <a class="btn btn-q" href="#contact">Book a 30-minute walkthrough</a>
@@ -117,20 +117,83 @@
   </div>
 </section>
 
+<section class="sec sec-term" id="pipeline">
+  <div class="wrap">
+    <h2>What runs</h2>
+    <div class="term" id="term">
+      <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>pandax</span></div>
+      <ol class="term-lines">
+        <li data-i="0">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">ingest</span>
+          <span class="t-a">release-4.2.1</span>
+          <span class="t-o">412 components</span>
+        </li>
+        <li data-i="1">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">match</span>
+          <span class="t-a">osv · kev · epss</span>
+          <span class="t-o">7 findings</span>
+        </li>
+        <li data-i="2">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">assess</span>
+          <span class="t-a">reachability</span>
+          <span class="t-o">1 needs a decision</span>
+        </li>
+        <li data-i="3">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">record</span>
+          <span class="t-a">decision + rationale</span>
+          <span class="t-o">logged</span>
+        </li>
+        <li data-i="4">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">docs</span>
+          <span class="t-a">annex vii · annex v</span>
+          <span class="t-o">generated</span>
+        </li>
+        <li data-i="5">
+          <span class="t-p" aria-hidden="true">&rsaquo;</span>
+          <span class="t-c">seal</span>
+          <span class="t-a">ed25519</span>
+          <span class="t-o">sealed</span>
+        </li>
+        <li class="t-caret" aria-hidden="true"><span class="t-p">&rsaquo;</span><span class="caret"></span></li>
+      </ol>
+    </div>
+    <p class="note note-dark">One command. The record is the output, not a by-product.</p>
+  </div>
+</section>
+
 <section class="sec" id="obligation">
   <div class="wrap">
     <h2>The CRA makes product security a legal obligation</h2>
     <p class="lede">New EU rules apply to software and connected products.</p>
-    <ul class="rule-list">
-        <li>Companies must secure products and manage vulnerabilities throughout the product lifecycle.</li>
-        <li>Incident reporting starts 11 September 2026. Full application follows on 11 December 2027.</li>
-        <li>Penalties can reach €15 million or 2.5% of worldwide annual revenue.</li>
-    </ul>
-    <p class="live-row">
-      <span class="live"><span class="live-dot" aria-hidden="true"></span>In effect</span>
-      <span class="live-date">11 September 2026</span>
-      <span class="since" data-since="2026-09-11"></span>
-    </p>
+
+    <ol class="tl" id="tl">
+      <span class="tl-rail" aria-hidden="true"><i id="tlFill"></i></span>
+        <li class="tl-mark is-past">
+          <span class="tl-dot" aria-hidden="true"></span>
+          <time datetime="2026-06-11">11 Jun 2026</time>
+          <span class="tl-label">Assessment bodies designated</span>
+          
+        </li>
+        <li class="tl-mark is-live">
+          <span class="tl-dot" aria-hidden="true"></span>
+          <time datetime="2026-09-11">11 Sep 2026</time>
+          <span class="tl-label">Reporting applies</span>
+          <span class="tl-live">In effect</span><span class="since" data-since="2026-09-11"></span>
+        </li>
+        <li class="tl-mark">
+          <span class="tl-dot" aria-hidden="true"></span>
+          <time datetime="2027-12-11">11 Dec 2027</time>
+          <span class="tl-label">Everything else</span>
+          
+        </li>
+    </ol>
+
+    <ul class="rule-list"><li>Secure the product, and manage its vulnerabilities, for its whole life.</li><li>Penalties reach €15 million or 2.5% of worldwide revenue.</li></ul>
     <p class="closer">Every release doesn't just need a security checklist. It needs evidence.</p>
     <p class="src">European Commission Digital Strategy; Regulation (EU) 2024/2847, Articles 71 and 73.</p>
   </div>
@@ -179,11 +242,12 @@
 <section class="sec" id="problem">
   <div class="wrap">
     <h2>When proof is requested, teams reconstruct compliance by hand</h2>
-    <p class="lede">Product security and compliance tools leave evidence fragmented.</p>
+    <p class="lede">The evidence exists. It is just scattered.</p>
+    <div class="scatter" id="scatter" aria-hidden="true"><span class="chip" data-i="0">Jira</span><span class="chip" data-i="1">CI/CD</span><span class="chip" data-i="2">SBOM</span><span class="chip" data-i="3">Documents</span><span class="chip" data-i="4">Legal</span></div>
     <ul class="rule-list rule-list-lead">
-        <li><strong>Product security tools find risks,</strong> but do not assemble CRA proof.</li>
-        <li><strong>General compliance tools track policy,</strong> but not each product release.</li>
-        <li><strong>Jira, CI/CD, SBOM tools, documents and legal workflows hold the evidence,</strong> and stay disconnected.</li>
+        <li><strong>Scanners find risks.</strong> They do not assemble proof.</li>
+        <li><strong>Compliance tools track policy.</strong> Not each release.</li>
+        <li><strong>Jira, CI/CD, SBOM, documents, legal.</strong> All disconnected.</li>
     </ul>
   </div>
 </section>
@@ -196,21 +260,21 @@
       <span class="step-line" aria-hidden="true"><i id="stepFill"></i></span>
       <li class="step" data-i="0">
         <span class="step-n">01</span>
-        <h3>Inventory the release</h3>
-        <p>Catalogue every component and library in the release.</p>
+        <h3>Inventory</h3>
+        <p>Catalogue every component in the release.</p>
       </li>
       <li class="step" data-i="1">
         <span class="step-n">02</span>
-        <h3>Assess the exposure</h3>
-        <p>Trace each vulnerability to the code the product uses.</p>
+        <h3>Assess</h3>
+        <p>Trace each finding to the code the product uses.</p>
       </li>
       <li class="step" data-i="2">
         <span class="step-n">03</span>
-        <h3>Submit the evidence</h3>
-        <p>Compile the required forms and file them with regulators.</p>
+        <h3>Submit</h3>
+        <p>Compile the forms and file them.</p>
       </li>
     </ol>
-    <p class="note">24h early warning · 72h follow-up notice — the clock starts when the manufacturer becomes aware.</p>
+    <p class="note">24h early warning. 72h follow-up. The clock starts at awareness.</p>
     <p class="closer">Manual work grows with every release.</p>
   </div>
 </section>
@@ -238,11 +302,11 @@
     </div>
 
     <ul class="rule-list rule-list-dark">
-        <li>Connects Jira, CI/CD, SBOM, documents and legal workflows to each product release.</li>
-        <li>Generates the required legal documents in the correct regulatory format, and flags what is missing.</li>
-        <li>Submits after your company's approval, and retains a time-stamped audit trail of every submission.</li>
+        <li>Connects Jira, CI/CD, SBOM and documents to each release.</li>
+        <li>Generates the legal documents, and flags what is missing.</li>
+        <li>Submits only after your approval, with a time-stamped trail.</li>
     </ul>
-    <p class="closer closer-dark">Nothing is submitted without the company's explicit authorization.</p>
+    <p class="closer closer-dark">Nothing is submitted without your authorization.</p>
   </div>
 </section>
 
@@ -250,12 +314,33 @@
   <div class="wrap">
     <h2>Your source code never leaves your environment</h2>
     <p class="lede">PandaX works from the SBOM, not the code.</p>
+
+    <div class="bound" id="bound" aria-hidden="true">
+      <div class="bound-side">
+        <span class="bound-cap">Your environment</span>
+        <span class="bound-item">Source code</span>
+        <span class="bound-item">Build system</span>
+        <span class="bound-item">Signing keys</span>
+      </div>
+      <div class="bound-gate">
+        <span class="bound-wire"></span>
+        <span class="bound-pass">SBOM</span>
+        <span class="bound-wire"></span>
+      </div>
+      <div class="bound-side bound-side-x">
+        <span class="bound-cap">PandaX</span>
+        <span class="bound-item is-on">Inventory</span>
+        <span class="bound-item is-on">Findings</span>
+        <span class="bound-item is-on">Record</span>
+      </div>
+    </div>
+
     <ul class="rule-list">
-        <li>PandaX never receives or views your source code. It stays inside your environment.</li>
-        <li>The company provides only the SBOM — the component and dependency inventory needed for analysis.</li>
-        <li>If an SBOM is not available, PandaX provides the tools to generate it without sharing source code.</li>
+        <li>PandaX never receives your source code.</li>
+        <li>You provide the SBOM. Nothing else crosses the line.</li>
+        <li>No SBOM yet? We give you the tools to make one.</li>
     </ul>
-    <p class="closer">CRA evidence without giving PandaX access to your source code.</p>
+    <p class="closer">Evidence, without handing over the code.</p>
   </div>
 </section>
 
@@ -301,31 +386,28 @@
 <section class="sec" id="who">
   <div class="wrap">
     <h2>Built for smaller manufacturers</h2>
-    <p class="lede">The CRA reaches every product with digital elements. Most smaller manufacturers have no compliance department to read it for them.</p>
+    <p class="lede">The CRA reaches every product with digital elements. Most makers have no compliance department to read it for them.</p>
     <table class="tbl">
       <caption class="vh">Who PandaX is built for</caption>
       <tbody>
-      <tr><th scope="row">Who they are</th><td>Small product and device makers placing hardware with software inside on the EU market.</td></tr>
-      <tr><th scope="row">What they lack</th><td>No in-house legal, security or compliance team to turn CRA articles into actual work.</td></tr>
-      <tr><th scope="row">What PandaX does</th><td>Turns each release into the record the CRA asks for, without hiring that team.</td></tr>
+      <tr><th scope="row">Who</th><td>Device makers putting hardware with software inside on the EU market.</td></tr>
+      <tr><th scope="row">What they lack</th><td>No legal or compliance team to turn CRA articles into work.</td></tr>
+      <tr><th scope="row">What we do</th><td>Turn each release into the record, without hiring that team.</td></tr>
       </tbody>
     </table>
-    <p class="closer">Every release. Evidence ready. Compliance work that used to need a legal team, handled by the product team.</p>
+    <p class="closer">Work that needed a legal team, handled by the product team.</p>
   </div>
 </section>
 
-<section class="sec" id="labs">
+<section class="sec sec-rail" id="labs">
   <div class="wrap">
     <h2>For labs and advisory firms</h2>
-    <table class="tbl">
-      <caption class="vh">Guardrails for testing, inspection and certification firms</caption>
-      <tbody>
-      <tr><th scope="row">Scanner-neutral</th><td>We ingest any scanner's output. We replace nothing.</td></tr>
-      <tr><th scope="row">No conformity opinions</th><td>No certificates, no verdicts. The judgement stays with the assessor.</td></tr>
-      <tr><th scope="row">Portable export</th><td>The manufacturer owns the record and can take it anywhere.</td></tr>
-      <tr><th scope="row">Outcome-independent pricing</th><td>Our price never depends on an assessment result.</td></tr>
-      </tbody>
-    </table>
+    <ul class="guards" id="guards">
+        <li data-i="0"><strong>Scanner-neutral.</strong> Any scanner's output. We replace nothing.</li>
+        <li data-i="1"><strong>No opinions.</strong> No certificates, no verdicts. The judgement is yours.</li>
+        <li data-i="2"><strong>Portable.</strong> The maker owns the record and can take it anywhere.</li>
+        <li data-i="3"><strong>Outcome-blind pricing.</strong> Our price never depends on the result.</li>
+    </ul>
     <p><a class="lnk" href="/partners/">Read the partner page</a></p>
   </div>
 </section>

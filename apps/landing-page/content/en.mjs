@@ -23,8 +23,17 @@ export const meta = {
 };
 
 export const nav = {
+  productsLabel: "Our products",
+  /** Add a product here and it appears in the header menu. */
+  products: [
+    {
+      name: "Artis",
+      href: "artis/",
+      mark: "assets/artis-mark.png",
+      blurb: "Turns a release into a reviewable record",
+    },
+  ],
   links: [
-    { label: "Artis", href: "/artis/" },
     { label: "The obligation", href: "#obligation" },
     { label: "What PandaX does", href: "#does" },
     { label: "Source code", href: "#source" },
@@ -169,7 +178,7 @@ export const manual = {
 export const does = {
   eyebrow: "Our product",
   name: "Artis",
-  heading: "Every release, evidence ready",
+  heading: "Artis makes every release evidence ready",
   lede: "Connect the evidence. Generate the documents. Submit with approval.",
   points: [
     "Connects Jira, CI/CD, SBOM and documents to each release.",

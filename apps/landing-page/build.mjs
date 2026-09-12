@@ -70,6 +70,23 @@ ${script ? `<script src="${r}assets/js/gsap.min.js"></script>\n<script src="${r}
 `;
 }
 
+function productsMenu(depth) {
+  const r = rel(depth);
+  const items = C.nav.products
+    .map((p) => `<a class="menu-item" href="${r}${p.href}">
+          <img src="${r}${p.mark}" alt="" width="36" height="36">
+          <span><strong>${esc(p.name)}</strong><small>${esc(p.blurb)}</small></span>
+        </a>`).join("\n        ");
+  return `<div class="menu" id="menu">
+      <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="menuPanel">
+        ${esc(C.nav.productsLabel)}<span class="menu-chev" aria-hidden="true"></span>
+      </button>
+      <div class="menu-panel" id="menuPanel">
+        ${items}
+      </div>
+    </div>`;
+}
+
 function header(depth) {
   const r = rel(depth);
   const links = depth ? "" : C.nav.links.map((l) => `<a href="${l.href}">${esc(l.label)}</a>`).join("\n        ");
@@ -79,6 +96,7 @@ function header(depth) {
       <img src="${r}assets/favicon-512.png" alt="" width="26" height="26">
       <span>${esc(C.meta.brand)}</span>
     </a>
+    ${productsMenu(depth)}
     <nav class="head-nav" aria-label="Sections">
         ${links}
     </nav>
@@ -390,16 +408,8 @@ function manualSection() {
 function doesSection() {
   const d = C.does;
   const points = d.points.map((x) => `<li>${esc(x)}</li>`).join("\n        ");
-  return `<section class="sec sec-dark sec-product" id="does">
+  return `<section class="sec sec-dark" id="does">
   <div class="wrap">
-    <div class="pname">
-      <img class="pname-mark" src="assets/artis-mark-light.png" alt="" width="84" height="84">
-      <div>
-        <span class="pname-eyebrow">${esc(d.eyebrow)}</span>
-        <span class="pname-word">${esc(d.name)}</span>
-      </div>
-    </div>
-
     <h2>${esc(d.heading)}</h2>
     <p class="lede lede-dark">${esc(d.lede)}</p>
 
@@ -601,14 +611,18 @@ function artisPage() {
     script: true,
     body: `<section class="sec sec-lead" id="top">
   <div class="wrap">
-    <div class="prod">
-      <img class="prod-mark" src="../assets/artis-mark.png" alt="" width="96" height="96">
-      <div class="prod-text">
-        <h1>${esc(a.heading)}</h1>
-        <p class="lede">${esc(a.lede)}</p>
-        <p class="lede lede-sm">${esc(a.body)}</p>
-        <div class="acts"><a class="btn" href="${a.action.href}">${esc(a.action.label)}</a></div>
-      </div>
+    <div class="pname-lead">
+      <span class="pname-eyebrow">${esc(C.does.eyebrow)}</span>
+      <h1 class="pname-word">
+        <img class="pname-mark" src="../assets/artis-mark.png" alt="" width="72" height="72">
+        ${esc(a.heading)}
+      </h1>
+    </div>
+    <div class="prod-text">
+      <p class="lede">${esc(a.lede)}</p>
+      <p class="lede lede-sm">${esc(a.body)}</p>
+      <div class="acts"><a class="btn" href="${a.action.href}">${esc(a.action.label)}</a></div>
+    </div>
   </div>
 </section>
 

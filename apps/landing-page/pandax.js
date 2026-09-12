@@ -24,6 +24,27 @@
      X at the centre of the panda and out into the page.
      ===================================================================== */
 
+  /** True when this view came from elsewhere on the site rather than fresh. */
+  function seenAlready() {
+    var entry = (performance.getEntriesByType &&
+                 performance.getEntriesByType("navigation")[0]) || null;
+
+    // A reload is a deliberate restart: play it.
+    if (entry && entry.type === "reload") return false;
+
+    // Back and forward within the site: already seen.
+    if (entry && entry.type === "back_forward") return true;
+
+    // Otherwise it depends on where they came from. Same origin means they
+    // were just here; anything else is a first arrival.
+    try {
+      return !!document.referrer &&
+             new URL(document.referrer).origin === location.origin;
+    } catch (e) {
+      return false;
+    }
+  }
+
   function boot() {
     var boot = $("#boot");
     var laptop = $("#laptop");
@@ -35,10 +56,12 @@
 
     document.body.classList.add("boot-on");
 
-    // A deep link wants the section, not the overture. Reduced motion wants
-    // no overture at all. Either way the page starts where the page starts.
+    // A deep link wants the section, not the overture. Reduced motion wants no
+    // overture at all. And neither does someone coming back from another page
+    // on this site — sitting through it again to reach the nav is a tax on
+    // every visit. A reload still plays it.
     var deepLink = location.hash && location.hash !== "#top";
-    if (deepLink || still || !window.gsap || !window.ScrollTrigger) {
+    if (deepLink || still || seenAlready() || !window.gsap || !window.ScrollTrigger) {
       boot.style.display = "none";
       document.body.classList.add("entered");
       return;

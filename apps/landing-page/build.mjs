@@ -511,22 +511,6 @@ function labsSection() {
 </section>`;
 }
 
-/* proof ------------------------------------------------------------------ */
-
-function proofSection() {
-  const p = C.proof;
-  return `<section class="sec" id="proof">
-  <div class="wrap">
-    <h2>${esc(p.heading)}</h2>
-    <p class="lede">${esc(p.lede)}</p>
-    <div class="shot-todo">
-      <span class="shot-todo-t">${esc(p.placeholder.title)}</span>
-      <span class="shot-todo-b">${esc(p.placeholder.body)}</span>
-    </div>
-  </div>
-</section>`;
-}
-
 /* 11 --------------------------------------------------------------- faq --- */
 
 function faqSection() {
@@ -593,8 +577,7 @@ const home = shell({
   description: `${C.hero.subhead} ${C.hero.body}`,
   body: [
     bootSection(), heroSection(), pipelineSection(), obligationSection(), vectorsSection(), problemSection(),
-    manualSection(), doesSection(), sourceSection(), usefulSection(),
-    proofSection(), whoSection(), labsSection(), faqSection(), closingSection(),
+    manualSection(), doesSection(), sourceSection(), usefulSection(), whoSection(), labsSection(), faqSection(), closingSection(),
   ].join("\n\n"),
   script: true,
 });

@@ -264,7 +264,28 @@
     }
   }
 
-  function init() { boot(); page(); }
+  /* ------------------------------------------------- the products menu --- */
+
+  function menu() {
+    var wrap = $("#menu"), btn = $("#menuBtn");
+    if (!wrap || !btn) return;
+
+    var open = function (v) { btn.setAttribute("aria-expanded", v ? "true" : "false"); };
+
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      open(btn.getAttribute("aria-expanded") !== "true");
+    });
+    // Hover and focus are handled in CSS; these close the tapped-open state.
+    document.addEventListener("click", function (e) {
+      if (!wrap.contains(e.target)) open(false);
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { open(false); btn.blur(); }
+    });
+  }
+
+  function init() { boot(); menu(); page(); }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

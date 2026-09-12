@@ -53,6 +53,37 @@ MIGRATIONS = (
         'ALTER TABLE remediation_cases ADD COLUMN release_id TEXT REFERENCES releases(id)',
         "UPDATE remediation_cases SET release_id=COALESCE((SELECT release_id FROM case_runs WHERE case_id=remediation_cases.id AND role='source' LIMIT 1), json_extract(state_json, '$.release_id'))",
     ),
+    (
+        """CREATE TABLE advisory_watches (
+            id TEXT PRIMARY KEY,
+            run_id TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            product_version TEXT NOT NULL,
+            inventory_json TEXT NOT NULL,
+            simulated INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            last_attempt_at TEXT,
+            last_success_at TEXT,
+            stale_since TEXT,
+            last_error TEXT,
+            coverage_json TEXT NOT NULL DEFAULT '{}',
+            UNIQUE(product_name, product_version, simulated)
+        )""",
+        """CREATE TABLE advisory_cases (
+            watch_id TEXT NOT NULL REFERENCES advisory_watches(id),
+            advisory_identity TEXT NOT NULL,
+            case_id TEXT NOT NULL REFERENCES remediation_cases(id),
+            PRIMARY KEY(watch_id, advisory_identity)
+        )""",
+        """CREATE TABLE advisory_evidence (
+            watch_id TEXT NOT NULL REFERENCES advisory_watches(id),
+            advisory_identity TEXT NOT NULL,
+            evidence_hash TEXT NOT NULL,
+            observed_at TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            PRIMARY KEY(watch_id, advisory_identity, evidence_hash)
+        )""",
+    ),
 )
 
 

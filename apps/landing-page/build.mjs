@@ -637,12 +637,6 @@ function legalPage(key, extra) {
   });
 }
 
-const impressumBody = C.legalPages.impressum.sections
-  .map((s) => `<h2>${esc(s.title)}</h2>
-    <table class="tbl tbl-legal"><tbody>
-    ${s.rows.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${v.startsWith("TODO") ? `<span class="todo">${esc(v)}</span>` : esc(v)}</td></tr>`).join("\n    ")}
-    </tbody></table>`).join("\n\n    ");
-
 const privacySections = C.privacyBody.sections
   .map((s) => `<h2>${esc(s.title)}</h2>
     <p>${s.body.split(/(TODO[^.]*\.)/).map((x) => (x.startsWith("TODO") ? `<span class="todo">${esc(x)}</span>` : esc(x))).join("")}</p>`)
@@ -651,7 +645,6 @@ const privacySections = C.privacyBody.sections
 const pages = [
   ["index.html", home],
   ["partners/index.html", partnersPage],
-  ["impressum/index.html", legalPage("impressum", impressumBody)],
   ["datenschutz/index.html", legalPage("datenschutz", privacySections)],
   ["privacy/index.html", legalPage("privacy", privacySections)],
 ];

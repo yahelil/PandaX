@@ -284,18 +284,6 @@ export const contact = {
   fallbackAddress: "hello@pandax.online", // TODO(legal): confirm the real address
 };
 
-export const proof = {
-  heading: "The working product",
-  lede: "A proof of concept runs today.",
-  // TODO(asset): the PoC dashboard screenshot is not in this repo. The known
-  // run analysed a Java package (maven=39) and must be labelled as that, never
-  // presented as a device release. Placeholder until the image arrives.
-  placeholder: {
-    title: "Screenshot pending",
-    body: "A dashboard image goes here, labelled with what the run actually analysed.",
-  },
-};
-
 export const footer = {
   lines: ["PandaX", "Product security evidence for the EU Cyber Resilience Act"],
   links: [

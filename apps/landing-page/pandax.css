@@ -776,6 +776,33 @@ a { color: inherit; }
 }
 .rule-list-soft li { color: #8C9298; }
 
+
+/* ------------------------------------------------------ the product --- */
+
+.sec-product { padding-top: 76px; }
+
+.pname { display: flex; align-items: center; gap: 22px; margin-bottom: 34px; }
+.pname-mark { display: block; flex: 0 0 auto; }
+.pname-eyebrow {
+  display: block;
+  font-family: var(--mono); font-size: 12.5px;
+  color: var(--d-body); margin-bottom: 2px;
+}
+.pname-word {
+  display: block;
+  font-family: var(--disp); font-weight: 700;
+  font-size: clamp(52px, 8.5vw, 108px);
+  letter-spacing: -0.045em; line-height: 0.92;
+  color: var(--d-ink);
+}
+
+/* On graphite the dark button disappears; invert it. */
+.btn-light {
+  background: var(--bronze-l); color: var(--ink);
+  border-color: var(--bronze-l);
+}
+.btn-light:hover { background: #E4BE6B; border-color: #E4BE6B; color: var(--ink); }
+
 /* ------------------------------------------------------------ tables ---- */
 
 .tbl {
@@ -1021,6 +1048,8 @@ a { color: inherit; }
   .bound { grid-template-columns: 1fr; }
   .state { grid-template-columns: 1fr; gap: 30px; }
   .prod { gap: 18px; }
+  .pname { gap: 15px; margin-bottom: 26px; }
+  .pname-mark { width: 56px; height: 56px; }
   .prod-mark { width: 64px; height: 64px; }
   .bound-gate { flex-direction: row; }
   .bound-wire { width: 24px; height: 1px; }

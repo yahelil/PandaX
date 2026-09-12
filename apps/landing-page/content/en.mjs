@@ -54,7 +54,7 @@ export const boot = {
 export const hero = {
   headline: "Every release. Evidence ready.",
   subhead: "Product security evidence for the EU Cyber Resilience Act.",
-  body: "Upload a product release. PandaX turns it into a clear record for review.",
+  body: "A release goes in. A reviewable record comes out.",
   primary: { label: "See a sample record", href: "#contact" },
   secondary: { label: "Book a 30-minute walkthrough", href: "#contact" },
   /** Shown on the laptop screen. An example, labelled as one on the page. */
@@ -79,20 +79,40 @@ export const hero = {
   },
 };
 
+/* 1b --------------------------------------------------------- pipeline --- */
+
+/** The engine, written the way it runs. Types itself out once, when reached. */
+export const pipeline = {
+  heading: "What runs",
+  lines: [
+    { cmd: "ingest",  arg: "release-4.2.1",        out: "412 components" },
+    { cmd: "match",   arg: "osv · kev · epss",     out: "7 findings" },
+    { cmd: "assess",  arg: "reachability",         out: "1 needs a decision" },
+    { cmd: "record",  arg: "decision + rationale", out: "logged" },
+    { cmd: "docs",    arg: "annex vii · annex v",  out: "generated" },
+    { cmd: "seal",    arg: "ed25519",              out: "sealed" },
+  ],
+  note: "One command. The record is the output, not a by-product.",
+};
+
 /* 2 -------------------------------------------------------- obligation --- */
 
 export const obligation = {
   heading: "The CRA makes product security a legal obligation",
   lede: "New EU rules apply to software and connected products.",
+  marks: [
+    { date: "11 Jun 2026", iso: "2026-06-11", label: "Assessment bodies designated" },
+    { date: "11 Sep 2026", iso: "2026-09-11", label: "Reporting applies", live: true },
+    { date: "11 Dec 2027", iso: "2027-12-11", label: "Everything else" },
+  ],
   points: [
-    "Companies must secure products and manage vulnerabilities throughout the product lifecycle.",
-    "Incident reporting starts 11 September 2026. Full application follows on 11 December 2027.",
-    "Penalties can reach €15 million or 2.5% of worldwide annual revenue.",
+    "Secure the product, and manage its vulnerabilities, for its whole life.",
+    "Penalties reach €15 million or 2.5% of worldwide revenue.",
   ],
   closing: "Every release doesn't just need a security checklist. It needs evidence.",
   source:
     "European Commission Digital Strategy; Regulation (EU) 2024/2847, Articles 71 and 73.",
-  live: { date: "11 September 2026", iso: "2026-09-11", label: "In effect" },
+  liveLabel: "In effect",
 };
 
 /* 3 ------------------------------------------------------------ vector --- */
@@ -120,11 +140,11 @@ export const vectors = {
 
 export const problem = {
   heading: "When proof is requested, teams reconstruct compliance by hand",
-  lede: "Product security and compliance tools leave evidence fragmented.",
+  lede: "The evidence exists. It is just scattered.",
   lines: [
-    { lead: "Product security tools find risks,", rest: "but do not assemble CRA proof." },
-    { lead: "General compliance tools track policy,", rest: "but not each product release." },
-    { lead: "Jira, CI/CD, SBOM tools, documents and legal workflows hold the evidence,", rest: "and stay disconnected." },
+    { lead: "Scanners find risks.", rest: "They do not assemble proof." },
+    { lead: "Compliance tools track policy.", rest: "Not each release." },
+    { lead: "Jira, CI/CD, SBOM, documents, legal.", rest: "All disconnected." },
   ],
 };
 
@@ -134,11 +154,11 @@ export const manual = {
   heading: "The manual process",
   lede: "Each release creates the same work again.",
   steps: [
-    { title: "Inventory the release", body: "Catalogue every component and library in the release." },
-    { title: "Assess the exposure", body: "Trace each vulnerability to the code the product uses." },
-    { title: "Submit the evidence", body: "Compile the required forms and file them with regulators." },
+    { title: "Inventory", body: "Catalogue every component in the release." },
+    { title: "Assess", body: "Trace each finding to the code the product uses." },
+    { title: "Submit", body: "Compile the forms and file them." },
   ],
-  clock: "24h early warning · 72h follow-up notice — the clock starts when the manufacturer becomes aware.",
+  clock: "24h early warning. 72h follow-up. The clock starts at awareness.",
   closing: "Manual work grows with every release.",
 };
 
@@ -148,11 +168,11 @@ export const does = {
   heading: "PandaX makes every release evidence ready",
   lede: "Connect the evidence. Generate the documents. Submit with approval.",
   points: [
-    "Connects Jira, CI/CD, SBOM, documents and legal workflows to each product release.",
-    "Generates the required legal documents in the correct regulatory format, and flags what is missing.",
-    "Submits after your company's approval, and retains a time-stamped audit trail of every submission.",
+    "Connects Jira, CI/CD, SBOM and documents to each release.",
+    "Generates the legal documents, and flags what is missing.",
+    "Submits only after your approval, with a time-stamped trail.",
   ],
-  closing: "Nothing is submitted without the company's explicit authorization.",
+  closing: "Nothing is submitted without your authorization.",
 };
 
 /* 7 ------------------------------------------------------------- source --- */
@@ -161,11 +181,11 @@ export const source = {
   heading: "Your source code never leaves your environment",
   lede: "PandaX works from the SBOM, not the code.",
   points: [
-    "PandaX never receives or views your source code. It stays inside your environment.",
-    "The company provides only the SBOM — the component and dependency inventory needed for analysis.",
-    "If an SBOM is not available, PandaX provides the tools to generate it without sharing source code.",
+    "PandaX never receives your source code.",
+    "You provide the SBOM. Nothing else crosses the line.",
+    "No SBOM yet? We give you the tools to make one.",
   ],
-  closing: "CRA evidence without giving PandaX access to your source code.",
+  closing: "Evidence, without handing over the code.",
 };
 
 /* 8 ------------------------------------------------------------- useful --- */
@@ -184,13 +204,13 @@ export const useful = {
 
 export const who = {
   heading: "Built for smaller manufacturers",
-  lede: "The CRA reaches every product with digital elements. Most smaller manufacturers have no compliance department to read it for them.",
+  lede: "The CRA reaches every product with digital elements. Most makers have no compliance department to read it for them.",
   rows: [
-    { title: "Who they are", body: "Small product and device makers placing hardware with software inside on the EU market." },
-    { title: "What they lack", body: "No in-house legal, security or compliance team to turn CRA articles into actual work." },
-    { title: "What PandaX does", body: "Turns each release into the record the CRA asks for, without hiring that team." },
+    { title: "Who", body: "Device makers putting hardware with software inside on the EU market." },
+    { title: "What they lack", body: "No legal or compliance team to turn CRA articles into work." },
+    { title: "What we do", body: "Turn each release into the record, without hiring that team." },
   ],
-  closing: "Every release. Evidence ready. Compliance work that used to need a legal team, handled by the product team.",
+  closing: "Work that needed a legal team, handled by the product team.",
 };
 
 /* 10 -------------------------------------------------------------- labs --- */
@@ -198,10 +218,10 @@ export const who = {
 export const labs = {
   heading: "For labs and advisory firms",
   points: [
-    { title: "Scanner-neutral", body: "We ingest any scanner's output. We replace nothing." },
-    { title: "No conformity opinions", body: "No certificates, no verdicts. The judgement stays with the assessor." },
-    { title: "Portable export", body: "The manufacturer owns the record and can take it anywhere." },
-    { title: "Outcome-independent pricing", body: "Our price never depends on an assessment result." },
+    { title: "Scanner-neutral", body: "Any scanner's output. We replace nothing." },
+    { title: "No opinions", body: "No certificates, no verdicts. The judgement is yours." },
+    { title: "Portable", body: "The maker owns the record and can take it anywhere." },
+    { title: "Outcome-blind pricing", body: "Our price never depends on the result." },
   ],
   action: { label: "Read the partner page", href: "/partners/" },
 };

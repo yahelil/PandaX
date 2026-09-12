@@ -359,6 +359,7 @@ a { color: inherit; }
 /* -------------------------------------------------------- the screen ---- */
 
 .sc { position: absolute; inset: 0; display: flex; flex-direction: column; color: var(--d-ink); }
+.rec-frame .sc { position: relative; inset: auto; min-height: 420px; }
 .sc-bar {
   display: flex; align-items: center; gap: 12px;
   padding: 0 14px; height: 30px; flex: 0 0 auto;
@@ -741,6 +742,40 @@ a { color: inherit; }
 #guards.lit li { opacity: 1; transform: none; }
 .guards strong { color: var(--ink); font-weight: 560; }
 
+
+/* --------------------------------------------------------- the product --- */
+
+.prod { display: flex; align-items: flex-start; gap: 26px; }
+.prod-mark { display: block; flex: 0 0 auto; margin-top: 6px; }
+.prod h1 { font-size: clamp(44px, 6vw, 76px); }
+.prod-text { min-width: 0; }
+.prod-text .lede { margin-top: 18px; }
+
+/* The record, shown on its own rather than inside the machine. */
+.rec-frame {
+  position: relative;
+  margin-top: 30px;
+  min-height: 420px;
+  background: var(--graphite);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+/* Working today, next to what is not. */
+.state { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 0 48px; margin-top: 30px; }
+.state-cap {
+  font-family: var(--mono); font-size: 12px; font-weight: 400;
+  color: var(--body); padding-bottom: 10px;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.state-cap.is-now { color: var(--bronze); }
+.state-cap.is-now::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--bronze);
+}
+.rule-list-soft li { color: #8C9298; }
+
 /* ------------------------------------------------------------ tables ---- */
 
 .tbl {
@@ -984,6 +1019,9 @@ a { color: inherit; }
   .tl-mark { padding-top: 0; padding-left: 28px; padding-bottom: 22px; }
   .tl-dot { top: 5px; }
   .bound { grid-template-columns: 1fr; }
+  .state { grid-template-columns: 1fr; gap: 30px; }
+  .prod { gap: 18px; }
+  .prod-mark { width: 64px; height: 64px; }
   .bound-gate { flex-direction: row; }
   .bound-wire { width: 24px; height: 1px; }
   .term-lines li { grid-template-columns: 14px 4.6rem minmax(0,1fr); font-size: 12.5px; gap: 10px; }

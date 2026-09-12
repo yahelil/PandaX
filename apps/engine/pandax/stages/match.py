@@ -49,6 +49,36 @@ def _fixed_version(advisory: dict, purl: str) -> str:
     return ""
 
 
+def findings_from_advisories(
+    components: list[dict], hits: dict[str, list[str]], advisories: dict[str, dict]
+) -> list[Finding]:
+    """Build the same finding records for scans and scheduled refreshes."""
+    by_purl = {component["purl"]: component for component in components}
+    findings = []
+    for purl, ids in hits.items():
+        comp = by_purl[purl]
+        for advisory_id in ids:
+            advisory = advisories[advisory_id]
+            cves = sorted(a for a in advisory.get("aliases", []) if a.startswith("CVE-"))
+            vector = _cvss_vector(advisory)
+            for cve in cves or [advisory_id]:
+                findings.append(
+                    Finding(
+                        cve=cve,
+                        osv_id=advisory_id,
+                        purl=purl,
+                        component=comp["name"],
+                        version=comp["version"],
+                        summary=(advisory.get("summary") or "").strip(),
+                        cvss_vector=vector,
+                        severity=severity_from_vector(vector),
+                        fixed_version=_fixed_version(advisory, purl),
+                        bom_ref=comp.get("bom_ref", purl),
+                    )
+                )
+    return findings
+
+
 def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
     yield ev.start(STAGE, "matching components against OSV.dev")
 
@@ -58,7 +88,6 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
 
     matchable = [c for c in ctx.components if is_matchable_purl(c.get("purl"))]
     purls = list(dict.fromkeys(c["purl"] for c in matchable))
-    by_purl = {c["purl"]: c for c in matchable}
     yield ev.log(STAGE, f"POST /v1/querybatch with {len(purls)} package URLs")
     if ctx.skipped_components:
         yield ev.log(
@@ -84,28 +113,7 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
                     zip(unique_ids, executor.map(feeds.vuln_detail, unique_ids))
                 )
 
-        findings: list[Finding] = []
-        for purl, ids in hits.items():
-            comp = by_purl[purl]
-            for vid in ids:
-                adv = advisories[vid]
-                cves = [a for a in adv.get("aliases", []) if a.startswith("CVE-")]
-                vector = _cvss_vector(adv)
-                for cve in cves or [vid]:
-                    findings.append(
-                        Finding(
-                            cve=cve,
-                            osv_id=vid,
-                            purl=purl,
-                            component=comp["name"],
-                            version=comp["version"],
-                            summary=(adv.get("summary") or "").strip(),
-                            cvss_vector=vector,
-                            severity=severity_from_vector(vector),
-                            fixed_version=_fixed_version(adv, purl),
-                            bom_ref=comp.get("bom_ref", purl),
-                        )
-                    )
+        findings = findings_from_advisories(matchable, hits, advisories)
     finally:
         if owned:
             feeds.close()

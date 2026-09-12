@@ -288,7 +288,6 @@ export const footer = {
   lines: ["PandaX", "Product security evidence for the EU Cyber Resilience Act"],
   links: [
     { label: "Partners", href: "/partners/" },
-    { label: "Impressum", href: "/impressum/" },
     { label: "Datenschutzerklärung", href: "/datenschutz/" },
     { label: "Privacy", href: "/privacy/" },
   ],
@@ -343,19 +342,6 @@ export const partners = {
 /* ------------------------------------------------------------- legal --- */
 
 export const legalPages = {
-  impressum: {
-    title: "Impressum",
-    description: "Angaben gemäß § 5 TMG.",
-    heading: "Impressum",
-    note: "Angaben gemäß § 5 TMG. This page is required for a German-facing site and is not yet complete.",
-    sections: [
-      { title: "Diensteanbieter", rows: [["Legal entity", "TODO — registered company name and legal form"], ["Address", "TODO — street, postal code, city, country"]] },
-      { title: "Vertreten durch", rows: [["Managing director", "TODO — name of the managing director"]] },
-      { title: "Kontakt", rows: [["Email", "TODO — contact email address"], ["Telephone", "TODO — contact telephone number"]] },
-      { title: "Registereintrag", rows: [["Register", "TODO — register court and registration number"], ["VAT ID", "TODO — Umsatzsteuer-Identifikationsnummer per § 27a UStG"]] },
-      { title: "Verantwortlich für den Inhalt", rows: [["Responsible", "TODO — name and address per § 18 Abs. 2 MStV"]] },
-    ],
-  },
   datenschutz: {
     title: "Datenschutzerklärung",
     description: "Informationen zur Verarbeitung personenbezogener Daten.",
@@ -372,7 +358,7 @@ export const legalPages = {
 
 export const privacyBody = {
   sections: [
-    { title: "Controller", body: "TODO — the legal entity responsible for processing, with its address and contact details. See the Impressum." },
+    { title: "Controller", body: "TODO — the legal entity responsible for processing, with its address and contact details." },
     { title: "What this website collects", body: "This website sets no cookies, runs no analytics and embeds no third-party services. No consent banner is required, because nothing is stored on your device beyond what is technically necessary to serve the page." },
     { title: "Server logs", body: "The hosting provider records standard request data — IP address, time, requested file, referrer and user agent — to deliver and secure the site. Legal basis: Art. 6(1)(f) GDPR. TODO — confirm the retention period with the provider." },
     { title: "Contact form and email", body: "If you write to us, the details you send are processed to answer you and kept for as long as the enquiry requires. Legal basis: Art. 6(1)(b) and (f) GDPR. The form posts to our own endpoint; there is no third-party form service." },

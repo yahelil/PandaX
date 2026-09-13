@@ -57,7 +57,7 @@ export const hero = {
    *  evidence that is automated, never the compliance: promising the outcome
    *  is a UWG exposure, and it is the sentence a scanner writes. */
   highlight: "automated",
-  subhead: "PandaX turns each release into a reviewable record: the components, the findings, the decisions, and the documents an assessor asks to see.",
+  subhead: "PandaX turns each release into a record a reviewer can read. What shipped, what was found, what you decided, and the documents to prove it.",
   body: "Independent of any scanner, and yours to take anywhere.",
   primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
   secondary: { label: "See Actis", href: "/actis/" },
@@ -134,7 +134,7 @@ export const obligation = {
   ],
   liveLabel: "In effect",
   points: [
-    "Companies must keep technical files available to authorities for at least 10 years: cybersecurity risk assessments, software architecture designs and test reports.",
+    "Cybersecurity risk assessments, software architecture designs, test reports. Companies must keep these available to authorities for at least 10 years.",
     "Penalties can reach €15 million or 2.5% of worldwide annual turnover, whichever is higher.",
   ],
   source:
@@ -252,7 +252,7 @@ export const questions = {
   items: [
     {
       glyph: "evidence",
-      title: "Evidence, not just findings",
+      title: "Evidence, not a list",
       body: "A scanner hands you a list. Actis ties every component, finding and decision to the release that shipped, so there is something to show when proof is asked for.",
     },
     {
@@ -302,7 +302,7 @@ export const action = {
   lead: "Ready to see",
   highlight: "Actis",
   tail: "in action?",
-  body: "One run against one release, and the record it seals: the components, the findings, the fix that shipped, and the proof somebody signed it off.",
+  body: "One run against one release, and the record it seals. Every component, every finding, the fix that shipped, and the proof somebody signed it off.",
   cta: { label: "See Actis", href: "/actis/" },
 };
 
@@ -349,7 +349,7 @@ export const footer = {
 export const actis = {
   title: "Actis",
   description:
-    "Actis is the PandaX product: it turns a product release into the record the Cyber Resilience Act asks for.",
+    "Actis is the PandaX product. It turns a product release into the record the Cyber Resilience Act asks for.",
   heading: "Actis",
   lede: "The product. A release goes in, a reviewable record comes out.",
   body: "Actis is built by PandaX. It reads an SBOM, matches it against public advisory sources, records what you decide about each finding, generates the documents, and seals the result to the release that shipped.",
@@ -524,7 +524,7 @@ export const audience = {
 
 export const about = {
   heading: "Who we are",
-  lede: "PandaX is an independent European workspace for product security evidence.",
+  lede: "An independent European workspace for product security evidence.",
   claim: "The record is the product.",
   claimBody: "Scanners find things. Managed services do the work on your behalf. Neither of them owns the document at the end. The technical file falls out of somebody else's tool, and gets assembled by hand again on the next release. That part is ours.",
   promisesTitle: "What we hold to",
@@ -537,7 +537,7 @@ export const about = {
     {
       glyph: "portable",
       title: "Portable by default",
-      body: "The export is yours: a form a reviewer can read, and a form you can take to someone else entirely.",
+      body: "The export is yours. A form a reviewer can read, and a form you can take to someone else entirely.",
     },
     {
       glyph: "impartial",

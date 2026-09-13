@@ -287,7 +287,7 @@ a { color: inherit; }
 .hero-copy { min-width: 0; }
 .hero-stage { min-width: 0; }
 .hero .lede { max-width: 40ch; }
-.hero h1 { max-width: 15ch; }
+.hero h1 { max-width: 21ch; text-wrap: balance; }
 .lede {
   text-wrap: pretty;
   margin-top: 22px;
@@ -1549,30 +1549,103 @@ a { color: inherit; }
 
 /* --------------------------------------------------------- audience ---- */
 
-.aud {
-  margin-top: 38px;
-  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
-  gap: 0 64px; align-items: start;
-}
 .aud-cap {
   font-family: var(--text); font-size: 12px; font-weight: 600;
   letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--body); margin: 0 0 16px;
+  color: var(--body); margin: 0 0 18px;
 }
-.whos { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
-.who {
-  padding: 20px 0 20px 22px;
-  border-top: 1px solid var(--line);
-  border-left: 3px solid transparent;
-  transition: border-left-color .2s, padding-left .2s;
-}
-.who:last-child { border-bottom: 1px solid var(--line); }
-.who:hover { border-left-color: var(--brand); padding-left: 26px; }
-.who h3 { font-size: 17px; margin: 0 0 6px; letter-spacing: -0.016em; }
-.who p { font-size: 15.5px; color: var(--body); margin: 0; max-width: 52ch; }
+.aud-cap-wide { margin-top: 52px; }
 
-.about-body { margin-top: 34px; display: grid; gap: 20px; max-width: 72ch; }
-.about-body p { font-size: 17px; line-height: 1.62; }
+/* The fit test, as a test: four things to tick, not four more sentences. */
+.fitbox {
+  margin-top: 38px; padding: 30px 34px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+}
+.sec-alt .fitbox { background: var(--bg); }
+.fits {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 40px;
+}
+.fits li { display: grid; grid-template-columns: 26px 1fr; gap: 12px; align-items: start; }
+.fits span { font-size: 16px; line-height: 1.5; color: var(--ink); }
+.tickmark {
+  width: 26px; height: 26px; flex: 0 0 auto;
+  padding: 5px; border-radius: 50%;
+  background: rgba(24, 82, 196, 0.1);
+  fill: none; stroke: var(--brand); stroke-width: 2.6;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 26; stroke-dashoffset: 26;
+  transition: stroke-dashoffset .45s cubic-bezier(.3,.8,.3,1);
+}
+.sec.lit .tickmark { stroke-dashoffset: 0; }
+.fits li:nth-child(2) .tickmark { transition-delay: .1s; }
+.fits li:nth-child(3) .tickmark { transition-delay: .2s; }
+.fits li:nth-child(4) .tickmark { transition-delay: .3s; }
+
+/* The three people in the room, each with a mark of their own. */
+.whos {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px;
+}
+.who {
+  padding: 30px 30px 32px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface);
+  transition: border-color .2s, transform .25s cubic-bezier(.3,.8,.3,1);
+}
+.sec-alt .who { background: var(--bg); }
+.who:hover { border-color: var(--brand); transform: translateY(-3px); }
+.who-tile {
+  display: grid; place-items: center;
+  width: 54px; height: 54px; border-radius: 10px;
+  background: rgba(24, 82, 196, 0.09);
+}
+.who-tile .gly { stroke: var(--brand); }
+.who h3 { font-size: 17.5px; margin: 20px 0 8px; letter-spacing: -0.018em; }
+.who p { font-size: 15.5px; color: var(--body); margin: 0; }
+
+.gly { width: 30px; height: 30px; display: block; stroke-width: 2; }
+
+/* ------------------------------------------------------ the manual work -- */
+
+/* The problem wears the warm note; the brand colour is kept for what we
+   give back. Four steps, and a line that carries them round again. */
+.mws {
+  list-style: none; margin: 40px 0 0; padding: 0;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px;
+  counter-reset: none;
+}
+.mw {
+  padding: 26px 24px 28px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface);
+  transition: border-color .2s, transform .25s cubic-bezier(.3,.8,.3,1);
+}
+.sec-alt .mw { background: var(--bg); }
+.mw:hover { border-color: var(--flag); transform: translateY(-3px); }
+.mw-head { display: flex; align-items: center; justify-content: space-between; }
+.mw-n {
+  font-family: var(--mono); font-size: 12px; letter-spacing: 0.02em;
+  color: var(--flag-t);
+}
+.mw-head .gly { width: 34px; height: 34px; stroke: var(--flag); }
+.mw h3 { font-size: 16.5px; margin: 18px 0 8px; letter-spacing: -0.016em; line-height: 1.22; }
+.mw p { font-size: 15px; color: var(--body); margin: 0; }
+
+.again { position: relative; margin-top: 10px; padding-bottom: 6px; }
+.again-loop {
+  display: block; width: 100%; height: 44px;
+  fill: none; stroke: var(--flag); stroke-opacity: 0.5; stroke-width: 1.5;
+  stroke-dasharray: 6 6;
+  animation: again-run 30s linear infinite;
+}
+@keyframes again-run { to { stroke-dashoffset: -240; } }
+.again-tag {
+  position: absolute; left: 50%; bottom: -2px; transform: translateX(-50%);
+  background: var(--bg); padding: 0 14px;
+  font-size: 14.5px; color: var(--flag-t);
+}
+.sec-alt .again-tag { background: var(--surface); }
 
 /* ------------------------------------------------------- responsive ---- */
 
@@ -1632,7 +1705,9 @@ a { color: inherit; }
   .wf-dot { top: 5px; }
   .mk { grid-template-columns: 1fr; gap: 18px; }
   .caps { grid-template-columns: 1fr; gap: 0; }
-  .aud { grid-template-columns: 1fr; gap: 40px; }
+  .fits { grid-template-columns: 1fr; }
+  .whos, .mws { grid-template-columns: 1fr; }
+  .again { display: none; }
   .foot-cols { grid-template-columns: 1fr 1fr; gap: 28px 24px; }
   .qs { grid-template-columns: 1fr; }
   .qs-item { border-left: 0; border-top: 1px solid var(--line); padding: 40px 0 0; }
@@ -1680,6 +1755,8 @@ a { color: inherit; }
   .laptop-cycling .laptop-lid { animation: none !important; transform: rotateX(0deg) !important; }
   .laptop-cycling .laptop-lid-back { animation: none !important; opacity: 0 !important; }
   .scene .node { opacity: 1 !important; transform: none !important; animation: none !important; }
+  .again-loop { animation: none !important; }
+  .tickmark { stroke-dashoffset: 0 !important; }
   .pulse { display: none; }
 }
 

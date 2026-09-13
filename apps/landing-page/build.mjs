@@ -22,7 +22,8 @@ const id = (s) => `<span class="id">${esc(s)}</span>`;
 const rel = (d) => (d ? "../".repeat(d) : "");
 const n2 = (i) => String(i + 1).padStart(2, "0");
 
-function shell({ ogTitle, description, depth = 0, slug = "", body, script = false }) {
+function shell({ ogTitle, description, depth = 0, slug = "", body, script = false, doc = false }) {
+  const bodyClass = doc ? ' class="doc"' : "";
   const r = rel(depth);
   return `<!doctype html>
 <html lang="${C.meta.lang}">
@@ -57,7 +58,7 @@ ${JSON.stringify({
 }, null, 2)}
 </script>
 </head>
-<body>
+<body${bodyClass}>
 <a class="skip" href="#main">Skip to content</a>
 ${header(depth)}
 <main id="main">
@@ -624,25 +625,28 @@ function legalPage(key, extra) {
     ogTitle: `${C.meta.brand} — ${L.title}`,
     description: L.description,
     depth: 1,
+    doc: true,
     body: `<section class="sec sec-lead">
   <div class="wrap narrow">
     <h1>${esc(L.heading)}</h1>
-    <p class="note">${esc(L.note)}</p>
+    <p class="doc-date">${esc(L.updated)}</p>
     ${extra}
   </div>
 </section>`,
   });
 }
 
-const privacySections = C.privacyBody.sections
-  .map((s) => `<h2>${esc(s.title)}</h2>
-    <p>${s.body.split(/(TODO[^.]*\.)/).map((x) => (x.startsWith("TODO") ? `<span class="todo">${esc(x)}</span>` : esc(x))).join("")}</p>`)
-  .join("\n\n    ");
+const privacySections = `<p class="doc-intro">${esc(C.privacyBody.intro)}</p>\n\n    ` +
+  C.privacyBody.sections
+    .map((s) => `<section class="doc-s">
+      <h2>${esc(s.title)}</h2>
+      <p>${esc(s.body)}</p>
+    </section>`)
+    .join("\n\n    ");
 
 const pages = [
   ["index.html", home],
   ["artis/index.html", artisPage()],
-  ["datenschutz/index.html", legalPage("datenschutz", privacySections)],
   ["privacy/index.html", legalPage("privacy", privacySections)],
 ];
 

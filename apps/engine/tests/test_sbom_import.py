@@ -222,6 +222,9 @@ def test_run_from_sbom_skips_syft_and_seals_original(monkeypatch, tmp_path: Path
     monkeypatch.setattr(pipeline, "Feeds", Feeds)
     monkeypatch.setattr(pipeline, "KEY_PATH", tmp_path / "signing-key.pem")
     monkeypatch.setattr(dossier, "_compile", compile_pdf)
+    monkeypatch.setattr(dossier.pdfa, "validate_pdf", lambda *_args: {
+        "compliant": True, "validator_version": dossier.pdfa.VERSION,
+    })
 
     events = list(pipeline.run_sbom(source, out_base=tmp_path / "out"))
     summary = next(event.data for event in events if event.kind == ev.RUN_DONE)
@@ -231,4 +234,11 @@ def test_run_from_sbom_skips_syft_and_seals_original(monkeypatch, tmp_path: Path
     assert (run_dir / "input" / "uploaded.json").exists()
     assert (run_dir / "sbom.cdx.json").exists()
     assert "syft" not in json.loads((run_dir / "manifest.json").read_text())["tool_versions"]
+    assert summary["coverage_summary"] == {
+        "completed": 1,
+        "unsupported": 0,
+        "unscanned": 0,
+        "failed": 0,
+        "unknown": 0,
+    }
     assert all(check.ok for check in verify_run(run_dir))

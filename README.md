@@ -105,22 +105,26 @@ into ~10 package upgrades, which is the whole backlog.
 **1 · The seal holds**
 
 ```bash
-uv run pandax verify
+uv run pandax key export-public trusted-pandax-key.pem
+uv run pandax verify --trusted-key trusted-pandax-key.pem
 ```
 Recomputes every file digest, re-derives every chain link, and checks the
-Ed25519 signature. Seven checks, all green.
+Ed25519 signature against the public key supplied outside the bundle. Integrity,
+signature validity and signer trust are reported separately.
 
 **2 · The seal actually catches tampering** — the important one
 
 ```bash
 uv run pandax tamper --target sbom.cdx.json   # flips ONE byte; file stays valid JSON
-uv run pandax verify                          # now fails, naming S2_SBOM as the source
+uv run pandax verify --trusted-key trusted-pandax-key.pem
+# now fails, naming S2_SBOM as the source
 ```
 
 **3 · The findings reproduce against the live feed**
 
 ```bash
-uv run pandax verify --online     # re-queries OSV.dev and compares the advisory set
+uv run pandax verify --trusted-key trusted-pandax-key.pem --online
+# re-queries OSV.dev and compares the advisory set
 ```
 
 **4 · The statutory clocks**
@@ -251,11 +255,113 @@ The chain head is committed in `manifest.json`, which is signed with Ed25519.
 
 Changing any file breaks its digest. Editing a ledger record breaks that link.
 Re-linking the whole chain to hide the edit still fails, because the head no
-longer matches the signed manifest. `pandax verify` reports which of those
-happened.
+longer matches the signed manifest. Trusted verification additionally checks
+the signature against a public key supplied separately from the bundle:
 
-> The signing key is generated locally and proves **integrity, not legal
-> identity**. A production deployment needs an eIDAS qualified electronic seal.
+```powershell
+pandax key export-public trusted-pandax-key.pem
+$env:PANDAX_TRUSTED_KEY = "C:\secure-config\trusted-pandax-key.pem"
+pandax verify out\run-example
+```
+
+Use `pandax verify RUN --trusted-key KEY.pem` for a one-off trusted check, or
+`pandax verify RUN --inspect-only` to inspect an old bundle without claiming
+that its signer is trusted. See [trusted verification](docs/trusted-verification.md)
+for provisioning and status meanings.
+
+### Continuous monitoring
+
+Register an artifact or SBOM once, then let PandaX recheck it on a saved schedule:
+
+```powershell
+uv run pandax monitor add "Product release" .\product.zip --every-minutes 360
+uv run pandax monitor watch
+```
+
+`pandax monitor list` shows source freshness and the next check. `pandax monitor
+alerts` reports new, changed, reappearing, and no-longer-detected findings plus
+source failures and recoveries. Repeated identical results do not create new
+alerts. If a required source cannot be checked, PandaX records monitoring as
+incomplete and does not treat missing results as resolved vulnerabilities.
+
+### Approved runtime evidence
+
+A software file or SBOM shows which components are included, but it cannot show
+whether a component is actually loaded, used, enabled, or exposed on a real
+device. PandaX can now attach a small approved telemetry summary to a scan:
+
+```powershell
+uv run pandax telemetry validate .\runtime-telemetry.json
+uv run pandax scan .\product.zip --telemetry .\runtime-telemetry.json
+uv run pandax monitor add "Product release" .\product.zip --telemetry .\runtime-telemetry.json
+```
+
+Start with [the example telemetry file](docs/runtime-telemetry-example.json).
+The JSON uses schema `pandax/runtime-telemetry/v1`. It names the exact product
+and version, records the authorized company reviewer and approval time, and
+contains component PURLs with one of these signals: `component_loaded`,
+`component_executed`, `network_exposed`, `feature_enabled`, or `not_observed`.
+An optional device reference must already be converted to a SHA-256 value.
+Hostnames, IP addresses, serial numbers, environment variables, command lines,
+and raw logs are rejected. The original source is represented by its digest;
+only the checked, minimal form is placed in the signed evidence bundle.
+
+Runtime signals remain **evidence for company review**. They do not automatically
+declare a component reachable, make a vulnerability reportable, or start a CRA
+deadline. `telemetry-assessments.json` clearly marks matched and unmatched
+observations and every decision that still needs a person.
+
+### Vendor advisories and backported fixes
+
+Generic feeds can incorrectly flag a distribution package when its vendor has
+backported a security fix without changing the upstream version. An authorized
+security curator can install reviewed, exact-package vendor decisions:
+
+```powershell
+uv run pandax advisory validate .\vendor-intelligence.json
+uv run pandax advisory install .\vendor-intelligence.json
+uv run pandax advisory status
+```
+
+PandaX matches these decisions only to an exact, versioned Package URL. It keeps
+the official source, complete vendor revision, patch reference, review record,
+and any conflicting generic-feed result in the signed bundle. See
+[vendor advisories and backports](docs/vendor-intelligence.md) and the
+[example catalogue](docs/vendor-intelligence-example.json).
+
+### Product exposure analysis
+
+PandaX can combine reviewed build flags, feature configuration, network
+exposure, SBOM dependency paths, and approved runtime observations:
+
+```powershell
+uv run pandax exposure validate .\exposure-context.json
+uv run pandax scan .\product.zip --exposure-context .\exposure-context.json
+```
+
+The result explains whether the supplied evidence supports reachability,
+supports non-reachability, conflicts, or remains insufficient. It does not make
+the final decision or start a CRA deadline. See the [exposure analysis guide](docs/exposure-analysis.md)
+and [example context](docs/exposure-context-example.json).
+
+Vulnerability results keep [coverage, affectedness, KEV signals and product
+reachability](docs/vulnerability-coverage.md) separate. A completed source with
+no result is shown as “no finding in checked sources,” never as proof that the
+product is clean. The [native advisory coverage](docs/native-advisory-coverage.md)
+page lists the exact curl and OpenSSL release boundaries that are currently
+reviewed, explains source priority, and identifies what remains unknown.
+
+Evidence recipients can instead install the independent offline verifier from
+[`apps/verifier`](apps/verifier/README.md). It accepts a folder or ZIP and does
+not import the PandaX product:
+
+```powershell
+pandax-verify evidence.zip --trusted-key trusted-pandax-key.pem
+```
+
+> External-key verification establishes that the bundle came from the
+> pre-approved PandaX signing installation. It does not prove **legal identity**;
+> that requires an appropriate identity-backed or eIDAS-qualified seal.
 
 ### Honest documents
 
@@ -289,7 +395,8 @@ exploitable vulnerabilities").
 ## Known gaps
 
 1. No reachability analysis — non-KEV findings are `in_triage`, never `not_affected`.
-2. Ed25519 proves integrity, not legal identity (eIDAS seal needed).
+2. Externally trusted Ed25519 verification identifies the configured signing
+   installation, not a legal person (an identity-backed/eIDAS seal is still needed).
 3. PDF/A-2b is requested via Typst, not independently validated with veraPDF.
 4. Filings are generated, not submitted — the ENISA platform is not live.
 5. Squashfs/UBIFS images are not unpacked. The added OpenWrt scenarios use official rootfs tar archives; see the scenario guide.
@@ -307,6 +414,7 @@ apps/engine/pandax/
   render_cli.py  server.py        # two renderers, one event stream
   stages/{ingest,sbom,match,triage,clock,dossier}.py  # generate or import at S2
   templates/*.typ  web/           # Typst dossier, dashboard
+apps/verifier/                     # independent offline evidence verifier
 tools/bootstrap.py                # digest-pinned syft + log4j, builds the artifact
 fixtures/smarthub-sh100/          # the demo product
 ```

@@ -297,7 +297,9 @@
         body: JSON.stringify(data),
       }).then(function (r) {
         if (!r.ok) throw new Error(String(r.status));
-        f.hidden = true;
+        // The whole ask goes, heading and all, and the thank-you takes its place.
+        var ask = f.closest ? f.closest(".form-ask") : null;
+        (ask || f).hidden = true;
         done.hidden = false;
         done.focus();
       }).catch(function () {

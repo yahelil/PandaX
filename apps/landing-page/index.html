@@ -630,20 +630,25 @@
     </div>
     <div class="close-in close-one" id="contact">
       <div class="form-wrap">
-      <h2>Get in touch</h2>
-      <p class="lede lede-sm">Tell us what you build and which release is next.</p>
-      <form class="form" method="post" action="mailto:contact@pandax.online" data-post="/api/contact" enctype="text/plain">
-        <input type="hidden" name="kind" value="sample">
-        <p class="hp"><label>Leave this empty<input type="text" name="company_url" tabindex="-1" autocomplete="off"></label></p>
-        <div class="row">
-          <label>Name<input type="text" name="name" required autocomplete="name"></label>
-          <label>Work email<input type="email" name="email" required autocomplete="email"></label>
-        </div>
-        <label>Company<input type="text" name="company" autocomplete="organization"></label>
-        <label>What do you build?<textarea name="message" rows="4"></textarea></label>
-        <button class="btn" type="submit" data-idle="Send" data-busy="Sending…">Send</button>
-      </form>
-      <p class="form-done" role="status" tabindex="-1" hidden>Thank you. Your message is with us, and we will come back to you shortly.</p>
+      <div class="form-ask">
+        <h2>Get in touch</h2>
+        <p class="lede lede-sm">Tell us what you build and which release is next.</p>
+        <form class="form" method="post" action="mailto:contact@pandax.online" data-post="/api/contact" enctype="text/plain">
+          <input type="hidden" name="kind" value="sample">
+          <p class="hp"><label>Leave this empty<input type="text" name="company_url" tabindex="-1" autocomplete="off"></label></p>
+          <div class="row">
+            <label>Name<input type="text" name="name" required autocomplete="name"></label>
+            <label>Work email<input type="email" name="email" required autocomplete="email"></label>
+          </div>
+          <label>Company<input type="text" name="company" autocomplete="organization"></label>
+          <label>Anything you want to tell us<textarea name="message" rows="4"></textarea></label>
+          <button class="btn" type="submit" data-idle="Send" data-busy="Sending…">Send</button>
+        </form>
+      </div>
+      <div class="form-done" role="status" tabindex="-1" hidden>
+        <h2>Thank you.</h2>
+        <p class="lede lede-sm">Your message is with us. We will come back to you shortly.</p>
+      </div>
     </div>
     </div>
   </div>
@@ -682,7 +687,10 @@
         </ul>
       </div>
     </nav>
-    <p class="foot-legal">PandaX produces compliance documentation. It does not issue conformity opinions, certificates or verdicts.</p>
+    <div class="foot-base">
+      <p class="foot-copy">&copy; 2026 PandaX</p>
+      <p class="foot-legal">PandaX produces compliance documentation. It does not issue conformity opinions, certificates or verdicts.</p>
+    </div>
   </div>
 </footer>
 <script>window.PANDAX_RECORDS = [{"label":"Example record","product":"Gateway controller","release":"4.2.1","runId":"run-20260910-084417-c31f0a","stats":[{"value":"412","label":"components"},{"value":"7","label":"findings"},{"value":"1","label":"needs a decision"},{"value":"6 of 6","label":"checks passed"}],"checks":["Inventory","Findings","Decisions","Timeline","Documents","Sealed"],"finding":{"cve":"CVE-2023-46218","component":"curl 8.3.0","fix":"Upgrade to curl 8.5.0"}},{"label":"Example record","product":"Sensor hub","release":"2.8.0","runId":"run-20260911-113902-7ae4d1","stats":[{"value":"286","label":"components"},{"value":"3","label":"findings"},{"value":"0","label":"needs a decision"},{"value":"6 of 6","label":"checks passed"}],"checks":["Inventory","Findings","Decisions","Timeline","Documents","Sealed"],"finding":{"cve":"CVE-2024-2511","component":"openssl 3.0.12","fix":"Upgrade to openssl 3.0.14"}},{"label":"Example record","product":"Edge router","release":"1.14.3","runId":"run-20260912-201545-b09f38","stats":[{"value":"531","label":"components"},{"value":"12","label":"findings"},{"value":"2","label":"needs a decision"},{"value":"6 of 6","label":"checks passed"}],"checks":["Inventory","Findings","Decisions","Timeline","Documents","Sealed"],"finding":{"cve":"CVE-2023-44487","component":"nghttp2 1.52.0","fix":"Upgrade to nghttp2 1.57.0"}}];</script>

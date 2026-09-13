@@ -1310,15 +1310,10 @@ a { color: inherit; }
 .sec-q .sec-n { display: none; }
 
 .q-head {
-  text-align: center; max-width: 20ch; margin: 0 auto;
-  padding-bottom: 0; font-size: clamp(32px, 4.2vw, 50px);
+  text-align: center; max-width: 24ch; margin: 0 auto; text-wrap: balance;
+  padding-bottom: 0; font-size: clamp(31px, 4vw, 48px);
 }
 .q-head::after { display: none; }
-.q-lede {
-  text-align: center; max-width: 52ch; margin: 18px auto 0;
-  font-size: 17px; line-height: 1.6; color: var(--body);
-}
-/* The highlight takes the section's own colour rather than a fixed one. */
 .hl-accent { color: var(--ink); }
 .hl-accent::after {
   background: var(--accent, var(--bronze)); opacity: 0.3;
@@ -1348,14 +1343,13 @@ a { color: inherit; }
 }
 .qs-item p { font-size: 16px; max-width: 34ch; }
 
-/* The seal: a rim of marks turning slowly, the drawing steady inside it. */
-.qart { width: 124px; height: 124px; display: block; }
-.q-ring { stroke: var(--ink); stroke-width: 1.6; opacity: 0.4; }
-.q-ticks { stroke: var(--ink); stroke-width: 1.6; opacity: 0.3; }
-.q-ticks { transform-box: fill-box; transform-origin: center; animation: q-turn 64s linear infinite; }
-@keyframes q-turn { to { transform: rotate(360deg); } }
+/* A hexagon, with a fainter one set behind it for depth. */
+.qart { width: 132px; height: 132px; display: block; }
+.q-hex { stroke: var(--ink); stroke-width: 2; }
+.q-hex-back { opacity: 0.22; }
 .q-glyph { stroke: var(--ink); stroke-width: 2; }
 .q-dot { fill: var(--accent, var(--bronze)); stroke: none; }
+.q-head { fill: var(--ink); stroke: none; }
 
 /* Each seal settles as the section is reached; the rim answers the pointer. */
 .qs-item .qart { opacity: 0; transform: translateY(12px); transition: opacity .5s, transform .5s; }
@@ -1363,11 +1357,9 @@ a { color: inherit; }
 .sec-q.lit .qs-item:nth-child(2) .qart { transition-delay: .17s; }
 .sec-q.lit .qs-item:nth-child(3) .qart { transition-delay: .29s; }
 .sec-q.lit .qs-item .qart { opacity: 1; transform: none; }
-.q-ring { transition: stroke .25s, opacity .25s, transform .35s cubic-bezier(.3,.8,.3,1); }
-.qs-item:hover .q-ring {
-  stroke: var(--accent, var(--bronze)); opacity: 0.85;
-  transform-box: fill-box; transform-origin: center; transform: scale(1.06);
-}
+.q-hex, .q-glyph { transition: transform .28s cubic-bezier(.3,.8,.3,1), stroke .25s; }
+.qs-item:hover .q-hex:not(.q-hex-back), .qs-item:hover .q-glyph { transform: translate(-4px, -4px); }
+.qs-item:hover .q-hex:not(.q-hex-back) { stroke: var(--accent, var(--bronze)); }
 
 /* ------------------------------------------------------------ tables ---- */
 
@@ -1673,7 +1665,7 @@ a { color: inherit; }
   .laptop-cycling .laptop-lid { animation: none !important; transform: rotateX(0deg) !important; }
   .laptop-cycling .laptop-lid-back { animation: none !important; opacity: 0 !important; }
   .scene .node { opacity: 1 !important; transform: none !important; animation: none !important; }
-  .bam, .q-ticks { animation: none !important; }
+  .bam { animation: none !important; }
   .pulse { display: none; }
 }
 

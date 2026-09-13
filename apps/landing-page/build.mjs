@@ -517,34 +517,31 @@ function doesSection() {
 
 /* 7b ----------------------------------------------------- questions --- */
 
-/** A stamp ring with the drawing inside it \u2014 the seal this site already keeps.
- *  Twelve marks around the rim, turning slowly, the way a dial does. */
-function sealGlyph(kind) {
-  const ticks = Array.from({ length: 12 }, (_, i) => {
-    const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
-    const at = (r) => [(60 + Math.cos(a) * r).toFixed(1), (60 + Math.sin(a) * r).toFixed(1)];
-    const [x1, y1] = at(50), [x2, y2] = at(56);
-    return `<path d="M${x1} ${y1} L${x2} ${y2}"/>`;
-  }).join("");
-
+/** A hexagon holding the drawing \u2014 the shape the hero illustration already
+ *  uses, so the mark comes out of our own vocabulary. */
+function hexGlyph(kind) {
   const inner = {
-    contents: `<path d="M60 40 L82 52 v24 L60 88 L38 76 V52 Z"/>
-          <path d="M38 52 L60 64 L82 52"/>
-          <path d="M60 64 v24"/>
-          <circle class="q-dot" cx="60" cy="52" r="3.4"/>`,
-    known: `<path d="M60 42 L82 82 H38 Z"/>
-          <path d="M60 57 v11"/>
-          <circle class="q-dot" cx="60" cy="75" r="3.4"/>`,
-    did: `<path d="M46 40 h19 l11 11 v31 h-30 z"/>
-          <path d="M65 40 v11 h11"/>
-          <path d="M51 66 l6 6 l12 -14"/>
-          <circle class="q-dot" cx="76" cy="76" r="3.4"/>`,
+    evidence: `<path d="M44 48 l4.5 4.5 l7.5 -8.5"/>
+          <path d="M62 50 h17"/>
+          <path d="M44 60 l4.5 4.5 l7.5 -8.5"/>
+          <path d="M62 62 h17"/>
+          <path d="M44 72 l4.5 4.5 l7.5 -8.5"/>
+          <path d="M62 74 h11"/>
+          <circle class="q-dot" cx="79" cy="74" r="3.2"/>`,
+    document: `<path d="M45 39 h20 l12 12 v30 h-32 z"/>
+          <path d="M65 39 v12 h12"/>
+          <path d="M52 61 h17"/>
+          <path d="M52 70 h11"/>
+          <circle class="q-dot" cx="75" cy="70" r="3.4"/>`,
+    again: `<path d="M70.9 44.4 A19 19 0 1 1 49.1 44.4"/>
+          <path class="q-head" d="M77 48.7 L68 48.5 L73.8 40.3 Z"/>
+          <circle class="q-dot" cx="60" cy="61" r="3.8"/>`,
   }[kind];
 
   return `<svg class="qart" viewBox="0 0 120 120" aria-hidden="true">
         <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <g class="q-ticks">${ticks}</g>
-          <circle class="q-ring" cx="60" cy="60" r="44"/>
+          <path class="q-hex q-hex-back" d="M108 62 L84.5 102.7 H37.5 L14 62 L37.5 21.3 H84.5 Z"/>
+          <path class="q-hex" d="M104 58 L80.5 98.7 H33.5 L10 58 L33.5 17.3 H80.5 Z"/>
           <g class="q-glyph">${inner}</g>
         </g>
       </svg>`;
@@ -554,7 +551,7 @@ function questionsSection() {
   const q = C.questions;
   const items = q.items
     .map((it) => `<li class="qs-item">
-        ${sealGlyph(it.glyph)}
+        ${hexGlyph(it.glyph)}
         <h3>${esc(it.title)}</h3>
         <p>${esc(it.body)}</p>
       </li>`).join("\n      ");
@@ -562,7 +559,6 @@ function questionsSection() {
   return `<section class="sec sec-q" id="questions">
   <div class="wrap">
     <h2 class="q-head">${esc(q.heading)} <span class="hl hl-accent">${esc(q.highlight)}</span></h2>
-    <p class="q-lede">${esc(q.lede)}</p>
     <ul class="qs">
       ${items}
     </ul>

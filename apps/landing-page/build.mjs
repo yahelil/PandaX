@@ -112,6 +112,9 @@ function footer(depth) {
     .map((l) => `<a href="${depth && l.href.startsWith("/") ? r + l.href.slice(1) : l.href}">${esc(l.label)}</a>`)
     .join("\n      ");
   return `<footer class="foot">
+  <span class="foot-mark" aria-hidden="true">
+    <img src="${r}assets/pandax-mark-ink.png" alt="" width="240" height="240" loading="lazy">
+  </span>
   <div class="wrap foot-in">
     <div class="foot-brand">
       <img src="${r}assets/favicon-512.png" alt="" width="22" height="22">
@@ -620,11 +623,66 @@ function formBlock(heading, body, kind) {
     </div>`;
 }
 
+/** The closing showcase: the product running, with the mark beside it. */
+function actionStage() {
+  const a = C.action;
+  return `<div class="act">
+      <h2 class="act-head">${esc(a.lead)} <span class="hl hl-rose">${esc(a.highlight)}</span> ${esc(a.tail)}</h2>
+      <p class="act-sub">${esc(a.body)}</p>
+      <div class="act-stage">
+        <svg class="act-art" viewBox="0 0 1200 470" aria-hidden="true" preserveAspectRatio="xMidYMax meet">
+          <defs>
+            <linearGradient id="actL" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stop-color="#4A4FA8" stop-opacity="0"/>
+              <stop offset="0.28" stop-color="#4A4FA8" stop-opacity="0.07"/>
+              <stop offset="0.62" stop-color="#4A4FA8" stop-opacity="0.17"/>
+              <stop offset="1" stop-color="#4A4FA8" stop-opacity="0.02"/>
+            </linearGradient>
+            <linearGradient id="actR" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stop-color="#B4577E" stop-opacity="0"/>
+              <stop offset="0.28" stop-color="#B4577E" stop-opacity="0.07"/>
+              <stop offset="0.66" stop-color="#B4577E" stop-opacity="0.18"/>
+              <stop offset="1" stop-color="#B4577E" stop-opacity="0.02"/>
+            </linearGradient>
+          </defs>
+          <g class="act-hill act-hill-l">
+            <path d="M-80 340 C10 340 30 200 110 200 C168 200 186 262 228 262 C276 262 296 196 352 196 C430 196 448 340 520 340 L520 470 L-80 470 Z"
+                  fill="url(#actL)"/>
+            <path d="M-80 340 C10 340 30 200 110 200 C168 200 186 262 228 262 C276 262 296 196 352 196 C430 196 448 340 520 340"
+                  fill="none" stroke="#4A4FA8" stroke-opacity="0.34" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <g class="act-hill act-hill-r">
+            <path d="M1280 312 C1190 312 1170 168 1090 168 C1030 168 1012 236 970 236 C922 236 902 172 846 172 C768 172 752 312 680 312 L680 470 L1280 470 Z"
+                  fill="url(#actR)"/>
+            <path d="M1280 312 C1190 312 1170 168 1090 168 C1030 168 1012 236 970 236 C922 236 902 172 846 172 C768 172 752 312 680 312"
+                  fill="none" stroke="#B4577E" stroke-opacity="0.34" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <g class="act-plus" stroke="#B0801F" stroke-width="1.7" stroke-linecap="round">
+            <path d="M56 132 h17 M64.5 123.5 v17"/>
+            <path d="M1148 96 h13 M1154.5 89.5 v13"/>
+            <path d="M1112 250 h10 M1117 245 v10"/>
+          </g>
+        </svg>
+        <div class="act-frame" data-cycle="1">
+          <div class="rec-frame">
+            ${screen(C.hero.records[0])}
+          </div>
+          <span class="act-mark" aria-hidden="true">
+            <img src="assets/pandax-mark-ink.png" alt="" width="46" height="46" loading="lazy">
+          </span>
+        </div>
+      </div>
+    </div>`;
+}
+
 function closingSection() {
   const c = C.contact;
   return `<section class="sec sec-close" id="contact">
-  <div class="wrap close-in close-one">
-    ${formBlock(c.heading, c.body, "sample")}
+  <div class="wrap">
+    ${actionStage()}
+    <div class="close-in close-one">
+      ${formBlock(c.heading, c.body, "sample")}
+    </div>
   </div>
 </section>`;
 }

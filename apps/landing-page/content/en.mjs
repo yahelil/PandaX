@@ -288,6 +288,13 @@ export const capability = {
   },
 };
 
+export const action = {
+  lead: "Ready to see",
+  highlight: "Actis",
+  tail: "in action?",
+  body: "One run against one firmware image, and the record it seals. Components, findings, the fix that shipped, and the proof it was signed off — this is what comes out the other side.",
+};
+
 export const contact = {
   heading: "Get in touch",
   body: "Tell us what you build and which release is next.",

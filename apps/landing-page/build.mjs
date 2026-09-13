@@ -23,8 +23,9 @@ const id = (s) => `<span class="id">${esc(s)}</span>`;
 const rel = (d) => (d ? "../".repeat(d) : "");
 const n2 = (i) => String(i + 1).padStart(2, "0");
 
-function shell({ ogTitle, description, depth = 0, slug = "", body, script = false, doc = false }) {
-  const bodyClass = doc ? ' class="doc"' : "";
+function shell({ ogTitle, description, depth = 0, slug = "", body, script = false, doc = false, pageClass = "", currentProduct = "" }) {
+  const classes = [doc ? "doc" : "", pageClass].filter(Boolean).join(" ");
+  const bodyClass = classes ? ` class="${classes}"` : "";
   const r = rel(depth);
   return `<!doctype html>
 <html lang="${C.meta.lang}">
@@ -61,7 +62,7 @@ ${JSON.stringify({
 </head>
 <body${bodyClass}>
 <a class="skip" href="#main">Skip to content</a>
-${header(depth)}
+${header(depth, currentProduct)}
 <main id="main">
 ${body}
 </main>
@@ -72,10 +73,10 @@ ${script ? `<script>window.PANDAX_RECORDS = ${JSON.stringify(C.hero.records)};</
 `;
 }
 
-function productsMenu(depth) {
+function productsMenu(depth, currentProduct) {
   const r = rel(depth);
   const items = C.nav.products
-    .map((p) => `<a class="menu-item" href="${r}${p.href}">
+    .map((p) => `<a class="menu-item${p.href === currentProduct ? " is-current" : ""}" href="${r}${p.href}"${p.href === currentProduct ? ' aria-current="page"' : ""}>
           <img src="${r}${p.mark}" alt="" width="36" height="36">
           <span><strong>${esc(p.name)}</strong><small>${esc(p.blurb)}</small></span>
         </a>`).join("\n        ");
@@ -89,7 +90,7 @@ function productsMenu(depth) {
     </div>`;
 }
 
-function header(depth) {
+function header(depth, currentProduct) {
   const r = rel(depth);
   const links = C.nav.links
     .map((l) => `<a href="${depth ? `${r}index.html${l.href}` : l.href}">${esc(l.label)}</a>`)
@@ -103,7 +104,7 @@ function header(depth) {
     <nav class="head-nav" aria-label="Sections">
         ${links}
     </nav>
-    ${productsMenu(depth)}
+    ${productsMenu(depth, currentProduct)}
     <a class="btn btn-sm" href="${depth ? `${r}index.html#contact` : C.nav.action.href}">${esc(C.nav.action.label)}</a>
   </div>
 </header>`;
@@ -477,41 +478,6 @@ function capabilitySection() {
     <ol class="caps">
       ${items}
     </ol>
-    <div class="band">
-      <h3>${esc(c.closing.title)}</h3>
-      <p>${esc(c.closing.body)}</p>
-    </div>
-  </div>
-</section>`;
-}
-
-function manualSection() {
-  const m = C.manual;
-  const marks = ["parts", "trace", "patched", "submit"];
-  const steps = m.steps
-    .map((s, i) => `<li class="mw">
-        <span class="mw-head">
-          <span class="mw-n">${n2(i)}</span>
-          ${lineGlyph(marks[i])}
-        </span>
-        <h3>${esc(s.title)}</h3>
-        <p>${esc(s.body)}</p>
-      </li>`).join("\n      ");
-
-  return `<section class="sec" id="manual">
-  <div class="wrap">
-    <h2>${esc(m.heading)}</h2>
-    <p class="lede">${esc(m.lede)}</p>
-    <ol class="mws">
-      ${steps}
-    </ol>
-    <div class="again" aria-hidden="true">
-      <svg class="again-loop" viewBox="0 0 1000 44" preserveAspectRatio="none">
-        <path d="M990 4 v18 a14 14 0 0 1 -14 14 H24 a14 14 0 0 1 -14 -14 V4"/>
-      </svg>
-      <span class="again-tag">${esc(m.again)}</span>
-    </div>
-    <p class="note">${esc(m.clock)}</p>
   </div>
 </section>`;
 }
@@ -528,11 +494,9 @@ function doesSection() {
       <span class="flow-pulse flow-pulse-a"></span>
       <span class="flow-pulse flow-pulse-b"></span>
       <div class="flow-in">
-        <span class="fl-src" data-i="0">Jira</span>
-        <span class="fl-src" data-i="1">CI/CD</span>
-        <span class="fl-src" data-i="2">SBOM</span>
-        <span class="fl-src" data-i="3">Documents</span>
-        <span class="fl-src" data-i="4">Legal</span>
+        <span class="fl-src" data-i="0">SBOM</span>
+        <span class="fl-src" data-i="1">Documents</span>
+        <span class="fl-src" data-i="2">Legal</span>
       </div>
       <div class="flow-core">${esc(d.name)}</div>
       <div class="flow-out">
@@ -834,6 +798,8 @@ function actisPage() {
     description: a.description,
     depth: 1,
     script: true,
+    pageClass: "page-actis",
+    currentProduct: "actis/",
     body: grounds(`<section class="sec sec-lead" id="top">
   <div class="wrap">
     <div class="hero-in">
@@ -881,7 +847,7 @@ function actisPage() {
   </div>
 </section>
 
-<section class="sec">
+<section class="sec sec-proof">
   <div class="wrap">
     <h2>${esc(a.record.heading)}</h2>
     <p class="lede">${esc(a.record.lede)}</p>
@@ -945,7 +911,7 @@ const home = shell({
     // The home page makes the case. How the product works in detail lives
     // on the product page, where someone has already decided to look.
     heroSection(), audienceSection(),
-    marketSection(), manualSection(),
+    marketSection(),
     doesSection(), questionsSection(),
     obligationSection(), growthSection(), workflowSection(),
     aboutSection(), closingSection(),

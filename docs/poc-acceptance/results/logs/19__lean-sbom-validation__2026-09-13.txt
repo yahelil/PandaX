@@ -1,0 +1,60 @@
+PandaX card 19 — scoped CycloneDX SBOM PoC acceptance
+Date: 2026-09-13 (Asia/Jerusalem)
+Base revision at execution: e8fafb569c42a6b3d3db186f2a5bb7510513a6f7
+Run ID: run-20260913-222816-809197-4e3aa1
+
+AUTHORIZED SCOPE
+CycloneDX SBOM end-to-end validation only. Track A/B raw firmware, Docker,
+unseen-device intake, and physical-device validation were intentionally not run.
+
+RESULT: PASS for the scoped SBOM PoC.
+
+1. End-to-end scan
+   Input: fixtures/example-sbom.cdx.json (CycloneDX 1.6)
+   Components: 2 total; 1 matchable; 1 skipped with explicit coverage warning.
+   Findings: 2 vulnerabilities; CVE-2020-11023 identified as CISA KEV.
+   Article 14 clocks: 1.
+   Documents: 3 PDFs generated.
+   Evidence: 31 files sealed with Ed25519; ledger root recorded below.
+   Expected product decision: conformity BLOCKED by the known exploited
+   vulnerability. The scan command returned 1 for that product decision after
+   the pipeline completed and sealed its output; this is not a pipeline error.
+
+2. Independent evidence verification
+   Command: pandax verify <run> --trusted-key <separately exported public key>
+   Result: exit 0; all 12 displayed checks passed, including 31 file digests,
+   six contiguous ledger records/hash links, stage outputs, signature, and
+   external signer trust.
+
+3. Whole-directory PDF/A validation
+   Command: python tools/validate_pdfs.py <run> --reports <separate-report-dir>
+            --verapdf <veraPDF launcher>
+   Result: exit 0; 3/3 PDFs passed.
+   Files:
+   - AnnexVII_Technical_Documentation.pdf
+   - EU_Declaration_of_Conformity.pdf
+   - Simplified_EU_Declaration_of_Conformity.pdf
+
+4. Persistence, simulated refresh, incident, and workflow validation
+   Command: python -m pytest -q -p no:cacheprovider
+            apps/engine/tests/test_advisory_watch.py
+            apps/engine/tests/test_case_incident.py
+            apps/engine/tests/test_case_workflow.py
+            apps/engine/tests/test_case_submissions.py
+            apps/engine/tests/test_case_service.py
+            apps/engine/tests/test_cases.py
+   Result: exit 0; 40 passed, 2 dependency deprecation warnings.
+   Covered behaviors include repeat/restart deduplication, simulated replay
+   labeling, scheduled refresh opening a case, incident coexistence, clocks,
+   receipts/amendments, rollback, snapshots, and report persistence after
+   restart.
+
+5. Previously completed main-branch regression gates
+   Engine: 266 passed, 4 skipped, 2 warnings.
+   Verifier/helper: 34 passed.
+   Preflight: 22 passed.
+
+LIMITATION
+This evidence supports only: “PandaX PoC validated end-to-end for CycloneDX
+SBOM input.” It must not be cited as raw-firmware, unseen-image, Docker, or
+real-device acceptance.

@@ -5,10 +5,9 @@
  *
  * Everything else is handed straight back to the asset server.
  *
- * Configuration (Worker secrets, set once):
- *   RESEND_API_KEY   an API key from the mail provider
- *   CONTACT_TO       where the message should land
- *   CONTACT_FROM     optional; a verified sender on that key's domain
+ * Configuration:
+ *   EMAIL        Cloudflare Email Service binding
+ *   CONTACT_TO   verified destination address (Worker secret)
  *
  * Without those the route answers 503 and the page falls back to mailto,
  * so an unconfigured deploy degrades rather than swallowing messages.
@@ -46,9 +45,8 @@ async function contact(request, env) {
   if (!f.name || !f.email) return json({ ok: false, error: "missing" }, 422);
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(f.email)) return json({ ok: false, error: "email" }, 422);
 
-  const key = env.RESEND_API_KEY;
   const to = env.CONTACT_TO;
-  if (!key || !to) return json({ ok: false, error: "not_configured" }, 503);
+  if (!env.EMAIL || !to) return json({ ok: false, error: "not_configured" }, 503);
 
   const lines = [
     `Name:    ${f.name}`,
@@ -59,23 +57,17 @@ async function contact(request, env) {
     f.message || "(no message)",
   ];
 
-  let sent;
   try {
-    sent = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        from: env.CONTACT_FROM || "PandaX site <onboarding@resend.dev>",
-        to: [to],
-        reply_to: f.email,
-        subject: `pandax.online, ${f.name}${f.company ? ` (${f.company})` : ""}`,
-        text: lines.join("\n"),
-      }),
+    await env.EMAIL.send({
+      from: { email: "contact@pandax.online", name: "PandaX site" },
+      to,
+      replyTo: f.email,
+      subject: `pandax.online, ${f.name}${f.company ? ` (${f.company})` : ""}`,
+      text: lines.join("\n"),
     });
   } catch {
-    return json({ ok: false, error: "unreachable" }, 502);
+    return json({ ok: false, error: "send_failed" }, 502);
   }
-  if (!sent.ok) return json({ ok: false, error: "send_failed" }, 502);
   return json({ ok: true });
 }
 

@@ -1,15 +1,12 @@
 /**
- * All site copy, in one place.
+ * All site copy, in one place. Sourced from the PandaX deck.
  *
- * Edit here, then run `node build.mjs` to regenerate the HTML. Never edit the
- * generated pages by hand — they are overwritten.
+ * Edit here, then run `node build.mjs`. Never edit the generated pages by hand.
+ * Structured for translation: a German file would be content/de.mjs, same shape.
  *
- * Structured for translation: a German file would be content/de.mjs with the
- * same shape. No German copy is written yet.
- *
- * House rules: sentence case everywhere. Say record, evidence, audit trail —
- * never "CRA-compliant", "certified" or "guaranteed". The product analyses an
- * SBOM, so the word "firmware" does not appear on this site.
+ * House rules: sentence case. Say record, evidence, audit trail — never
+ * "CRA-compliant", "certified" or "guaranteed". The product reads an SBOM, so
+ * the word "firmware" does not appear.
  */
 
 export const meta = {
@@ -17,8 +14,6 @@ export const meta = {
   domain: "pandax.online",
   brand: "PandaX",
   product: "Artis",
-  // The dashboard UI says "CRA Compliance Vault". The public site uses the
-  // brand name only. Flagged for a decision rather than settled quietly.
   tagline: "Product security evidence for the EU Cyber Resilience Act",
 };
 
@@ -34,17 +29,11 @@ export const nav = {
     },
   ],
   links: [],
-
   action: { label: "Book a walkthrough", href: "#contact" },
 };
 
 /* 0 ------------------------------------------------------------- boot --- */
 
-/**
- * The entrance. The lid opens onto the PandaX mark, the camera pushes into the
- * screen, and the page opens through the transparent counter of the X.
- * Scroll-driven; skipped entirely for a deep link or reduced motion.
- */
 export const boot = {
   meta: "PandaX",
   metaRight: "EU Cyber Resilience Act",
@@ -58,12 +47,11 @@ export const boot = {
 /* 1 ------------------------------------------------------------- hero --- */
 
 export const hero = {
-  headline: "Every release. Evidence ready.",
+  headline: "Automate EU act compliance",
   subhead: "Product security evidence for the EU Cyber Resilience Act.",
-  body: "Artis takes a release in. A reviewable record comes out.",
+  body: "Every release needs legal evidence. PandaX builds it.",
   primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
   secondary: { label: "See Artis", href: "/artis/" },
-  /** Shown on the laptop screen. An example, labelled as one on the page. */
   record: {
     label: "Example record",
     product: "Gateway controller",
@@ -77,17 +65,12 @@ export const hero = {
       { value: "6 of 6", label: "checks passed" },
     ],
     checks: ["Inventory", "Findings", "Decisions", "Timeline", "Documents", "Sealed"],
-    finding: {
-      cve: "CVE-2023-46218",
-      component: "curl 8.3.0",
-      fix: "Upgrade to curl 8.5.0",
-    },
+    finding: { cve: "CVE-2023-46218", component: "curl 8.3.0", fix: "Upgrade to curl 8.5.0" },
   },
 };
 
-/* 1b --------------------------------------------------------- pipeline --- */
+/* --- the engine, shown only on the product page ------------------------ */
 
-/** The engine, written the way it runs. Types itself out once, when reached. */
 export const pipeline = {
   heading: "Artis, running",
   lines: [
@@ -104,178 +87,156 @@ export const pipeline = {
 /* 2 -------------------------------------------------------- obligation --- */
 
 export const obligation = {
-  heading: "The CRA makes product security a legal obligation",
-  lede: "New EU rules apply to software and connected products.",
+  heading: "The Cyber Resilience Act hardens vulnerability compliance",
+  lede: "Every release needs legal evidence.",
   marks: [
-    { date: "11 Jun 2026", iso: "2026-06-11", label: "Assessment bodies designated" },
-    { date: "11 Sep 2026", iso: "2026-09-11", label: "Reporting applies", live: true },
-    { date: "11 Dec 2027", iso: "2027-12-11", label: "Everything else" },
+    { date: "11 Sep 2026", iso: "2026-09-11", label: "Vulnerability-handling requirements apply", live: true },
+    { date: "11 Dec 2027", iso: "2027-12-11", label: "Full CRA application" },
   ],
+  liveLabel: "In effect",
   points: [
-    "Secure the product, and manage its vulnerabilities, for its whole life.",
-    "Penalties reach €15 million or 2.5% of worldwide revenue.",
+    "Companies must maintain technical files — cybersecurity risk assessments, software architecture designs and test reports — available to authorities for at least 10 years.",
+    "Penalties can reach €15 million or 2.5% of worldwide annual turnover, whichever is higher.",
   ],
-  closing: "Every release doesn't just need a security checklist. It needs evidence.",
   source:
     "European Commission Digital Strategy; Regulation (EU) 2024/2847, Articles 71 and 73.",
-  liveLabel: "In effect",
 };
 
-/* 3 ------------------------------------------------------------ vector --- */
+/* 3 ------------------------------------------------------- accelerating --- */
 
-export const vectors = {
-  heading: "Vulnerability exploitation is now the fastest-growing way in",
-  lede: "Verizon 2025 DBIR, initial access vectors.",
-  /** One measure, four categories, one of them the point. Bronze marks it. */
-  bars: [
-    { label: "Other vectors and unknowns", value: 42 },
-    { label: "Stolen credentials", value: 22 },
-    { label: "Vulnerability exploitation", value: 20, mark: true },
-    { label: "Phishing", value: 16 },
+export const growth = {
+  heading: "Vulnerability discovery is accelerating",
+  lede: "CVE reports more than doubled between 2020 and 2025.",
+  /** Actual CVE Program totals, then an exponential fit — labelled as one. */
+  series: [
+    { year: "2020", value: 18375 },
+    { year: "2021", value: 20161 },
+    { year: "2022", value: 25059 },
+    { year: "2023", value: 28961 },
+    { year: "2024", value: 40077 },
+    { year: "2025", value: 48244 },
+    { year: "2026", value: 57300, projected: true },
+    { year: "2027", value: 70000, projected: true },
+    { year: "2028", value: 85600, projected: true },
+    { year: "2029", value: 104700, projected: true },
+    { year: "2030", value: 128000, projected: true },
   ],
+  actualLabel: "Published",
+  projectedLabel: "Projected",
   facts: [
-    "20% of breaches began with vulnerability exploitation.",
-    "Up 34% year over year.",
-    "Edge and VPN devices went from 3% to 22% of exploitation incidents.",
+    { value: "42,595", label: "New vulnerabilities disclosed in the ENISA reporting period, up 27%." },
+    { value: "33%", label: "Rated high or critical — 7% critical, 26% high." },
   ],
+  ai: {
+    title: "The curve is not flattening",
+    body: "As AI tools speed up discovery, the number of findings that need evaluation and tracking grows with it.",
+  },
   source:
-    "Verizon 2025 DBIR. The DBIR reports phishing at about 15%; the figure here is rounded to 16%.",
+    "ENISA Threat Landscape 2025; CVE Program Metrics 2020–2025. Figures from 2026 on are an exponential fit to those totals, not a forecast. The 42,595 count is ENISA's reporting period and does not line up with a calendar year.",
 };
 
-/* 4 ----------------------------------------------------------- problem --- */
+/* 4 ---------------------------------------------------------- workflow --- */
 
-export const problem = {
-  heading: "When proof is requested, teams reconstruct compliance by hand",
-  lede: "The evidence exists. It is just scattered.",
-  lines: [
-    { lead: "Scanners find risks.", rest: "They do not assemble proof." },
-    { lead: "Compliance tools track policy.", rest: "Not each release." },
-    { lead: "Jira, CI/CD, SBOM, documents, legal.", rest: "All disconnected." },
+export const workflow = {
+  heading: "Vulnerability reporting workflow",
+  lede: "The 24-hour and 72-hour deadlines both run from the company's awareness.",
+  stages: [
+    { at: "24 hours", title: "Early warning", body: "Alerting for an actively exploited vulnerability or severe incident." },
+    { at: "72 hours", title: "Notification", body: "Affected product information, measures taken and user protection steps." },
+    { at: "14 days", title: "Actively exploited vulnerability", body: "Final report, once a corrective or mitigating measure becomes available." },
+    { at: "1 month", title: "Severe incident", body: "Final report, after the 72-hour notification." },
+  ],
+  closing: "Reports are submitted through the CRA Single Reporting Platform.",
+};
+
+/* 5 ------------------------------------------------------------ market --- */
+
+export const market = {
+  heading: "What the current market lacks",
+  lede: "Current solutions detect vulnerabilities. None of them automate compliance with the EU act.",
+  columns: [
+    {
+      title: "What the market delivers",
+      items: ["Vulnerability detection", "Severity scores", "SBOMs and scan reports", "Point-in-time security findings"],
+    },
+    {
+      title: "What the market misses",
+      items: [
+        "Evidence tied to the shipped product version",
+        "Annex VII technical documentation compatibility",
+        "Risk assessment, and how the risks were addressed",
+        "An SBOM tied to the shipped image",
+      ],
+      mark: true,
+    },
   ],
 };
 
-/* 5 ------------------------------------------------------------ manual --- */
+/* 6 ------------------------------------------------------------ manual --- */
 
 export const manual = {
-  heading: "The manual process",
-  lede: "Each release creates the same work again.",
+  heading: "The manual work",
+  lede: "Each vulnerability creates the same work again.",
   steps: [
-    { title: "Inventory", body: "Catalogue every component in the release." },
-    { title: "Assess", body: "Trace each finding to the code the product uses." },
-    { title: "Submit", body: "Compile the forms and file them." },
+    { title: "Break down the release", body: "Catalogue every component and library in the release." },
+    { title: "Assess the exposure", body: "Trace each vulnerability to the affected product and version." },
+    { title: "Prove the vulnerability was patched", body: "Prepare the remediation evidence and show the fix shipped." },
+    { title: "Submit the evidence", body: "Enter the required information by hand through the CRA reporting process." },
   ],
-  clock: "24h early warning. 72h follow-up. The clock starts at awareness.",
-  closing: "Manual work grows with every release.",
+  clock: "24h early warning. 72h notification. The countdown begins with manufacturer awareness.",
 };
 
-/* 6 --------------------------------------------------------------- does --- */
+/* 7 -------------------------------------------------------- automation --- */
 
 export const does = {
   eyebrow: "Our product",
   name: "Artis",
-  heading: "Artis makes every release evidence ready",
-  lede: "Connect the evidence. Generate the documents. Submit with approval.",
+  heading: "PandaX automates everything",
+  lede: "Connect the evidence. Draft the documents. File with approval.",
   points: [
-    "Connects Jira, CI/CD, SBOM and documents to each release.",
-    "Generates the legal documents, and flags what is missing.",
-    "Submits only after your approval, with a time-stamped trail.",
+    "Connects existing evidence from configured Jira, CI/CD, SBOM and document sources to the relevant product version.",
+    "Identifies missing evidence, flags missing inputs and drafts all required legal documents.",
+    "After your company's approval, files the reports and retains a time-stamped audit trail of every submission.",
   ],
-  closing: "Nothing is submitted without your authorization.",
+  closing: "Nothing is submitted without the company's explicit authorization.",
   action: { label: "See what Artis produces", href: "/artis/" },
 };
 
-/* 7 ------------------------------------------------------------- source --- */
+/* 8 ------------------------------------------------------------ source --- */
 
 export const source = {
   heading: "Your source code never leaves your environment",
   lede: "PandaX works from the SBOM, not the code.",
   points: [
-    "PandaX never receives your source code.",
-    "You provide the SBOM. Nothing else crosses the line.",
-    "No SBOM yet? We give you the tools to make one.",
+    "The company provides only the SBOM.",
+    "PandaX never receives or views your source code. It stays inside your environment.",
+    "If an SBOM is not available, PandaX provides the tools to generate one locally and export it.",
   ],
-  closing: "Evidence, without handing over the code.",
 };
 
-/* 8 ------------------------------------------------------------- useful --- */
+/* 9 -------------------------------------------------------- capability --- */
 
-export const useful = {
-  heading: "What makes PandaX useful",
+export const capability = {
+  heading: "What PandaX does",
   items: [
-    { title: "Starts with the product", body: "Takes a ready SBOM, or gives the option to generate one." },
-    { title: "Follows every update", body: "Keeps the report history available for later." },
-    { title: "Shows what is missing", body: "People add only what software cannot know." },
-    { title: "Creates a clear record", body: "The reports stay easy to review." },
+    { title: "Release evidence mapping", body: "Links each product release to SBOMs, tests, risks, tickets and approvals." },
+    { title: "Gap review", body: "Audits evidence against Annex VII and SRP requirements to pinpoint compliance gaps." },
+    { title: "Follows every update", body: "Syncs submission content across product revisions and regulatory changes." },
+    { title: "Evidence history", body: "Maintains dated, protected evidence for the retention period the EU act requires." },
+    { title: "Create legal documents", body: "Generates documents that follow the applicable legal standards." },
+    { title: "Submit the reports", body: "Guides approved technical reports through submission to ENISA." },
   ],
+  closing: {
+    title: "Designed for small manufacturers",
+    body: "Meet the EU act without adding a dedicated legal or compliance team.",
+  },
 };
 
-/* 9 --------------------------------------------------------------- who --- */
-
-export const who = {
-  heading: "Built for smaller manufacturers",
-  lede: "The CRA reaches every product with digital elements. Most makers have no compliance department to read it for them.",
-  rows: [
-    { title: "Who", body: "Device makers putting hardware with software inside on the EU market." },
-    { title: "What they lack", body: "No legal or compliance team to turn CRA articles into work." },
-    { title: "What we do", body: "Turn each release into the record, without hiring that team." },
-  ],
-  closing: "Work that needed a legal team, handled by the product team.",
-};
-
-/* 10 -------------------------------------------------------------- labs --- */
-
-export const labs = {
-  heading: "For labs and advisory firms",
-  points: [
-    { title: "Scanner-neutral", body: "Any scanner's output. We replace nothing." },
-    { title: "No opinions", body: "No certificates, no verdicts. The judgement is yours." },
-    { title: "Portable", body: "The maker owns the record and can take it anywhere." },
-    { title: "Outcome-blind pricing", body: "Our price never depends on the result." },
-  ],
-  action: { label: "Read the partner page", href: "/partners/" },
-};
-
-/* 11 --------------------------------------------------------------- faq --- */
-
-export const faq = {
-  heading: "Questions worth asking",
-  items: [
-    {
-      q: "Do you need our source code?",
-      a: "No. PandaX works from the SBOM. Your source code never leaves your environment and PandaX never receives or views it.",
-    },
-    {
-      q: "What if we don't have an SBOM?",
-      a: "PandaX provides the tools to generate one, without sharing source code.",
-    },
-    {
-      q: "Does this make us CRA-compliant?",
-      a: "No. PandaX produces the documentation and records the process. Conformity is assessed by a body, not by a tool.",
-    },
-    {
-      q: "Who decides what gets submitted to a regulator?",
-      a: "The company. Nothing is submitted without explicit authorization, and every submission keeps a time-stamped audit trail.",
-    },
-    {
-      q: "How is this different from a vulnerability scanner?",
-      a: "A scanner finds risks. It does not assemble the proof. PandaX connects the release, the findings, the decisions and the documents into one record a reviewer can read.",
-    },
-    {
-      q: "What happens to our records if we stop being a customer?",
-      a: "The export is an open format and it is yours. It is built to be read without PandaX, which is also what makes it useful to a reviewer.",
-    },
-    {
-      q: "What exists today, and what is still being built?",
-      a: "Today: a working proof of concept that takes a release, builds the inventory and findings, records decisions, generates the documents and seals the result. Being built: the hosted workspace, connectors and scheduled monitoring.",
-    },
-  ],
-};
-
-/* 12 ------------------------------------------------------------- close --- */
+/* 10 ------------------------------------------------------------ close --- */
 
 export const closing = {
-  heading: "See what the record looks like",
-  body: "The fastest way to judge this is to read one.",
+  heading: "Thank you for your time",
+  body: "Let's explore how PandaX could fit your product-security and CRA-readiness workflow.",
   primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
   secondary: { label: "See Artis", href: "/artis/" },
 };
@@ -283,13 +244,7 @@ export const closing = {
 export const contact = {
   heading: "Get in touch",
   body: "Tell us what you build and which release is next.",
-  fields: {
-    name: "Name",
-    email: "Work email",
-    company: "Company",
-    message: "What do you build?",
-    submit: "Send",
-  },
+  fields: { name: "Name", email: "Work email", company: "Company", message: "What do you build?", submit: "Send" },
   fallbackAddress: "contact@pandax.online",
 };
 
@@ -297,7 +252,6 @@ export const footer = {
   lines: ["PandaX", "Product security evidence for the EU Cyber Resilience Act"],
   links: [
     { label: "Artis", href: "/artis/" },
-    { label: "Partners", href: "/partners/" },
     { label: "Datenschutzerklärung", href: "/datenschutz/" },
     { label: "Privacy", href: "/privacy/" },
   ],
@@ -314,17 +268,11 @@ export const artis = {
   heading: "Artis",
   lede: "The product. A release goes in, a reviewable record comes out.",
   body: "Artis is built by PandaX. It reads an SBOM, matches it against public advisory sources, records what you decide about each finding, generates the documents, and seals the result to the release that shipped.",
-
-  runs: {
-    heading: "What it does",
-    note: "One command. The record is the output, not a by-product.",
-  },
-
+  runs: { heading: "What it does", note: "One command. The record is the output, not a by-product." },
   record: {
     heading: "What a record looks like",
     lede: "Every run produces one of these. This is an example, not a customer's.",
   },
-
   pack: {
     heading: "What you get",
     items: [
@@ -337,7 +285,6 @@ export const artis = {
     ],
     closing: "Open format. You own it, and you can take it to any reviewer.",
   },
-
   state: {
     heading: "What exists today",
     now: [
@@ -355,52 +302,7 @@ export const artis = {
     nowLabel: "Working today",
     buildingLabel: "Being built",
   },
-
   action: { label: "Book a 30-minute walkthrough", href: "/#contact" },
-};
-
-/* ---------------------------------------------------------- /partners --- */
-
-export const partners = {
-  title: "Partners",
-  description:
-    "How PandaX works with testing, inspection and certification firms and advisory practices.",
-  heading: "PandaX prepares the record. You assess it.",
-  intro:
-    "Manufacturers arrive at an assessment with evidence scattered across tools, spreadsheets and email. PandaX collects it into one reviewable record. That shortens your intake, and it does not touch your judgement.",
-  guardrails: {
-    heading: "Four guardrails",
-    items: [
-      {
-        title: "Scanner-neutral",
-        body: "We ingest output from any scanner and replace nothing you or your client already use. A client's own analysis becomes an input, not a competitor.",
-      },
-      {
-        title: "No conformity opinions",
-        body: "No certificates, no verdicts, no conformity opinions — and the product is built so it cannot imply one. Findings are recorded as observations with their sources. The judgement stays with the assessor.",
-      },
-      {
-        title: "Portable export",
-        body: "The record is an open format the manufacturer owns, readable without PandaX. Nothing locks a client to us or routes them to a particular reviewer.",
-      },
-      {
-        title: "Outcome-independent pricing",
-        body: "Pricing is per workspace and never tied to the result of an assessment. There is no arrangement under which PandaX earns more from a favourable outcome.",
-      },
-    ],
-  },
-  models: {
-    heading: "Three ways to work together",
-    items: [
-      { title: "Referral", body: "You send a manufacturer who needs their evidence in order before an assessment. They arrive with a reviewable record." },
-      { title: "Co-sell", body: "PandaX sits inside your own CRA readiness offering as the evidence workspace, under your engagement." },
-      { title: "White-label workspace", body: "A branded evidence workspace for your clients, with your firm as the front door." },
-    ],
-  },
-  form: {
-    heading: "Partner enquiry",
-    body: "Tell us about your practice and the clients raising CRA questions.",
-  },
 };
 
 /* ------------------------------------------------------------- legal --- */

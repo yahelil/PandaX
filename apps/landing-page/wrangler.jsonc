@@ -2,6 +2,12 @@
   "name": "pandax-landingpage",
   "compatibility_date": "2026-09-03",
   "main": "worker.js",
+  "send_email": [
+    {
+      "name": "EMAIL",
+      "remote": true
+    }
+  ],
   "assets": {
     "directory": ".",
     "binding": "ASSETS"

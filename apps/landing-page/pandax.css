@@ -1440,14 +1440,20 @@ a { color: inherit; }
 .close-one { grid-template-columns: minmax(0, 620px); }
 
 .form { margin-top: 22px; display: flex; flex-direction: column; gap: 14px; }
-.form-done {
-  margin-top: 26px; padding: 20px 22px;
-  border: 1px solid var(--line); border-left: 3px solid var(--accent, var(--brand));
-  border-radius: 4px; background: var(--bg);
-  font-size: 16.5px; line-height: 1.55; color: var(--ink);
-  max-width: 46ch;
+/* When it lands, the ask is replaced rather than annotated: the same
+   heading weight that asked the question now answers it. */
+.form-done { animation: done-in .5s cubic-bezier(.3,.8,.3,1) both; }
+.form-done h2 {
+  font-family: var(--disp); font-weight: 700;
+  font-size: clamp(34px, 4.4vw, 52px); line-height: 1.06;
+  letter-spacing: -0.032em; color: var(--ink); margin: 0;
 }
+.form-done .lede { margin-top: 16px; max-width: 44ch; }
 .form-done:focus { outline: none; }
+@keyframes done-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
 .form button[type="submit"]:disabled { opacity: 0.55; cursor: default; }
 .form label {
   display: flex; flex-direction: column; gap: 6px;
@@ -1532,10 +1538,17 @@ a { color: inherit; }
 }
 .prod-blurb { font-size: 15.5px; line-height: 1.5; color: var(--body); }
 
-.foot-legal {
-  font-size: 13.5px; color: #8C9298;
+.foot-base {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 22px;
   border-top: 1px solid var(--line); padding-top: 16px;
-  max-width: 78ch;
+}
+.foot-copy {
+  font-size: 13.5px; color: var(--body); margin: 0;
+  white-space: nowrap;
+}
+.foot-legal {
+  font-size: 13.5px; color: #8C9298; margin: 0;
+  max-width: 74ch;
 }
 
 /* --------------------------------------------------------- audience ---- */

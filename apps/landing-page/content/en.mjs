@@ -309,10 +309,11 @@ export const action = {
 export const contact = {
   heading: "Get in touch",
   body: "Tell us what you build and which release is next.",
-  fields: { name: "Name", email: "Work email", company: "Company", message: "What do you build?", submit: "Send" },
+  fields: { name: "Name", email: "Work email", company: "Company", message: "Anything you want to tell us", submit: "Send" },
   fallbackAddress: "contact@pandax.online",
   sending: "Sending\u2026",
-  sent: "Thank you. Your message is with us, and we will come back to you shortly.",
+  sentTitle: "Thank you.",
+  sent: "Your message is with us. We will come back to you shortly.",
 };
 
 export const footer = {

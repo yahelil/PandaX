@@ -4,7 +4,7 @@ Three feeds, each chosen for a distinct job and each verified reachable
 without an API key:
 
   OSV.dev   deterministic PURL -> vulnerability matching, batched
-  CISA KEV  "actively exploited" - the fact that starts the Article 14 clock
+  CISA KEV  a strong active-exploitation signal for manufacturer review
   EPSS      probability of exploitation in the next 30 days, for ranking
 
 NVD was dropped: it needs an API key, is rate-limited, and OSV already
@@ -29,6 +29,7 @@ KEV_URL = (
 EPSS_URL = "https://api.first.org/data/v1/epss"
 
 OSV_BATCH_SIZE = 100
+OSV_DETAIL_MAX_AGE_SECONDS = 6 * 3600
 KEV_MAX_AGE_SECONDS = 6 * 3600
 TIMEOUT = httpx.Timeout(60.0, connect=20.0)
 
@@ -46,6 +47,8 @@ class Feeds:
         self.vuln_cache.mkdir(parents=True, exist_ok=True)
         self.offline = offline
         self._client: httpx.Client | None = None
+        self.last_epss_status = "unknown"
+        self.last_epss_errors: list[str] = []
 
     @property
     def client(self) -> httpx.Client:
@@ -74,14 +77,27 @@ class Feeds:
                 resp.raise_for_status()
             except httpx.HTTPError as exc:
                 raise FeedError(f"OSV querybatch failed: {exc}") from exc
-            for purl, entry in zip(chunk, resp.json().get("results", [])):
-                result[purl] = [v["id"] for v in entry.get("vulns", [])]
+            try:
+                results = resp.json().get("results", [])
+                if not isinstance(results, list) or len(results) != len(chunk):
+                    raise ValueError("response did not contain one result per query")
+                for purl, entry in zip(chunk, results):
+                    vulns = entry.get("vulns", [])
+                    if not isinstance(vulns, list):
+                        raise ValueError("vulns must be a list")
+                    result[purl] = [v["id"] for v in vulns]
+            except (KeyError, TypeError, ValueError) as exc:
+                raise FeedError(f"OSV querybatch returned malformed results: {exc}") from exc
         return result
 
     def vuln_detail(self, osv_id: str) -> dict[str, Any]:
-        """Fetch one OSV advisory, cached on disk by id."""
+        """Fetch one OSV advisory, refreshing stale online cache entries."""
         cached = self.vuln_cache / f"{osv_id}.json"
-        if cached.exists():
+        fresh = (
+            cached.exists()
+            and (time.time() - cached.stat().st_mtime) < OSV_DETAIL_MAX_AGE_SECONDS
+        )
+        if cached.exists() and (self.offline or fresh):
             return json.loads(cached.read_text(encoding="utf-8"))
         if self.offline:
             raise FeedError(f"{osv_id} not cached and feeds are offline")
@@ -109,8 +125,9 @@ class Feeds:
                 resp.raise_for_status()
                 cached.write_text(json.dumps(resp.json()), encoding="utf-8")
             except httpx.HTTPError as exc:
-                if not cached.exists():
-                    raise FeedError(f"CISA KEV fetch failed: {exc}") from exc
+                # A stale cache is useful only in explicit offline mode.  An
+                # online refresh failure must be visible as incomplete coverage.
+                raise FeedError(f"CISA KEV fetch failed: {exc}") from exc
         if not cached.exists():
             raise FeedError("CISA KEV feed unavailable and not cached")
         data = json.loads(cached.read_text(encoding="utf-8"))
@@ -128,8 +145,14 @@ class Feeds:
         """Exploit Prediction Scoring System values, best effort."""
         cves = [c for c in cves if c.startswith("CVE-")]
         scores: dict[str, float] = {}
-        if not cves or self.offline:
+        self.last_epss_errors = []
+        if not cves:
+            self.last_epss_status = "unscanned"
             return scores
+        if self.offline:
+            self.last_epss_status = "unscanned"
+            return scores
+        self.last_epss_status = "completed"
         for start in range(0, len(cves), 100):
             chunk = cves[start : start + 100]
             try:
@@ -137,8 +160,10 @@ class Feeds:
                 resp.raise_for_status()
                 for row in resp.json().get("data", []):
                     scores[row["cve"]] = float(row.get("epss", 0.0))
-            except (httpx.HTTPError, ValueError, KeyError):
+            except (httpx.HTTPError, ValueError, KeyError) as exc:
                 # EPSS is enrichment, not a gate: a miss must not fail a scan.
+                self.last_epss_status = "failed"
+                self.last_epss_errors.append(str(exc))
                 continue
         return scores
 

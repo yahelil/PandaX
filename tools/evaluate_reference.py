@@ -141,16 +141,31 @@ def render_markdown(report):
     matches = sum(x['verdict']=='MATCH' for x in checks)
     positive = [x for x in checks if x['expected']=='find']
     negative = [x for x in checks if x['expected']!='find']
+    integrity_verified = sum(
+        c.get('integrity_ok', False) and c.get('signature_valid', False)
+        for c in report['cases']
+    )
+    revision_label = (
+        f"working tree based on **`{report['engine_commit'][:7]}`**"
+        if report.get('engine_worktree_dirty')
+        else f"Git revision **`{report['engine_commit'][:7]}`**"
+    )
     lines = ['# PandaX: independent reference vs actual results', '',
-        f"Tested GitHub revision **`{report['engine_commit'][:7]}`**, after pulling `origin/main` and restarting the dashboard at `{report['base_url']}`. Tests used its HTTP scan, SBOM-upload, event-stream, summary and seal-verification endpoints. This is a test of the freshly pulled local dashboard, not a separately verified hosted deployment.", '',
+        f"Tested the {revision_label}, after pulling `origin/main` and restarting the dashboard at `{report['base_url']}`. Tests used its HTTP scan, SBOM-upload, event-stream, summary and seal-verification endpoints. This is a test of the freshly pulled local dashboard, not a separately verified hosted deployment.", '',
         f"Run: **{report['started_utc']}** to **{report.get('finished_utc','in progress')}**.", '',
-        f"**{matches}/{len(checks)} named checks match; {len(missing)} expected findings are missing.** All {sum(c.get('complete',False) for c in report['cases'])}/{len(report['cases'])} input scans completed, with {sum(c.get('seal_ok',False) for c in report['cases'])} verified seals. The four built-in comparison actions also completed and passed.", '',
+        f"**{matches}/{len(checks)} named checks match; {len(missing)} expected findings are missing.** All {sum(c.get('complete',False) for c in report['cases'])}/{len(report['cases'])} input scans completed. {integrity_verified}/{len(report['cases'])} passed integrity and bundled-signature verification, and {sum(c.get('seal_ok',False) for c in report['cases'])}/{len(report['cases'])} also established external signer trust. The four built-in comparison actions also completed and passed.", '',
         f"Positive checks: **{sum(x['verdict']=='MATCH' for x in positive)}/{len(positive)} found**. Negative checks: **{sum(x['verdict']=='MATCH' for x in negative)}/{len(negative)} correctly absent**. These figures measure only the independent reference's selected CVEs, not overall scanner accuracy or complete release security.", '',
         'The expected values were frozen before execution. No scanner rules were changed to make these checks pass. The answer key remains independent; this report contains the observed results.', '',
         '## Missing findings', '', '| Input | PDF expects | PandaX result | Public evidence |', '|---|---|---|---|']
     for c,x in missing:
         lines.append(f"| {c['title']} | {x['cve']} - {x['name']} | Missing; correct {x['component']} version was inventoried | [Advisory]({urls[x['source']]}) |")
-    lines += ['', 'The current native supplement covers CVE-2023-38545 for libcurl and CVE-2014-0160 for libssl. It does not cover the additional reference CVEs above, and the live OSV results did not fill the gap. The built-in comparisons test those narrow demo CVEs, so their PASS result can coexist with these missed findings.', '',
+    lines += ['', (
+        'The native advisory catalogue now covers the selected curl and OpenSSL '
+        'boundaries in this reference. Decisions require a digest-verified official '
+        'release, retain vendor evidence and retrieval records, and do not claim '
+        'runtime reachability. This remains curated coverage rather than a complete '
+        'native vulnerability database.'
+    ), '',
         '## Every tested input', '',
         '| Input | Positive checks found | Negative checks correct | Total reported finding rows | Named-check result |', '|---|---:|---:|---:|---|']
     for c in report['cases']:
@@ -158,10 +173,10 @@ def render_markdown(report):
         verdict='MATCH' if all(x['verdict']=='MATCH' for x in c['checks']) else 'DIFFERENCES'
         lines.append(f"| {c['title']} | {sum(x['verdict']=='MATCH' for x in pos)}/{len(pos)} | {sum(x['verdict']=='MATCH' for x in neg)}/{len(neg)} | {c.get('stats',{}).get('findings','failed')} | {verdict} |")
     lines += ['', 'A dashboard finding row is a component/CVE pair; the reference counts named CVE checks. For example, OpenWrt 19.07.0 reports four rows covering three unique CVEs because the libubox issue is attached to both libubox and libblobmsg-json. That is not an extra independent CVE. Additional findings outside the reference are retained in the JSON report and are **ungraded**, not assumed false positives.', '',
-        '## Triage and evidence differences', '',
-        '1. **Pillow / WebP exposure is not established.** Both SmartHub inputs report CVE-2023-4863 on Pillow and set VEX state `exploitable` from KEV membership. The input has a Pillow dependency declaration, but the observed inventory does not establish an installed libwebp build. The reference requires wheel/native-library evidence. This is unsupported exposure certainty, not proof that the CVE is a false positive. [Pillow maintainer notes]('+urls['P6']+').', '',
-        '2. **The VEX label and reachability explanation differ.** OpenSSL 1.0.1f receives VEX state `exploitable` for Heartbleed from KEV membership, while the same entry explicitly says build flags and runtime reachability remain unknown. The component-level match is supported; deployed exploitability is not established by this source scan. [OpenSSL advisory]('+urls['O1']+').', '',
-        '3. **Absence is not always explicit fix evidence.** The named negative checks are absent as expected. However, curl CVE-2023-38546 on 8.4.0 and CVE-2023-38039 on both releases have no corresponding native assessment. Their absence alone does not show PandaX knew the fix boundary. The primary demo CVEs do have explicit fixed assessments. [curl cookie advisory]('+urls['C2']+'), [curl header advisory]('+urls['C4']+').', '',
+        '## Triage and evidence notes', '',
+        '1. **Pillow / WebP exposure is not established.** Both SmartHub inputs report CVE-2023-4863 on Pillow, but KEV membership is kept separate from product reachability. The VEX state remains `in_triage` because the observed inventory does not establish an installed libwebp build or a reachable vulnerable path. [Pillow maintainer notes]('+urls['P6']+').', '',
+        '2. **OpenSSL affectedness is not runtime exploitability.** OpenSSL 1.0.1f is affected by Heartbleed at the component-version level, while build flags and deployed reachability remain unassessed. The VEX state is therefore `in_triage`, even though CISA KEV makes review urgent. [OpenSSL advisory]('+urls['O1']+').', '',
+        '3. **Fix evidence is explicit for curated rules.** The curl 8.4.0 decision for CVE-2023-38546 records the official vendor fix boundary and retains the disagreeing OSV range as a conflict. CVE-2023-38039 remains a named negative control outside the curated native catalogue, so its absence must not be broadened into a complete-security claim. [curl cookie advisory]('+urls['C2']+'), [curl header advisory]('+urls['C4']+').', '',
         '4. **The new SBOM sample behaves correctly for missing identity.** It retains both jQuery 3.4.0 and internal-device-agent 1.0.0, finds the named jQuery CVE, and records one component as not scanned because the internal component lacks a versioned PURL. Its zero finding count must not be interpreted as a clean security assessment.', '',
         'The ten named SmartHub positive checks were detected in both directory and ZIP scans, with the expected historical fix versions. All selected inventory checks were present. No exploit or runtime application test was performed.', '',
         '## Built-in comparison actions', '', '| Action | Actual built-in verdict | Evidence |', '|---|---|---|']
@@ -173,7 +188,7 @@ def render_markdown(report):
         '- [Every expected/observed CVE row (CSV)](pandax-reference-comparison.csv)',
         '- [Machine-readable results, VEX states and run IDs](pandax-reference-comparison.json)',
         '- [Public-source baseline](../../docs/expected-results-baseline.json)', '',
-        'Start the dashboard from the desired GitHub revision, then run `python tools/evaluate_reference.py`. The evaluator exits 1 when named checks fail; this run intentionally exited 1 for the seven misses. A KEV warning by itself is not treated as an execution failure.', '',
+        'Start the dashboard from the desired GitHub revision, configure its trusted public key, then run `python tools/evaluate_reference.py`. The evaluator exits 1 when a named check, execution, inventory check, or trusted seal verification fails. A KEV warning by itself is not treated as an execution failure.', '',
         f"Raw API summaries, event streams and verification responses remain locally under `{report['evidence_directory']}`; signed pipeline bundles remain in `out/run-*`. The JSON/CSV report is committed, while bulky raw scan artifacts remain local.", '',
         'Frozen baseline SHA-256: `'+report['reference_sha256']+'`.',
         'Tested PDF SHA-256: `'+report['reference_pdf_sha256']+'`.', '']
@@ -189,6 +204,7 @@ def main():
     stamp = dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
     root = ROOT / 'out/reference-validation' / stamp; root.mkdir(parents=True)
     report = {'started_utc': stamp, 'base_url': args.base_url, 'engine_commit': subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
+              'engine_worktree_dirty': bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip()),
               'reference_sha256': digest(BASELINE), 'reference_pdf_sha256': digest(ROOT/'output/pdf/PandaX_Independent_Expected_Results.pdf'),
               'reference_version': baseline['reference_version'], 'evidence_directory': str(root.relative_to(ROOT)), 'cases': [], 'comparisons': []}
     (root/'frozen-reference.json').write_bytes(BASELINE.read_bytes())
@@ -205,7 +221,10 @@ def main():
             else:
                 request_json(args.base_url, '/api/scan', {'artifact': artifact})
             summary, complete, seal, errors = collect_run(args.base_url, folder)
-            result.update(run_id=summary['run_id'], complete=complete, seal_ok=seal['ok'], errors=errors,
+            result.update(run_id=summary['run_id'], complete=complete, seal_ok=seal['ok'],
+                          integrity_ok=seal.get('integrity_ok', False),
+                          signature_valid=seal.get('signature_valid', False),
+                          signer_trust=seal.get('signer_trust', 'unknown'), errors=errors,
                           stats=summary['stats'], **compare_case(case, summary, complete))
             # Preserve actual VEX states for a separate reachability review.
             rid=summary['run_id']

@@ -27,6 +27,14 @@ const el = (tag, cls, text) => {
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 }[ch]));
+const safeHttpUrl = (value) => {
+  try {
+    const url = new URL(String(value || ""));
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch (_) {
+    return "";
+  }
+};
 
 let runId = "";
 let source = null;
@@ -521,7 +529,8 @@ function renderComponents() {
   $("components-table").innerHTML = `
     <thead><tr>
       <th>Component</th><th>Version</th><th>Ecosystem</th>
-      <th>Package URL</th><th style="text-align:right">Findings</th><th>Status</th>
+      <th>Package URL</th><th>Coverage</th><th style="text-align:right">Findings</th>
+      <th>Affectedness</th><th>Reachability</th><th>KEV signal</th>
     </tr></thead>
     <tbody>${rows
       .map(
@@ -530,16 +539,11 @@ function renderComponents() {
         <td class="mono">${esc(c.version)}</td>
         <td><span class="pill blue">${esc(c.ecosystem)}</span></td>
         <td class="mono dim">${c.purl ? esc(c.purl) : "Unavailable"}</td>
+        <td>${coverageFlag(c.coverage_status)}</td>
         <td class="num">${c.findings || "—"}</td>
-        <td>${
-          !c.matchable
-            ? '<span class="pill unknown">not scanned</span>'
-            : c.kev
-            ? kevFlag()
-            : c.affected
-              ? '<span class="pill medium">affected</span>'
-              : '<span class="pill good">clean</span>'
-        }</td>
+        <td>${affectednessFlag(c.affectedness, c.findings, c.coverage_status)}</td>
+        <td>${reachabilityFlag(c.reachability)}</td>
+        <td>${c.kev ? kevFlag() : '<span class="dim">—</span>'}</td>
       </tr>`
       )
       .join("")}</tbody>`;
@@ -549,6 +553,43 @@ function renderComponents() {
 
 const kevFlag = () =>
   '<span class="kev-flag"><svg viewBox="0 0 24 24"><path d="M12 2 1 21h22L12 2zm0 6 7 12H5l7-12z"/><path d="M11 10h2v5h-2zm0 6h2v2h-2z"/></svg>KEV</span>';
+
+const coverageFlag = (status) => ({
+  completed: '<span class="pill good">check completed</span>',
+  failed: '<span class="pill critical">check failed</span>',
+  unsupported: '<span class="pill medium">unsupported</span>',
+  unscanned: '<span class="pill unknown">not scanned</span>',
+  unknown: '<span class="pill unknown">coverage unknown</span>',
+}[status] || '<span class="pill unknown">coverage unknown</span>');
+
+const affectednessFlag = (state, count = 1, coverage = "unknown") => {
+  if (state === "affected") return '<span class="pill medium">affected version</span>';
+  if (!count && coverage === "completed") {
+    return '<span class="pill blue">no finding in checked sources</span>';
+  }
+  return '<span class="pill unknown">unknown</span>';
+};
+
+const reachabilityFlag = (state) => ({
+  reachable: '<span class="pill critical">reachable</span>',
+  not_reachable: '<span class="pill good">not reachable — evidenced</span>',
+  not_assessed: '<span class="pill unknown">not assessed</span>',
+  unknown: '<span class="pill unknown">unknown</span>',
+}[state] || '<span class="pill unknown">unknown</span>');
+
+const exposureFlag = (state) => ({
+  evidence_supports_reachable: '<span class="pill critical">evidence supports reachable</span>',
+  evidence_supports_not_reachable: '<span class="pill good">evidence supports not reachable</span>',
+  conflicting_evidence: '<span class="pill medium">conflicting evidence</span>',
+  insufficient_evidence: '<span class="pill unknown">insufficient evidence</span>',
+  not_assessed: '<span class="pill unknown">not assessed</span>',
+}[state] || '<span class="pill unknown">not assessed</span>');
+
+const kevStatusFlag = (finding) => {
+  if (finding.kev) return kevFlag();
+  if (finding.kev_check_status === "completed") return '<span class="dim">not listed</span>';
+  return '<span class="pill unknown">unknown</span>';
+};
 
 const okFlag = (text) =>
   `<span class="ok-flag"><svg viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6.5"/></svg>${esc(text)}</span>`;
@@ -560,8 +601,9 @@ function vulnTable(rows, compact = false) {
   return `
     <thead><tr>
       <th>Vulnerability ID</th><th>Impacted Component</th><th>Severity</th>
-      <th>KEV Status</th><th style="text-align:right">EPSS</th>
-      <th>Fixed In</th>${compact ? "" : "<th>Actions</th>"}
+      ${compact ? "" : "<th>Affectedness</th><th>Reachability decision</th><th>Exposure evidence</th>"}
+      <th>KEV signal</th><th style="text-align:right">EPSS</th>
+      <th>Fixed In</th>${compact ? "" : "<th>Source</th>"}
     </tr></thead>
     <tbody>${rows
       .map(
@@ -569,14 +611,25 @@ function vulnTable(rows, compact = false) {
         <td class="mono"><b>${esc(f.cve)}</b></td>
         <td>${esc(f.component)} <span class="dim mono">${esc(f.version)}</span></td>
         <td><span class="pill ${f.severity.toLowerCase()}">${esc(f.severity)}</span></td>
-        <td>${f.kev ? kevFlag() : '<span class="dim">—</span>'}</td>
+        ${compact ? "" : `<td>${affectednessFlag(f.affectedness)}</td><td>${reachabilityFlag(f.reachability)}</td><td>${exposureFlag(f.exposure_assessment)}</td>`}
+        <td>${kevStatusFlag(f)}</td>
         <td class="num">${Number(f.epss).toFixed(5)}</td>
         <td class="mono">${f.fixed_version ? esc(f.fixed_version) : '<span class="dim">none</span>'}</td>
-        ${compact ? "" : `<td><a class="link" href="https://osv.dev/vulnerability/${esc(f.osv_id)}"
-               target="_blank" rel="noopener">View Details</a></td>`}
+        ${compact ? "" : `<td>${findingSource(f)}</td>`}
       </tr>`
       )
       .join("")}</tbody>`;
+}
+
+function findingSource(finding) {
+  const fallback = finding.osv_id
+    ? `https://osv.dev/vulnerability/${encodeURIComponent(finding.osv_id)}`
+    : "";
+  const url = safeHttpUrl(finding.source_url || fallback);
+  const label = esc(finding.source || "Source evidence");
+  return url
+    ? `<a class="link" href="${esc(url)}" target="_blank" rel="noopener">${label}</a>`
+    : `<span class="dim">${label}</span>`;
 }
 
 function renderVulns() {
@@ -676,6 +729,15 @@ const REPORT_META = [
   ["release-checks.json", "Release checks", "Expected and observed outcomes, with missing detections shown as failures."],
   ["native-inventory.json", "Native component evidence", "Package revisions, source-header evidence and declared dependencies."],
   ["native-assessments.json", "Vendor advisory determinations", "Affected, fixed, unknown and variant exclusions. Bounded coverage for the requested native CVEs."],
+  ["native-advisory-sources.json", "Native advisory source catalogue", "Versioned curl and OpenSSL advisory ranges, retrieval records, source precedence and retained conflicts."],
+  ["vendor-intelligence.json", "Installed vendor intelligence", "The reviewed catalogue snapshot used for exact package and backport decisions."],
+  ["vendor-assessments.json", "Vendor package decisions", "Exact package decisions, review records, backport proof and conflicting sources."],
+  ["vendor-superseded-findings.json", "Superseded generic findings", "Generic feed results retained when reviewed vendor evidence took precedence."],
+  ["exposure-context.json", "Reviewed exposure context", "Approved build, feature and network-exposure facts for this exact product release."],
+  ["exposure-context-source.json", "Exposure context receipt", "Digest and size of the original reviewed context without retaining raw input."],
+  ["exposure-assessments.json", "Product exposure analysis", "Dependency paths, build flags, configuration and runtime signals prepared for company review."],
+  ["coverage.json", "Vulnerability source coverage", "Per-component checks, exact queries, source addresses, completion states and bounded native-advisory determinations."],
+  ["triage-coverage.json", "KEV and EPSS source checks", "Records whether the exploitation catalogue and prioritisation source were checked successfully."],
   ["release-source.json", "Official package provenance", "Source URL, release type and pinned SHA-256 digest."],
   ["archive-links.json", "Archive links", "Links recorded from the official archive; none are created or followed on the host."],
   ["AnnexVII_Technical_Documentation.pdf", "Annex VII technical documentation",
@@ -685,7 +747,7 @@ const REPORT_META = [
   ["sbom.cdx.json", "Software Bill of Materials",
    "CycloneDX 1.6, satisfying Annex I Part II(1). Carries no vulnerability data by design."],
   ["findings.cdx-vex.json", "VEX exploitation status",
-   "CycloneDX 1.6 VEX. KEV hits are exploitable; everything else stays in_triage."],
+   "CycloneDX 1.6 VEX. KEV is an urgent signal; exploitable additionally requires product-specific reachability evidence."],
   ["incidents.json", "Article 14 incident register",
    "Open incidents with their 24h / 72h / 14d statutory deadlines."],
   ["manifest.json", "Signed manifest",
@@ -742,28 +804,51 @@ function renderLedger() {
 function renderChecks(host, result) {
   host.innerHTML = "";
   for (const c of result.checks) {
-    const row = el("div", "check " + (c.ok ? "ok" : "bad"));
+    const warning = c.category === "trust" && !c.ok && result.integrity_ok && result.signature_valid;
+    const row = el("div", "check " + (c.ok ? "ok" : warning ? "warn" : "bad"));
     const body = el("div");
     body.append(el("div", "n", c.name), el("div", "d", c.detail));
-    row.append(el("span", "m", c.ok ? "✔" : "✘"), body);
+    row.append(el("span", "m", c.ok ? "✔" : warning ? "!" : "✘"), body);
     host.append(row);
   }
-  const verdict = el("div", "verdict " + (result.ok ? "ok" : "bad"));
-  verdict.textContent = result.ok
-    ? "VERIFIED — every digest recomputed, every chain link re-derived, signature valid. Proves integrity, not legal identity."
-    : "TAMPERING DETECTED — the files on disk are not the files that were signed. A regulator would reject this bundle.";
+  const presentations = {
+    trusted: ["ok", "TRUSTED — bundle integrity and signer trust were independently verified."],
+    untrusted: ["warn", "INTACT, TRUST NOT ESTABLISHED — internal checks passed, but no independently trusted signer was confirmed."],
+    incomplete: ["bad", "INCOMPLETE — required evidence or signature information is missing or malformed."],
+    invalid: ["bad", "INVALID OR TAMPERED — the evidence does not match its integrity seal."],
+  };
+  const presentation = presentations[result.status] || presentations.invalid;
+  const verdict = el("div", "verdict " + presentation[0]);
+  verdict.append(el("div", "", presentation[1]));
+  if (result.trusted_key_fingerprint) {
+    verdict.append(el("div", "trust-fingerprint", `Trusted key SHA-256: ${result.trusted_key_fingerprint}`));
+  }
+  if (result.bundle_key_fingerprint) {
+    verdict.append(el("div", "trust-fingerprint", `Bundle key SHA-256: ${result.bundle_key_fingerprint}`));
+  }
   host.append(verdict);
 
   const pill = $("seal-pill");
   pill.hidden = false;
-  pill.textContent = result.ok ? "SEALED" : "TAMPERED";
-  pill.className = "seal-pill " + (result.ok ? "ok" : "bad");
+  pill.textContent = result.status === "trusted" ? "TRUSTED"
+    : result.status === "untrusted" ? "TRUST NOT ESTABLISHED"
+    : result.status === "incomplete" ? "INCOMPLETE" : "INVALID";
+  pill.className = "seal-pill " + presentation[0];
 }
 
 async function runVerify() {
   if (!runId) return;
   const res = await fetch(`/api/verify/${runId}`);
   const result = await res.json();
+  if (!res.ok) {
+    renderChecks($("checks2"), {
+      status: "incomplete",
+      integrity_ok: false,
+      signature_valid: false,
+      checks: [{name: "trusted-key configuration", ok: false, category: "trust", detail: result.detail || "Verification is unavailable."}],
+    });
+    return;
+  }
   renderChecks($("checks2"), result);
 }
 

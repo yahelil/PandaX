@@ -31,7 +31,10 @@ only-include = ["apps/engine/pandax"]
 sources = ["apps/engine"]
 
 [tool.pytest.ini_options]
-testpaths = ["apps/engine/tests"]
+testpaths = ["apps/engine/tests", "apps/verifier/tests"]
 markers = [
     "slow: end-to-end tests needing the bootstrapped syft binary and network",
 ]
+
+[tool.uv.workspace]
+members = ["apps/verifier"]

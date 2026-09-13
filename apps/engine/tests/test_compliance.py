@@ -89,11 +89,11 @@ def test_declaration_is_allowed_once_nothing_is_exploited(ctx: RunContext):
 # --- CycloneDX VEX ----------------------------------------------------------
 
 
-def test_vex_is_cyclonedx_16_and_marks_kev_exploitable(ctx: RunContext):
+def test_vex_is_cyclonedx_16_and_keeps_kev_separate_from_reachability(ctx: RunContext):
     vex = triage.build_vex(ctx)
     assert vex["bomFormat"] == "CycloneDX" and vex["specVersion"] == "1.6"
     states = {v["id"]: v["analysis"]["state"] for v in vex["vulnerabilities"]}
-    assert states["CVE-2021-44228"] == "exploitable"
+    assert states["CVE-2021-44228"] == "in_triage"
     assert states["CVE-2020-28500"] == "in_triage"
 
 

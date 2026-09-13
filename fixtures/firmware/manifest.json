@@ -1,0 +1,67 @@
+{
+  "sources_checked": "2026-09-10",
+  "openwrt": {
+    "description": "Official OpenWrt 23.05.5 generic x86/64 device SquashFS rootfs (not a combined boot disk)",
+    "url": "https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-23.05.5-x86-64-generic-squashfs-rootfs.img.gz",
+    "sha256": "478601ab0f5176372e6e0079614240dd25049c74167572ca9bc1b91e9261fe17",
+    "checksum_source": "https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/sha256sums",
+    "release": "23.05.5",
+    "inventory_oracle": {
+      "url": "https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/openwrt-23.05.5-x86-64.manifest",
+      "sha256": "dd40f52bc073870ebafe260463683419b2bb36e226c34d4c0002e6b62195b8d6",
+      "package_count": 127
+    },
+    "device_packages": {
+      "bnx2-firmware": "20230804-1",
+      "kmod-amazon-ena": "5.15.167-1",
+      "kmod-amd-xgbe": "5.15.167-1",
+      "kmod-bnx2": "5.15.167-1",
+      "kmod-e1000": "5.15.167-1",
+      "kmod-e1000e": "5.15.167-1",
+      "kmod-forcedeth": "5.15.167-1",
+      "kmod-hwmon-core": "5.15.167-1",
+      "kmod-i2c-algo-bit": "5.15.167-1",
+      "kmod-i2c-core": "5.15.167-1",
+      "kmod-igb": "5.15.167-1",
+      "kmod-igc": "5.15.167-1",
+      "kmod-ixgbe": "5.15.167-1",
+      "kmod-libphy": "5.15.167-1",
+      "kmod-mdio": "5.15.167-1",
+      "kmod-mdio-devres": "5.15.167-1",
+      "kmod-mii": "5.15.167-1",
+      "kmod-phy-realtek": "5.15.167-1",
+      "kmod-pps": "5.15.167-1",
+      "kmod-ptp": "5.15.167-1",
+      "kmod-r8169": "5.15.167-1",
+      "kmod-tg3": "5.15.167-1",
+      "r8169-firmware": "20230804-1"
+    },
+    "device_oracle_sources": [
+      {
+        "url": "https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/profiles.json",
+        "sha256": "530c0c1ffa71bf971aa354151d6f065d9e4ee71fe509dd9e01c3b3757bd9f6dc"
+      },
+      {
+        "url": "https://downloads.openwrt.org/releases/23.05.5/targets/x86/64/packages/Packages.manifest",
+        "sha256": "b731d68e60e1f7d1d49ad32667d5dd9b76d2e21253b80a2d40e28c54a5b1d3af"
+      },
+      {
+        "url": "https://downloads.openwrt.org/releases/23.05.5/packages/x86_64/base/Packages.manifest",
+        "sha256": "87c33006d3d16ee1d7798c511c4b38f4d93fe0b772daf73acab0afef4cd6903e"
+      }
+    ]
+  },
+  "ubifs": {
+    "description": "ONEKEY unblob 26.6.4 UBIFS regression filesystem; not a complete device firmware",
+    "url": "https://media.githubusercontent.com/media/onekey-sec/unblob/1fcc7a0a584a70a96c31f5a276c20944d199a089/tests/integration/filesystem/ubi/ubifs/__input__/banana.ubifs",
+    "sha256": "87b05f653d717736b766a9cca10b75656cc14c1d9442c61fdc514cc275a8a634",
+    "oracle_source": "https://github.com/onekey-sec/unblob/tree/1fcc7a0a584a70a96c31f5a276c20944d199a089/tests/integration/filesystem/ubi/ubifs/__output__/banana.ubifs_extract",
+    "uncompressed_bytes": 32,
+    "files": {
+      "banana1.txt": "022d66975222661648a212f974a822fac4d349c0f7c13ef7e0ba3ac0e7d9f519",
+      "banana2.txt": "cec01facc588f339e757822825743d16fae68d80ddf9b5e9e08f2862644f7733",
+      "banana3.txt": "da312e2d0258a4055f9863f680f165b29b39f32ecd806c75c1e8f8a2a079d221",
+      "banana4.txt": "2a93968fdfdadcfaf2f7c16a766f546894367585c063964dca393a0e86a65625"
+    }
+  }
+}

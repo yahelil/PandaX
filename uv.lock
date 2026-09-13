@@ -2,6 +2,12 @@ version = 1
 revision = 3
 requires-python = ">=3.10"
 
+[manifest]
+members = [
+    "pandax",
+    "pandax-evidence-verifier",
+]
+
 [[package]]
 name = "annotated-doc"
 version = "0.0.5"
@@ -374,6 +380,26 @@ requires-dist = [
     { name = "typer", specifier = ">=0.12" },
     { name = "typst", specifier = ">=0.13" },
     { name = "uvicorn", specifier = ">=0.29" },
+]
+provides-extras = ["dev"]
+
+[[package]]
+name = "pandax-evidence-verifier"
+version = "0.1.0"
+source = { editable = "apps/verifier" }
+dependencies = [
+    { name = "cryptography" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "cryptography", specifier = ">=42.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
 ]
 provides-extras = ["dev"]
 

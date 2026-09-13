@@ -7,6 +7,13 @@ __pycache__/
 .venv/
 venv/
 env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
 # Build & Outputs
 dist/
@@ -18,8 +25,18 @@ out/
 
 # Environment & Secrets
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+
+# Deployment-specific keys and local application data
+# Trust anchors are public, but remain installation-specific and must be
+# distributed through the authenticated onboarding/configuration channel.
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
 
 # IDEs & System
 .idea/
@@ -33,8 +50,15 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
+
+# Local development and manual verification workspaces
+.local-test/
+.uv-plan-cache/
+.codex-build/
+.codex-finalizer/
+tmp/
+
 # PandaX POC
-out/
 .tools/
 .cache/
 # fetched by tools/bootstrap.py, digest-pinned - not source

@@ -1,0 +1,31 @@
+{
+  "schema": "pandax/exposure-context/v1",
+  "product": {
+    "name": "SmartHub SH-100",
+    "version": "2.3.1",
+    "unique_id": "PDX-SH100-EU"
+  },
+  "approval": {
+    "reviewer": "Authorized company security reviewer",
+    "reviewed_at": "2026-09-13T10:00:00Z",
+    "authority_attestation": true
+  },
+  "components": [
+    {
+      "purl": "pkg:maven/org.apache.logging.log4j/log4j-core@2.14.1",
+      "observed_at": "2026-09-13T09:30:00Z",
+      "compiled_state": "included",
+      "feature_state": "disabled",
+      "network_exposure": "not_exposed",
+      "evidence_ref": "release-review/SH100-2.3.1/logging",
+      "build_flags": [
+        {
+          "name": "REMOTE_LOOKUPS",
+          "state": "disabled",
+          "effect": "supports_not_reachable",
+          "evidence_ref": "build-record/SH100-2.3.1/flags"
+        }
+      ]
+    }
+  ]
+}

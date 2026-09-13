@@ -577,6 +577,14 @@ const reachabilityFlag = (state) => ({
   unknown: '<span class="pill unknown">unknown</span>',
 }[state] || '<span class="pill unknown">unknown</span>');
 
+const exposureFlag = (state) => ({
+  evidence_supports_reachable: '<span class="pill critical">evidence supports reachable</span>',
+  evidence_supports_not_reachable: '<span class="pill good">evidence supports not reachable</span>',
+  conflicting_evidence: '<span class="pill medium">conflicting evidence</span>',
+  insufficient_evidence: '<span class="pill unknown">insufficient evidence</span>',
+  not_assessed: '<span class="pill unknown">not assessed</span>',
+}[state] || '<span class="pill unknown">not assessed</span>');
+
 const kevStatusFlag = (finding) => {
   if (finding.kev) return kevFlag();
   if (finding.kev_check_status === "completed") return '<span class="dim">not listed</span>';
@@ -593,7 +601,7 @@ function vulnTable(rows, compact = false) {
   return `
     <thead><tr>
       <th>Vulnerability ID</th><th>Impacted Component</th><th>Severity</th>
-      ${compact ? "" : "<th>Affectedness</th><th>Reachability</th>"}
+      ${compact ? "" : "<th>Affectedness</th><th>Reachability decision</th><th>Exposure evidence</th>"}
       <th>KEV signal</th><th style="text-align:right">EPSS</th>
       <th>Fixed In</th>${compact ? "" : "<th>Source</th>"}
     </tr></thead>
@@ -603,7 +611,7 @@ function vulnTable(rows, compact = false) {
         <td class="mono"><b>${esc(f.cve)}</b></td>
         <td>${esc(f.component)} <span class="dim mono">${esc(f.version)}</span></td>
         <td><span class="pill ${f.severity.toLowerCase()}">${esc(f.severity)}</span></td>
-        ${compact ? "" : `<td>${affectednessFlag(f.affectedness)}</td><td>${reachabilityFlag(f.reachability)}</td>`}
+        ${compact ? "" : `<td>${affectednessFlag(f.affectedness)}</td><td>${reachabilityFlag(f.reachability)}</td><td>${exposureFlag(f.exposure_assessment)}</td>`}
         <td>${kevStatusFlag(f)}</td>
         <td class="num">${Number(f.epss).toFixed(5)}</td>
         <td class="mono">${f.fixed_version ? esc(f.fixed_version) : '<span class="dim">none</span>'}</td>
@@ -722,6 +730,12 @@ const REPORT_META = [
   ["native-inventory.json", "Native component evidence", "Package revisions, source-header evidence and declared dependencies."],
   ["native-assessments.json", "Vendor advisory determinations", "Affected, fixed, unknown and variant exclusions. Bounded coverage for the requested native CVEs."],
   ["native-advisory-sources.json", "Native advisory source catalogue", "Versioned curl and OpenSSL advisory ranges, retrieval records, source precedence and retained conflicts."],
+  ["vendor-intelligence.json", "Installed vendor intelligence", "The reviewed catalogue snapshot used for exact package and backport decisions."],
+  ["vendor-assessments.json", "Vendor package decisions", "Exact package decisions, review records, backport proof and conflicting sources."],
+  ["vendor-superseded-findings.json", "Superseded generic findings", "Generic feed results retained when reviewed vendor evidence took precedence."],
+  ["exposure-context.json", "Reviewed exposure context", "Approved build, feature and network-exposure facts for this exact product release."],
+  ["exposure-context-source.json", "Exposure context receipt", "Digest and size of the original reviewed context without retaining raw input."],
+  ["exposure-assessments.json", "Product exposure analysis", "Dependency paths, build flags, configuration and runtime signals prepared for company review."],
   ["coverage.json", "Vulnerability source coverage", "Per-component checks, exact queries, source addresses, completion states and bounded native-advisory determinations."],
   ["triage-coverage.json", "KEV and EPSS source checks", "Records whether the exploitation catalogue and prioritisation source were checked successfully."],
   ["release-source.json", "Official package provenance", "Source URL, release type and pinned SHA-256 digest."],

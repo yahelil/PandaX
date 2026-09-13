@@ -41,11 +41,16 @@ def add(
         "--telemetry",
         help="Approved runtime evidence to attach to every scheduled scan",
     ),
+    exposure_context: Optional[Path] = typer.Option(
+        None,
+        "--exposure-context",
+        help="Reviewed build, feature and network-exposure evidence",
+    ),
 ) -> None:
     """Register a product source for repeat checks."""
     _output(
         lambda: _store().add_policy(
-            name, source, source_type, every_minutes, telemetry
+            name, source, source_type, every_minutes, telemetry, exposure_context
         )
     )
 

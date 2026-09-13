@@ -203,13 +203,28 @@
     <h2>What your tools already do, and where they stop</h2>
     <p class="lede">Scanners are good at finding things. None of them produce the file an assessor asks to see.</p>
     <div class="mk">
-      <div class="mk-col">
+      <div class="mk-col mk-have">
         <h3>What a scanner gives you</h3>
-        <ul><li>Vulnerability detection</li><li>Severity scores</li><li>SBOMs and scan reports</li><li>Point-in-time security findings</li></ul>
+        <ul>
+          <li><svg class="mk-tick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>Vulnerability detection</li>
+          <li><svg class="mk-tick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>Severity scores</li>
+          <li><svg class="mk-tick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>SBOMs and scan reports</li>
+          <li><svg class="mk-tick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>Point-in-time security findings</li>
+        </ul>
       </div>
-      <div class="mk-col is-mark">
+      <div class="mk-edge" aria-hidden="true">
+        <span class="mk-rail"></span>
+        <span class="mk-stop">stops here</span>
+        <span class="mk-rail mk-rail-dash"></span>
+      </div>
+      <div class="mk-col mk-todo">
         <h3>What it leaves you to write</h3>
-        <ul><li>Evidence tied to the shipped product version</li><li>Annex VII technical documentation compatibility</li><li>Risk assessment, and how the risks were addressed</li><li>An SBOM tied to the shipped image</li></ul>
+        <ul>
+          <li><span class="mk-box" aria-hidden="true"></span>Evidence tied to the shipped product version</li>
+          <li><span class="mk-box" aria-hidden="true"></span>Annex VII technical documentation compatibility</li>
+          <li><span class="mk-box" aria-hidden="true"></span>Risk assessment, and how the risks were addressed</li>
+          <li><span class="mk-box" aria-hidden="true"></span>An SBOM tied to the shipped image</li>
+        </ul>
       </div>
     </div>
   </div>
@@ -357,81 +372,6 @@
         <h3>No more rebuilding by hand</h3>
         <p>The work that repeats on every release — inventory, exposure, remediation proof, submission — runs once and keeps its own history.</p>
       </li>
-    </ul>
-  </div>
-</section>
-
-<section class="sec sec-alt" id="capability">
-  <div class="wrap">
-    <h2>What it covers</h2>
-    <ol class="caps">
-      <li class="cap" data-i="0">
-        <span class="cap-n">01</span>
-        <h3>Release evidence mapping</h3>
-        <p>Links each product release to SBOMs, tests, risks, tickets and approvals.</p>
-      </li>
-      <li class="cap" data-i="1">
-        <span class="cap-n">02</span>
-        <h3>Gap review</h3>
-        <p>Checks what you have against what Annex VII asks for, and names what is missing.</p>
-      </li>
-      <li class="cap" data-i="2">
-        <span class="cap-n">03</span>
-        <h3>Carries forward</h3>
-        <p>Keeps the record current when the product changes, and when the rules do.</p>
-      </li>
-      <li class="cap" data-i="3">
-        <span class="cap-n">04</span>
-        <h3>Evidence history</h3>
-        <p>Maintains dated, protected evidence for the retention period the CRA requires.</p>
-      </li>
-      <li class="cap" data-i="4">
-        <span class="cap-n">05</span>
-        <h3>Drafts the documents</h3>
-        <p>The Annex VII technical file and the Annex V declaration, in the form they are asked for.</p>
-      </li>
-      <li class="cap" data-i="5">
-        <span class="cap-n">06</span>
-        <h3>Files the reports</h3>
-        <p>Takes reports you have approved through the single reporting platform, and keeps the receipt.</p>
-      </li>
-    </ol>
-    <div class="band">
-      <h3>Built for teams without a compliance department</h3>
-      <p>The work still gets done properly. It just does not need someone hired to do it.</p>
-    </div>
-  </div>
-</section>
-
-<section class="sec" id="source">
-  <div class="wrap">
-    <h2>Your source code stays where it is</h2>
-    <p class="lede">Actis reads the SBOM. It never needs the code itself.</p>
-
-    <div class="bound" id="bound" aria-hidden="true">
-      <div class="bound-side">
-        <span class="bound-cap">Your environment</span>
-        <span class="bound-item">Source code</span>
-        <span class="bound-item">Build system</span>
-        <span class="bound-item">Signing keys</span>
-      </div>
-      <div class="bound-gate">
-        <span class="bound-wire"></span>
-        <span class="bound-pass">SBOM</span>
-        <span class="bound-wire"></span>
-      </div>
-      <div class="bound-side bound-side-x">
-        <span class="bound-cap">PandaX</span>
-        <span class="bound-item is-on">Inventory</span>
-        <span class="bound-item is-on">Findings</span>
-        <span class="bound-item is-on">Record</span>
-      </div>
-    </div>
-
-    <ul class="rule-list">
-        <li>You hand over an SBOM — nothing else.</li>
-        <li>The code never leaves your environment, because it is never asked for.</li>
-        <li>No SBOM yet? There are tools to build one inside your environment and export only that.</li>
     </ul>
   </div>
 </section>

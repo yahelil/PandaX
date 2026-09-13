@@ -569,11 +569,10 @@ function hexGlyph(kind) {
     document: `<path d="M45 39 h20 l12 12 v30 h-32 z"/>
           <path d="M65 39 v12 h12"/>
           <path d="M52 61 h17"/>
-          <path d="M52 70 h11"/>
-          <circle class="q-dot" cx="75" cy="70" r="3.4"/>`,
-    again: `<path d="M70.9 44.4 A19 19 0 1 1 49.1 44.4"/>
-          <path class="q-head" d="M77 48.7 L68 48.5 L73.8 40.3 Z"/>
-          <circle class="q-dot" cx="60" cy="61" r="3.8"/>`,
+          <path d="M52 70 h17"/>`,
+    again: `<path d="M77.2 52 A19 19 0 1 1 68 42.8"/>
+          <path class="q-head" d="M68 42.8 L60.2 43.1 L63.2 36.7 Z"/>
+          <circle class="q-dot" cx="60" cy="60" r="3.8"/>`,
   }[kind];
 
   return `<svg class="qart" viewBox="0 0 120 120" aria-hidden="true">

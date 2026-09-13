@@ -109,18 +109,56 @@ function header(depth) {
 </header>`;
 }
 
+/** The notices, as a panel that comes in from the side. The links still
+ *  point at the real pages, so this is an upgrade rather than a gate. */
+function sheets() {
+  const one = (key, body) => `<template data-sheet-body="${key}">
+      <p class="doc-intro">${esc(body.intro)}</p>
+      ${body.sections.map((s, i) => `<section class="doc-s">
+        <span class="doc-n">${n2(i)}</span>
+        <div><h2>${esc(s.title)}</h2><p>${esc(s.body)}</p></div>
+      </section>`).join("\n      ")}
+    </template>`;
+
+  return `<div class="sheet" id="sheet" hidden>
+  <div class="sheet-scrim" data-sheet-close></div>
+  <aside class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1">
+    <header class="sheet-head">
+      <div>
+        <span class="sheet-eyebrow" id="sheetEyebrow"></span>
+        <h2 id="sheetTitle"></h2>
+      </div>
+      <button class="sheet-x" type="button" data-sheet-close aria-label="Close">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5 l10 10 M15 5 l-10 10"/></svg>
+      </button>
+    </header>
+    <div class="sheet-body" id="sheetBody"></div>
+    <footer class="sheet-foot">
+      <a class="btn btn-q" id="sheetFull" href="/privacy/">Open the full page</a>
+    </footer>
+  </aside>
+  ${one("privacy", C.privacyBody)}
+  ${one("cookies", C.cookiesBody)}
+</div>`;
+}
+
 function footer(depth) {
   const r = rel(depth);
   const to = (href) => (depth && href.startsWith("/") ? r + href.slice(1) : href);
+  const key = (href) => (href.includes("/privacy/") ? "privacy" : href.includes("/cookies/") ? "cookies" : "");
   const groups = C.footer.groups
     .map((g) => `<div class="foot-col">
         <h2>${esc(g.title)}</h2>
         <ul>
-          ${g.links.map((l) => `<li><a href="${to(l.href)}">${esc(l.label)}</a></li>`).join("\n          ")}
+          ${g.links.map((l) => {
+            const k = key(l.href);
+            return `<li><a href="${to(l.href)}"${k ? ` data-sheet="${k}" data-sheet-title="${esc(l.label)}"` : ""}>${esc(l.label)}</a></li>`;
+          }).join("\n          ")}
         </ul>
       </div>`).join("\n      ");
 
-  return `<footer class="foot">
+  return `${sheets()}
+<footer class="foot">
   <span class="foot-mark" aria-hidden="true">
     <img src="${r}assets/pandax-mark-ink.png" alt="" width="224" height="224" loading="lazy">
   </span>
@@ -973,9 +1011,12 @@ function legalPage(key, extra) {
 
 const docSections = (body) =>
   `<p class="doc-intro">${esc(body.intro)}</p>\n\n    ` +
-  body.sections.map((s) => `<section class="doc-sec">
-      <h2>${esc(s.title)}</h2>
-      <p>${esc(s.body)}</p>
+  body.sections.map((s, i) => `<section class="doc-s">
+      <span class="doc-n">${n2(i)}</span>
+      <div>
+        <h2>${esc(s.title)}</h2>
+        <p>${esc(s.body)}</p>
+      </div>
     </section>`).join("\n\n    ");
 
 const cookiesSections = docSections(C.cookiesBody);

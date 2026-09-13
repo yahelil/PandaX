@@ -234,6 +234,30 @@ export const does = {
   action: { label: "See what Actis produces", href: "/actis/" },
 };
 
+/* 7b -------------------------------------------------------- easier --- */
+
+export const easier = {
+  heading: "Product security made",
+  highlight: "easier.",
+  items: [
+    {
+      glyph: "record",
+      title: "Evidence, not just findings",
+      body: "A scanner hands you a list. Actis ties every component, finding and decision to the release that shipped, so there is something to show when proof is asked for.",
+    },
+    {
+      glyph: "document",
+      title: "The documents, generated",
+      body: "Annex VII technical documentation and the Annex V declaration, drafted in the format the regulation asks for, with the missing inputs flagged rather than guessed.",
+    },
+    {
+      glyph: "automate",
+      title: "No more rebuilding by hand",
+      body: "The work that repeats on every release — inventory, exposure, remediation proof, submission — runs once and keeps its own history.",
+    },
+  ],
+};
+
 /* 8 ------------------------------------------------------------ source --- */
 
 export const source = {

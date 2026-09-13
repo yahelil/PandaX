@@ -69,74 +69,83 @@
       </div>
     </div>
     <div class="hero-stage">
-      <svg class="scene" viewBox="14 72 528 292" role="img"
-     aria-label="A release enters, is matched and decided, and leaves as a sealed record.">
+      <svg class="scene" viewBox="0 0 600 460" role="img"
+     aria-label="A release enters, is matched against sources, weighed at a decision, and leaves as a sealed record.">
   <defs>
-    <linearGradient id="wash-a" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#B0801F" stop-opacity="0.30"/>
-      <stop offset="100%" stop-color="#B0801F" stop-opacity="0"/>
-    </linearGradient>
-    <linearGradient id="wash-b" x1="1" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#4A4FA8" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="#B4577E" stop-opacity="0.05"/>
-    </linearGradient>
+    <!-- Radial, and fully transparent before the edge, so nothing is clipped. -->
+    <radialGradient id="wash-a">
+      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.34"/>
+      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#D9AE55" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wash-b">
+      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.24"/>
+      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#B4577E" stop-opacity="0"/>
+    </radialGradient>
     <path id="route"
-      d="M86 214 C 150 214, 168 132, 232 132 C 292 132, 300 214, 360 214
-         C 420 214, 428 300, 474 300"/>
+      d="M108 176 C 176 176, 178 108, 246 108 C 314 108, 318 244, 386 244
+         C 442 244, 452 336, 502 336"/>
   </defs>
 
-  <!-- soft ground, so the line work is not floating on nothing -->
-  <ellipse class="wash" cx="196" cy="150" rx="150" ry="116" fill="url(#wash-a)"/>
-  <ellipse class="wash wash-2" cx="404" cy="286" rx="136" ry="104" fill="url(#wash-b)"/>
+  <circle class="wash"   cx="212" cy="178" r="162" fill="url(#wash-a)"/>
+  <circle class="wash wash-2" cx="406" cy="296" r="156" fill="url(#wash-b)"/>
 
   <g class="ink" fill="none" stroke-linecap="round" stroke-linejoin="round">
 
-    <!-- the route the evidence travels -->
     <use href="#route" class="route"/>
 
-    <!-- the release: a box, drawn open -->
+    <!-- the release, as a box being opened -->
     <g class="node node-in">
-      <path d="M30 196 L64 178 L98 196 L64 214 Z"/>
-      <path d="M30 196 L30 236 L64 254 L64 214"/>
-      <path d="M98 196 L98 236 L64 254"/>
-      <path class="thin" d="M47 205 L47 245"/>
+      <path d="M34 150 L82 124 L130 150 L82 176 Z"/>
+      <path d="M34 150 L34 208 L82 234 L82 176"/>
+      <path d="M130 150 L130 208 L82 234"/>
+      <path class="thin" d="M58 163 L58 221"/>
+      <path class="thin" d="M82 124 L82 176"/>
     </g>
 
     <!-- the lattice: the mark's own geometry, where components are matched -->
     <g class="node node-mid">
-      <path d="M232 96 L262 113 L262 147 L232 164 L202 147 L202 113 Z"/>
-      <path class="thin" d="M232 96 L232 130 M232 130 L262 147 M232 130 L202 147"/>
-      <circle class="dot" cx="232" cy="130" r="4.5"/>
-      <circle class="orbit" cx="232" cy="130" r="46"/>
+      <path d="M246 56 L290 81 L290 131 L246 156 L202 131 L202 81 Z"/>
+      <path class="thin" d="M246 56 L246 106 M246 106 L290 131 M246 106 L202 131"/>
+      <g class="panda">
+        <circle class="p-ear" cx="228" cy="88" r="9"/>
+        <circle class="p-ear" cx="264" cy="88" r="9"/>
+        <circle class="p-head" cx="246" cy="104" r="21"/>
+        <ellipse class="p-eye" cx="238" cy="101" rx="4.6" ry="5.6"/>
+        <ellipse class="p-eye" cx="254" cy="101" rx="4.6" ry="5.6"/>
+        <path class="p-nose" d="M243 113 q3 3 6 0"/>
+      </g>
+      <circle class="orbit" cx="246" cy="106" r="70"/>
     </g>
 
-    <!-- the decision: one finding, weighed -->
+    <!-- the decision: one route taken, one not, and the choice recorded -->
     <g class="node node-dec">
-      <path d="M336 196 L384 196"/>
-      <path d="M360 182 L360 232"/>
-      <path class="thin" d="M336 196 L326 216 L346 216 Z"/>
-      <path class="thin" d="M384 196 L374 216 L394 216 Z"/>
-      <circle class="dot" cx="360" cy="176" r="4.5"/>
+      <circle cx="386" cy="244" r="26"/>
+      <path class="thin branch-off" d="M386 244 L440 206"/>
+      <path class="branch-on" d="M386 244 L440 282"/>
+      <circle class="dot" cx="386" cy="244" r="5.5"/>
+      <circle class="dot mark-off" cx="440" cy="206" r="4"/>
     </g>
 
     <!-- the record: sheets, and the seal that closes them -->
     <g class="node node-out">
-      <rect x="444" y="252" width="62" height="80" rx="4"/>
-      <path class="thin" d="M456 274 H494 M456 288 H494 M456 302 H480"/>
+      <path d="M470 286 H556 a6 6 0 0 1 6 6 V404 a6 6 0 0 1 -6 6 H470 a6 6 0 0 1 -6 -6 V292 a6 6 0 0 1 6 -6 Z"/>
+      <path class="thin" d="M486 314 H540 M486 334 H540 M486 354 H518"/>
       <g class="seal">
-        <circle cx="506" cy="330" r="17"/>
-        <path class="thin tick" d="M499 330 l5 5 l9 -11"/>
+        <circle cx="546" cy="392" r="22"/>
+        <path class="seal-tick" d="M535 393 l7 8 l15 -18"/>
       </g>
     </g>
 
     <!-- what travels the route -->
-    <circle class="pulse" r="5">
-      <animateMotion dur="7s" repeatCount="indefinite" rotate="auto">
+    <circle class="pulse" r="6">
+      <animateMotion dur="7.5s" repeatCount="indefinite">
         <mpath href="#route"/>
       </animateMotion>
     </circle>
-    <circle class="pulse pulse-2" r="3.5">
-      <animateMotion dur="7s" begin="2.3s" repeatCount="indefinite" rotate="auto">
+    <circle class="pulse pulse-2" r="4">
+      <animateMotion dur="7.5s" begin="2.5s" repeatCount="indefinite">
         <mpath href="#route"/>
       </animateMotion>
     </circle>

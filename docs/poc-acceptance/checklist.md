@@ -61,7 +61,7 @@ These apply to every card regardless of its content.
 | 01 | CLI clock and verdict before final report | Yaheli | Genuine | Done | ⬜ pending |
 | 02 | External trust anchor for evidence | Guy | Genuine | Done | ⬜ pending |
 | 03 | SquashFS / UBIFS ingest via Docker unblob | Simon | Genuine | Done | ⬜ pending |
-| 04 | This checklist and the evidence index | Eden | — | To Do | ⬜ pending |
+| 04 | This checklist and the evidence index | Eden | Genuine | To Do | ⬜ pending |
 | 05 | Durable cases, events, decisions, clocks | Yaheli | Genuine | Done | ⬜ pending |
 | 06 | External verification and key substitution | Guy | Genuine | Done | ⬜ pending |
 | 07 | Pinned firmware fixtures and test matrix | Simon | Genuine | To Do | ⬜ pending |

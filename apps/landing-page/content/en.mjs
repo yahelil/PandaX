@@ -53,7 +53,10 @@ export const boot = {
 
 export const hero = {
   headline: "Automate CRA compliance",
-  /** The word that takes the highlight, matched in the headline. */
+  /** The word that takes the highlight, matched in the headline.
+   *  Note for whoever edits this next: the acquisition plan rules out selling
+   *  compliance as an outcome, on UWG grounds. This wording was chosen anyway,
+   *  deliberately. Worth a German legal read before any paid campaign. */
   highlight: "Automate",
   subhead: "PandaX turns each release into a record a reviewer can read. What shipped, what was found, what you decided, and the documents to prove it.",
   body: "Every vulnerability decision needs traceable evidence. PandaX builds the record.",

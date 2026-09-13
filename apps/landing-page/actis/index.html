@@ -61,53 +61,79 @@
   <div class="wrap">
     <div class="hero-in">
       <div class="prod-text">
-        <span class="pname-eyebrow">Our product</span>
-        <h1 class="pname-word">Actis</h1>
+        <div class="pname-lead">
+          <span class="pname-eyebrow">Our product</span>
+          <h1 class="pname-word">
+            <img class="pname-mark" src="../assets/actis-mark.png" alt="" width="60" height="60">
+            Actis
+          </h1>
+        </div>
         <p class="lede">The product. A release goes in, a reviewable record comes out.</p>
         <p class="lede lede-sm">Actis is built by PandaX. It reads an SBOM, matches it against public advisory sources, records what you decide about each finding, generates the documents, and seals the result to the release that shipped.</p>
         <div class="acts"><a class="btn" href="/#contact">Book a 30-minute walkthrough</a></div>
       </div>
       <div class="hero-stage">
-        <svg class="scene scene-mark" viewBox="0 0 460 460" role="img"
-     aria-label="The Actis mark, held in a turning lattice.">
-  <defs>
-    <radialGradient id="m-wash-a">
-      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.30"/>
-      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.14"/>
-      <stop offset="100%" stop-color="#D9AE55" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="m-wash-b">
-      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.22"/>
-      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.10"/>
-      <stop offset="100%" stop-color="#B4577E" stop-opacity="0"/>
-    </radialGradient>
-    <path id="ring-mid" d="M80 230 A150 150 0 1 1 380 230 A150 150 0 1 1 80 230"/>
-  </defs>
-
-  <circle class="wash" cx="196" cy="196" r="164" fill="url(#m-wash-a)"/>
-  <circle class="wash wash-2" cx="278" cy="276" r="152" fill="url(#m-wash-b)"/>
-
-  <g class="ink" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <path class="thin hex" d="M230 96 L320 148 L320 252 L230 304 L140 252 L140 148 Z"/>
-    <circle class="orbit ring-a" cx="230" cy="230" r="150"/>
-    <circle class="orbit ring-b" cx="230" cy="230" r="186"/>
-
-    <g class="sat"><circle cx="230" cy="80" r="7"/></g>
-    <g class="sat"><circle cx="380" cy="230" r="7"/></g>
-    <g class="sat"><circle cx="230" cy="380" r="7"/></g>
-    <g class="sat"><circle cx="80" cy="230" r="7"/></g>
-
-    <circle class="pulse" r="6">
-      <animateMotion dur="9s" repeatCount="indefinite"><mpath href="#ring-mid"/></animateMotion>
-    </circle>
-    <circle class="pulse pulse-2" r="4" opacity="0">
-      <animate attributeName="opacity" to="1" begin="3s" dur="0.01s" fill="freeze"/>
-      <animateMotion dur="9s" begin="3s" repeatCount="indefinite"><mpath href="#ring-mid"/></animateMotion>
-    </circle>
-  </g>
-
-  <image class="mark-art" href="../assets/actis-mark.png" x="150" y="150" width="160" height="160"/>
-</svg>
+        <div class="laptop laptop-cycling">
+          <div class="laptop-lid">
+            <div class="laptop-lid-back" aria-hidden="true">
+              <img src="../assets/actis-mark-light.png" alt="" width="60" height="60">
+            </div>
+            <div class="laptop-bezel">
+              <span class="laptop-camera" aria-hidden="true"></span>
+              <div class="laptop-screen">
+                <div class="sc" id="sc">
+          <div class="sc-bar" aria-hidden="true">
+            <span class="sc-dots"><i></i><i></i><i></i></span>
+            <span class="sc-app">Actis</span>
+          </div>
+          <div class="sc-body">
+            <div class="sc-head">
+              <span class="sc-flag">Example record</span>
+              <span class="sc-seal" id="scSeal"><span class="seal-dot" aria-hidden="true"></span>Sealed</span>
+            </div>
+            <div class="sc-title"><span data-f="product">Gateway controller</span> <span data-f="release">4.2.1</span></div>
+            <div class="sc-run"><span class="id" data-f="runId">run-20260910-084417-c31f0a</span></div>
+            <div class="sc-stats">
+            <div class="sc-stat">
+              <span class="sc-v" data-count="412">412</span>
+              <span class="sc-l">components</span>
+            </div>
+            <div class="sc-stat">
+              <span class="sc-v" data-count="7">7</span>
+              <span class="sc-l">findings</span>
+            </div>
+            <div class="sc-stat" data-mark="1">
+              <span class="sc-v" data-count="1">1</span>
+              <span class="sc-l">needs a decision</span>
+            </div>
+            <div class="sc-stat">
+              <span class="sc-v" data-count="6 of 6">6 of 6</span>
+              <span class="sc-l">checks passed</span>
+            </div>
+            </div>
+            <ul class="sc-checks"><li data-i="0"><span class="tick" aria-hidden="true"></span>Inventory</li><li data-i="1"><span class="tick" aria-hidden="true"></span>Findings</li><li data-i="2"><span class="tick" aria-hidden="true"></span>Decisions</li><li data-i="3"><span class="tick" aria-hidden="true"></span>Timeline</li><li data-i="4"><span class="tick" aria-hidden="true"></span>Documents</li><li data-i="5"><span class="tick" aria-hidden="true"></span>Sealed</li></ul>
+            <div class="sc-fix">
+              <span class="fx-arrow" aria-hidden="true"></span>
+              <span class="id" data-f="cve">CVE-2023-46218</span> in <span class="id" data-f="component">curl 8.3.0</span> — <span data-f="fix">Upgrade to curl 8.5.0</span>
+            </div>
+          </div>
+        </div>
+              </div>
+              <div class="laptop-glare" aria-hidden="true"></div>
+            </div>
+          </div>
+          <div class="laptop-base">
+            <div class="laptop-keys" aria-hidden="true">
+          <div class="lk-row lk-fn"><span>esc</span><span>F1</span><span>F2</span><span>F3</span><span>F4</span><span>F5</span><span>F6</span><span>F7</span><span>F8</span><span>F9</span><span>F10</span><span>F11</span><span>F12</span><span>⏻</span></div>
+          <div class="lk-row lk-num"><span>~</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>0</span><span>-</span><span class="lk-bar"></span><span class="lk-w">delete</span></div>
+          <div class="lk-row lk-q"><span class="lk-w">tab</span><span>Q</span><span>W</span><span>E</span><span>R</span><span>T</span><span>Y</span><span>U</span><span>I</span><span>O</span><span>P</span><span>[</span><span>]</span><span>\</span></div>
+          <div class="lk-row lk-a"><span class="lk-w">caps</span><span>A</span><span>S</span><span>D</span><span>F</span><span>G</span><span>H</span><span>J</span><span>K</span><span>L</span><span>;</span><span>'</span><span class="lk-w">return</span></div>
+          <div class="lk-row lk-z"><span class="lk-w2">shift</span><span>Z</span><span>X</span><span>C</span><span>V</span><span>B</span><span>N</span><span>M</span><span>,</span><span>.</span><span>/</span><span class="lk-w2">shift</span></div>
+          <div class="lk-row lk-sp"><span>fn</span><span>⌃</span><span>⌥</span><span>⌘</span><span class="lk-bar"></span><span>⌘</span><span>⌥</span><span>◀</span><span>▲▼</span><span>▶</span></div>
+        </div>
+          </div>
+          <div class="laptop-shadow" aria-hidden="true"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -166,13 +192,8 @@
   <div class="wrap">
     <h2>What a record looks like</h2>
     <p class="lede">Every run produces one of these. This is an example, not a customer's.</p>
-    <div class="hero-stage">
-      <div class="laptop">
-        <div class="laptop-lid">
-          <div class="laptop-bezel">
-            <span class="laptop-camera" aria-hidden="true"></span>
-            <div class="laptop-screen">
-              <div class="sc" id="sc">
+    <div class="rec-frame">
+      <div class="sc" id="sc">
           <div class="sc-bar" aria-hidden="true">
             <span class="sc-dots"><i></i><i></i><i></i></span>
             <span class="sc-app">Actis</span>
@@ -209,22 +230,6 @@
             </div>
           </div>
         </div>
-            </div>
-            <div class="laptop-glare" aria-hidden="true"></div>
-          </div>
-        </div>
-        <div class="laptop-base">
-          <div class="laptop-keys" aria-hidden="true">
-          <div class="lk-row lk-fn"><span>esc</span><span>F1</span><span>F2</span><span>F3</span><span>F4</span><span>F5</span><span>F6</span><span>F7</span><span>F8</span><span>F9</span><span>F10</span><span>F11</span><span>F12</span><span>⏻</span></div>
-          <div class="lk-row lk-num"><span>~</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>0</span><span>-</span><span class="lk-bar"></span><span class="lk-w">delete</span></div>
-          <div class="lk-row lk-q"><span class="lk-w">tab</span><span>Q</span><span>W</span><span>E</span><span>R</span><span>T</span><span>Y</span><span>U</span><span>I</span><span>O</span><span>P</span><span>[</span><span>]</span><span>\</span></div>
-          <div class="lk-row lk-a"><span class="lk-w">caps</span><span>A</span><span>S</span><span>D</span><span>F</span><span>G</span><span>H</span><span>J</span><span>K</span><span>L</span><span>;</span><span>'</span><span class="lk-w">return</span></div>
-          <div class="lk-row lk-z"><span class="lk-w2">shift</span><span>Z</span><span>X</span><span>C</span><span>V</span><span>B</span><span>N</span><span>M</span><span>,</span><span>.</span><span>/</span><span class="lk-w2">shift</span></div>
-          <div class="lk-row lk-sp"><span>fn</span><span>⌃</span><span>⌥</span><span>⌘</span><span class="lk-bar"></span><span>⌘</span><span>⌥</span><span>◀</span><span>▲▼</span><span>▶</span></div>
-        </div>
-        </div>
-        <div class="laptop-shadow" aria-hidden="true"></div>
-      </div>
     </div>
   </div>
 </section>

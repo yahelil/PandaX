@@ -4,7 +4,8 @@
  * Edit here, then run `node build.mjs`. Never edit the generated pages by hand.
  * Structured for translation: a German file would be content/de.mjs, same shape.
  *
- * House rules: sentence case. Say record, evidence, audit trail — never
+ * House rules: sentence case. No em dashes anywhere: they are the clearest
+ * tell that a machine wrote the line. Say record, evidence, audit trail, never
  * "CRA-compliant", "certified" or "guaranteed". The product reads an SBOM, so
  * the word "firmware" does not appear.
  */
@@ -28,7 +29,11 @@ export const nav = {
       blurb: "Turns a release into a reviewable record",
     },
   ],
-  links: [],
+  links: [
+    { label: "Who it is for", href: "#audience" },
+    { label: "How it works", href: "#does" },
+    { label: "About", href: "#about" },
+  ],
   action: { label: "Book a walkthrough", href: "#contact" },
 };
 
@@ -48,10 +53,13 @@ export const boot = {
 
 export const hero = {
   headline: "Automate CRA compliance",
-  /** The word that takes the highlight, matched in the headline. */
+  /** The word that takes the highlight, matched in the headline.
+   *  Note for whoever edits this next: the acquisition plan rules out selling
+   *  compliance as an outcome, on UWG grounds. This wording was chosen anyway,
+   *  deliberately. Worth a German legal read before any paid campaign. */
   highlight: "Automate",
-  subhead: "Product security evidence for the EU Cyber Resilience Act.",
-  body: "Every release needs legal evidence. PandaX builds it.",
+  subhead: "PandaX turns each release into a record a reviewer can read. What shipped, what was found, what you decided, and the documents to prove it.",
+  body: "Every vulnerability decision needs traceable evidence. PandaX builds the record.",
   primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
   secondary: { label: "See Actis", href: "/actis/" },
   /** The machine cycles through these. Each is a complete, consistent example. */
@@ -119,16 +127,16 @@ export const pipeline = {
 /* 2 -------------------------------------------------------- obligation --- */
 
 export const obligation = {
-  heading: "The Cyber Resilience Act hardens vulnerability compliance",
-  lede: "Every release needs legal evidence.",
+  heading: "What the Act asks you to keep",
+  lede: "Not a scan report. A file that shows what you shipped, what was wrong with it, and what you did about it. Kept for ten years.",
   marks: [
     { date: "11 Sep 2026", iso: "2026-09-11", label: "Vulnerability-handling requirements apply", live: true },
     { date: "11 Dec 2027", iso: "2027-12-11", label: "Full CRA application" },
   ],
   liveLabel: "In effect",
   points: [
-    "Companies must maintain technical files — cybersecurity risk assessments, software architecture designs and test reports — available to authorities for at least 10 years.",
-    "Penalties can reach €15 million or 2.5% of worldwide annual turnover, whichever is higher.",
+    "Cybersecurity risk assessments, software architecture designs, test reports. Companies must keep these available to authorities for at least 10 years.",
+    "Penalties can reach up to €15 million or 2.5% of worldwide annual turnover, whichever is higher.",
   ],
   source:
     "European Commission Digital Strategy; Regulation (EU) 2024/2847, Articles 71 and 73.",
@@ -139,7 +147,7 @@ export const obligation = {
 export const growth = {
   heading: "Vulnerability discovery is accelerating",
   lede: "CVE reports more than doubled between 2020 and 2025.",
-  /** Actual CVE Program totals, then an exponential fit — labelled as one. */
+  /** Actual CVE Program totals, then an exponential fit, labelled as one. */
   series: [
     { year: "2020", value: 18375 },
     { year: "2021", value: 20161 },
@@ -157,11 +165,11 @@ export const growth = {
   projectedLabel: "Projected",
   facts: [
     { value: "42,595", label: "New vulnerabilities disclosed in the ENISA reporting period, up 27%." },
-    { value: "33%", label: "Rated high or critical — 7% critical, 26% high." },
+    { value: "33%", label: "Rated high or critical: 7% critical, 26% high." },
   ],
   ai: {
     title: "The curve is not flattening",
-    body: "As AI tools speed up discovery, the number of findings that need evaluation and tracking grows with it.",
+    body: "Advancing AI tools are expected to drive a substantial increase in discoveries to evaluate and track.",
   },
   source:
     "ENISA Threat Landscape 2025; CVE Program Metrics 2020–2025. Figures from 2026 on are an exponential fit to those totals, not a forecast. The 42,595 count is ENISA's reporting period and does not line up with a calendar year.",
@@ -170,8 +178,8 @@ export const growth = {
 /* 4 ---------------------------------------------------------- workflow --- */
 
 export const workflow = {
-  heading: "Vulnerability reporting workflow",
-  lede: "The 24-hour and 72-hour deadlines both run from the company's awareness.",
+  heading: "The clock starts when you know",
+  lede: "Both deadlines run from the moment you become aware, not from the moment you have a fix.",
   stages: [
     { at: "24 hours", title: "Early warning", body: "Alerting for an actively exploited vulnerability or severe incident." },
     { at: "72 hours", title: "Notification", body: "Affected product information, measures taken and user protection steps." },
@@ -184,19 +192,21 @@ export const workflow = {
 /* 5 ------------------------------------------------------------ market --- */
 
 export const market = {
-  heading: "What the current market lacks",
-  lede: "Current solutions detect vulnerabilities. None of them automate CRA compliance.",
+  heading: "What your tools already do, and where they stop",
+  lede: "Most tools focus on vulnerability detection rather than end-to-end CRA evidence.",
   columns: [
     {
-      title: "What the market delivers",
+      title: "What a scanner gives you",
       items: ["Vulnerability detection", "Severity scores", "SBOMs and scan reports", "Point-in-time security findings"],
     },
     {
-      title: "What the market misses",
+      /* Phrased as what arrives, not as homework. The gap has to be visible
+         or there is no reason to buy, but it is ours to close, not theirs. */
+      title: "What Actis adds",
       items: [
-        "Evidence tied to the shipped product version",
-        "Annex VII technical documentation compatibility",
-        "Risk assessment, and how the risks were addressed",
+        "Evidence tied to the version that actually shipped",
+        "The Annex VII technical documentation",
+        "The risk assessment, and how each risk was addressed",
         "An SBOM tied to the shipped image",
       ],
       mark: true,
@@ -204,29 +214,15 @@ export const market = {
   ],
 };
 
-/* 6 ------------------------------------------------------------ manual --- */
-
-export const manual = {
-  heading: "The manual work",
-  lede: "Each vulnerability creates the same work again.",
-  steps: [
-    { title: "Break down the release", body: "Catalogue every component and library in the release." },
-    { title: "Assess the exposure", body: "Trace each vulnerability to the affected product and version." },
-    { title: "Prove the vulnerability was patched", body: "Prepare the remediation evidence and show the fix shipped." },
-    { title: "Submit the evidence", body: "Enter the required information by hand through the CRA reporting process." },
-  ],
-  clock: "24h early warning. 72h notification. The countdown begins with manufacturer awareness.",
-};
-
 /* 7 -------------------------------------------------------- automation --- */
 
 export const does = {
   eyebrow: "Our product",
   name: "Actis",
-  heading: "PandaX automates everything",
+  heading: "Actis automates CRA evidence workflow",
   lede: "Connect the evidence. Draft the documents. File with approval.",
   points: [
-    "Connects existing evidence from configured Jira, CI/CD, SBOM and document sources to the relevant product version.",
+    "Connects existing SBOM and document evidence to the relevant product version.",
     "Identifies missing evidence, flags missing inputs and drafts all required legal documents.",
     "After your company's approval, files the reports and retains a time-stamped audit trail of every submission.",
   ],
@@ -234,26 +230,26 @@ export const does = {
   action: { label: "See what Actis produces", href: "/actis/" },
 };
 
-/* 7b -------------------------------------------------------- easier --- */
+/* 7b ----------------------------------------------------- questions --- */
 
-export const easier = {
-  heading: "Product security made",
-  highlight: "easier.",
+export const questions = {
+  heading: "The proof,",
+  highlight: "assembled once.",
   items: [
     {
-      glyph: "record",
-      title: "Evidence, not just findings",
+      glyph: "evidence",
+      title: "Evidence, not a list",
       body: "A scanner hands you a list. Actis ties every component, finding and decision to the release that shipped, so there is something to show when proof is asked for.",
     },
     {
       glyph: "document",
       title: "The documents, generated",
-      body: "Annex VII technical documentation and the Annex V declaration, drafted in the format the regulation asks for, with the missing inputs flagged rather than guessed.",
+      body: "Annex VII technical documentation and the EU declaration of conformity following Annex V, drafted in the format the regulation asks for, with missing inputs flagged rather than guessed.",
     },
     {
-      glyph: "automate",
+      glyph: "again",
       title: "No more rebuilding by hand",
-      body: "The work that repeats on every release — inventory, exposure, remediation proof, submission — runs once and keeps its own history.",
+      body: "Inventory, exposure, remediation proof, submission. The work that repeats on every release runs once and keeps its own history.",
     },
   ],
 };
@@ -261,52 +257,71 @@ export const easier = {
 /* 8 ------------------------------------------------------------ source --- */
 
 export const source = {
-  heading: "Your source code never leaves your environment",
-  lede: "PandaX works from the SBOM, not the code.",
+  heading: "Your source code stays where it is",
+  lede: "Actis reads the SBOM. It never needs the code itself.",
   points: [
-    "The company provides only the SBOM.",
-    "PandaX never receives or views your source code. It stays inside your environment.",
-    "If an SBOM is not available, PandaX provides the tools to generate one locally and export it.",
+    "You hand over an SBOM, and nothing else.",
+    "The code never leaves your environment, because it is never asked for.",
+    "No SBOM yet? There are tools to build one inside your environment and export only that.",
   ],
 };
 
 /* 9 -------------------------------------------------------- capability --- */
 
 export const capability = {
-  heading: "What PandaX does",
+  heading: "What it covers",
   items: [
     { title: "Release evidence mapping", body: "Links each product release to SBOMs, tests, risks, tickets and approvals." },
-    { title: "Gap review", body: "Audits evidence against Annex VII and SRP requirements to pinpoint compliance gaps." },
-    { title: "Follows every update", body: "Syncs submission content across product revisions and regulatory changes." },
+    { title: "Gap review", body: "Checks what you have against what Annex VII asks for, and names what is missing." },
+    { title: "Carries forward", body: "Keeps the record current when the product changes, and when the rules do." },
     { title: "Evidence history", body: "Maintains dated, protected evidence for the retention period the CRA requires." },
-    { title: "Create legal documents", body: "Generates documents that follow the applicable legal standards." },
-    { title: "Submit the reports", body: "Guides approved technical reports through submission to ENISA." },
+    { title: "Drafts the documents", body: "The Annex VII technical file and the EU declaration of conformity following Annex V, in the form they are asked for." },
+    { title: "Files the reports", body: "Takes reports you have approved through the CRA Single Reporting Platform and keeps the receipt." },
   ],
-  closing: {
-    title: "Designed for small manufacturers",
-    body: "Meet the CRA without adding a dedicated legal or compliance team.",
-  },
 };
 
 export const action = {
   lead: "Ready to see",
   highlight: "Actis",
   tail: "in action?",
-  body: "One run against one firmware image, and the record it seals. Components, findings, the fix that shipped, and the proof it was signed off — this is what comes out the other side.",
+  body: "One run against one release, and the record it seals. Every component, every finding, the fix that shipped, and the proof somebody signed it off.",
+  cta: { label: "See Actis", href: "/actis/" },
 };
 
 export const contact = {
   heading: "Get in touch",
   body: "Tell us what you build and which release is next.",
-  fields: { name: "Name", email: "Work email", company: "Company", message: "What do you build?", submit: "Send" },
+  fields: { name: "Name", email: "Work email", company: "Company", message: "Anything you want to tell us", submit: "Send" },
   fallbackAddress: "contact@pandax.online",
+  sending: "Sending\u2026",
+  sentTitle: "Thank you.",
+  sent: "Your message is with us. We will come back to you shortly.",
 };
 
 export const footer = {
   lines: ["PandaX", "Product security evidence for the EU Cyber Resilience Act"],
-  links: [
-    { label: "Actis", href: "/actis/" },
-    { label: "Privacy", href: "/privacy/" },
+  groups: [
+    {
+      title: "Product",
+      links: [
+        { label: "Actis", href: "/actis/" },
+        { label: "All products", href: "/products/" },
+      ],
+    },
+    {
+      title: "Company",
+      links: [
+        { label: "Contact", href: "/#contact" },
+        { label: "Book a walkthrough", href: "/#contact" },
+      ],
+    },
+    {
+      title: "Legal",
+      links: [
+        { label: "Privacy", href: "/privacy/" },
+        { label: "Cookies", href: "/cookies/" },
+      ],
+    },
   ],
   legal:
     "PandaX produces compliance documentation. It does not issue conformity opinions, certificates or verdicts.",
@@ -317,7 +332,7 @@ export const footer = {
 export const actis = {
   title: "Actis",
   description:
-    "Actis is the PandaX product: it turns a product release into the record the Cyber Resilience Act asks for.",
+    "Actis is the PandaX product. It turns a product release into the record the Cyber Resilience Act asks for.",
   heading: "Actis",
   lede: "The product. A release goes in, a reviewable record comes out.",
   body: "Actis is built by PandaX. It reads an SBOM, matches it against public advisory sources, records what you decide about each finding, generates the documents, and seals the result to the release that shipped.",
@@ -332,8 +347,8 @@ export const actis = {
       { title: "Component inventory", body: "An SBOM tied to the release that shipped." },
       { title: "Findings", body: "Each with the upgrade that clears it." },
       { title: "Decisions", body: "What you decided, who decided it, and why." },
-      { title: "Documents", body: "Annex VII technical documentation and the Annex V declaration." },
-      { title: "Reporting timeline", body: "The Article 14 record, stage by stage." },
+      { title: "Documents", body: "Annex VII technical documentation and the EU declaration of conformity following Annex V." },
+      { title: "Reporting timeline", body: "A timeline of Article 14 reporting steps and decisions." },
       { title: "Sealed bundle", body: "Timestamped, and verifiable without Actis installed." },
     ],
     closing: "Open format. You own it, and you can take it to any reviewer.",
@@ -349,7 +364,7 @@ export const actis = {
     ],
     building: [
       "The hosted workspace, for more than one person.",
-      "Connectors into Jira, CI/CD and document systems.",
+      "Connectors into document systems.",
       "Scheduled advisory monitoring that opens cases on its own.",
     ],
     nowLabel: "Working today",
@@ -367,6 +382,12 @@ export const legalPages = {
     heading: "Privacy",
     updated: "Last updated 13 September 2026.",
   },
+  cookies: {
+    title: "Cookies",
+    description: "This website sets no cookies. This page says so, and why.",
+    heading: "Cookies",
+    updated: "Last updated 13 September 2026.",
+  },
 };
 
 export const privacyBody = {
@@ -379,19 +400,19 @@ export const privacyBody = {
     },
     {
       title: "What the site collects",
-      body: "Nothing on its own. This website sets no cookies, runs no analytics and embeds no third-party services, so no consent banner is needed. Nothing is stored on your device beyond what is technically necessary to serve the page.",
+      body: "This website sets no non-essential cookies, runs no analytics and embeds no third-party content. It collects contact details only when you choose to submit the contact form.",
     },
     {
       title: "Server logs",
-      body: "The hosting provider records standard request data — IP address, time, requested file, referrer and user agent — in order to deliver and secure the site. These logs are kept only as long as that purpose requires. Legal basis: Art. 6(1)(f) GDPR.",
+      body: "To deliver and secure the site, the hosting provider records standard request data: IP address, time, requested file, referrer and user agent. These logs are kept only as long as that purpose requires. Legal basis: Art. 6(1)(f) GDPR.",
     },
     {
       title: "If you write to us",
-      body: "The details you send through the contact form or by email are used to answer you, and kept for as long as the enquiry requires. Legal basis: Art. 6(1)(b) and (f) GDPR. The form posts to our own address; there is no third-party form service.",
+      body: "The details you send through the contact form or by email are used to answer you, and kept for as long as the enquiry requires. Legal basis: Art. 6(1)(b) and (f) GDPR. The form posts to an endpoint on this domain. Cloudflare processes the request as our hosting provider, and Resend delivers the message to our email inbox.",
     },
     {
       title: "Fonts and images",
-      body: "Everything is served from this domain. No request is made to Google Fonts or to any other external host, so no data reaches a third party by loading the page.",
+      body: "Fonts and images are served from this domain. The page makes no requests to third-party content or analytics providers.",
     },
     {
       title: "Hosting",
@@ -403,6 +424,109 @@ export const privacyBody = {
     },
   ],
   // TODO(legal): once the operating entity is registered, add its legal name,
-  // registered address and — if the site keeps targeting Germany — an Impressum
+  // registered address and, if the site keeps targeting Germany, an Impressum
   // per § 5 DDG. Nothing on the page states anything untrue without them.
+};
+
+
+/* ------------------------------------------------------------- cookies --- */
+
+/* Every statement here was checked against the built site before it was
+   written: no external request is made at runtime, and no cookie is set. */
+export const cookiesBody = {
+  intro:
+    "This website sets no cookies. That is the whole notice, but the detail is below, because a page that simply asserts it is worth no more than one that does not.",
+  sections: [
+    {
+      title: "Nothing is stored on your device",
+      body: "No cookies, no local storage, no session storage, and no other identifier. Nothing is written when you arrive, and nothing is read when you come back. Opening the site twice is indistinguishable from opening it once.",
+    },
+    {
+      title: "So there is no consent banner",
+      body: "The consent requirement in Article 5(3) of the ePrivacy Directive, and in \u00a7 25 TDDDG in Germany, applies to storing or reading information on your device. Because nothing is stored or read, the requirement does not arise. A banner here would be asking permission for something that does not happen.",
+    },
+    {
+      title: "No analytics, and no third parties",
+      body: "There is no analytics, no tag manager, no advertising pixel, no embedded video, no chat widget and no third-party form embed. The fonts are served from this domain rather than from Google Fonts. Loading this page makes no request to any host but ours.",
+    },
+    {
+      title: "What the contact form does",
+      body: "The form posts what you type to an endpoint on this domain, which forwards it to us so that we can reply. It sets no cookie and leaves nothing behind on your device. What happens to the message afterwards is described in the privacy notice.",
+    },
+    {
+      title: "If this changes",
+      body: "Adding anything that stores data on your device would change what this page has to say, and would bring a consent requirement with it. This notice would be updated first, not afterwards.",
+    },
+  ],
+};
+
+/* ------------------------------------------------------------ products --- */
+
+export const productsPage = {
+  title: "Our products",
+  description: "What PandaX builds, and what each one is for.",
+  heading: "Our products",
+  lede: "One product today. This page is where the next one will be listed.",
+};
+
+/* ------------------------------------------------------------ audience --- */
+
+/* Drawn from the positioning, not from the acquisition plan: the plan's
+   segment sizes, competitor reads and economics stay internal. */
+export const audience = {
+  heading: "Who this is for",
+  /* Spelled out here: this is the first section on the page, so "the Act"
+     would arrive before anything has named it. */
+  lede: "The EU Cyber Resilience Act asks you to show your work. This is for whoever has to produce it.",
+  fitTitle: "You are probably a fit if",
+  /* Fragments, not sentences. It is a checklist; it should read like one. */
+  fit: [
+    "You sell connected equipment into the EU",
+    "You ship often enough for the work to repeat",
+    "Someone has already asked for a technical file",
+    "Today it is assembled by hand, near the release date",
+  ],
+  readersTitle: "What it gives each of you",
+  readers: [
+    {
+      who: "Product security and compliance",
+      body: "Your next release, already reviewable, with your test lab in the room.",
+    },
+    {
+      who: "Engineering and quality leadership",
+      body: "One process across every product family, instead of starting over each release.",
+    },
+    {
+      who: "Test labs and consultancies",
+      body: "A pack your reviewers can reuse. We do not compete with your assessment.",
+    },
+  ],
+};
+
+/* --------------------------------------------------------------- about --- */
+
+export const about = {
+  heading: "Who we are",
+  lede: "An independent European workspace for product security evidence.",
+  claim: "The record is the product.",
+  claimBody: "Scanners find things. Managed services do the work on your behalf. Neither of them owns the document at the end. The technical file falls out of somebody else's tool, and gets assembled by hand again on the next release. That part is ours.",
+  promisesTitle: "What we hold to",
+  promises: [
+    {
+      glyph: "neutral",
+      title: "Neutral about scanners",
+      body: "Whatever you already pay for can feed the record. We have no interest in replacing it.",
+    },
+    {
+      glyph: "portable",
+      title: "Portable by default",
+      body: "The export is yours. A form a reviewer can read, and a form you can take to someone else entirely.",
+    },
+    {
+      glyph: "impartial",
+      title: "Never paid on the outcome",
+      body: "We do not charge on the result of a conformity assessment. Our fee cannot depend on a verdict.",
+    },
+  ],
+  disclaimer: "PandaX produces documentation. It does not issue conformity opinions, certificates or verdicts.",
 };

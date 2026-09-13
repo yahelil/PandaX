@@ -1,0 +1,7 @@
+# The build is run before deploy; its sources are not part of the site.
+build.mjs
+worker.js
+wrangler.jsonc
+README.md
+content
+.assetsignore

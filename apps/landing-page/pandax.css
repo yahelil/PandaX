@@ -624,8 +624,7 @@ a { color: inherit; }
 .laptop-screen .tick { width: 7px; height: 4px; }
 .laptop-screen .fx-to { color: var(--d-body); }
 .sc-fix { margin-top: 12px; padding-top: 9px; font-size: 8.5px; gap: 6px; }
-.laptop-screen .fx-arrow { width: 10px; }
-
+.laptop-screen 
 /* The turn between one example release and the next. */
 .sc-title span, .sc-run .id, .sc-fix span { transition: opacity .3s; }
 .sc.turning .sc-title span,
@@ -713,7 +712,6 @@ a { color: inherit; }
   display: flex; align-items: center; gap: 9px;
   font-size: clamp(9px, 1vw, 13px); color: var(--brand-l);
 }
-.fx-arrow { width: 16px; height: 1px; background: var(--brand-l); flex: 0 0 auto; }
 
 /* ---------------------------------------------------------- sections ---- */
 
@@ -1654,15 +1652,59 @@ a { color: inherit; }
   display: grid; grid-template-columns: minmax(0, 1fr) auto;
   gap: 32px; align-items: center;
 }
-/* The mark belongs here: this is the section about whose company it is. */
-.claim-mark {
-  flex: 0 0 auto;
-  width: 104px; height: 104px; border-radius: 50%;
+/* The claim, acted out: three releases stack up and the mark seals them.
+   Runs on its own clock, in CSS, and stops dead under reduced motion. */
+.claim-art {
+  position: relative;
+  width: 176px; height: 132px; flex: 0 0 auto;
+}
+.cr {
+  position: absolute; left: 0; width: 132px; height: 22px;
+  border: 1px solid var(--line); border-radius: 5px;
+  background: var(--bg);
+  opacity: 0; transform: translateX(26px);
+  animation: cr-in 7s cubic-bezier(.3,.8,.3,1) infinite;
+}
+.sec-alt .cr { background: var(--surface); }
+.cr::before {
+  content: ""; position: absolute; left: 11px; top: 50%; margin-top: -3px;
+  width: 6px; height: 6px; border-radius: 50%; background: var(--brand); opacity: 0.5;
+}
+.cr::after {
+  content: ""; position: absolute; left: 27px; right: 14px; top: 50%; margin-top: -0.5px;
+  height: 1px; background: var(--line);
+}
+.cr-1 { top: 74px; animation-delay: 0s; }
+.cr-2 { top: 44px; animation-delay: .35s; }
+.cr-3 { top: 14px; animation-delay: .7s; }
+@keyframes cr-in {
+  0%   { opacity: 0; transform: translateX(26px); }
+  9%   { opacity: 1; transform: translateX(0); }
+  84%  { opacity: 1; transform: translateX(0); }
+  93%  { opacity: 0; transform: translateX(-10px); }
+  100% { opacity: 0; transform: translateX(-10px); }
+}
+
+/* The seal lands once the stack is complete. */
+.cr-seal {
+  position: absolute; right: 0; top: 46px;
+  width: 76px; height: 76px; border-radius: 50%;
   display: grid; place-items: center;
   background: var(--bg); border: 1px solid var(--line);
+  box-shadow: 0 10px 26px -12px rgba(15, 23, 32, 0.4);
+  opacity: 0; transform: scale(.6) rotate(-12deg);
+  animation: cr-seal 7s cubic-bezier(.3,1.5,.4,1) infinite;
+  animation-delay: 1.15s;
 }
-.sec-alt .claim-mark { background: var(--surface); }
-.claim-mark img { width: 66px; height: 66px; }
+.sec-alt .cr-seal { background: var(--surface); }
+.cr-seal img { width: 46px; height: 46px; }
+@keyframes cr-seal {
+  0%   { opacity: 0; transform: scale(.6) rotate(-12deg); }
+  7%   { opacity: 1; transform: scale(1) rotate(0deg); }
+  76%  { opacity: 1; transform: scale(1) rotate(0deg); }
+  84%  { opacity: 0; transform: scale(.9) rotate(0deg); }
+  100% { opacity: 0; transform: scale(.6) rotate(-12deg); }
+}
 .sec-alt .claim { background: var(--bg); }
 .claim-line {
   font-family: var(--disp); font-weight: 700;
@@ -1868,7 +1910,7 @@ a { color: inherit; }
   .mk { grid-template-columns: 1fr; gap: 34px; }
   .mk-edge { display: none; }
   .whos, .mws, .holds { grid-template-columns: 1fr; }
-  .claim { padding: 26px 24px; grid-template-columns: 1fr; gap: 22px; justify-items: start; }
+  .claim { padding: 26px 24px; grid-template-columns: 1fr; gap: 26px; justify-items: start; }
   .again { display: none; }
   .foot-cols { grid-template-columns: 1fr 1fr; gap: 28px 24px; }
   .qs { grid-template-columns: 1fr; }
@@ -1920,6 +1962,7 @@ a { color: inherit; }
   .again-loop { animation: none !important; }
   .tickmark, .mk-add { stroke-dashoffset: 0 !important; }
   .flow-pulse { display: none; }
+  .cr, .cr-seal { animation: none !important; opacity: 1 !important; transform: none !important; }
   .pulse { display: none; }
 }
 
@@ -1954,15 +1997,6 @@ a { color: inherit; }
   margin-top: 0;
   box-shadow: 0 28px 64px -30px rgba(22, 24, 27, 0.45);
 }
-.act-mark {
-  position: absolute; left: -36px; bottom: -30px;
-  width: 78px; height: 78px; border-radius: 50%;
-  display: grid; place-items: center;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  box-shadow: 0 12px 28px -10px rgba(22, 24, 27, 0.36);
-}
-.act-mark img { width: 46px; height: 46px; }
 
 /* ---------------------------------------------------------- documents --- */
 

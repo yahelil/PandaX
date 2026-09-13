@@ -379,6 +379,14 @@ second person can apply it without reading the board.
 
 ### 19 — Real-device acceptance run · Eden
 
+> **2026-09-13 scoped acceptance:** Yaheli approved a reduced PoC gate using the
+> repository's CycloneDX SBOM fixture instead of Track A/B firmware. The SBOM
+> pipeline, case/restart behavior, simulated advisory and incident paths, three
+> generated PDFs, evidence seal, and external-key verification passed. This
+> closes card 19 only for the CycloneDX SBOM PoC; it does **not** claim raw
+> firmware or real-device validation. Evidence: [execution log](results/logs/19__lean-sbom-validation__2026-09-13.txt)
+> and [manifest summary](results/manifests/19__lean-sbom-validation__2026-09-13.md).
+
 - **Expected output** — the Track A OpenWrt rehearsal, then the Track B unseen
   image run; a real scan; separately labelled simulated advisory and incident;
   review, clocks, restart, exports, a simulated receipt and an amendment; the

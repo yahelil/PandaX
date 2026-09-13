@@ -344,6 +344,78 @@
   </div>
 </section>
 </main>
+<div class="sheet" id="sheet" hidden>
+  <div class="sheet-scrim" data-sheet-close></div>
+  <aside class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1">
+    <header class="sheet-head">
+      <div>
+        <span class="sheet-eyebrow" id="sheetEyebrow"></span>
+        <h2 id="sheetTitle"></h2>
+      </div>
+      <button class="sheet-x" type="button" data-sheet-close aria-label="Close">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5 l10 10 M15 5 l-10 10"/></svg>
+      </button>
+    </header>
+    <div class="sheet-body" id="sheetBody"></div>
+    <footer class="sheet-foot">
+      <a class="btn btn-q" id="sheetFull" href="/privacy/">Open the full page</a>
+    </footer>
+  </aside>
+  <template data-sheet-body="privacy">
+      <p class="doc-intro">This notice explains what happens to personal data when you use this website. It is short because the site does very little with it.</p>
+      <section class="doc-s">
+        <span class="doc-n">01</span>
+        <div><h2>Who is responsible</h2><p>PandaX operates this website and decides how the data described here is handled. Questions about this notice, or any request below, can go to contact@pandax.online.</p></div>
+      </section>
+      <section class="doc-s">
+        <span class="doc-n">02</span>
+        <div><h2>What the site collects</h2><p>Nothing on its own. This website sets no cookies, runs no analytics and embeds no third-party services, so no consent banner is needed. Nothing is stored on your device beyond what is technically necessary to serve the page.</p></div>
+      </section>
+      <section class="doc-s">
+        <span class="doc-n">03</span>
+        <div><h2>Server logs</h2><p>To deliver and secure the site, the hosting provider records standard request data: IP address, time, requested file, referrer and user agent. These logs are kept only as long as that purpose requires. Legal basis: Art. 6(1)(f) GDPR.</p></div>
+      </section>
+      <section class="doc-s">
+        <span class="doc-n">04</span>
+        <div><h2>If you write to us</h2><p>The details you send through the contact form or by email are used to answer you, and kept for as long as the enquiry requires. Legal basis: Art. 6(1)(b) and (f) GDPR. The form posts to our own address; there is no third-party form service.</p></div>
+      </section>
+      <section class="doc-s">
+        <span class="doc-n">05</span>
+        <div><h2>Fonts and images</h2><p>Everything is served from this domain. No request is made to Google Fonts or to any other external host, so no data reaches a third party by loading the page.</p></div>
+      </section>
+      <section class="doc-s">
+        <span class="doc-n">06</span>
+        <div><h2>Hosting</h2><p>The site is hosted by Cloudflare, Inc. and served from its global edge network, which means the server nearest you answers the request. Cloudflare handles this data as our hosting provider.</p></div>
+      </section>
+      <section class="doc-s">
+        <span class="doc-n">07</span>
+        <div><h2>Your rights</h2><p>You have the right of access, rectification, erasure, restriction, data portability and objection. You can exercise any of these by writing to contact@pandax.online. You also have the right to complain to your local data protection supervisory authority.</p></div>
+      </section>
+    </template>
+  <template data-sheet-body="cookies">
+      <p class="doc-intro">This website sets no cookies. That is the whole notice, but the detail is below, because a page that simply asserts it is worth no more than one that does not.</p>
+      <section class="doc-s">
+        <span class="doc-n">01</span>
+        <div><h2>Nothing is stored on your device</h2><p>No cookies, no local storage, no session storage, and no other identifier. Nothing is written when you arrive, and nothing is read when you come back. Opening the site twice is indistinguishable from opening it once.</p></div>
+      </section>
+      <section class="doc-s">
+        <span class="doc-n">02</span>
+        <div><h2>So there is no consent banner</h2><p>The consent requirement in Article 5(3) of the ePrivacy Directive, and in § 25 TDDDG in Germany, applies to storing or reading information on your device. Because nothing is stored or read, the requirement does not arise. A banner here would be asking permission for something that does not happen.</p></div>
+      </section>
+      <section class="doc-s">
+        <span class="doc-n">03</span>
+        <div><h2>No analytics, and no third parties</h2><p>There is no analytics, no tag manager, no advertising pixel, no embedded video, no chat widget and no third-party form service. The fonts are served from this domain rather than from Google Fonts. Loading this page makes no request to any host but ours.</p></div>
+      </section>
+      <section class="doc-s">
+        <span class="doc-n">04</span>
+        <div><h2>What the contact form does</h2><p>The form posts what you type to an endpoint on this domain, which forwards it to us so that we can reply. It sets no cookie and leaves nothing behind on your device. What happens to the message afterwards is described in the privacy notice.</p></div>
+      </section>
+      <section class="doc-s">
+        <span class="doc-n">05</span>
+        <div><h2>If this changes</h2><p>Adding anything that stores data on your device would change what this page has to say, and would bring a consent requirement with it. This notice would be updated first, not afterwards.</p></div>
+      </section>
+    </template>
+</div>
 <footer class="foot">
   <span class="foot-mark" aria-hidden="true">
     <img src="../assets/pandax-mark-ink.png" alt="" width="224" height="224" loading="lazy">
@@ -372,8 +444,8 @@
       <div class="foot-col">
         <h2>Legal</h2>
         <ul>
-          <li><a href="../privacy/">Privacy</a></li>
-          <li><a href="../cookies/">Cookies</a></li>
+          <li><a href="../privacy/" data-sheet="privacy" data-sheet-title="Privacy">Privacy</a></li>
+          <li><a href="../cookies/" data-sheet="cookies" data-sheet-title="Cookies">Cookies</a></li>
         </ul>
       </div>
     </nav>

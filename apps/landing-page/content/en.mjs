@@ -234,26 +234,27 @@ export const does = {
   action: { label: "See what Actis produces", href: "/actis/" },
 };
 
-/* 7b -------------------------------------------------------- easier --- */
+/* 7b ----------------------------------------------------- questions --- */
 
-export const easier = {
-  heading: "Product security made",
-  highlight: "easier.",
+export const questions = {
+  heading: "Every audit asks the same",
+  highlight: "three questions.",
+  lede: "Actis answers all three from one run, against the release that actually shipped.",
   items: [
     {
-      glyph: "record",
-      title: "Evidence, not just findings",
-      body: "A scanner hands you a list. Actis ties every component, finding and decision to the release that shipped, so there is something to show when proof is asked for.",
+      glyph: "contents",
+      title: "What is in it?",
+      body: "The component inventory for the image that shipped \u2014 not the branch, not the build before it. Every library and version, tied to that release.",
     },
     {
-      glyph: "document",
-      title: "The documents, generated",
-      body: "Annex VII technical documentation and the Annex V declaration, drafted in the format the regulation asks for, with the missing inputs flagged rather than guessed.",
+      glyph: "known",
+      title: "What did you know?",
+      body: "Each finding against that inventory, the date it was known, and what was decided about it \u2014 including the ones you chose not to fix, and why.",
     },
     {
-      glyph: "automate",
-      title: "No more rebuilding by hand",
-      body: "The work that repeats on every release — inventory, exposure, remediation proof, submission — runs once and keeps its own history.",
+      glyph: "did",
+      title: "What did you do?",
+      body: "The fix, the release it shipped in, and the Annex VII and Annex V documents drawn from that same record rather than written again by hand.",
     },
   ],
 };

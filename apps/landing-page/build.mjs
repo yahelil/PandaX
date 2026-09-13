@@ -205,12 +205,90 @@ function terminal() {
     </div>`;
 }
 
+/** The evidence path, drawn as one line: a release goes in, a record comes out.
+ *  Continuous motion, no JS — the pulse travels in CSS. */
+function scene() {
+  return `<svg class="scene" viewBox="14 72 528 292" role="img"
+     aria-label="A release enters, is matched and decided, and leaves as a sealed record.">
+  <defs>
+    <linearGradient id="wash-a" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#B0801F" stop-opacity="0.30"/>
+      <stop offset="100%" stop-color="#B0801F" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="wash-b" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4A4FA8" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#B4577E" stop-opacity="0.05"/>
+    </linearGradient>
+    <path id="route"
+      d="M86 214 C 150 214, 168 132, 232 132 C 292 132, 300 214, 360 214
+         C 420 214, 428 300, 474 300"/>
+  </defs>
+
+  <!-- soft ground, so the line work is not floating on nothing -->
+  <ellipse class="wash" cx="196" cy="150" rx="150" ry="116" fill="url(#wash-a)"/>
+  <ellipse class="wash wash-2" cx="404" cy="286" rx="136" ry="104" fill="url(#wash-b)"/>
+
+  <g class="ink" fill="none" stroke-linecap="round" stroke-linejoin="round">
+
+    <!-- the route the evidence travels -->
+    <use href="#route" class="route"/>
+
+    <!-- the release: a box, drawn open -->
+    <g class="node node-in">
+      <path d="M30 196 L64 178 L98 196 L64 214 Z"/>
+      <path d="M30 196 L30 236 L64 254 L64 214"/>
+      <path d="M98 196 L98 236 L64 254"/>
+      <path class="thin" d="M47 205 L47 245"/>
+    </g>
+
+    <!-- the lattice: the mark's own geometry, where components are matched -->
+    <g class="node node-mid">
+      <path d="M232 96 L262 113 L262 147 L232 164 L202 147 L202 113 Z"/>
+      <path class="thin" d="M232 96 L232 130 M232 130 L262 147 M232 130 L202 147"/>
+      <circle class="dot" cx="232" cy="130" r="4.5"/>
+      <circle class="orbit" cx="232" cy="130" r="46"/>
+    </g>
+
+    <!-- the decision: one finding, weighed -->
+    <g class="node node-dec">
+      <path d="M336 196 L384 196"/>
+      <path d="M360 182 L360 232"/>
+      <path class="thin" d="M336 196 L326 216 L346 216 Z"/>
+      <path class="thin" d="M384 196 L374 216 L394 216 Z"/>
+      <circle class="dot" cx="360" cy="176" r="4.5"/>
+    </g>
+
+    <!-- the record: sheets, and the seal that closes them -->
+    <g class="node node-out">
+      <rect x="444" y="252" width="62" height="80" rx="4"/>
+      <path class="thin" d="M456 274 H494 M456 288 H494 M456 302 H480"/>
+      <g class="seal">
+        <circle cx="506" cy="330" r="17"/>
+        <path class="thin tick" d="M499 330 l5 5 l9 -11"/>
+      </g>
+    </g>
+
+    <!-- what travels the route -->
+    <circle class="pulse" r="5">
+      <animateMotion dur="7s" repeatCount="indefinite" rotate="auto">
+        <mpath href="#route"/>
+      </animateMotion>
+    </circle>
+    <circle class="pulse pulse-2" r="3.5">
+      <animateMotion dur="7s" begin="2.3s" repeatCount="indefinite" rotate="auto">
+        <mpath href="#route"/>
+      </animateMotion>
+    </circle>
+  </g>
+</svg>`;
+}
+
 function heroSection() {
   const h = C.hero;
   return `<section class="hero" id="top">
   <div class="wrap hero-in">
     <div class="hero-copy">
-      <h1>${esc(h.headline)}</h1>
+      <h1>${esc(h.headline).replace(esc(h.highlight), `<span class="hl">${esc(h.highlight)}</span>`)}</h1>
       <p class="lede">${esc(h.subhead)}</p>
       <p class="lede lede-sm">${esc(h.body)}</p>
       <div class="acts">
@@ -219,21 +297,7 @@ function heroSection() {
       </div>
     </div>
     <div class="hero-stage">
-      <div class="laptop" aria-hidden="false">
-        <div class="laptop-lid">
-          <div class="laptop-bezel">
-            <span class="laptop-camera" aria-hidden="true"></span>
-            <div class="laptop-screen">
-              ${screen(h.records[0])}
-            </div>
-            <div class="laptop-glare" aria-hidden="true"></div>
-          </div>
-        </div>
-        <div class="laptop-base">
-          ${keyboard()}
-        </div>
-        <div class="laptop-shadow" aria-hidden="true"></div>
-      </div>
+      ${scene()}
     </div>
   </div>
 </section>`;
@@ -556,8 +620,22 @@ function artisPage() {
   <div class="wrap">
     <h2>${esc(a.record.heading)}</h2>
     <p class="lede">${esc(a.record.lede)}</p>
-    <div class="rec-frame">
-      ${screen(C.hero.records[0])}
+    <div class="hero-stage">
+      <div class="laptop">
+        <div class="laptop-lid">
+          <div class="laptop-bezel">
+            <span class="laptop-camera" aria-hidden="true"></span>
+            <div class="laptop-screen">
+              ${screen(C.hero.records[0])}
+            </div>
+            <div class="laptop-glare" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="laptop-base">
+          ${keyboard()}
+        </div>
+        <div class="laptop-shadow" aria-hidden="true"></div>
+      </div>
     </div>
   </div>
 </section>

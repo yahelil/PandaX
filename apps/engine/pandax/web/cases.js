@@ -199,12 +199,30 @@ function renderCases(cases) {
 async function loadCases() {
   try {
     renderCases(await caseRequest("/api/cases"));
+    const watches = await caseRequest("/api/advisory-watches");
+    $("advisory-watch-status").textContent = watches.length
+      ? watches.map(watch => `${watch.simulated ? "SIMULATED | " : ""}${watch.product_name} ${watch.product_version}: ${watch.case_count} case(s), ${watch.stale ? "STALE since " + watch.stale_since + " — " + watch.last_error : "current as of " + (watch.last_success_at || "first refresh pending")}`).join(" · ")
+      : "No releases watched for new advisories.";
   } catch (error) {
     caseMessage(error.message, true);
   }
 }
 
 $("refresh-cases").addEventListener("click", loadCases);
+$("watch-release").addEventListener("click", async () => {
+  try {
+    await caseRequest("/api/advisory-watches", {method: "POST", body: JSON.stringify({source_run_id: runId})});
+    await loadCases();
+    caseMessage("Current release inventory is watched. PandaX will refresh it hourly while the app runs.");
+  } catch (error) { caseMessage(error.message, true); }
+});
+$("refresh-advisories").addEventListener("click", async () => {
+  try {
+    await caseRequest("/api/advisory-watches/refresh", {method: "POST", body: "{}"});
+    await loadCases();
+    caseMessage("Advisory refresh finished. Existing results were retained if a source was unavailable.");
+  } catch (error) { caseMessage(error.message, true); }
+});
 
 function reviewForm(item) {
   const details = el('details');

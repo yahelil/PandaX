@@ -15,6 +15,7 @@ import shutil
 import tempfile
 import threading
 from collections import Counter
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -34,7 +35,27 @@ MAX_SBOM_BYTES = 50 * 1024 * 1024
 MAX_TELEMETRY_BYTES = 1024 * 1024
 MAX_EXPOSURE_CONTEXT_BYTES = 1024 * 1024
 
-api = FastAPI(title="PandaX CRA Compliance Engine", docs_url="/api/docs")
+
+def _advisory_service():
+    from .advisory_watch import AdvisoryWatchService
+    from .case_service import CaseService
+    return AdvisoryWatchService(CaseService(runs_dir=OUT_DIR))
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from .advisory_watch import AdvisoryRefreshLoop
+    interval = max(1, float(os.environ.get("PANDAX_ADVISORY_REFRESH_SECONDS", "3600")))
+    loop = AdvisoryRefreshLoop(_advisory_service, interval)
+    app.state.advisory_refresh = loop
+    loop.start()
+    try:
+        yield
+    finally:
+        loop.stop()
+
+
+api = FastAPI(title="PandaX CRA Compliance Engine", docs_url="/api/docs", lifespan=lifespan)
 
 
 def _case_store() -> CaseStore:

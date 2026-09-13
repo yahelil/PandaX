@@ -74,7 +74,7 @@
         fn();
         io.disconnect();
       });
-    }, { threshold: threshold || 0.35, rootMargin: "0px 0px -8% 0px" });
+    }, { threshold: threshold == null ? 0.35 : threshold, rootMargin: "0px 0px -8% 0px" });
     io.observe(el);
   }
 
@@ -179,6 +179,15 @@
       if (still) { sc.classList.add("ran", "sealed"); return; }
       onView(sc, function () { assemble(sc); }, 0.25);
     });
+
+    // The evidence table and the two state lists, arriving in order.
+    var arrive = function (host, items, step) {
+      if (!items.length || still || !("IntersectionObserver" in window)) return;
+      host.classList.add("armed");
+      onView(host, function () { stagger(items, step, "ran", host); }, 0);
+    };
+    $$(".tbl").forEach(function (t) { arrive(t, $$("tbody tr", t), 85); });
+    $$(".rule-list").forEach(function (l) { arrive(l, $$("li", l), 80); });
 
     // The engine, typing itself out.
     var term = $("#term");

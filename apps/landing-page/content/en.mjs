@@ -48,6 +48,8 @@ export const boot = {
 
 export const hero = {
   headline: "Automate EU act compliance",
+  /** The word that takes the highlight, matched in the headline. */
+  highlight: "Automate",
   subhead: "Product security evidence for the EU Cyber Resilience Act.",
   body: "Every release needs legal evidence. PandaX builds it.",
   primary: { label: "Book a 30-minute walkthrough", href: "#contact" },

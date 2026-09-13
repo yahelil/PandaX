@@ -64,7 +64,7 @@ ${header(depth)}
 ${body}
 </main>
 ${footer(depth)}
-${script ? `<script src="${r}assets/js/gsap.min.js"></script>\n<script src="${r}assets/js/ScrollTrigger.min.js"></script>\n<script src="${r}pandax.js"></script>` : ""}
+${script ? `<script src="${r}pandax.js" defer></script>` : ""}
 </body>
 </html>
 `;
@@ -126,60 +126,6 @@ function footer(depth) {
 }
 
 
-/* 0 ------------------------------------------------------------- boot --- */
-
-function bootSection() {
-  const b = C.boot;
-  const menu = b.screenNav.map((x) => `<span>${esc(x)}</span>`).join("");
-  return `<section class="boot" id="boot">
-  <div class="boot-stick">
-    <div class="boot-bg" aria-hidden="true"></div>
-
-    <div class="boot-meta" aria-hidden="true">
-      <span class="bm-l"><i class="bm-d"></i> ${esc(b.meta)}</span>
-      <span class="bm-r">${esc(b.metaRight)}</span>
-    </div>
-
-    <div class="laptop" id="laptop">
-      <div class="laptop-lid" id="laptopLid">
-        <div class="laptop-lid-back" aria-hidden="true">
-          <div class="lid-mark"><div class="lid-glyph"></div><div class="lid-word">Panda<i>X</i></div></div>
-        </div>
-        <div class="laptop-bezel">
-          <div class="laptop-camera" aria-hidden="true"></div>
-          <div class="laptop-screen" aria-hidden="true">
-            <div class="sh">
-              <div class="sh-bg"></div>
-              <div class="sh-grade"></div>
-              <div class="sh-nav">
-                <span class="sh-mark"><span class="sh-glyph"></span> Panda<i>X</i></span>
-                <span class="sh-menu">${menu}</span>
-                <span class="sh-status">${esc(b.screenYear)}</span>
-              </div>
-              <div class="sh-stage">
-                <div class="lp-img" id="lpImg" role="img" aria-label="${esc(C.meta.brand)}"></div>
-                <div class="swm">
-                  <div class="swm-name">Panda<i>X</i></div>
-                  <div class="swm-rule"></div>
-                  <div class="swm-tag">${esc(b.tag)}</div>
-                </div>
-              </div>
-            </div>
-            <div class="laptop-glare" aria-hidden="true"></div>
-          </div>
-        </div>
-      </div>
-      <div class="laptop-base">
-        ${keyboard()}
-      </div>
-      <div class="laptop-shadow" aria-hidden="true"></div>
-    </div>
-
-    <div class="boot-hint" id="bootHint" aria-hidden="true">${esc(b.hint)}</div>
-  </div>
-</section>`;
-}
-
 /* 1 ------------------------------------------------------------- hero --- */
 
 function screen(rec) {
@@ -223,39 +169,8 @@ const KEYS = [
   ["lk-sp", "fn ⌃ ⌥ ⌘ = ⌘ ⌥ ◀ ▲▼ ▶"],
 ];
 
-function keyboard() {
-  const rows = KEYS.map(([cls, keys]) => {
-    const cells = keys.split(" ").map((k) => {
-      if (k === "=") return `<span class="lk-bar"></span>`;
-      if (k.startsWith("|")) return `<span class="lk-w">${esc(k.slice(1))}</span>`;
-      if (k.startsWith("!")) return `<span class="lk-w2">${esc(k.slice(1))}</span>`;
-      return `<span>${esc(k)}</span>`;
-    }).join("");
-    return `<div class="lk-row ${cls}">${cells}</div>`;
-  }).join("\n          ");
-  return `<div class="laptop-keys" aria-hidden="true">
-          ${rows}
-        </div>`;
-}
-
-function heroSection() {
-  const h = C.hero;
-  return `<section class="hero" id="top">
-  <div class="wrap">
-    <h1>${esc(h.headline)}</h1>
-    <p class="lede">${esc(h.subhead)}</p>
-    <p class="lede lede-sm">${esc(h.body)}</p>
-    <div class="acts">
-      <a class="btn" href="${h.primary.href}">${esc(h.primary.label)}</a>
-      <a class="btn btn-q" href="${h.secondary.href}">${esc(h.secondary.label)}</a>
-    </div>
-  </div>
-</section>`;
-}
-
-/* 1b --------------------------------------------------------- pipeline --- */
-
-function terminal(depth) {
+/** The engine, typed out. Used on the product page. */
+function terminal() {
   const pl = C.pipeline;
   const lines = pl.lines
     .map((l, i) => `<li data-i="${i}">
@@ -271,6 +186,26 @@ function terminal(depth) {
         <li class="t-caret" aria-hidden="true"><span class="t-p">&rsaquo;</span><span class="caret"></span></li>
       </ol>
     </div>`;
+}
+
+function heroSection() {
+  const h = C.hero;
+  return `<section class="hero" id="top">
+  <div class="wrap hero-in">
+    <div class="hero-copy">
+      <h1>${esc(h.headline)}</h1>
+      <p class="lede">${esc(h.subhead)}</p>
+      <p class="lede lede-sm">${esc(h.body)}</p>
+      <div class="acts">
+        <a class="btn" href="${h.primary.href}">${esc(h.primary.label)}</a>
+        <a class="btn btn-q" href="${h.secondary.href}">${esc(h.secondary.label)}</a>
+      </div>
+    </div>
+    <div class="rec-frame hero-rec">
+      ${screen(h.record)}
+    </div>
+  </div>
+</section>`;
 }
 
 /* 2 -------------------------------------------------------- obligation --- */
@@ -640,7 +575,7 @@ const home = shell({
   ogTitle: `${C.meta.brand} — ${C.meta.tagline}`,
   description: `${C.hero.subhead} ${C.hero.body}`,
   body: [
-    bootSection(), heroSection(), obligationSection(),
+    heroSection(), obligationSection(),
     growthSection(), workflowSection(), marketSection(), manualSection(),
     doesSection(), sourceSection(), capabilitySection(), closingSection(),
   ].join("\n\n"),

@@ -172,3 +172,41 @@ def test_background_loop_catches_up_and_stops():
     assert count >= 2
     assert recorder.calls == count
     assert thread is not None and not thread.is_alive()
+
+
+def test_scheduled_refresh_opens_case_after_clean_check(tmp_path):
+    class LaterAdvisoryFeeds(FakeFeeds):
+        def __init__(self):
+            super().__init__()
+            self.queries = 0
+            self.first_check = threading.Event()
+            self.advisory_check = threading.Event()
+
+        def query_purls(self, purls):
+            self.queries += 1
+            if self.queries == 1:
+                self.first_check.set()
+                return {purl: [] for purl in purls}
+            self.advisory_check.set()
+            return super().query_purls(purls)
+
+    feed = LaterAdvisoryFeeds()
+    watcher = setup_service(tmp_path, feed)
+    watcher.watch("run-source", simulated=True)
+    loop = AdvisoryRefreshLoop(lambda: watcher, interval_seconds=0.05)
+
+    loop.start()
+    try:
+        assert feed.first_check.wait(1)
+        assert watcher.cases.list() == []
+        assert feed.advisory_check.wait(1)
+        deadline = time.monotonic() + 1
+        while not watcher.cases.list() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        cases = watcher.cases.list()
+    finally:
+        loop.stop()
+
+    assert len(cases) == 1
+    assert cases[0]["state"]["simulated"] is True
+    assert watcher.list()[0]["case_count"] == 1

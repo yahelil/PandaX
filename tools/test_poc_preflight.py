@@ -180,6 +180,17 @@ def test_explicit_verapdf_path_that_does_not_exist_fails(monkeypatch, tmp_path, 
     assert f"not found: {missing}" in capsys.readouterr().out
 
 
+def test_explicit_verapdf_path_implies_pdf_check(monkeypatch, tmp_path, capsys):
+    healthy(monkeypatch, tmp_path)
+    missing = tmp_path / "nowhere" / "verapdf"
+
+    assert poc_preflight.main(["--verapdf", str(missing)]) == 1
+
+    out = capsys.readouterr().out
+    assert "FAIL  veraPDF" in out
+    assert f"not found: {missing}" in out
+
+
 def test_explicit_verapdf_path_is_used_instead_of_path_lookup(monkeypatch, tmp_path):
     calls = []
     healthy(monkeypatch, tmp_path, calls,

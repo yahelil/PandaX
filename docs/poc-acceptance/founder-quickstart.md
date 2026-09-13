@@ -39,7 +39,8 @@ python tools/poc_preflight.py --pdf       # also veraPDF
 | `--firmware` | Docker CLI on PATH, daemon reachable via `docker info` | firmware ingest (cards 03, 07, 19) |
 | `--pdf` | veraPDF on PATH, or `--verapdf PATH` | PDF/A validation (cards 10, 13) |
 
-`--verapdf PATH` names the executable explicitly instead of searching PATH.
+`--verapdf PATH` names the executable explicitly instead of searching PATH and
+enables the PDF check without requiring a separate `--pdf` flag.
 
 Exit code is 0 only when every **requested** check passes, otherwise 1. An
 optional tool you did not ask about is not a check and cannot fail the run — a

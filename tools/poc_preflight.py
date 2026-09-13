@@ -216,7 +216,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    checks = run_checks(args.firmware, args.pdf, args.verapdf)
+    checks = run_checks(
+        args.firmware,
+        args.pdf or args.verapdf is not None,
+        args.verapdf,
+    )
     report(checks)
     # Exit 0 only when every requested check passed. An unrequested optional
     # tool is not a check and cannot fail the run.

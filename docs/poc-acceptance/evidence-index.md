@@ -141,7 +141,7 @@ One row per card. `Status` is the acceptance result, not the board column — se
 | 01 | Clock and verdict output for pending, known, overdue; one historical bundle | `results/logs/01__clock-fixtures__<date>.txt` | Genuine | Yaheli | ⬜ pending |
 | 02 | Verification runs with correct, wrong and missing trusted key | `results/logs/02__trust-matrix__<date>.txt` | Genuine | Guy | ⬜ pending |
 | 03 | SquashFS and UBIFS extraction reports; limit and unsafe-path failures | `results/logs/03__extraction-matrix__<date>.txt` | Genuine | Simon | ⬜ pending |
-| 04 | This checklist, index and intake document | branch `eden-poc-guide` | — | Eden | ⬜ pending |
+| 04 | This checklist, index and intake document | branch `eden-poc-guide` | Genuine | Eden | ⬜ pending |
 | 05 | Restart, replay, rollback and stale-update runs | `results/logs/05__persistence__<date>.txt` | Genuine | Yaheli | ⬜ pending |
 | 06 | Standalone verifier from a clean environment; re-sealed bundle rejected | `results/logs/06__standalone-verify__<date>.txt` | Genuine | Guy | ⬜ pending |
 | 07 | Pinned OpenWrt manifest, UBIFS fixture, extraction matrix | `results/manifests/openwrt-<release>.md`, `results/logs/07__fixture-matrix__<date>.txt` | Genuine | Simon | ⬜ pending |

@@ -1,4 +1,4 @@
-/* PandaX — marketing site
+/* PandaX, marketing site
  *
  * The page should read like the artifact it sells: exact alignment, real
  * identifiers, hairlines and tabular rules. Structure carries the argument;
@@ -447,7 +447,7 @@ a { color: inherit; }
 .sat:nth-of-type(3) { animation-delay: 1.2s; }
 .sat:nth-of-type(4) { animation-delay: 1.8s; }
 
-/* The shield: what the product actually produces — evidence, protected. */
+/* The shield: what the product actually produces, evidence, protected. */
 .shield { stroke: var(--brand); stroke-width: 3; }
 .lattice { stroke: var(--brand); opacity: 0.42; }
 .shield-check {
@@ -622,7 +622,8 @@ a { color: inherit; }
 .laptop-screen .sc-checks { margin-top: 10px; gap: 5px 9px; }
 .laptop-screen .sc-checks li { font-size: 8.5px; gap: 4px; }
 .laptop-screen .tick { width: 7px; height: 4px; }
-.laptop-screen .sc-fix { margin-top: 12px; padding-top: 9px; font-size: 8.5px; gap: 6px; }
+.laptop-screen .fx-to { color: var(--d-body); }
+.sc-fix { margin-top: 12px; padding-top: 9px; font-size: 8.5px; gap: 6px; }
 .laptop-screen .fx-arrow { width: 10px; }
 
 /* The turn between one example release and the next. */

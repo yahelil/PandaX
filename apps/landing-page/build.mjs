@@ -1,7 +1,7 @@
 /**
  * Renders the static pages from content/en.mjs.
  *
- * The site ships as plain files to Cloudflare static assets — no framework, no
+ * The site ships as plain files to Cloudflare static assets, no framework, no
  * bundler. This script exists only so all copy lives in one editable file.
  * Generated HTML is committed alongside it.
  *
@@ -166,7 +166,7 @@ function screen(rec) {
             <ul class="sc-checks">${checks}</ul>
             <div class="sc-fix">
               <span class="fx-arrow" aria-hidden="true"></span>
-              <span class="id" data-f="cve">${esc(rec.finding.cve)}</span> in <span class="id" data-f="component">${esc(rec.finding.component)}</span> — <span data-f="fix">${esc(rec.finding.fix)}</span>
+              <span class="id" data-f="cve">${esc(rec.finding.cve)}</span> in <span class="id" data-f="component">${esc(rec.finding.component)}</span> <span class="fx-to">→</span> <span data-f="fix">${esc(rec.finding.fix)}</span>
             </div>
           </div>
         </div>`;
@@ -217,7 +217,7 @@ function terminal() {
 }
 
 /** The evidence path, drawn as one line: a release goes in, a record comes out.
- *  Continuous motion, no JS — everything travels and breathes in CSS. */
+ *  Continuous motion, no JS, everything travels and breathes in CSS. */
 function scene() {
   return `<svg class="scene" viewBox="0 0 600 460" role="img"
      aria-label="A release enters, is matched against sources, weighed at a decision, and leaves as a sealed record.">
@@ -815,7 +815,7 @@ function actisPage() {
 
   return shell({
     slug: "actis/",
-    ogTitle: `${esc(C.meta.product)} — ${esc(C.meta.tagline)}`,
+    ogTitle: `${esc(C.meta.product)}: ${esc(C.meta.tagline)}`,
     description: a.description,
     depth: 1,
     script: true,
@@ -922,7 +922,7 @@ function grounds(html) {
 /* --------------------------------------------------------------- pages --- */
 
 const home = shell({
-  ogTitle: `${C.meta.brand} — ${C.meta.tagline}`,
+  ogTitle: `${C.meta.brand}: ${C.meta.tagline}`,
   description: `${C.hero.subhead} ${C.hero.body}`,
   body: grounds([
     // Her order: the customer first, then the product and what it gives
@@ -942,7 +942,7 @@ function legalPage(key, extra) {
   const L = C.legalPages[key];
   return shell({
     slug: `${key}/`,
-    ogTitle: `${C.meta.brand} — ${L.title}`,
+    ogTitle: `${C.meta.brand}: ${L.title}`,
     description: L.description,
     depth: 1,
     doc: true,
@@ -986,7 +986,7 @@ function productsIndex() {
 
   return shell({
     slug: "products/",
-    ogTitle: `${C.meta.brand} — ${P.title}`,
+    ogTitle: `${C.meta.brand}: ${P.title}`,
     description: P.description,
     depth: 1,
     body: `<section class="sec sec-lead">

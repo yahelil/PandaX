@@ -52,21 +52,51 @@ export const hero = {
   body: "Every release needs legal evidence. PandaX builds it.",
   primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
   secondary: { label: "See Artis", href: "/artis/" },
-  record: {
-    label: "Example record",
-    product: "Gateway controller",
-    release: "4.2.1",
-    runId: "run-20260910-084417-c31f0a",
-    sealed: "2026-09-10T08:44:17Z",
-    stats: [
-      { value: "412", label: "components" },
-      { value: "7", label: "findings" },
-      { value: "1", label: "needs a decision" },
-      { value: "6 of 6", label: "checks passed" },
-    ],
-    checks: ["Inventory", "Findings", "Decisions", "Timeline", "Documents", "Sealed"],
-    finding: { cve: "CVE-2023-46218", component: "curl 8.3.0", fix: "Upgrade to curl 8.5.0" },
-  },
+  /** The machine cycles through these. Each is a complete, consistent example. */
+  records: [
+    {
+      label: "Example record",
+      product: "Gateway controller",
+      release: "4.2.1",
+      runId: "run-20260910-084417-c31f0a",
+      stats: [
+        { value: "412", label: "components" },
+        { value: "7", label: "findings" },
+        { value: "1", label: "needs a decision" },
+        { value: "6 of 6", label: "checks passed" },
+      ],
+      checks: ["Inventory", "Findings", "Decisions", "Timeline", "Documents", "Sealed"],
+      finding: { cve: "CVE-2023-46218", component: "curl 8.3.0", fix: "Upgrade to curl 8.5.0" },
+    },
+    {
+      label: "Example record",
+      product: "Sensor hub",
+      release: "2.8.0",
+      runId: "run-20260911-113902-7ae4d1",
+      stats: [
+        { value: "286", label: "components" },
+        { value: "3", label: "findings" },
+        { value: "0", label: "needs a decision" },
+        { value: "6 of 6", label: "checks passed" },
+      ],
+      checks: ["Inventory", "Findings", "Decisions", "Timeline", "Documents", "Sealed"],
+      finding: { cve: "CVE-2024-2511", component: "openssl 3.0.12", fix: "Upgrade to openssl 3.0.14" },
+    },
+    {
+      label: "Example record",
+      product: "Edge router",
+      release: "1.14.3",
+      runId: "run-20260912-201545-b09f38",
+      stats: [
+        { value: "531", label: "components" },
+        { value: "12", label: "findings" },
+        { value: "2", label: "needs a decision" },
+        { value: "6 of 6", label: "checks passed" },
+      ],
+      checks: ["Inventory", "Findings", "Decisions", "Timeline", "Documents", "Sealed"],
+      finding: { cve: "CVE-2023-44487", component: "nghttp2 1.52.0", fix: "Upgrade to nghttp2 1.57.0" },
+    },
+  ],
 };
 
 /* --- the engine, shown only on the product page ------------------------ */
@@ -230,15 +260,6 @@ export const capability = {
     title: "Designed for small manufacturers",
     body: "Meet the EU act without adding a dedicated legal or compliance team.",
   },
-};
-
-/* 10 ------------------------------------------------------------ close --- */
-
-export const closing = {
-  heading: "Thank you for your time",
-  body: "Let's explore how PandaX could fit your product-security and CRA-readiness workflow.",
-  primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
-  secondary: { label: "See Artis", href: "/artis/" },
 };
 
 export const contact = {

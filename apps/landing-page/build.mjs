@@ -848,6 +848,10 @@ function actisPage() {
   </div>
 </section>
 
+${capabilitySection()}
+
+${sourceSection()}
+
 <section class="sec">
   <div class="wrap">
     <h2>${esc(a.pack.heading)}</h2>
@@ -897,9 +901,11 @@ const home = shell({
   body: grounds([
     // Her order: the customer first, then the product and what it gives
     // them, then the law and the numbers, then who we are.
+    // The home page makes the case. How the product works in detail lives
+    // on the product page, where someone has already decided to look.
     heroSection(), audienceSection(),
     marketSection(), manualSection(),
-    doesSection(), questionsSection(), capabilitySection(), sourceSection(),
+    doesSection(), questionsSection(),
     obligationSection(), growthSection(), workflowSection(),
     aboutSection(), closingSection(),
   ].join("\n\n")),

@@ -605,11 +605,13 @@ function sourceSection() {
 
 function formBlock(heading, body, kind) {
   const c = C.contact;
+  // The form posts itself with JS. The mailto stays as the action so a
+  // visitor without JS still has a way through rather than a dead button.
   const action = FORM_ENDPOINT || `mailto:${c.fallbackAddress}`;
   return `<div class="form-wrap">
       <h2>${esc(heading)}</h2>
       <p class="lede lede-sm">${esc(body)}</p>
-      <form class="form" method="post" action="${esc(action)}"${FORM_ENDPOINT ? "" : ' enctype="text/plain"'}>
+      <form class="form" method="post" action="${esc(action)}" data-post="/api/contact"${FORM_ENDPOINT ? "" : ' enctype="text/plain"'}>
         <input type="hidden" name="kind" value="${esc(kind)}">
         <p class="hp"><label>Leave this empty<input type="text" name="company_url" tabindex="-1" autocomplete="off"></label></p>
         <div class="row">
@@ -618,8 +620,9 @@ function formBlock(heading, body, kind) {
         </div>
         <label>${esc(c.fields.company)}<input type="text" name="company" autocomplete="organization"></label>
         <label>${esc(c.fields.message)}<textarea name="message" rows="4"></textarea></label>
-        <button class="btn" type="submit">${esc(c.fields.submit)}</button>
+        <button class="btn" type="submit" data-idle="${esc(c.fields.submit)}" data-busy="${esc(c.sending)}">${esc(c.fields.submit)}</button>
       </form>
+      <p class="form-done" role="status" tabindex="-1" hidden>${esc(c.sent)}</p>
     </div>`;
 }
 
@@ -678,6 +681,9 @@ function recordStage(depth) {
             <img src="${r}assets/pandax-mark-ink.png" alt="" width="46" height="46" loading="lazy">
           </span>
         </div>
+      </div>
+      <div class="act-act">
+        <a class="btn" href="${r ? r + C.action.cta.href.slice(1) : C.action.cta.href}">${esc(C.action.cta.label)}</a>
       </div>`;
 }
 
@@ -708,10 +714,10 @@ function actionStage() {
 
 function closingSection() {
   const c = C.contact;
-  return `<section class="sec sec-close" id="contact">
+  return `<section class="sec sec-close" id="see">
   <div class="wrap">
     ${actionStage()}
-    <div class="close-in close-one">
+    <div class="close-in close-one" id="contact">
       ${formBlock(c.heading, c.body, "sample")}
     </div>
   </div>

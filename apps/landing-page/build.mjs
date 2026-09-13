@@ -766,8 +766,13 @@ function aboutSection() {
     <p class="lede">${esc(a.lede)}</p>
 
     <div class="claim">
-      <p class="claim-line">${esc(a.claim)}</p>
-      <p class="claim-body">${esc(a.claimBody)}</p>
+      <div class="claim-text">
+        <p class="claim-line">${esc(a.claim)}</p>
+        <p class="claim-body">${esc(a.claimBody)}</p>
+      </div>
+      <span class="claim-mark" aria-hidden="true">
+        <img src="assets/pandax-mark-ink.png" alt="" width="72" height="72" loading="lazy">
+      </span>
     </div>
 
     <h3 class="aud-cap aud-cap-wide">${esc(a.promisesTitle)}</h3>

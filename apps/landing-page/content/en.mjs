@@ -273,7 +273,6 @@ export const footer = {
   lines: ["PandaX", "Product security evidence for the EU Cyber Resilience Act"],
   links: [
     { label: "Artis", href: "/artis/" },
-    { label: "Datenschutzerklärung", href: "/datenschutz/" },
     { label: "Privacy", href: "/privacy/" },
   ],
   legal:
@@ -329,28 +328,48 @@ export const artis = {
 /* ------------------------------------------------------------- legal --- */
 
 export const legalPages = {
-  datenschutz: {
-    title: "Datenschutzerklärung",
-    description: "Informationen zur Verarbeitung personenbezogener Daten.",
-    heading: "Datenschutzerklärung",
-    note: "This site sets no cookies and runs no analytics. The structure below is complete; the entries marked TODO need the legal entity's details before publication.",
-  },
   privacy: {
     title: "Privacy",
     description: "How this website handles personal data.",
     heading: "Privacy",
-    note: "English translation of the Datenschutzerklärung. The German version is authoritative.",
+    updated: "Last updated 13 September 2026.",
   },
 };
 
 export const privacyBody = {
+  intro:
+    "This notice explains what happens to personal data when you use this website. It is short because the site does very little with it.",
   sections: [
-    { title: "Controller", body: "TODO — the legal entity responsible for processing, with its address and contact details." },
-    { title: "What this website collects", body: "This website sets no cookies, runs no analytics and embeds no third-party services. No consent banner is required, because nothing is stored on your device beyond what is technically necessary to serve the page." },
-    { title: "Server logs", body: "The hosting provider records standard request data — IP address, time, requested file, referrer and user agent — to deliver and secure the site. Legal basis: Art. 6(1)(f) GDPR. TODO — confirm the retention period with the provider." },
-    { title: "Contact form and email", body: "If you write to us, the details you send are processed to answer you and kept for as long as the enquiry requires. Legal basis: Art. 6(1)(b) and (f) GDPR. The form posts to our own endpoint; there is no third-party form service." },
-    { title: "Fonts and assets", body: "Fonts and images are served from this domain. No request is made to Google Fonts or any other external host." },
-    { title: "Hosting", body: "This site is hosted by Cloudflare, Inc. and served from its global edge network, which means the server nearest the visitor answers the request. TODO — confirm the data processing agreement and the standard contractual clauses on the account." },
-    { title: "Your rights", body: "You have the right of access, rectification, erasure, restriction, data portability and objection, and the right to complain to a supervisory authority. TODO — name the competent supervisory authority." },
+    {
+      title: "Who is responsible",
+      body: "PandaX operates this website and decides how the data described here is handled. Questions about this notice, or any request below, can go to contact@pandax.online.",
+    },
+    {
+      title: "What the site collects",
+      body: "Nothing on its own. This website sets no cookies, runs no analytics and embeds no third-party services, so no consent banner is needed. Nothing is stored on your device beyond what is technically necessary to serve the page.",
+    },
+    {
+      title: "Server logs",
+      body: "The hosting provider records standard request data — IP address, time, requested file, referrer and user agent — in order to deliver and secure the site. These logs are kept only as long as that purpose requires. Legal basis: Art. 6(1)(f) GDPR.",
+    },
+    {
+      title: "If you write to us",
+      body: "The details you send through the contact form or by email are used to answer you, and kept for as long as the enquiry requires. Legal basis: Art. 6(1)(b) and (f) GDPR. The form posts to our own address; there is no third-party form service.",
+    },
+    {
+      title: "Fonts and images",
+      body: "Everything is served from this domain. No request is made to Google Fonts or to any other external host, so no data reaches a third party by loading the page.",
+    },
+    {
+      title: "Hosting",
+      body: "The site is hosted by Cloudflare, Inc. and served from its global edge network, which means the server nearest you answers the request. Cloudflare handles this data as our hosting provider.",
+    },
+    {
+      title: "Your rights",
+      body: "You have the right of access, rectification, erasure, restriction, data portability and objection. You can exercise any of these by writing to contact@pandax.online. You also have the right to complain to your local data protection supervisory authority.",
+    },
   ],
+  // TODO(legal): once the operating entity is registered, add its legal name,
+  // registered address and — if the site keeps targeting Germany — an Impressum
+  // per § 5 DDG. Nothing on the page states anything untrue without them.
 };

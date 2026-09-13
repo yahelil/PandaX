@@ -119,10 +119,13 @@
 
   /** Rotate the record through the example releases, so the hero is not a still. */
   function cycle() {
-    var sc = $(".laptop-screen .sc");
     var recs = window.PANDAX_RECORDS;
-    if (!sc || !recs || recs.length < 2 || still) return;
+    if (!recs || recs.length < 2 || still) return;
+    $$(".laptop-screen .sc, [data-cycle] .sc").forEach(function (sc) { turn(sc, recs); });
+  }
 
+  /** One screen, rotating through the example releases on its own clock. */
+  function turn(sc, recs) {
     var at = 0;
     function put(rec) {
       var set = function (f, v) { var el = $('[data-f="' + f + '"]', sc); if (el) el.textContent = v; };

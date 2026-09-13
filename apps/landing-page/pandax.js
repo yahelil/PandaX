@@ -97,7 +97,53 @@
     (host || items[0].parentNode).classList.add(cls);
   }
 
+  /** Count a formatted number up, keeping its separators and any suffix. */
+  function countFigure(el) {
+    var raw = el.textContent.trim();
+    var m = raw.match(/^([\d,]+)(.*)$/);
+    if (!m) return;
+    var target = parseInt(m[1].replace(/,/g, ""), 10);
+    var suffix = m[2];
+    if (isNaN(target)) return;
+    var start = performance.now();
+    (function frame(now) {
+      var t = Math.max(0, Math.min(1, (now - start) / 1100));
+      var v = Math.round(target * (1 - Math.pow(1 - t, 3)));
+      el.textContent = v.toLocaleString("en-US") + suffix;
+      if (t < 1) requestAnimationFrame(frame);
+      else el.textContent = raw;
+    })(start);
+  }
+
+  /** A hairline at the top of the window, tracking how far down the page is. */
+  function progress() {
+    var bar = document.createElement("div");
+    bar.className = "prog";
+    document.body.appendChild(bar);
+    function tick() {
+      var h = document.documentElement;
+      var max = h.scrollHeight - h.clientHeight;
+      bar.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + "%";
+    }
+    tick();
+    addEventListener("scroll", tick, { passive: true });
+    addEventListener("resize", tick);
+  }
+
   function page() {
+    // Each section lights its marker and its rule as it is reached.
+    $$(".sec").forEach(function (sec) {
+      if (still) { sec.classList.add("lit"); return; }
+      onView(sec, function () { sec.classList.add("lit"); }, 0.12);
+    });
+
+    if (!still) progress();
+
+    $$(".figure-v").forEach(function (el) {
+      if (still) return;
+      onView(el, function () { countFigure(el); }, 0.4);
+    });
+
     $$(".since").forEach(elapsed);
 
     // The record on the page builds itself once, when it is reached.

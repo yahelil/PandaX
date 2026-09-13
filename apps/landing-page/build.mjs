@@ -1,7 +1,7 @@
 /**
  * Renders the static pages from content/en.mjs.
  *
- * The site ships as plain files to Cloudflare static assets — no framework, no
+ * The site ships as plain files to Cloudflare static assets, no framework, no
  * bundler. This script exists only so all copy lives in one editable file.
  * Generated HTML is committed alongside it.
  *
@@ -13,6 +13,7 @@ import * as C from "./content/en.mjs";
 
 /** Set to post the forms somewhere. Empty falls back to mailto. */
 const FORM_ENDPOINT = process.env.PANDAX_FORM_ENDPOINT ?? "";
+const YEAR = new Date().getFullYear();
 
 const esc = (s) =>
   String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -37,7 +38,7 @@ function shell({ ogTitle, description, depth = 0, slug = "", body, script = fals
 <meta property="og:title" content="${esc(ogTitle)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:image" content="https://${C.meta.domain}/assets/favicon-512.png">
-<meta name="theme-color" content="#F2F2F0">
+<meta name="theme-color" content="#FFFFFF">
 
 <link rel="icon" href="${r}assets/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="${r}assets/favicon-dark-32.png" sizes="32x32" type="image/png" media="(prefers-color-scheme: dark)">
@@ -60,7 +61,7 @@ ${JSON.stringify({
 </head>
 <body${bodyClass}>
 <a class="skip" href="#main">Skip to content</a>
-${header(depth)}
+${header(depth, slug)}
 <main id="main">
 ${body}
 </main>
@@ -71,10 +72,10 @@ ${script ? `<script>window.PANDAX_RECORDS = ${JSON.stringify(C.hero.records)};</
 `;
 }
 
-function productsMenu(depth) {
+function productsMenu(depth, slug) {
   const r = rel(depth);
   const items = C.nav.products
-    .map((p) => `<a class="menu-item" href="${r}${p.href}">
+    .map((p) => `<a class="menu-item${slug === p.href ? " is-current" : ""}" href="${r}${p.href}">
           <img src="${r}${p.mark}" alt="" width="36" height="36">
           <span><strong>${esc(p.name)}</strong><small>${esc(p.blurb)}</small></span>
         </a>`).join("\n        ");
@@ -88,9 +89,11 @@ function productsMenu(depth) {
     </div>`;
 }
 
-function header(depth) {
+function header(depth, slug) {
   const r = rel(depth);
-  const links = depth ? "" : C.nav.links.map((l) => `<a href="${l.href}">${esc(l.label)}</a>`).join("\n        ");
+  const links = C.nav.links
+    .map((l) => `<a href="${depth ? `${r}index.html${l.href}` : l.href}">${esc(l.label)}</a>`)
+    .join("\n        ");
   return `<header class="head">
   <div class="wrap head-in">
     <a class="mark" href="${depth ? `${r}index.html` : "#top"}">
@@ -100,20 +103,64 @@ function header(depth) {
     <nav class="head-nav" aria-label="Sections">
         ${links}
     </nav>
-    ${productsMenu(depth)}
+    ${productsMenu(depth, slug)}
     <a class="btn btn-sm" href="${depth ? `${r}index.html#contact` : C.nav.action.href}">${esc(C.nav.action.label)}</a>
   </div>
 </header>`;
 }
 
+/** The notices, as a panel that comes in from the side. The links still
+ *  point at the real pages, so this is an upgrade rather than a gate. */
+function sheets() {
+  const one = (key, body) => `<template data-sheet-body="${key}">
+      <p class="doc-intro">${esc(body.intro)}</p>
+      ${body.sections.map((s, i) => `<section class="doc-s">
+        <span class="doc-n">${n2(i)}</span>
+        <div><h2>${esc(s.title)}</h2><p>${esc(s.body)}</p></div>
+      </section>`).join("\n      ")}
+    </template>`;
+
+  return `<div class="sheet" id="sheet" hidden>
+  <div class="sheet-scrim" data-sheet-close></div>
+  <aside class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1">
+    <header class="sheet-head">
+      <div>
+        <span class="sheet-eyebrow" id="sheetEyebrow"></span>
+        <h2 id="sheetTitle"></h2>
+      </div>
+      <button class="sheet-x" type="button" data-sheet-close aria-label="Close">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5 l10 10 M15 5 l-10 10"/></svg>
+      </button>
+    </header>
+    <div class="sheet-body" id="sheetBody"></div>
+    <footer class="sheet-foot">
+      <a class="btn btn-q" id="sheetFull" href="/privacy/">Open the full page</a>
+    </footer>
+  </aside>
+  ${one("privacy", C.privacyBody)}
+  ${one("cookies", C.cookiesBody)}
+</div>`;
+}
+
 function footer(depth) {
   const r = rel(depth);
-  const links = C.footer.links
-    .map((l) => `<a href="${depth && l.href.startsWith("/") ? r + l.href.slice(1) : l.href}">${esc(l.label)}</a>`)
-    .join("\n      ");
-  return `<footer class="foot">
+  const to = (href) => (depth && href.startsWith("/") ? r + href.slice(1) : href);
+  const key = (href) => (href.includes("/privacy/") ? "privacy" : href.includes("/cookies/") ? "cookies" : "");
+  const groups = C.footer.groups
+    .map((g) => `<div class="foot-col">
+        <h2>${esc(g.title)}</h2>
+        <ul>
+          ${g.links.map((l) => {
+            const k = key(l.href);
+            return `<li><a href="${to(l.href)}"${k ? ` data-sheet="${k}" data-sheet-title="${esc(l.label)}"` : ""}>${esc(l.label)}</a></li>`;
+          }).join("\n          ")}
+        </ul>
+      </div>`).join("\n      ");
+
+  return `${sheets()}
+<footer class="foot">
   <span class="foot-mark" aria-hidden="true">
-    <img src="${r}assets/pandax-mark-ink.png" alt="" width="240" height="240" loading="lazy">
+    <img src="${r}assets/pandax-mark-ink.png" alt="" width="224" height="224" loading="lazy">
   </span>
   <div class="wrap foot-in">
     <div class="foot-brand">
@@ -121,10 +168,13 @@ function footer(depth) {
       <span>${esc(C.footer.lines[0])}</span>
       <span class="foot-tag">${esc(C.footer.lines[1])}</span>
     </div>
-    <nav class="foot-links" aria-label="Site">
-      ${links}
+    <nav class="foot-cols" aria-label="Site">
+      ${groups}
     </nav>
-    <p class="foot-legal">${esc(C.footer.legal)}</p>
+    <div class="foot-base">
+      <p class="foot-copy">&copy; ${YEAR} ${esc(C.meta.brand)}</p>
+      <p class="foot-legal">${esc(C.footer.legal)}</p>
+    </div>
   </div>
 </footer>`;
 }
@@ -140,7 +190,7 @@ function screen(rec) {
             </div>`).join("\n            ");
   const checks = rec.checks
     .map((c, i) => `<li data-i="${i}"><span class="tick" aria-hidden="true"></span>${esc(c)}</li>`).join("");
-  return `<div class="sc" id="sc">
+  return `<div class="sc">
           <div class="sc-bar" aria-hidden="true">
             <span class="sc-dots"><i></i><i></i><i></i></span>
             <span class="sc-app">${esc(C.meta.product)}</span>
@@ -148,7 +198,7 @@ function screen(rec) {
           <div class="sc-body">
             <div class="sc-head">
               <span class="sc-flag">${esc(rec.label)}</span>
-              <span class="sc-seal" id="scSeal"><span class="seal-dot" aria-hidden="true"></span>Sealed</span>
+              <span class="sc-seal"><span class="seal-dot" aria-hidden="true"></span>Sealed</span>
             </div>
             <div class="sc-title"><span data-f="product">${esc(rec.product)}</span> <span data-f="release">${esc(rec.release)}</span></div>
             <div class="sc-run"><span class="id" data-f="runId">${esc(rec.runId)}</span></div>
@@ -157,8 +207,7 @@ function screen(rec) {
             </div>
             <ul class="sc-checks">${checks}</ul>
             <div class="sc-fix">
-              <span class="fx-arrow" aria-hidden="true"></span>
-              <span class="id" data-f="cve">${esc(rec.finding.cve)}</span> in <span class="id" data-f="component">${esc(rec.finding.component)}</span> — <span data-f="fix">${esc(rec.finding.fix)}</span>
+              <span class="id" data-f="cve">${esc(rec.finding.cve)}</span> in <span class="id" data-f="component">${esc(rec.finding.component)}</span> <span class="fx-to">→</span> <span data-f="fix">${esc(rec.finding.fix)}</span>
             </div>
           </div>
         </div>`;
@@ -209,21 +258,21 @@ function terminal() {
 }
 
 /** The evidence path, drawn as one line: a release goes in, a record comes out.
- *  Continuous motion, no JS — everything travels and breathes in CSS. */
+ *  Continuous motion, no JS, everything travels and breathes in CSS. */
 function scene() {
   return `<svg class="scene" viewBox="0 0 600 460" role="img"
      aria-label="A release enters, is matched against sources, weighed at a decision, and leaves as a sealed record.">
   <defs>
     <!-- Radial, and fully transparent before the edge, so nothing is clipped. -->
     <radialGradient id="wash-a">
-      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.34"/>
-      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.16"/>
-      <stop offset="100%" stop-color="#D9AE55" stop-opacity="0"/>
+      <stop offset="0%"   stop-color="#1852C4" stop-opacity="0.26"/>
+      <stop offset="55%"  stop-color="#1852C4" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#1852C4" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="wash-b">
-      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.24"/>
-      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#B4577E" stop-opacity="0"/>
+      <stop offset="0%"   stop-color="#E0523C" stop-opacity="0.18"/>
+      <stop offset="55%"  stop-color="#E0523C" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#E0523C" stop-opacity="0"/>
     </radialGradient>
     <path id="route"
       d="M108 176 C 176 176, 178 108, 246 108 C 314 108, 318 244, 386 244
@@ -327,7 +376,7 @@ function obligationSection() {
     }).join("\n        ");
   const points = o.points.map((x) => `<li>${esc(x)}</li>`).join("");
   return `<section class="sec" id="obligation">
-  <div class="wrap">
+    <div class="wrap">
     <h2>${esc(o.heading)}</h2>
     <p class="lede">${esc(o.lede)}</p>
 
@@ -349,8 +398,8 @@ function growthSection() {
   const max = Math.max(...g.series.map((s) => s.value));
   const shown = new Set(["2020", "2025", "2030"]);   // label the turns, not every bar
   const bars = g.series
-    .map((s, i) => `<div class="col${s.projected ? " is-proj" : ""}" data-i="${i}">
-          <span class="col-v">${shown.has(s.year) ? esc(Math.round(s.value / 1000)) + "K" : ""}</span>
+    .map((s, i) => `<div class="col${s.projected ? " is-proj" : ""}${shown.has(s.year) ? " is-key" : ""}" data-i="${i}">
+          <span class="col-v" aria-hidden="true">${esc(Math.round(s.value / 1000))}K</span>
           <span class="col-bar" style="--h:${((s.value / max) * 100).toFixed(1)}%"></span>
           <span class="col-y">${esc(s.year)}</span>
         </div>`).join("\n        ");
@@ -417,22 +466,40 @@ function workflowSection() {
 
 function marketSection() {
   const m = C.market;
-  const col = (c) => `<div class="mk-col${c.mark ? " is-mark" : ""}">
-        <h3>${esc(c.title)}</h3>
-        <ul>${c.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
-      </div>`;
+  const have = m.columns[0], left = m.columns[1];
+  const done = have.items
+    .map((i) => `<li><svg class="mk-tick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>${esc(i)}</li>`)
+    .join("\n          ");
+  const added = left.items
+    .map((i) => `<li><svg class="mk-add" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>${esc(i)}</li>`)
+    .join("\n          ");
+
   return `<section class="sec" id="market">
   <div class="wrap">
     <h2>${esc(m.heading)}</h2>
     <p class="lede">${esc(m.lede)}</p>
     <div class="mk">
-      ${m.columns.map(col).join("\n      ")}
+      <div class="mk-col mk-have">
+        <h3>${esc(have.title)}</h3>
+        <ul>
+          ${done}
+        </ul>
+      </div>
+      <div class="mk-edge" aria-hidden="true">
+        <span class="mk-rail"></span>
+        <span class="mk-stop">Actis picks up</span>
+        <span class="mk-rail mk-rail-dash"></span>
+      </div>
+      <div class="mk-col mk-todo">
+        <h3>${esc(left.title)}</h3>
+        <ul>
+          ${added}
+        </ul>
+      </div>
     </div>
   </div>
 </section>`;
 }
-
-/* 9 -------------------------------------------------------- capability --- */
 
 function capabilitySection() {
   const c = C.capability;
@@ -448,38 +515,9 @@ function capabilitySection() {
     <ol class="caps">
       ${items}
     </ol>
-    <div class="band">
-      <h3>${esc(c.closing.title)}</h3>
-      <p>${esc(c.closing.body)}</p>
-    </div>
   </div>
 </section>`;
 }
-
-/* 5 ------------------------------------------------------------ manual --- */
-
-function manualSection() {
-  const m = C.manual;
-  const steps = m.steps
-    .map((s, i) => `<li class="step" data-i="${i}">
-        <span class="step-n">${n2(i)}</span>
-        <h3>${esc(s.title)}</h3>
-        <p>${esc(s.body)}</p>
-      </li>`).join("\n      ");
-  return `<section class="sec" id="manual">
-  <div class="wrap">
-    <h2>${esc(m.heading)}</h2>
-    <p class="lede">${esc(m.lede)}</p>
-    <ol class="steps" id="steps">
-      <span class="step-line" aria-hidden="true"><i id="stepFill"></i></span>
-      ${steps}
-    </ol>
-    <p class="note">${esc(m.clock)}</p>
-  </div>
-</section>`;
-}
-
-/* 6 -------------------------------------------------------------- does --- */
 
 function doesSection() {
   const d = C.does;
@@ -490,6 +528,8 @@ function doesSection() {
     <p class="lede lede-dark">${esc(d.lede)}</p>
 
     <div class="flow" id="flow" aria-hidden="true">
+      <span class="flow-pulse flow-pulse-a"></span>
+      <span class="flow-pulse flow-pulse-b"></span>
       <div class="flow-in">
         <span class="fl-src" data-i="0">Jira</span>
         <span class="fl-src" data-i="1">CI/CD</span>
@@ -514,57 +554,56 @@ function doesSection() {
 </section>`;
 }
 
-/* 7b -------------------------------------------------------- easier --- */
+/* 7b ----------------------------------------------------- questions --- */
 
-/** A stack of cards with one drawing on the face. The accent dot is the only
- *  colour in it, the way a single highlight carries a whole row. */
-function cardGlyph(kind) {
+/** A hexagon holding the drawing \u2014 the shape the hero illustration already
+ *  uses, so the mark comes out of our own vocabulary. */
+function hexGlyph(kind) {
   const inner = {
-    record: `<rect x="34" y="36" width="52" height="42" rx="3"/>
-        <path d="M34 46 H86"/>
-        <circle class="g-dot" cx="46" cy="62" r="4"/>
-        <path d="M50 62 H60 M64 58 L70 54 M64 66 L70 70"/>
-        <circle cx="72" cy="52" r="3.5"/>
-        <circle cx="72" cy="72" r="3.5"/>`,
-    document: `<path d="M40 30 H74 L82 38 V84 H40 Z"/>
-        <path d="M74 30 V38 H82"/>
-        <path d="M48 50 H72 M48 58 H72 M48 66 H64"/>
-        <circle class="g-dot" cx="70" cy="74" r="7"/>
-        <path d="M66 80 L66 90 L70 87 L74 90 L74 80"/>`,
-    automate: `<circle cx="66" cy="48" r="14"/>
-        <circle class="g-dot" cx="66" cy="48" r="5"/>
-        <path d="M66 30 V36 M66 60 V66 M48 48 H54 M78 48 H84 M54 36 L58 40 M74 56 L78 60 M54 60 L58 56 M74 40 L78 36"/>
-        <path d="M36 88 V66 a5 5 0 0 1 10 0 V78 h8 a5 5 0 0 1 5 5 v5"/>`,
+    evidence: `<path d="M44 48 l4.5 4.5 l7.5 -8.5"/>
+          <path d="M62 50 h17"/>
+          <path d="M44 60 l4.5 4.5 l7.5 -8.5"/>
+          <path d="M62 62 h17"/>
+          <path d="M44 72 l4.5 4.5 l7.5 -8.5"/>
+          <path d="M62 74 h11"/>
+          <circle class="q-dot" cx="79" cy="74" r="3.2"/>`,
+    document: `<path d="M45 39 h20 l12 12 v30 h-32 z"/>
+          <path d="M65 39 v12 h12"/>
+          <path d="M52 61 h17"/>
+          <path d="M52 70 h11"/>
+          <circle class="q-dot" cx="75" cy="70" r="3.4"/>`,
+    again: `<path d="M70.9 44.4 A19 19 0 1 1 49.1 44.4"/>
+          <path class="q-head" d="M77 48.7 L68 48.5 L73.8 40.3 Z"/>
+          <circle class="q-dot" cx="60" cy="61" r="3.8"/>`,
   }[kind];
-  return `<svg class="cardart" viewBox="0 0 120 120" aria-hidden="true">
-      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-        <rect class="card card-3" x="22" y="22" width="86" height="86" rx="12"/>
-        <rect class="card card-2" x="16" y="16" width="86" height="86" rx="12"/>
-        <rect class="card card-1" x="10" y="10" width="86" height="86" rx="12"/>
-        <g class="glyph">${inner}</g>
-      </g>
-    </svg>`;
+
+  return `<svg class="qart" viewBox="0 0 120 120" aria-hidden="true">
+        <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path class="q-hex q-hex-back" d="M108 62 L84.5 102.7 H37.5 L14 62 L37.5 21.3 H84.5 Z"/>
+          <path class="q-hex" d="M104 58 L80.5 98.7 H33.5 L10 58 L33.5 17.3 H80.5 Z"/>
+          <g class="q-glyph">${inner}</g>
+        </g>
+      </svg>`;
 }
 
-function easierSection() {
-  const e = C.easier;
-  const items = e.items
-    .map((i, n) => `<li class="ez" data-i="${n}">
-        ${cardGlyph(i.glyph)}
-        <h3>${esc(i.title)}</h3>
-        <p>${esc(i.body)}</p>
+function questionsSection() {
+  const q = C.questions;
+  const items = q.items
+    .map((it) => `<li class="qs-item">
+        ${hexGlyph(it.glyph)}
+        <h3>${esc(it.title)}</h3>
+        <p>${esc(it.body)}</p>
       </li>`).join("\n      ");
-  return `<section class="sec sec-ez" id="easier">
+
+  return `<section class="sec sec-q" id="questions">
   <div class="wrap">
-    <h2 class="ez-head">${esc(e.heading)} <span class="hl hl-rose">${esc(e.highlight)}</span></h2>
-    <ul class="ezs">
+    <h2 class="q-head">${esc(q.heading)} <span class="hl hl-accent">${esc(q.highlight)}</span></h2>
+    <ul class="qs">
       ${items}
     </ul>
   </div>
 </section>`;
 }
-
-/* 7 ------------------------------------------------------------ source --- */
 
 function sourceSection() {
   const s = C.source;
@@ -605,82 +644,178 @@ function sourceSection() {
 
 function formBlock(heading, body, kind) {
   const c = C.contact;
+  // The form posts itself with JS. The mailto stays as the action so a
+  // visitor without JS still has a way through rather than a dead button.
   const action = FORM_ENDPOINT || `mailto:${c.fallbackAddress}`;
   return `<div class="form-wrap">
-      <h2>${esc(heading)}</h2>
-      <p class="lede lede-sm">${esc(body)}</p>
-      <form class="form" method="post" action="${esc(action)}"${FORM_ENDPOINT ? "" : ' enctype="text/plain"'}>
-        <input type="hidden" name="kind" value="${esc(kind)}">
-        <p class="hp"><label>Leave this empty<input type="text" name="company_url" tabindex="-1" autocomplete="off"></label></p>
-        <div class="row">
-          <label>${esc(c.fields.name)}<input type="text" name="name" required autocomplete="name"></label>
-          <label>${esc(c.fields.email)}<input type="email" name="email" required autocomplete="email"></label>
-        </div>
-        <label>${esc(c.fields.company)}<input type="text" name="company" autocomplete="organization"></label>
-        <label>${esc(c.fields.message)}<textarea name="message" rows="4"></textarea></label>
-        <button class="btn" type="submit">${esc(c.fields.submit)}</button>
-      </form>
+      <div class="form-ask">
+        <h2>${esc(heading)}</h2>
+        <p class="lede lede-sm">${esc(body)}</p>
+        <form class="form" method="post" action="${esc(action)}" data-post="/api/contact"${FORM_ENDPOINT ? "" : ' enctype="text/plain"'}>
+          <input type="hidden" name="kind" value="${esc(kind)}">
+          <p class="hp"><label>Leave this empty<input type="text" name="company_url" tabindex="-1" autocomplete="off"></label></p>
+          <div class="row">
+            <label>${esc(c.fields.name)}<input type="text" name="name" required autocomplete="name"></label>
+            <label>${esc(c.fields.email)}<input type="email" name="email" required autocomplete="email"></label>
+          </div>
+          <label>${esc(c.fields.company)}<input type="text" name="company" autocomplete="organization"></label>
+          <label>${esc(c.fields.message)}<textarea name="message" rows="4"></textarea></label>
+          <button class="btn" type="submit" data-idle="${esc(c.fields.submit)}" data-busy="${esc(c.sending)}">${esc(c.fields.submit)}</button>
+        </form>
+      </div>
+      <div class="form-done" role="status" tabindex="-1" hidden>
+        <h2>${esc(c.sentTitle)}</h2>
+        <p class="lede lede-sm">${esc(c.sent)}</p>
+      </div>
     </div>`;
+}
+
+/** The record, framed, with the mark resting on its corner. */
+function recordStage(depth) {
+  const r = rel(depth);
+  return `<div class="act-stage">
+        <div class="act-frame" data-cycle="1">
+          <div class="rec-frame">
+            ${screen(C.hero.records[0])}
+          </div>
+        </div>
+      </div>`;
+}
+
+/** Monoline marks, drawn on one grid so they sit together. */
+function lineGlyph(kind) {
+  const d = {
+    // the three people in the room
+    shield: `<path d="M30 16 L48 23 v13 c0 11-7 18-18 22 -11-4-18-11-18-22 V23 Z"/>
+          <path d="M23 30 h14 M23 37 h14 M23 44 h9"/>`,
+    layers: `<path d="M30 12 L50 22 L30 32 L10 22 Z"/>
+          <path d="M10 30 L30 40 L50 30"/>
+          <path d="M10 38 L30 48 L50 38"/>`,
+    stamp: `<path d="M16 48 h28"/>
+          <path d="M20 41 h20 v5 h-20 Z"/>
+          <path d="M25 41 v-6 a5 5 0 0 1 -4 -5 v-6 a5 5 0 0 1 5 -5 h8 a5 5 0 0 1 5 5 v6 a5 5 0 0 1 -4 5 v6"/>`,
+    // the work that repeats
+    parts: `<path d="M30 10 L48 20 v20 L30 50 L12 40 V20 Z"/>
+          <path d="M12 20 L30 30 L48 20 M30 30 v20"/>`,
+    trace: `<circle cx="27" cy="27" r="13"/>
+          <path d="M36.5 36.5 L50 50"/>
+          <path d="M21 27 h12 M27 21 v12"/>`,
+    patched: `<path d="M30 11 L47 18 v12 c0 10-6.5 16.5-17 20 -10.5-3.5-17-10-17-20 V18 Z"/>
+          <path d="M22 29 l6 6 l11 -13"/>`,
+    submit: `<path d="M12 36 v10 a2 2 0 0 0 2 2 h32 a2 2 0 0 0 2 -2 V36"/>
+          <path d="M30 40 V12"/>
+          <path d="M21 21 l9 -9 l9 9"/>`,
+    // what we hold to
+    neutral: `<path d="M10 15 L27 30 M10 30 h17 M10 45 L27 30"/>
+          <circle cx="33" cy="30" r="6"/>
+          <path d="M39 30 h11"/>`,
+    portable: `<path d="M11 17 h20 v26 h-20 Z"/>
+          <path d="M31 30 h14"/>
+          <path d="M39 24 l6 6 l-6 6"/>`,
+    impartial: `<path d="M30 13 v34 M18 47 h24 M13 21 h34 M30 17 v4"/>
+          <path d="M13 21 l-5 11 h10 Z"/>
+          <path d="M47 21 l-5 11 h10 Z"/>`,
+  }[kind];
+  return `<svg class="gly" viewBox="0 0 60 60" aria-hidden="true">
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round">${d}</g>
+        </svg>`;
+}
+
+/* 1b ------------------------------------------------------- audience --- */
+
+/** Before the law, before the product: who is standing here and why. */
+function audienceSection() {
+  const a = C.audience;
+  const marks = ["shield", "layers", "stamp"];
+  const fit = a.fit
+    .map((x) => `<li><svg class="tickmark" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 l4.5 4.5 L19 7"/></svg><span>${esc(x)}</span></li>`)
+    .join("\n        ");
+  const readers = a.readers
+    .map((r, i) => `<li class="who">
+        <span class="who-tile">${lineGlyph(marks[i])}</span>
+        <h3>${esc(r.who)}</h3>
+        <p>${esc(r.body)}</p>
+      </li>`).join("\n      ");
+
+  return `<section class="sec" id="audience">
+  <div class="wrap">
+    <h2>${esc(a.heading)}</h2>
+    <p class="lede">${esc(a.lede)}</p>
+
+    <div class="fitbox">
+      <h3 class="aud-cap">${esc(a.fitTitle)}</h3>
+      <ul class="fits">
+        ${fit}
+      </ul>
+    </div>
+
+    <h3 class="aud-cap aud-cap-wide">${esc(a.readersTitle)}</h3>
+    <ul class="whos">
+      ${readers}
+    </ul>
+  </div>
+</section>`;
+}
+
+/* 9b ---------------------------------------------------------- about --- */
+
+function aboutSection() {
+  const a = C.about;
+  const promises = a.promises
+    .map((x) => `<li class="hold">
+        <span class="hold-mark">${lineGlyph(x.glyph)}</span>
+        <h3>${esc(x.title)}</h3>
+        <p>${esc(x.body)}</p>
+      </li>`).join("\n      ");
+
+  return `<section class="sec" id="about">
+  <div class="wrap">
+    <h2>${esc(a.heading)}</h2>
+    <p class="lede">${esc(a.lede)}</p>
+
+    <div class="claim">
+      <div class="claim-text">
+        <p class="claim-line">${esc(a.claim)}</p>
+        <p class="claim-body">${esc(a.claimBody)}</p>
+      </div>
+      <div class="claim-art" aria-hidden="true">
+        <span class="cr cr-1"></span>
+        <span class="cr cr-2"></span>
+        <span class="cr cr-3"></span>
+        <span class="cr-seal">
+          <img src="assets/pandax-mark-ink.png" alt="" width="52" height="52" loading="lazy">
+        </span>
+      </div>
+    </div>
+
+    <h3 class="aud-cap aud-cap-wide">${esc(a.promisesTitle)}</h3>
+    <ul class="holds">
+      ${promises}
+    </ul>
+    <p class="note">${esc(a.disclaimer)}</p>
+  </div>
+</section>`;
 }
 
 /** The closing showcase: the product running, with the mark beside it. */
 function actionStage() {
   const a = C.action;
   return `<div class="act">
-      <h2 class="act-head">${esc(a.lead)} <span class="hl hl-rose">${esc(a.highlight)}</span> ${esc(a.tail)}</h2>
+      <h2 class="act-head">${esc(a.lead)} <span class="hl hl-accent">${esc(a.highlight)}</span> ${esc(a.tail)}</h2>
       <p class="act-sub">${esc(a.body)}</p>
-      <div class="act-stage">
-        <svg class="act-art" viewBox="0 0 1200 470" aria-hidden="true" preserveAspectRatio="xMidYMax meet">
-          <defs>
-            <linearGradient id="actL" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stop-color="#4A4FA8" stop-opacity="0"/>
-              <stop offset="0.28" stop-color="#4A4FA8" stop-opacity="0.07"/>
-              <stop offset="0.62" stop-color="#4A4FA8" stop-opacity="0.17"/>
-              <stop offset="1" stop-color="#4A4FA8" stop-opacity="0.02"/>
-            </linearGradient>
-            <linearGradient id="actR" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stop-color="#B4577E" stop-opacity="0"/>
-              <stop offset="0.28" stop-color="#B4577E" stop-opacity="0.07"/>
-              <stop offset="0.66" stop-color="#B4577E" stop-opacity="0.18"/>
-              <stop offset="1" stop-color="#B4577E" stop-opacity="0.02"/>
-            </linearGradient>
-          </defs>
-          <g class="act-hill act-hill-l">
-            <path d="M-80 340 C10 340 30 200 110 200 C168 200 186 262 228 262 C276 262 296 196 352 196 C430 196 448 340 520 340 L520 470 L-80 470 Z"
-                  fill="url(#actL)"/>
-            <path d="M-80 340 C10 340 30 200 110 200 C168 200 186 262 228 262 C276 262 296 196 352 196 C430 196 448 340 520 340"
-                  fill="none" stroke="#4A4FA8" stroke-opacity="0.34" stroke-width="1.5" stroke-linecap="round"/>
-          </g>
-          <g class="act-hill act-hill-r">
-            <path d="M1280 312 C1190 312 1170 168 1090 168 C1030 168 1012 236 970 236 C922 236 902 172 846 172 C768 172 752 312 680 312 L680 470 L1280 470 Z"
-                  fill="url(#actR)"/>
-            <path d="M1280 312 C1190 312 1170 168 1090 168 C1030 168 1012 236 970 236 C922 236 902 172 846 172 C768 172 752 312 680 312"
-                  fill="none" stroke="#B4577E" stroke-opacity="0.34" stroke-width="1.5" stroke-linecap="round"/>
-          </g>
-          <g class="act-plus" stroke="#B0801F" stroke-width="1.7" stroke-linecap="round">
-            <path d="M56 132 h17 M64.5 123.5 v17"/>
-            <path d="M1148 96 h13 M1154.5 89.5 v13"/>
-            <path d="M1112 250 h10 M1117 245 v10"/>
-          </g>
-        </svg>
-        <div class="act-frame" data-cycle="1">
-          <div class="rec-frame">
-            ${screen(C.hero.records[0])}
-          </div>
-          <span class="act-mark" aria-hidden="true">
-            <img src="assets/pandax-mark-ink.png" alt="" width="46" height="46" loading="lazy">
-          </span>
-        </div>
+      ${recordStage(0)}
+      <div class="act-act">
+        <a class="btn" href="${C.action.cta.href}">${esc(C.action.cta.label)}</a>
       </div>
     </div>`;
 }
 
 function closingSection() {
   const c = C.contact;
-  return `<section class="sec sec-close" id="contact">
+  return `<section class="sec sec-close" id="see">
   <div class="wrap">
     ${actionStage()}
-    <div class="close-in close-one">
+    <div class="close-in close-one" id="contact">
       ${formBlock(c.heading, c.body, "sample")}
     </div>
   </div>
@@ -698,11 +833,11 @@ function actisPage() {
 
   return shell({
     slug: "actis/",
-    ogTitle: `${esc(C.meta.product)} — ${esc(C.meta.tagline)}`,
+    ogTitle: `${esc(C.meta.product)}: ${esc(C.meta.tagline)}`,
     description: a.description,
     depth: 1,
     script: true,
-    body: `<section class="sec sec-lead" id="top">
+    body: grounds(`<section class="sec sec-lead" id="top">
   <div class="wrap">
     <div class="hero-in">
       <div class="prod-text">
@@ -753,11 +888,13 @@ function actisPage() {
   <div class="wrap">
     <h2>${esc(a.record.heading)}</h2>
     <p class="lede">${esc(a.record.lede)}</p>
-    <div class="rec-frame">
-      ${screen(C.hero.records[0])}
-    </div>
+    ${recordStage(1)}
   </div>
 </section>
+
+${capabilitySection()}
+
+${sourceSection()}
 
 <section class="sec">
   <div class="wrap">
@@ -783,36 +920,38 @@ function actisPage() {
       </div>
     </div>
   </div>
-</section>`,
+</section>`),
   });
 }
 
 
-/** Give the page rhythm: a counted marker per section, alternating grounds. */
-function rhythm(html) {
-  let n = 0;
-  return html.replace(/<section class="sec([^"]*)"([\s\S]*?)<h2>/g, (m, rest, mid) => {
-    n += 1;
-    const num = String(n).padStart(2, "0");
-    const dark = rest.includes("sec-dark");
-    // Light sections alternate ground so no two in a row read the same.
-    const alt = !dark && n % 2 === 0 ? " sec-alt" : "";
-    // The washes alternate sides so the page is lit down its length.
-    const wash = dark ? "" : ` sec-wash sec-wash-${n % 4 < 2 ? "a" : "b"}`;
-    const marker = `<span class="sec-n" aria-hidden="true">${num}</span>`;
-    return `<section class="sec${rest}${alt}${wash}"${mid}${marker}<h2>`;
+/** Alternate the grounds down the page, so no two sections in a row read
+ *  the same. The dark sections count as a ground of their own. */
+function grounds(html) {
+  let prev = "page";                       // the opening sits on the page ground
+  return html.replace(/<section class="sec([^"]*)"/g, (m, rest) => {
+    if (/sec-dark|sec-term/.test(rest)) { prev = "dark"; return m; }
+    const alt = prev === "page" ? " sec-alt" : "";
+    prev = alt ? "band" : "page";
+    return `<section class="sec${rest}${alt}"`;
   });
 }
 
 /* --------------------------------------------------------------- pages --- */
 
 const home = shell({
-  ogTitle: `${C.meta.brand} — ${C.meta.tagline}`,
+  ogTitle: `${C.meta.brand}: ${C.meta.tagline}`,
   description: `${C.hero.subhead} ${C.hero.body}`,
-  body: rhythm([
-    heroSection(), obligationSection(),
-    growthSection(), workflowSection(), marketSection(), manualSection(),
-    doesSection(), easierSection(), sourceSection(), capabilitySection(), closingSection(),
+  body: grounds([
+    // Her order: the customer first, then the product and what it gives
+    // them, then the law and the numbers, then who we are.
+    // The home page makes the case. How the product works in detail lives
+    // on the product page, where someone has already decided to look.
+    heroSection(), audienceSection(),
+    marketSection(),
+    doesSection(), questionsSection(),
+    obligationSection(), growthSection(), workflowSection(),
+    aboutSection(), closingSection(),
   ].join("\n\n")),
   script: true,
 });
@@ -821,7 +960,7 @@ function legalPage(key, extra) {
   const L = C.legalPages[key];
   return shell({
     slug: `${key}/`,
-    ogTitle: `${C.meta.brand} — ${L.title}`,
+    ogTitle: `${C.meta.brand}: ${L.title}`,
     description: L.description,
     depth: 1,
     doc: true,
@@ -835,6 +974,17 @@ function legalPage(key, extra) {
   });
 }
 
+const docSections = (body) =>
+  `<p class="doc-intro">${esc(body.intro)}</p>\n\n    ` +
+  body.sections.map((s, i) => `<section class="doc-s">
+      <span class="doc-n">${n2(i)}</span>
+      <div>
+        <h2>${esc(s.title)}</h2>
+        <p>${esc(s.body)}</p>
+      </div>
+    </section>`).join("\n\n    ");
+
+const cookiesSections = docSections(C.cookiesBody);
 const privacySections = `<p class="doc-intro">${esc(C.privacyBody.intro)}</p>\n\n    ` +
   C.privacyBody.sections
     .map((s) => `<section class="doc-s">
@@ -843,10 +993,41 @@ const privacySections = `<p class="doc-intro">${esc(C.privacyBody.intro)}</p>\n\
     </section>`)
     .join("\n\n    ");
 
+/** The product index. One today; the shape holds when there are more. */
+function productsIndex() {
+  const P = C.productsPage;
+  const items = C.nav.products
+    .map((pr) => `<li class="prod-card">
+        <a href="../${esc(pr.href)}">
+          <img src="../${esc(pr.mark)}" alt="" width="48" height="48" loading="lazy">
+          <span class="prod-name">${esc(pr.name)}</span>
+          <span class="prod-blurb">${esc(pr.blurb)}</span>
+        </a>
+      </li>`).join("\n      ");
+
+  return shell({
+    slug: "products/",
+    ogTitle: `${C.meta.brand}: ${P.title}`,
+    description: P.description,
+    depth: 1,
+    body: `<section class="sec sec-lead">
+  <div class="wrap">
+    <h1>${esc(P.heading)}</h1>
+    <p class="lede">${esc(P.lede)}</p>
+    <ul class="prods">
+      ${items}
+    </ul>
+  </div>
+</section>`,
+  });
+}
+
 const pages = [
   ["index.html", home],
   ["actis/index.html", actisPage()],
+  ["products/index.html", productsIndex()],
   ["privacy/index.html", legalPage("privacy", privacySections)],
+  ["cookies/index.html", legalPage("cookies", cookiesSections)],
 ];
 
 for (const [path, html] of pages) {

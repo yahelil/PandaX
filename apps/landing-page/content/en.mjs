@@ -51,11 +51,11 @@ export const boot = {
 /* 1 ------------------------------------------------------------- hero --- */
 
 export const hero = {
-  headline: "Automate CRA compliance",
+  headline: "Audit-ready evidence, every release",
   /** The word that takes the highlight, matched in the headline. */
-  highlight: "Automate",
-  subhead: "Product security evidence for the EU Cyber Resilience Act.",
-  body: "Every release needs legal evidence. PandaX builds it.",
+  highlight: "Audit-ready",
+  subhead: "PandaX turns each release into a reviewable record: the components, the findings, the decisions, and the documents an assessor asks to see.",
+  body: "Independent of any scanner, and yours to take anywhere.",
   primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
   secondary: { label: "See Actis", href: "/actis/" },
   /** The machine cycles through these. Each is a complete, consistent example. */
@@ -123,8 +123,8 @@ export const pipeline = {
 /* 2 -------------------------------------------------------- obligation --- */
 
 export const obligation = {
-  heading: "The Cyber Resilience Act hardens vulnerability compliance",
-  lede: "Every release needs legal evidence.",
+  heading: "What the Act asks you to keep",
+  lede: "Not a scan report. A file that shows what you shipped, what was wrong with it, and what you did — kept for ten years.",
   marks: [
     { date: "11 Sep 2026", iso: "2026-09-11", label: "Vulnerability-handling requirements apply", live: true },
     { date: "11 Dec 2027", iso: "2027-12-11", label: "Full CRA application" },
@@ -174,8 +174,8 @@ export const growth = {
 /* 4 ---------------------------------------------------------- workflow --- */
 
 export const workflow = {
-  heading: "Vulnerability reporting workflow",
-  lede: "The 24-hour and 72-hour deadlines both run from the company's awareness.",
+  heading: "The clock starts when you know",
+  lede: "Both deadlines run from the moment you become aware — not from the moment you have a fix.",
   stages: [
     { at: "24 hours", title: "Early warning", body: "Alerting for an actively exploited vulnerability or severe incident." },
     { at: "72 hours", title: "Notification", body: "Affected product information, measures taken and user protection steps." },
@@ -188,15 +188,15 @@ export const workflow = {
 /* 5 ------------------------------------------------------------ market --- */
 
 export const market = {
-  heading: "What the current market lacks",
-  lede: "Current solutions detect vulnerabilities. None of them automate CRA compliance.",
+  heading: "What your tools already do, and where they stop",
+  lede: "Scanners are good at finding things. None of them produce the file an assessor asks to see.",
   columns: [
     {
-      title: "What the market delivers",
+      title: "What a scanner gives you",
       items: ["Vulnerability detection", "Severity scores", "SBOMs and scan reports", "Point-in-time security findings"],
     },
     {
-      title: "What the market misses",
+      title: "What it leaves you to write",
       items: [
         "Evidence tied to the shipped product version",
         "Annex VII technical documentation compatibility",
@@ -211,14 +211,15 @@ export const market = {
 /* 6 ------------------------------------------------------------ manual --- */
 
 export const manual = {
-  heading: "The manual work",
-  lede: "Each vulnerability creates the same work again.",
+  heading: "The same work, every release",
+  lede: "One finding sets off four jobs. The next release sets off the same four, from the top.",
   steps: [
     { title: "Break down the release", body: "Catalogue every component and library in the release." },
     { title: "Assess the exposure", body: "Trace each vulnerability to the affected product and version." },
-    { title: "Prove the vulnerability was patched", body: "Prepare the remediation evidence and show the fix shipped." },
+    { title: "Prove the fix shipped", body: "Gather the remediation evidence and show which release carried it." },
     { title: "Submit the evidence", body: "Enter the required information by hand through the CRA reporting process." },
   ],
+  again: "then all four again, next release",
   clock: "24h early warning. 72h notification. The countdown begins with manufacturer awareness.",
 };
 
@@ -227,7 +228,7 @@ export const manual = {
 export const does = {
   eyebrow: "Our product",
   name: "Actis",
-  heading: "PandaX automates everything",
+  heading: "Actis does the assembling",
   lede: "Connect the evidence. Draft the documents. File with approval.",
   points: [
     "Connects existing evidence from configured Jira, CI/CD, SBOM and document sources to the relevant product version.",
@@ -265,30 +266,30 @@ export const questions = {
 /* 8 ------------------------------------------------------------ source --- */
 
 export const source = {
-  heading: "Your source code never leaves your environment",
-  lede: "PandaX works from the SBOM, not the code.",
+  heading: "Your source code stays where it is",
+  lede: "Actis reads the SBOM. It never needs the code itself.",
   points: [
-    "The company provides only the SBOM.",
-    "PandaX never receives or views your source code. It stays inside your environment.",
-    "If an SBOM is not available, PandaX provides the tools to generate one locally and export it.",
+    "You hand over an SBOM — nothing else.",
+    "The code never leaves your environment, because it is never asked for.",
+    "No SBOM yet? There are tools to build one inside your environment and export only that.",
   ],
 };
 
 /* 9 -------------------------------------------------------- capability --- */
 
 export const capability = {
-  heading: "What PandaX does",
+  heading: "What it covers",
   items: [
     { title: "Release evidence mapping", body: "Links each product release to SBOMs, tests, risks, tickets and approvals." },
-    { title: "Gap review", body: "Audits evidence against Annex VII and SRP requirements to pinpoint compliance gaps." },
-    { title: "Follows every update", body: "Syncs submission content across product revisions and regulatory changes." },
+    { title: "Gap review", body: "Checks what you have against what Annex VII asks for, and names what is missing." },
+    { title: "Carries forward", body: "Keeps the record current when the product changes, and when the rules do." },
     { title: "Evidence history", body: "Maintains dated, protected evidence for the retention period the CRA requires." },
-    { title: "Create legal documents", body: "Generates documents that follow the applicable legal standards." },
-    { title: "Submit the reports", body: "Guides approved technical reports through submission to ENISA." },
+    { title: "Drafts the documents", body: "The Annex VII technical file and the Annex V declaration, in the form they are asked for." },
+    { title: "Files the reports", body: "Takes reports you have approved through the single reporting platform, and keeps the receipt." },
   ],
   closing: {
-    title: "Designed for small manufacturers",
-    body: "Meet the CRA without adding a dedicated legal or compliance team.",
+    title: "Built for teams without a compliance department",
+    body: "The work still gets done properly. It just does not need someone hired to do it.",
   },
 };
 
@@ -296,7 +297,7 @@ export const action = {
   lead: "Ready to see",
   highlight: "Actis",
   tail: "in action?",
-  body: "One run against one firmware image, and the record it seals. Components, findings, the fix that shipped, and the proof it was signed off — this is what comes out the other side.",
+  body: "One run against one release, and the record it seals: the components, the findings, the fix that shipped, and the proof somebody signed it off.",
   cta: { label: "See Actis", href: "/actis/" },
 };
 
@@ -490,7 +491,7 @@ export const audience = {
   fitTitle: "You are probably a fit if",
   fit: [
     "You manufacture connected industrial or electrical equipment and sell it into the EU.",
-    "You ship firmware often enough that the evidence work repeats.",
+    "You ship often enough that the same evidence work comes round again.",
     "Someone has already asked you for a technical file, an SBOM, or a reporting timeline.",
     "Today that answer is assembled by hand, by a few people, close to the release date.",
   ],

@@ -429,8 +429,8 @@ function marketSection() {
   const done = have.items
     .map((i) => `<li><svg class="mk-tick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>${esc(i)}</li>`)
     .join("\n          ");
-  const todo = left.items
-    .map((i) => `<li><span class="mk-box" aria-hidden="true"></span>${esc(i)}</li>`)
+  const added = left.items
+    .map((i) => `<li><svg class="mk-add" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>${esc(i)}</li>`)
     .join("\n          ");
 
   return `<section class="sec" id="market">
@@ -446,13 +446,13 @@ function marketSection() {
       </div>
       <div class="mk-edge" aria-hidden="true">
         <span class="mk-rail"></span>
-        <span class="mk-stop">stops here</span>
+        <span class="mk-stop">Actis picks up</span>
         <span class="mk-rail mk-rail-dash"></span>
       </div>
       <div class="mk-col mk-todo">
         <h3>${esc(left.title)}</h3>
         <ul>
-          ${todo}
+          ${added}
         </ul>
       </div>
     </div>
@@ -522,6 +522,8 @@ function doesSection() {
     <p class="lede lede-dark">${esc(d.lede)}</p>
 
     <div class="flow" id="flow" aria-hidden="true">
+      <span class="flow-pulse flow-pulse-a"></span>
+      <span class="flow-pulse flow-pulse-b"></span>
       <div class="flow-in">
         <span class="fl-src" data-i="0">Jira</span>
         <span class="fl-src" data-i="1">CI/CD</span>
@@ -695,6 +697,16 @@ function lineGlyph(kind) {
     submit: `<path d="M12 36 v10 a2 2 0 0 0 2 2 h32 a2 2 0 0 0 2 -2 V36"/>
           <path d="M30 40 V12"/>
           <path d="M21 21 l9 -9 l9 9"/>`,
+    // what we hold to
+    neutral: `<path d="M10 15 L27 30 M10 30 h17 M10 45 L27 30"/>
+          <circle cx="33" cy="30" r="6"/>
+          <path d="M39 30 h11"/>`,
+    portable: `<path d="M11 17 h20 v26 h-20 Z"/>
+          <path d="M31 30 h14"/>
+          <path d="M39 24 l6 6 l-6 6"/>`,
+    impartial: `<path d="M30 13 v34 M18 47 h24 M13 21 h34 M30 17 v4"/>
+          <path d="M13 21 l-5 11 h10 Z"/>
+          <path d="M47 21 l-5 11 h10 Z"/>`,
   }[kind];
   return `<svg class="gly" viewBox="0 0 60 60" aria-hidden="true">
           <g fill="none" stroke-linecap="round" stroke-linejoin="round">${d}</g>
@@ -741,14 +753,28 @@ function audienceSection() {
 
 function aboutSection() {
   const a = C.about;
-  const body = a.body.map((t) => `<p>${esc(t)}</p>`).join("\n      ");
+  const promises = a.promises
+    .map((x) => `<li class="hold">
+        <span class="hold-mark">${lineGlyph(x.glyph)}</span>
+        <h3>${esc(x.title)}</h3>
+        <p>${esc(x.body)}</p>
+      </li>`).join("\n      ");
+
   return `<section class="sec" id="about">
   <div class="wrap">
     <h2>${esc(a.heading)}</h2>
     <p class="lede">${esc(a.lede)}</p>
-    <div class="about-body">
-      ${body}
+
+    <div class="claim">
+      <p class="claim-line">${esc(a.claim)}</p>
+      <p class="claim-body">${esc(a.claimBody)}</p>
     </div>
+
+    <h3 class="aud-cap aud-cap-wide">${esc(a.promisesTitle)}</h3>
+    <ul class="holds">
+      ${promises}
+    </ul>
+    <p class="note">${esc(a.disclaimer)}</p>
   </div>
 </section>`;
 }

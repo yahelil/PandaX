@@ -6,6 +6,7 @@ read artifact contents, never the selector's name or its expected test outcome.
 """
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from urllib.parse import quote
@@ -15,7 +16,8 @@ from .context import Finding
 LIBUBOX_ADVISORY = 'https://openwrt.org/advisory/2020-01-31-2'
 DNSMASQ_ADVISORY = 'https://openwrt.org/advisory/2021-01-19-1'
 CURL_ADVISORY = 'https://curl.se/docs/CVE-2023-38545.html'
-OPENSSL_ADVISORY = 'https://www.openssl.org/news/secadv/20140407.txt'
+OPENSSL_ADVISORY = 'https://openssl-library.org/news/secadv/20140407.txt'
+ADVISORY_CATALOG_PATH = Path(__file__).parent / 'data/native-advisories.json'
 DNSSEC_CVES = {f'CVE-2020-{n}' for n in (25681, 25682, 25683, 25685, 25687)}
 CURL_CONDITIONS = (
     'Requires SOCKS5 remote hostname resolution (socks5h://, --socks5-hostname, '
@@ -33,14 +35,111 @@ HEARTBLEED_CONDITIONS = (
 )
 
 
+def advisory_catalog() -> dict:
+    """Load the versioned, reviewable source snapshot used by native rules."""
+    data = json.loads(ADVISORY_CATALOG_PATH.read_text(encoding='utf-8'))
+    if data.get('schema') != 'pandax/native-advisory-catalog/v1':
+        raise ValueError('unsupported native advisory catalogue schema')
+    return data
+
+
+def _source_identity(data: dict, project: str, version: str) -> tuple[bool, dict]:
+    """Require the artifact digest to identify the expected upstream release."""
+    identity = data.get('source_identity') or {}
+    verified = (
+        identity.get('status') == 'verified'
+        and identity.get('method') == 'sha256'
+        and identity.get('project') == project
+        and identity.get('version') == version
+        and bool(identity.get('sha256'))
+        and bool(identity.get('url'))
+    )
+    return verified, identity
+
+
+def _catalog_assessments(component: dict, data: dict, project: str) -> list[dict]:
+    """Apply selected upstream rules only to a digest-verified release identity."""
+    catalog = advisory_catalog()
+    version = component['version']
+    identity_verified, identity = _source_identity(data, project, version)
+    results = []
+    for rule in catalog['advisories']:
+        if rule['project'] != project or rule['component'] != component['name']:
+            continue
+        if not identity_verified:
+            state = 'unknown'
+            decision = (
+                'The source header identifies this version, but the artifact was not '
+                'matched to the approved upstream SHA-256 release record. A vendor '
+                'affectedness conclusion is therefore not asserted.'
+            )
+        elif version in rule['affected_versions']:
+            state = 'affected'
+            decision = rule['affectedness_evidence']
+        elif version in rule['fixed_versions']:
+            state = 'fixed'
+            decision = rule['affectedness_evidence']
+        else:
+            state = 'unknown'
+            decision = (
+                f"Version {version} is outside this catalogue's curated release boundaries; "
+                'no affected or fixed conclusion is asserted.'
+            )
+
+        conflicts = [
+            item for item in rule.get('conflicting_sources', [])
+            if item.get('applies_to_version') == version
+        ]
+        detail = decision + ' ' + rule['reachability_note'] + (
+            ' Product reachability remains not assessed.'
+        )
+        source = rule['source']
+        source_record = {
+            **source,
+            'selected_state': state,
+            'affected_versions': rule['affected_versions'],
+            'fixed_versions': rule['fixed_versions'],
+            'fixed_version': rule['fixed_version'],
+            'raw_assertion': rule['affectedness_evidence'],
+        }
+        results.append({
+            'cve': rule['cve'],
+            'title': rule['title'],
+            'state': state,
+            'component': component['name'],
+            'version': version,
+            'purl': component['purl'],
+            'bom_ref': component['bom-ref'],
+            'fixed_version': rule['fixed_version'],
+            'source': source['url'],
+            'source_name': source['name'],
+            'source_url': source['url'],
+            'source_retrieved_at': source['retrieved_at'],
+            'ruleset': f"pandax.native/{catalog['catalog_version']}",
+            'catalog_version': catalog['catalog_version'],
+            'affectedness_evidence': decision,
+            'reachability_note': rule['reachability_note'],
+            'detail': detail,
+            'source_identity': identity,
+            'source_records': [source_record],
+            'conflicting_sources': conflicts,
+            'source_precedence': catalog['source_precedence'],
+        })
+    return results
+
+
 def _read(path: Path) -> str:
     return path.read_text(encoding='utf-8', errors='replace')
 
 
-def inventory(root: Path) -> dict:
+def inventory(root: Path, source_identity: dict | None = None) -> dict:
     result = {'components': [], 'dependencies': [], 'evidence': [],
               'coverage': 'Native supplement: OpenWrt opkg inventory and curl/OpenSSL source headers. '
-                          'Dependency metadata is not a runtime call graph.'}
+                          'Dependency metadata is not a runtime call graph.',
+              'source_identity': source_identity or {
+                  'status': 'unverified',
+                  'reason': 'The input was not matched to a pinned upstream release digest.',
+              }}
 
     def component(name, version, path, kind='library', namespace='generic', **extra):
         purl = f'pkg:{namespace}/{quote(name, safe="")}@{quote(version, safe="")}'
@@ -138,23 +237,48 @@ def assess(data: dict) -> list[dict]:
                         'Check DNSSEC, cache size and forwarding settings in etc/config/dhcp. '
                         'The full OpenWrt package revision matters: 2.80-16.2 backports the fixes.'))
         elif name == 'libcurl':
-            state = {'8.3.0': 'affected', '8.4.0': 'fixed'}.get(version, 'unknown')
-            rows = [('CVE-2023-38545', state, '8.4.0', CURL_ADVISORY, CURL_CONDITIONS)]
+            results.extend(_catalog_assessments(c, data, 'curl'))
+            continue
         elif name == 'libssl':
-            state = {'1.0.1f': 'affected', '1.0.1g': 'fixed'}.get(version, 'unknown')
-            rows = [('CVE-2014-0160', state, '1.0.1g', OPENSSL_ADVISORY, HEARTBLEED_CONDITIONS)]
+            results.extend(_catalog_assessments(c, data, 'openssl'))
+            continue
         for cve, state, fixed, source, detail in rows:
             results.append(dict(cve=cve, state=state, component=name, version=version,
                                 purl=c['purl'], bom_ref=c['bom-ref'], fixed_version=fixed,
-                                source=source, detail=detail))
+                                source=source, source_name='Vendor advisory',
+                                source_url=source, ruleset='pandax.native/1',
+                                affectedness_evidence=detail, detail=detail))
+    for result in results:
+        validate_assessment(result)
     return results
+
+
+def validate_assessment(assessment: dict) -> None:
+    """A conclusive affectedness decision must point to its supporting advisory."""
+    allowed = {'affected', 'fixed', 'variant_excluded', 'unknown'}
+    state = assessment.get('state')
+    if state not in allowed:
+        raise ValueError(f'unsupported native affectedness state: {state}')
+    if state in {'affected', 'fixed', 'variant_excluded'}:
+        if not assessment.get('source_url') or not assessment.get('affectedness_evidence'):
+            raise ValueError(
+                f'{state} native assessment requires advisory-specific source and evidence'
+            )
 
 
 def findings(assessments: list[dict]) -> list[Finding]:
     return [Finding(cve=a['cve'], osv_id='', purl=a['purl'], component=a['component'],
-                    version=a['version'], summary=a['detail'], fixed_version=a['fixed_version'],
-                    bom_ref=a['bom_ref'], source='Vendor advisory', source_url=a['source'],
-                    applicability=a['detail']) for a in assessments if a['state'] == 'affected']
+                    version=a['version'], summary=a.get('title', a['detail']),
+                    fixed_version=a['fixed_version'],
+                    bom_ref=a['bom_ref'], source=a.get('source_name', 'Vendor advisory'),
+                    source_url=a.get('source_url', a['source']), applicability=a['detail'],
+                    coverage_status='completed', affectedness='affected',
+                    affectedness_evidence=a.get('affectedness_evidence', a['detail']),
+                    reachability='not_assessed',
+                    query_source=a.get('ruleset', 'pandax.native/1'),
+                    query_value=f"{a['component']}@{a['version']}:{a['cve']}",
+                    source_retrieved_at=a.get('source_retrieved_at', ''))
+            for a in assessments if a['state'] == 'affected']
 
 
 def enrich_sbom(sbom: dict, data: dict) -> None:

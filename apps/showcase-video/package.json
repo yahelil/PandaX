@@ -1,0 +1,19 @@
+{
+  "name": "@pandax/showcase-video",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "capture": "node scripts/capture.mjs",
+    "voiceover": "uv run --with kokoro-onnx --with soundfile python scripts/generate_voiceover.py",
+    "studio": "remotion studio src/index.tsx",
+    "render": "remotion render src/index.tsx PandaXShowcase ../../output/video/pandax-poc-showcase.mp4 --codec=h264 --crf=18 --audio-codec=aac"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.346",
+    "playwright-core": "1.55.0",
+    "react": "19.1.1",
+    "react-dom": "19.1.1",
+    "remotion": "4.0.346"
+  }
+}

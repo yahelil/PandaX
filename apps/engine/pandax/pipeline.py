@@ -20,10 +20,12 @@ from .context import (
     KEY_PATH,
     RunContext,
     new_run_dir,
+    signing_key_path,
 )
 from .evidence import Ledger, load_or_create_key, sha256_file, write_manifest
 from .feeds import Feeds
 from .stages import clock, dossier, ingest, match, sbom, triage
+from . import exposure, telemetry
 
 STAGE_SEAL = "SEAL"
 
@@ -50,6 +52,8 @@ def run(
     out_base: Path | None = None,
     clock_speed: float = 1.0,
     offline: bool = False,
+    telemetry_path: Path | None = None,
+    exposure_context_path: Path | None = None,
 ) -> ev.Stream:
     """Run from a product artifact, including ingest and SBOM synthesis."""
     yield from _run(
@@ -58,6 +62,8 @@ def run(
         out_base=out_base,
         clock_speed=clock_speed,
         offline=offline,
+        telemetry_path=telemetry_path,
+        exposure_context_path=exposure_context_path,
     )
 
 
@@ -66,6 +72,8 @@ def run_sbom(
     out_base: Path | None = None,
     clock_speed: float = 1.0,
     offline: bool = False,
+    telemetry_path: Path | None = None,
+    exposure_context_path: Path | None = None,
 ) -> ev.Stream:
     """Run from a supplied JSON SBOM, skipping artifact ingest and Syft."""
     yield from _run(
@@ -74,6 +82,8 @@ def run_sbom(
         out_base=out_base,
         clock_speed=clock_speed,
         offline=offline,
+        telemetry_path=telemetry_path,
+        exposure_context_path=exposure_context_path,
     )
 
 
@@ -83,6 +93,8 @@ def _run(
     out_base: Path | None,
     clock_speed: float,
     offline: bool,
+    telemetry_path: Path | None,
+    exposure_context_path: Path | None,
 ) -> ev.Stream:
     artifact = Path(artifact).resolve()
     if not artifact.exists():
@@ -155,6 +167,10 @@ def _run(
             )
 
         yield from match.run(ctx, feeds)
+        if telemetry_path is not None:
+            yield from telemetry.apply(ctx, telemetry_path)
+        if exposure_context_path is not None or ctx.runtime_telemetry_path is not None:
+            yield from exposure.run(ctx, exposure_context_path)
         yield from triage.run(ctx, feeds)
         source_path = ctx.path("release-source.json")
         if source_path.exists():
@@ -176,7 +192,8 @@ def _run(
 
     # --- seal the bundle -----------------------------------------------------
     yield ev.start(STAGE_SEAL, "hash-chaining and signing the evidence bundle")
-    key = load_or_create_key(KEY_PATH)
+    configured_key_path = signing_key_path(KEY_PATH)
+    key = load_or_create_key(configured_key_path)
     manifest = write_manifest(
         run_dir=run_dir,
         run_id=run_id,
@@ -190,7 +207,7 @@ def _run(
     yield ev.log(
         STAGE_SEAL, f"manifest covers {len(manifest['files'])} files", ev.GOOD
     )
-    yield ev.log(STAGE_SEAL, f"signing key: {KEY_PATH}")
+    yield ev.log(STAGE_SEAL, f"signing key: {configured_key_path}")
     yield ev.artifact(
         STAGE_SEAL, "manifest.json", sha256_file(run_dir / "manifest.json")
     )
@@ -210,6 +227,14 @@ def _run(
         sbom_version=ctx.sbom_source_version,
         matchable_components=ctx.matchable_components,
         skipped_components=ctx.skipped_components,
+        coverage_summary={
+            status: sum(
+                1
+                for check in ctx.vulnerability_coverage
+                if check.get("status") == status
+            )
+            for status in ("completed", "failed", "unknown", "unsupported", "unscanned")
+        },
     )
 
 

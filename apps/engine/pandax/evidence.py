@@ -33,12 +33,15 @@ LEDGER_NAME = "ledger.jsonl"
 MANIFEST_NAME = "manifest.json"
 SIG_NAME = "manifest.sig"
 PUBKEY_NAME = "pubkey.pem"
+MANIFEST_SCHEMA = "pandax/manifest/v1"
+CONTROL_FILES = {MANIFEST_NAME, SIG_NAME, PUBKEY_NAME}
 
 SIGNING_NOTE = (
     "Ed25519 over the canonical JSON of manifest.json (UTF-8, sorted keys, no "
-    "whitespace). Proves integrity of this bundle, NOT the legal identity of "
-    "the signer - a production CRA deployment requires an eIDAS qualified "
-    "electronic seal."
+    "whitespace). The bundled public key supports internal signature inspection "
+    "but is not a trust anchor. Signer trust requires a public key obtained "
+    "separately. This identifies a configured signing installation, not a legal "
+    "person or an eIDAS qualified electronic seal."
 )
 
 
@@ -68,6 +71,47 @@ def record_digest(record: dict[str, Any]) -> str:
     """Hash of a ledger record with its own hash field excluded."""
     trimmed = {k: v for k, v in record.items() if k != "record_hash"}
     return sha256_bytes(canonical(trimmed))
+
+
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def _load_json_object(blob: str, label: str) -> dict[str, Any]:
+    value = json.loads(blob, object_pairs_hook=_unique_json_object)
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    return value
+
+
+def _validate_manifest_structure(manifest: dict[str, Any]) -> None:
+    required_types: dict[str, type] = {
+        "schema": str,
+        "run_id": str,
+        "created": str,
+        "product": dict,
+        "tool_versions": dict,
+        "ledger_root": str,
+        "ledger_sha256": str,
+        "ledger_records": int,
+        "files": list,
+    }
+    for field, expected in required_types.items():
+        if field not in manifest:
+            raise ValueError(f"manifest is missing {field}")
+        if not isinstance(manifest[field], expected) or (
+            expected is int and isinstance(manifest[field], bool)
+        ):
+            raise ValueError(f"manifest field {field} must be {expected.__name__}")
+    if manifest["schema"] != MANIFEST_SCHEMA:
+        raise ValueError(f"unsupported manifest schema: {manifest['schema']}")
+    if manifest["ledger_records"] < 0:
+        raise ValueError("manifest ledger_records cannot be negative")
 
 
 # --- ledger -----------------------------------------------------------------
@@ -225,48 +269,247 @@ class Check:
     name: str
     ok: bool
     detail: str = ""
+    category: str = "integrity"
+    problem: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "ok": self.ok,
+            "detail": self.detail,
+            "category": self.category,
+        }
+
+
+@dataclass
+class VerificationResult:
+    status: str
+    integrity_ok: bool
+    signature_valid: bool
+    signer_trust: str
+    reason: str
+    checks: list[Check]
+    bundle_key_fingerprint: str = ""
+    trusted_key_fingerprint: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return self.status == "trusted"
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "ok": self.ok,
+            "integrity_ok": self.integrity_ok,
+            "signature_valid": self.signature_valid,
+            "signer_trust": self.signer_trust,
+            "reason": self.reason,
+            "bundle_key_fingerprint": self.bundle_key_fingerprint,
+            "trusted_key_fingerprint": self.trusted_key_fingerprint,
+            "checks": [check.as_dict() for check in self.checks],
+        }
+
+
+class TrustedKeyConfigurationError(ValueError):
+    """The configured trust anchor cannot be used for Ed25519 verification."""
+
+
+def _parse_public_key(blob: bytes) -> Ed25519PublicKey:
+    loaded = serialization.load_pem_public_key(blob)
+    if not isinstance(loaded, Ed25519PublicKey):
+        raise ValueError("public key is not Ed25519")
+    return loaded
+
+
+def load_trusted_key(path: Path) -> Ed25519PublicKey:
+    path = Path(path)
+    try:
+        return _parse_public_key(path.read_bytes())
+    except (OSError, TypeError, ValueError) as exc:
+        raise TrustedKeyConfigurationError(
+            f"trusted key cannot be loaded from {path}: {exc}"
+        ) from exc
+
+
+def public_key_fingerprint(key: Ed25519PublicKey) -> str:
+    der = key.public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    return sha256_bytes(der)
+
+
+def write_public_key(key: Ed25519PrivateKey, output: Path, force: bool = False) -> str:
+    """Export only the public half and return its stable SHA-256 fingerprint."""
+    output = Path(output)
+    if output.exists() and not force:
+        raise FileExistsError(f"refusing to overwrite existing file: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    public = key.public_key()
+    output.write_bytes(
+        public.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+    return public_key_fingerprint(public)
+
+
+def _safe_bundle_path(run_dir: Path, relative: str) -> Path:
+    if not isinstance(relative, str) or not relative:
+        raise ValueError("file path must be a non-empty string")
+    root = Path(run_dir).resolve()
+    target = (root / relative).resolve()
+    if not target.is_relative_to(root):
+        raise ValueError(f"file path escapes bundle: {relative}")
+    return target
 
 
 def verify_run(run_dir: Path) -> list[Check]:
-    """Re-derive everything from scratch. Never trusts a value it did not recompute."""
+    """Inspect internal integrity without claiming that the signer is trusted."""
     run_dir = Path(run_dir)
     checks: list[Check] = []
 
     manifest_path = run_dir / MANIFEST_NAME
     if not manifest_path.exists():
-        return [Check("manifest present", False, f"{MANIFEST_NAME} not found")]
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    checks.append(Check("manifest present", True, f"run {manifest.get('run_id', '?')}"))
-
-    # 1. Ed25519 signature over the canonical manifest.
+        return [
+            Check(
+                "manifest present",
+                False,
+                f"{MANIFEST_NAME} not found",
+                problem="missing",
+            )
+        ]
     try:
-        pub = serialization.load_pem_public_key((run_dir / PUBKEY_NAME).read_bytes())
-        if not isinstance(pub, Ed25519PublicKey):
-            raise ValueError("public key is not Ed25519")
+        manifest = _load_json_object(
+            manifest_path.read_text(encoding="utf-8"), MANIFEST_NAME
+        )
+    except (OSError, ValueError, TypeError) as exc:
+        return [
+            Check(
+                "manifest present",
+                False,
+                f"{MANIFEST_NAME} is unreadable: {exc}",
+                problem="malformed",
+            )
+        ]
+    checks.append(Check("manifest present", True, f"run {manifest.get('run_id', '?')}"))
+    try:
+        _validate_manifest_structure(manifest)
+    except (TypeError, ValueError) as exc:
+        return [
+            *checks,
+            Check(
+                "manifest structure",
+                False,
+                str(exc),
+                problem=(
+                    "unsupported"
+                    if "unsupported manifest schema" in str(exc)
+                    else "malformed"
+                ),
+            ),
+        ]
+    checks.append(Check("manifest structure", True, f"schema {MANIFEST_SCHEMA}"))
+
+    # 1. Ed25519 signature against the key advertised by the bundle. This is
+    # useful inspection evidence, but it is deliberately not a trust decision.
+    try:
+        pub = _parse_public_key((run_dir / PUBKEY_NAME).read_bytes())
         sig = bytes.fromhex((run_dir / SIG_NAME).read_text(encoding="utf-8").strip())
         pub.verify(sig, canonical(manifest))
-        checks.append(Check("ed25519 signature", True, "manifest signature valid"))
+        checks.append(
+            Check(
+                "ed25519 signature",
+                True,
+                "manifest signature valid against bundled public key",
+                category="signature",
+            )
+        )
     except InvalidSignature:
         checks.append(
-            Check("ed25519 signature", False, "signature does not match manifest content")
+            Check(
+                "ed25519 signature",
+                False,
+                "signature does not match manifest content",
+                category="signature",
+                problem="mismatch",
+            )
         )
-    except (ValueError, OSError) as exc:
-        checks.append(Check("ed25519 signature", False, f"{type(exc).__name__}: {exc}"))
+    except FileNotFoundError as exc:
+        checks.append(
+            Check(
+                "ed25519 signature",
+                False,
+                f"required signature file is missing: {exc.filename}",
+                category="signature",
+                problem="missing",
+            )
+        )
+    except (ValueError, TypeError, OSError) as exc:
+        checks.append(
+            Check(
+                "ed25519 signature",
+                False,
+                f"signature or bundled public key is malformed: {exc}",
+                category="signature",
+                problem="malformed",
+            )
+        )
 
     # 2. Every file digest recorded in the manifest.
-    listed = manifest.get("files", [])
-    bad_files = []
+    listed = manifest.get("files")
+    bad_files: list[str] = []
+    file_problem = ""
+    listed_paths: set[str] = set()
+    listed_casefolded: set[str] = set()
+    if not isinstance(listed, list):
+        listed = []
+        bad_files.append("manifest files must be a list")
+        file_problem = "malformed"
     for entry in listed:
-        target = run_dir / entry["path"]
-        if not target.exists():
-            bad_files.append(f"{entry['path']} (missing)")
-        elif sha256_file(target) != entry["sha256"]:
-            bad_files.append(f"{entry['path']} (digest mismatch)")
+        try:
+            if not isinstance(entry, dict) or not isinstance(entry.get("sha256"), str):
+                raise ValueError("entry must contain path and sha256 strings")
+            relative = entry.get("path")
+            if not isinstance(relative, str):
+                raise ValueError("entry path must be a string")
+            folded = relative.casefold()
+            if folded in listed_casefolded:
+                raise ValueError(f"duplicate or case-colliding file path: {relative}")
+            listed_casefolded.add(folded)
+            listed_paths.add(relative)
+            target = _safe_bundle_path(run_dir, relative)
+            if not target.is_file():
+                bad_files.append(f"{entry.get('path')} (missing)")
+                file_problem = "missing"
+            elif sha256_file(target) != entry["sha256"]:
+                bad_files.append(f"{entry['path']} (digest mismatch)")
+                file_problem = file_problem or "mismatch"
+        except (OSError, TypeError, ValueError) as exc:
+            bad_files.append(str(exc))
+            file_problem = "malformed"
     checks.append(
         Check(
             f"file digests ({len(listed)} files)",
             not bad_files,
             "all match" if not bad_files else "; ".join(bad_files),
+            problem=file_problem,
+        )
+    )
+
+    actual_files = {
+        path.relative_to(run_dir).as_posix()
+        for path in run_dir.rglob("*")
+        if path.is_file()
+    }
+    unexpected = sorted(actual_files - listed_paths - CONTROL_FILES)
+    checks.append(
+        Check(
+            "unexpected files",
+            not unexpected,
+            "none" if not unexpected else "; ".join(unexpected),
+            problem="" if not unexpected else "mismatch",
         )
     )
 
@@ -281,24 +524,62 @@ def verify_run(run_dir: Path) -> list[Check]:
             "ledger file digest",
             ledger_ok,
             "matches manifest" if ledger_ok else "ledger.jsonl altered or missing",
+            problem="" if ledger_ok else "missing" if not ledger_path.exists() else "mismatch",
         )
     )
 
     # 4. Chain integrity, link by link, naming the exact break.
-    records = Ledger.load(run_dir)
+    records: list[dict[str, Any]] = []
+    chain_problem = ""
+    try:
+        records = Ledger.load(run_dir)
+    except (OSError, ValueError, TypeError) as exc:
+        chain_problem = "malformed"
+        broken = [f"ledger.jsonl is unreadable: {exc}"]
+    else:
+        broken = []
+    record_count_ok = len(records) == manifest.get("ledger_records")
+    checks.append(
+        Check(
+            "ledger record count",
+            record_count_ok,
+            f"expected {manifest.get('ledger_records')}, found {len(records)}",
+            problem="" if record_count_ok else "mismatch",
+        )
+    )
+    sequence_bad: list[str] = []
+    for index, record in enumerate(records):
+        if not isinstance(record, dict):
+            sequence_bad.append(f"record {index} is not an object")
+        elif record.get("seq") != index:
+            sequence_bad.append(f"record {index} says seq {record.get('seq')!r}")
+    checks.append(
+        Check(
+            "ledger sequence",
+            not sequence_bad,
+            "contiguous from zero" if not sequence_bad else "; ".join(sequence_bad),
+            problem="" if not sequence_bad else "mismatch",
+        )
+    )
     prev = GENESIS
-    broken: list[str] = []
     for rec in records:
-        if record_digest(rec) != rec.get("record_hash"):
-            broken.append(f"seq {rec.get('seq')} {rec.get('stage')}: record_hash")
-        if rec.get("prev_hash") != prev:
-            broken.append(f"seq {rec.get('seq')} {rec.get('stage')}: prev_hash")
-        prev = rec.get("record_hash", "")
+        try:
+            if not isinstance(rec, dict):
+                raise ValueError("ledger record must be an object")
+            if record_digest(rec) != rec.get("record_hash"):
+                broken.append(f"seq {rec.get('seq')} {rec.get('stage')}: record_hash")
+            if rec.get("prev_hash") != prev:
+                broken.append(f"seq {rec.get('seq')} {rec.get('stage')}: prev_hash")
+            prev = rec.get("record_hash", "")
+        except (TypeError, ValueError) as exc:
+            broken.append(f"malformed ledger record: {exc}")
+            chain_problem = "malformed"
     checks.append(
         Check(
             f"hash chain ({len(records)} links)",
             not broken,
             "unbroken" if not broken else "; ".join(broken),
+            problem=chain_problem or ("mismatch" if broken else ""),
         )
     )
 
@@ -311,24 +592,134 @@ def verify_run(run_dir: Path) -> list[Check]:
             f"root {str(manifest.get('ledger_root'))[:16]}..."
             if head_ok
             else "ledger head does not match the signed manifest",
+            problem="" if head_ok else "mismatch",
         )
     )
 
     # 6. Stage outputs must still hash to what the producing stage recorded.
     stage_bad: list[str] = []
+    stage_problem = ""
     for rec in records:
-        for out in rec.get("outputs", []):
-            target = run_dir / out["path"]
-            if not target.exists():
-                stage_bad.append(f"{rec['stage']} -> {out['path']} (missing)")
-            elif sha256_file(target) != out["sha256"]:
-                stage_bad.append(f"{rec['stage']} -> {out['path']} (digest mismatch)")
+        outputs = rec.get("outputs", [])
+        if not isinstance(outputs, list):
+            stage_bad.append(f"{rec.get('stage')} outputs must be a list")
+            stage_problem = "malformed"
+            continue
+        for out in outputs:
+            try:
+                if not isinstance(out, dict) or not isinstance(out.get("sha256"), str):
+                    raise ValueError("output must contain path and sha256 strings")
+                target = _safe_bundle_path(run_dir, out.get("path"))
+                if not target.is_file():
+                    stage_bad.append(f"{rec.get('stage')} -> {out.get('path')} (missing)")
+                    stage_problem = "missing"
+                elif sha256_file(target) != out["sha256"]:
+                    stage_bad.append(f"{rec.get('stage')} -> {out['path']} (digest mismatch)")
+                    stage_problem = stage_problem or "mismatch"
+            except (OSError, TypeError, ValueError) as exc:
+                stage_bad.append(str(exc))
+                stage_problem = "malformed"
     checks.append(
         Check(
             "stage outputs re-hashed",
             not stage_bad,
             "all match" if not stage_bad else "; ".join(stage_bad),
+            problem=stage_problem,
         )
     )
 
     return checks
+
+
+def verify_bundle(
+    run_dir: Path,
+    trusted_key: Path | Ed25519PublicKey | None = None,
+) -> VerificationResult:
+    """Inspect a bundle and separately decide whether its signer is trusted."""
+    run_dir = Path(run_dir)
+    checks = verify_run(run_dir)
+    integrity_checks = [check for check in checks if check.category == "integrity"]
+    signature_checks = [check for check in checks if check.category == "signature"]
+    integrity_ok = bool(integrity_checks) and all(check.ok for check in integrity_checks)
+    signature_valid = bool(signature_checks) and all(check.ok for check in signature_checks)
+    incomplete = any(
+        check.problem in {"missing", "malformed", "unsupported"} for check in checks
+    )
+
+    bundle_fingerprint = ""
+    try:
+        bundle_fingerprint = public_key_fingerprint(
+            _parse_public_key((run_dir / PUBKEY_NAME).read_bytes())
+        )
+    except (OSError, TypeError, ValueError):
+        pass
+
+    if trusted_key is None:
+        signer_trust = "not_configured"
+        trusted_fingerprint = ""
+        trust_ok = False
+        trust_detail = "no independently supplied trusted key was configured"
+    else:
+        key = (
+            load_trusted_key(trusted_key)
+            if isinstance(trusted_key, (str, Path))
+            else trusted_key
+        )
+        if not isinstance(key, Ed25519PublicKey):
+            raise TrustedKeyConfigurationError("trusted key is not Ed25519")
+        trusted_fingerprint = public_key_fingerprint(key)
+        try:
+            manifest = json.loads((run_dir / MANIFEST_NAME).read_text(encoding="utf-8"))
+            signature = bytes.fromhex(
+                (run_dir / SIG_NAME).read_text(encoding="utf-8").strip()
+            )
+            key.verify(signature, canonical(manifest))
+            signer_trust = "trusted"
+            trust_ok = True
+            trust_detail = f"signature verified with trusted key {trusted_fingerprint}"
+        except InvalidSignature:
+            signer_trust = "untrusted"
+            trust_ok = False
+            trust_detail = (
+                "signature does not verify with the independently supplied trusted key"
+            )
+        except (OSError, ValueError, TypeError) as exc:
+            signer_trust = "not_evaluated"
+            trust_ok = False
+            trust_detail = f"signer trust could not be evaluated: {exc}"
+
+    checks.append(
+        Check(
+            "external signer trust",
+            trust_ok,
+            trust_detail,
+            category="trust",
+            problem="" if trust_ok else "untrusted",
+        )
+    )
+
+    if incomplete:
+        status = "incomplete"
+        reason = "required evidence or signature information is missing or malformed"
+    elif not integrity_ok or not signature_valid:
+        status = "invalid"
+        reason = "the bundle does not match its internal integrity seal"
+    elif trust_ok:
+        status = "trusted"
+        reason = "bundle integrity and signer trust were independently verified"
+    else:
+        status = "untrusted"
+        reason = (
+            "bundle integrity passed, but the signer was not established as trusted"
+        )
+
+    return VerificationResult(
+        status=status,
+        integrity_ok=integrity_ok,
+        signature_valid=signature_valid,
+        signer_trust=signer_trust,
+        reason=reason,
+        checks=checks,
+        bundle_key_fingerprint=bundle_fingerprint,
+        trusted_key_fingerprint=trusted_fingerprint,
+    )

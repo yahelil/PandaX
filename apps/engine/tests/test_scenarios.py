@@ -23,6 +23,19 @@ def opkg(tmp_path, version='2.80-16.1', variant='dnsmasq'):
     return native.inventory(tmp_path)
 
 
+def upstream(project: str, version: str) -> dict:
+    return {
+        'id': f'{project}-{version}',
+        'project': project,
+        'version': version,
+        'url': f'https://example.invalid/{project}-{version}.tar.gz',
+        'sha256': 'a' * 64,
+        'status': 'verified',
+        'method': 'sha256',
+        'verified_at': '2026-09-09T00:00:00Z',
+    }
+
+
 def test_backport_revision_changes_verdict_without_upstream_version_change(tmp_path):
     before = native.assess(opkg(tmp_path))
     after = native.assess(opkg(tmp_path, '2.80-16.2'))
@@ -51,7 +64,7 @@ def test_curl_reads_header_not_directory_label(tmp_path, version, state):
     header.write_text(f'#define LIBCURL_VERSION "{version}"\n')
     (root / 'lib').mkdir(); (root / 'lib/socks.c').write_text('source')
     (root / 'src').mkdir(); (root / 'src/tool_main.c').write_text('source')
-    data = native.inventory(tmp_path)
+    data = native.inventory(tmp_path, upstream('curl', version))
     assert native.assess(data)[0]['state'] == state
     assert data['dependencies'][0]['dependsOn'] == [f'pkg:generic/libcurl@{version}']
     assert '65541' in native.assess(data)[0]['detail']
@@ -62,10 +75,106 @@ def test_heartbleed_source_and_consumer_inventory(tmp_path):
     (tmp_path / 'crypto/opensslv.h').write_text('#define OPENSSL_VERSION_TEXT "OpenSSL 1.0.1f 6 Jan 2014"')
     (tmp_path / 'ssl/t1_lib.c').write_text('source')
     (tmp_path / 'apps/s_server.c').write_text('source')
-    data = native.inventory(tmp_path)
+    data = native.inventory(tmp_path, upstream('openssl', '1.0.1f'))
     assert {c['name'] for c in data['components']} == {'libssl', 'openssl-s_server'}
     assert native.assess(data)[0]['state'] == 'affected'
     assert 'OPENSSL_NO_HEARTBEATS' in native.assess(data)[0]['detail']
+
+
+def test_unverified_upstream_lookalike_never_gets_conclusive_assessment(tmp_path):
+    root = tmp_path / 'curl-lookalike'
+    header = root / 'include/curl/curlver.h'
+    header.parent.mkdir(parents=True)
+    header.write_text('#define LIBCURL_VERSION "8.3.0"\n')
+    (root / 'lib').mkdir()
+    (root / 'lib/socks.c').write_text('source')
+
+    rows = native.assess(native.inventory(tmp_path))
+
+    assert len(rows) == 3
+    assert {row['state'] for row in rows} == {'unknown'}
+    assert all('not matched to the approved upstream SHA-256' in row['detail'] for row in rows)
+
+
+@pytest.mark.parametrize(
+    'project,version,expected',
+    [
+        ('curl', '8.3.0', {
+            'CVE-2023-38545': 'affected',
+            'CVE-2023-38546': 'affected',
+            'CVE-2023-46218': 'affected',
+        }),
+        ('curl', '8.4.0', {
+            'CVE-2023-38545': 'fixed',
+            'CVE-2023-38546': 'fixed',
+            'CVE-2023-46218': 'affected',
+        }),
+        ('curl', '8.5.0', {
+            'CVE-2023-38545': 'fixed',
+            'CVE-2023-38546': 'fixed',
+            'CVE-2023-46218': 'fixed',
+        }),
+        ('openssl', '1.0.1f', {
+            'CVE-2014-0160': 'affected',
+            'CVE-2014-0224': 'affected',
+            'CVE-2014-0195': 'affected',
+        }),
+        ('openssl', '1.0.1g', {
+            'CVE-2014-0160': 'fixed',
+            'CVE-2014-0224': 'affected',
+            'CVE-2014-0195': 'affected',
+        }),
+        ('openssl', '1.0.1h', {
+            'CVE-2014-0160': 'fixed',
+            'CVE-2014-0224': 'fixed',
+            'CVE-2014-0195': 'fixed',
+        }),
+    ],
+)
+def test_curated_upstream_boundaries(project, version, expected):
+    component = 'libcurl' if project == 'curl' else 'libssl'
+    purl = f'pkg:generic/{component}@{version}'
+    data = {
+        'components': [{
+            'name': component,
+            'version': version,
+            'purl': purl,
+            'bom-ref': purl,
+        }],
+        'source_identity': upstream(project, version),
+    }
+
+    rows = native.assess(data)
+
+    assert {row['cve']: row['state'] for row in rows} == expected
+    assert all(row['source_records'][0]['raw_assertion'] for row in rows)
+    assert all(row['source_retrieved_at'] for row in rows)
+
+
+def test_curl_vendor_boundary_retains_conflicting_osv_source():
+    version = '8.4.0'
+    purl = f'pkg:generic/libcurl@{version}'
+    data = {
+        'components': [{
+            'name': 'libcurl',
+            'version': version,
+            'purl': purl,
+            'bom-ref': purl,
+        }],
+        'source_identity': upstream('curl', version),
+    }
+
+    row = next(item for item in native.assess(data) if item['cve'] == 'CVE-2023-38546')
+
+    assert row['state'] == 'fixed'
+    assert row['conflicting_sources'][0]['asserted_state'] == 'affected'
+    assert 'official curl' in row['conflicting_sources'][0]['resolution']
+
+
+def test_distro_package_does_not_receive_upstream_curl_version_rule(tmp_path):
+    data = opkg(tmp_path, version='8.3.0', variant='libcurl')
+
+    assert native.assess(data) == []
 
 
 def test_missing_component_cannot_pass_fixed_release(ctx):

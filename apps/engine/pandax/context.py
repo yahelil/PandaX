@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -16,6 +17,12 @@ TOOLS_DIR = ROOT / ".tools"
 OUT_DIR = ROOT / "out"
 CACHE_DIR = ROOT / ".cache"
 KEY_PATH = Path.home() / ".pandax" / "dev_signing_key.pem"
+
+
+def signing_key_path(fallback: Path | None = None) -> Path:
+    """Resolve the installation signing key without caching environment state."""
+    configured = os.environ.get("PANDAX_SIGNING_KEY")
+    return Path(configured) if configured else Path(fallback or KEY_PATH)
 
 
 @dataclass
@@ -41,6 +48,28 @@ class Finding:
     source: str = "OSV"
     source_url: str = ""
     applicability: str = ""
+    # Coverage, affectedness, exploitation signals and product reachability are
+    # separate facts. Defaults keep historical/in-memory findings conservative.
+    coverage_status: str = "unknown"
+    affectedness: str = "unknown"
+    affectedness_evidence: str = ""
+    reachability: str = "unknown"
+    reachability_evidence: str = ""
+    # Approved runtime observations support a human review. They deliberately
+    # do not change reachability or legal reportability by themselves.
+    runtime_evidence_status: str = "not_supplied"
+    runtime_evidence: list[dict[str, Any]] = field(default_factory=list)
+    exposure_assessment: str = "not_assessed"
+    exposure_evidence: dict[str, Any] = field(default_factory=dict)
+    query_source: str = ""
+    query_value: str = ""
+    source_retrieved_at: str = ""
+    kev_check_status: str = "unknown"
+    kev_source_url: str = ""
+    kev_checked_at: str = ""
+    epss_check_status: str = "unknown"
+    epss_source_url: str = ""
+    epss_checked_at: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return dict(self.__dict__)
@@ -63,6 +92,10 @@ class RunContext:
     tool_versions: dict[str, str] = field(default_factory=dict)
     started: str = ""
     native_inventory: dict[str, Any] = field(default_factory=dict)
+    vulnerability_coverage: list[dict[str, Any]] = field(default_factory=list)
+    runtime_telemetry_path: Path | None = None
+    telemetry_assessments_path: Path | None = None
+    exposure_assessments_path: Path | None = None
 
     # A run can begin from a product artifact or from a pre-built SBOM.  These
     # fields make that provenance available to the dossier and both renderers.

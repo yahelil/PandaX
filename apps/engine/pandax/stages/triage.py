@@ -24,9 +24,14 @@ import uuid
 from .. import events as ev
 from ..context import CACHE_DIR, RunContext
 from ..evidence import sha256_file
-from ..feeds import Feeds
+from ..feeds import EPSS_URL, KEV_URL, FeedError, Feeds
 
 STAGE = "S4 TRIAGE"
+TRIAGE_COVERAGE_SCHEMA = "pandax/triage-source-coverage/v1"
+
+
+class TriageCoverageError(RuntimeError):
+    """A mandatory exploitation source failed, so the run cannot seal."""
 
 # CycloneDX severity vocabulary is lowercase.
 CDX_SEVERITY = {
@@ -71,22 +76,54 @@ def build_vex(ctx: RunContext) -> dict:
                 }
             )
 
-        if finding.kev:
+        if finding.reachability == "reachable" and finding.reachability_evidence.strip():
             analysis = {
                 "state": "exploitable",
                 "detail": (
-                    "Listed in the CISA Known Exploited Vulnerabilities catalogue"
-                    f" on {finding.kev_date_added}. Treated as an actively exploited"
-                    " vulnerability under CRA Article 14(1)."
+                    "Product-specific evidence records the affected component as reachable: "
+                    + finding.reachability_evidence.strip()
+                    + "."
+                    + (
+                        " The CVE is also listed in the CISA Known Exploited "
+                        "Vulnerabilities catalogue."
+                        if finding.kev
+                        else ""
+                    )
                 ),
             }
         else:
+            kev_detail = (
+                "The CVE is listed in the CISA Known Exploited Vulnerabilities "
+                "catalogue, which is an urgent exploitation signal but does not "
+                "by itself prove reachability in this product. "
+                if finding.kev
+                else ""
+            )
+            telemetry_detail = (
+                f" Approved runtime evidence contains {len(finding.runtime_evidence)} "
+                "observation(s), but PandaX has not converted those observations into "
+                "a reachability or reporting decision."
+                if finding.runtime_evidence
+                else ""
+            )
+            exposure_detail = (
+                " Exposure analysis is "
+                + finding.exposure_assessment.replace("_", " ")
+                + "; this is supporting evidence and still requires a company decision."
+                if finding.exposure_assessment != "not_assessed"
+                else ""
+            )
             analysis = {
                 "state": "in_triage",
                 "detail": (
-                    "Component is present and in an affected version range. No"
-                    " reachability analysis was performed, so no not_affected"
-                    " determination is asserted. Requires manufacturer review."
+                    kev_detail
+                    + "The component is recorded as "
+                    + f"{finding.affectedness or 'unknown'} and product reachability is "
+                    + f"{finding.reachability or 'unknown'}. No not_affected "
+                    "determination is asserted."
+                    + telemetry_detail
+                    + exposure_detail
+                    + " Requires manufacturer review."
                 ),
             }
 
@@ -100,6 +137,21 @@ def build_vex(ctx: RunContext) -> dict:
             "description": finding.summary,
             "affects": [{"ref": finding.bom_ref}],
             "analysis": analysis,
+            "properties": [
+                {"name": "pandax:coverage-status", "value": finding.coverage_status},
+                {"name": "pandax:affectedness", "value": finding.affectedness},
+                {"name": "pandax:kev-signal", "value": str(finding.kev).lower()},
+                {"name": "pandax:kev-check-status", "value": finding.kev_check_status},
+                {"name": "pandax:reachability", "value": finding.reachability},
+                {
+                    "name": "pandax:runtime-evidence-status",
+                    "value": finding.runtime_evidence_status,
+                },
+                {
+                    "name": "pandax:exposure-assessment",
+                    "value": finding.exposure_assessment,
+                },
+            ],
         }
         if finding.applicability:
             entry["analysis"]["detail"] += " " + finding.applicability
@@ -145,22 +197,53 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
 
     owned = feeds is None
     feeds = feeds or Feeds(CACHE_DIR)
+    checked_at = ev.now_iso()
+    kev_error = ""
+    epss_error = ""
+    kev: dict = {}
+    epss: dict[str, float] = {}
     try:
-        kev = feeds.kev()
-        yield ev.log(
-            STAGE,
-            f"CISA KEV: {len(kev):,} entries (released {feeds.kev_released()[:10]})",
-        )
-        epss = feeds.epss({f.cve for f in ctx.findings})
+        try:
+            kev = feeds.kev()
+        except FeedError as exc:
+            kev_error = str(exc)
+            yield ev.log(STAGE, f"CISA KEV check failed: {kev_error}", ev.ALERT_LVL)
+        else:
+            yield ev.log(
+                STAGE,
+                f"CISA KEV: {len(kev):,} entries (released {feeds.kev_released()[:10]})",
+            )
+        try:
+            epss = feeds.epss({f.cve for f in ctx.findings})
+        except FeedError as exc:
+            epss_error = str(exc)
     finally:
         if owned:
             feeds.close()
 
     ctx.tool_versions["cisa_kev"] = feeds.kev_released()[:10] or "unknown"
     ctx.tool_versions["epss"] = "first.org/data/v1"
+    kev_status = "failed" if kev_error else "completed"
+    epss_status = (
+        "failed"
+        if epss_error
+        else getattr(feeds, "last_epss_status", "completed")
+    )
+    epss_errors = list(getattr(feeds, "last_epss_errors", []))
+    if epss_error:
+        epss_errors.append(epss_error)
 
     for finding in ctx.findings:
         finding.epss = epss.get(finding.cve, 0.0)
+        finding.kev = False
+        finding.kev_date_added = ""
+        finding.kev_action = ""
+        finding.kev_check_status = kev_status
+        finding.kev_source_url = KEV_URL
+        finding.kev_checked_at = checked_at
+        finding.epss_check_status = epss_status
+        finding.epss_source_url = EPSS_URL
+        finding.epss_checked_at = checked_at
         entry = kev.get(finding.cve)
         if entry:
             finding.kev = True
@@ -199,6 +282,46 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
     vex_path = ctx.path("findings.cdx-vex.json")
     vex_path.write_text(json.dumps(vex, indent=2), encoding="utf-8")
 
+    triage_coverage = {
+        "schema": TRIAGE_COVERAGE_SCHEMA,
+        "generated": checked_at,
+        "checks": [
+            {
+                "source": "CISA Known Exploited Vulnerabilities",
+                "source_url": KEV_URL,
+                "status": kev_status,
+                "checked_at": checked_at,
+                "query": {"kind": "catalogue", "value": "all entries"},
+                "result_count": len(kev),
+                "reason": kev_error or "Catalogue loaded successfully.",
+            },
+            {
+                "source": "FIRST EPSS",
+                "source_url": EPSS_URL,
+                "status": epss_status,
+                "checked_at": checked_at,
+                "query": {
+                    "kind": "cve set",
+                    "value": sorted({finding.cve for finding in ctx.findings}),
+                },
+                "result_count": len(epss),
+                "reason": (
+                    "; ".join(epss_errors)
+                    if epss_errors
+                    else (
+                        "No CVEs required an EPSS query."
+                        if epss_status == "unscanned"
+                        else "EPSS query completed."
+                    )
+                ),
+            },
+        ],
+    }
+    triage_coverage_path = ctx.path("triage-coverage.json")
+    triage_coverage_path.write_text(
+        json.dumps(triage_coverage, indent=2), encoding="utf-8"
+    )
+
     # The enriched set is a NEW file: S3 owns findings.osv.json and its
     # recorded digest must stay valid, so nothing here overwrites it.
     findings_path = ctx.path("findings.json")
@@ -221,10 +344,30 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
         stage="S4_TRIAGE",
         tool="cisa-kev+epss",
         tool_version=ctx.tool_versions["cisa_kev"],
-        inputs=[ctx.ledger.ref(ctx.path("findings.matched.json"))],
-        outputs=[ctx.ledger.ref(vex_path), ctx.ledger.ref(findings_path)],
-        params={"kev_entries": len(kev), "epss_resolved": len(epss)},
+        inputs=[ctx.ledger.ref(ctx.path("findings.matched.json"))]
+        + (
+            [ctx.ledger.ref(ctx.telemetry_assessments_path)]
+            if ctx.telemetry_assessments_path is not None
+            else []
+        )
+        + (
+            [ctx.ledger.ref(ctx.exposure_assessments_path)]
+            if ctx.exposure_assessments_path is not None
+            else []
+        ),
+        outputs=[
+            ctx.ledger.ref(vex_path),
+            ctx.ledger.ref(findings_path),
+            ctx.ledger.ref(triage_coverage_path),
+        ],
+        params={
+            "kev_entries": len(kev),
+            "epss_resolved": len(epss),
+            "coverage_schema": TRIAGE_COVERAGE_SCHEMA,
+        },
     )
+    if kev_error:
+        raise TriageCoverageError(kev_error)
     yield ev.done(
         STAGE,
         f"{len(hits)} actively exploited, {len(ctx.findings) - len(hits)} in triage",

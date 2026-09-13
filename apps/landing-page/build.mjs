@@ -570,8 +570,8 @@ function hexGlyph(kind) {
           <path d="M65 39 v12 h12"/>
           <path d="M52 61 h17"/>
           <path d="M52 70 h17"/>`,
-    again: `<path d="M77.2 52 A19 19 0 1 1 68 42.8"/>
-          <path class="q-head" d="M68 42.8 L60.2 43.1 L63.2 36.7 Z"/>
+    again: `<path d="M78.4 55.1 A19 19 0 1 1 70.9 44.4"/>
+          <path class="q-head" d="M70.9 44.4 L63.2 43.3 L67.2 37.5 Z"/>
           <circle class="q-dot" cx="60" cy="60" r="3.8"/>`,
   }[kind];
 

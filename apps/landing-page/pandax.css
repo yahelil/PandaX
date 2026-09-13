@@ -1205,7 +1205,13 @@ a { color: inherit; }
 
 /* The same washes that sit behind the hero drawing, carried under the page so
    the sections are lit rather than flat. Decorative only, and never over text. */
-.sec { position: relative; }
+.sec {
+  position: relative;
+  /* The washes are positioned past the section's edges on purpose; clip on the
+     x axis so decoration cannot widen the page. `clip` keeps the sticky header
+     working, which `hidden` would break. */
+  overflow-x: clip;
+}
 .sec > .wrap { position: relative; z-index: 1; }
 .sec-wash::before {
   content: ""; position: absolute; pointer-events: none;

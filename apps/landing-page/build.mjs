@@ -37,7 +37,7 @@ function shell({ ogTitle, description, depth = 0, slug = "", body, script = fals
 <meta property="og:title" content="${esc(ogTitle)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:image" content="https://${C.meta.domain}/assets/favicon-512.png">
-<meta name="theme-color" content="#F2F2F0">
+<meta name="theme-color" content="#FFFFFF">
 
 <link rel="icon" href="${r}assets/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="${r}assets/favicon-dark-32.png" sizes="32x32" type="image/png" media="(prefers-color-scheme: dark)">
@@ -216,14 +216,14 @@ function scene() {
   <defs>
     <!-- Radial, and fully transparent before the edge, so nothing is clipped. -->
     <radialGradient id="wash-a">
-      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.34"/>
-      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.16"/>
-      <stop offset="100%" stop-color="#D9AE55" stop-opacity="0"/>
+      <stop offset="0%"   stop-color="#1852C4" stop-opacity="0.26"/>
+      <stop offset="55%"  stop-color="#1852C4" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#1852C4" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="wash-b">
-      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.24"/>
-      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.12"/>
-      <stop offset="100%" stop-color="#B4577E" stop-opacity="0"/>
+      <stop offset="0%"   stop-color="#E0523C" stop-opacity="0.18"/>
+      <stop offset="55%"  stop-color="#E0523C" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#E0523C" stop-opacity="0"/>
     </radialGradient>
     <path id="route"
       d="M108 176 C 176 176, 178 108, 246 108 C 314 108, 318 244, 386 244
@@ -326,9 +326,8 @@ function obligationSection() {
         </li>`;
     }).join("\n        ");
   const points = o.points.map((x) => `<li>${esc(x)}</li>`).join("");
-  return `<section class="sec sec-bam" id="obligation">
-  ${edgeGrove()}
-  <div class="wrap">
+  return `<section class="sec" id="obligation">
+    <div class="wrap">
     <h2>${esc(o.heading)}</h2>
     <p class="lede">${esc(o.lede)}</p>
 
@@ -626,53 +625,10 @@ function formBlock(heading, body, kind) {
     </div>`;
 }
 
-/** One leaf, a lens pointing along +x before it is turned. */
-function leaf(x, y, ang, len) {
-  const a = (n) => (len * n).toFixed(1);
-  const d = `M0 0 C${a(0.42)} ${-a(0.26)} ${a(0.8)} ${-a(0.2)} ${len} 0`
-          + ` C${a(0.8)} ${a(0.2)} ${a(0.42)} ${a(0.26)} 0 0 Z`;
-  return `<path class="bam-leaf" d="${d}" transform="translate(${x} ${y}) rotate(${ang})"/>`;
-}
-
-/** A bamboo stalk: the cane, its nodes, and the leaves near the crown. */
-function stalk(s) {
-  const foot = s.foot || 486;
-  let nodes = "";
-  for (let y = foot - 50; y > s.top + 28; y -= 62) {
-    nodes += `<path d="M${s.x - s.w / 2 - 2} ${y} h${s.w + 4}"/>`;
-  }
-  const leaves = s.leaves.map((l) => leaf(s.x, l[0], l[1], l[2])).join("");
-  return `<g class="bam${s.back ? " bam-back" : ""}" style="--sway:${s.sway}deg;--wait:${s.wait}s">
-            <path class="bam-stalk" d="M${s.x} ${foot} V${s.top}" stroke-width="${s.w}"/>
-            <g class="bam-node" stroke-width="${(s.w * 0.52).toFixed(1)}">${nodes}</g>
-            ${leaves}
-          </g>`;
-}
-
-/* The grove stands in the margins the frame leaves free: one cane forward,
-   one behind it, each side. More than that and it stops being a margin. */
-const GROVE = [
-  { x: 34, top: 118, w: 9, sway: 1.1, wait: 0, back: true,
-    leaves: [[146, -28, 38], [160, 198, 32]] },
-  { x: 104, top: 44, w: 13, sway: 1.5, wait: -2.6, back: false,
-    leaves: [[62, -36, 50], [76, 206, 44], [112, 16, 46], [126, 170, 38]] },
-  { x: 1096, top: 38, w: 13, sway: 1.6, wait: -3.8, back: false,
-    leaves: [[56, 212, 50], [70, -16, 44], [108, 168, 46], [122, 12, 38]] },
-  { x: 1166, top: 132, w: 9, sway: 1.2, wait: -1.4, back: true,
-    leaves: [[160, 196, 38], [174, -20, 32]] },
-];
-
-function grove() {
-  return `<svg class="act-art" viewBox="0 0 1200 470" aria-hidden="true" preserveAspectRatio="xMidYMax meet">
-          ${GROVE.map(stalk).join("\n          ")}
-        </svg>`;
-}
-
-/** The record, framed, with the grove behind it and the mark on the corner. */
+/** The record, framed, with the mark resting on its corner. */
 function recordStage(depth) {
   const r = rel(depth);
   return `<div class="act-stage">
-        ${grove()}
         <div class="act-frame" data-cycle="1">
           <div class="rec-frame">
             ${screen(C.hero.records[0])}
@@ -681,34 +637,19 @@ function recordStage(depth) {
             <img src="${r}assets/pandax-mark-ink.png" alt="" width="46" height="46" loading="lazy">
           </span>
         </div>
-      </div>
-      <div class="act-act">
-        <a class="btn" href="${r ? r + C.action.cta.href.slice(1) : C.action.cta.href}">${esc(C.action.cta.label)}</a>
       </div>`;
-}
-
-/* The canes that stand at a section's right edge. */
-const EDGE_GROVE = [
-  { x: 40, top: 210, w: 9.5, sway: 1.0, wait: -1.1, back: true, foot: 690,
-    leaves: [[240, -28, 40], [254, 198, 34]] },
-  { x: 118, top: 78, w: 13.5, sway: 1.45, wait: -3.3, back: false, foot: 690,
-    leaves: [[96, -36, 52], [110, 206, 46], [148, 16, 48], [162, 170, 40]] },
-];
-
-/** Two canes at the right edge, sized to the margin the wrap leaves free. */
-function edgeGrove() {
-  const art = EDGE_GROVE.map(stalk).join("\n            ");
-  return `<svg class="edge-bam" viewBox="0 0 200 660"`
-    + ` aria-hidden="true" preserveAspectRatio="xMinYMax slice">\n            ${art}\n          </svg>`;
 }
 
 /** The closing showcase: the product running, with the mark beside it. */
 function actionStage() {
   const a = C.action;
   return `<div class="act">
-      <h2 class="act-head">${esc(a.lead)} <span class="hl hl-rose">${esc(a.highlight)}</span> ${esc(a.tail)}</h2>
+      <h2 class="act-head">${esc(a.lead)} <span class="hl hl-accent">${esc(a.highlight)}</span> ${esc(a.tail)}</h2>
       <p class="act-sub">${esc(a.body)}</p>
       ${recordStage(0)}
+      <div class="act-act">
+        <a class="btn" href="${C.action.cta.href}">${esc(C.action.cta.label)}</a>
+      </div>
     </div>`;
 }
 
@@ -739,7 +680,7 @@ function actisPage() {
     description: a.description,
     depth: 1,
     script: true,
-    body: tint(`<section class="sec sec-lead" id="top">
+    body: grounds(`<section class="sec sec-lead" id="top">
   <div class="wrap">
     <div class="hero-in">
       <div class="prod-text">
@@ -823,29 +764,15 @@ function actisPage() {
 }
 
 
-/** Give the page rhythm: a counted marker per section, alternating grounds. */
-function rhythm(html) {
-  let n = 0;
-  return html.replace(/<section class="sec([^"]*)"([\s\S]*?)<h2>/g, (m, rest, mid) => {
-    n += 1;
-    const num = String(n).padStart(2, "0");
-    // Light sections alternate ground so no two in a row read the same.
-    const alt = !rest.includes("sec-dark") && n % 2 === 0 ? " sec-alt" : "";
-    const marker = `<span class="sec-n" aria-hidden="true">${num}</span>`;
-    return `<section class="sec${rest}${alt}"${mid}${marker}<h2>`;
-  });
-}
-
-/** Hand each section the next colour, and a wash to carry it down the page.
- *  Kept apart from the numbering so the product page is coloured too. */
-function tint(html) {
-  let n = 0;
+/** Alternate the grounds down the page, so no two sections in a row read
+ *  the same. The dark sections count as a ground of their own. */
+function grounds(html) {
+  let prev = "page";                       // the opening sits on the page ground
   return html.replace(/<section class="sec([^"]*)"/g, (m, rest) => {
-    n += 1;
-    const dark = rest.includes("sec-dark") || rest.includes("sec-term");
-    // The washes alternate sides so the page is lit down its length.
-    const wash = dark ? "" : ` sec-wash sec-wash-${n % 4 < 2 ? "a" : "b"}`;
-    return `<section class="sec${rest}${wash} sec-c${((n - 1) % 4) + 1}"`;
+    if (/sec-dark|sec-term/.test(rest)) { prev = "dark"; return m; }
+    const alt = prev === "page" ? " sec-alt" : "";
+    prev = alt ? "band" : "page";
+    return `<section class="sec${rest}${alt}"`;
   });
 }
 
@@ -854,11 +781,11 @@ function tint(html) {
 const home = shell({
   ogTitle: `${C.meta.brand} — ${C.meta.tagline}`,
   description: `${C.hero.subhead} ${C.hero.body}`,
-  body: tint(rhythm([
+  body: grounds([
     heroSection(), obligationSection(),
     growthSection(), workflowSection(), marketSection(), manualSection(),
     doesSection(), questionsSection(), sourceSection(), capabilitySection(), closingSection(),
-  ].join("\n\n"))),
+  ].join("\n\n")),
   script: true,
 });
 

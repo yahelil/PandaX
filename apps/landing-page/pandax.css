@@ -1704,17 +1704,16 @@ a { color: inherit; }
 
 /* Bamboo in the hero's outer margins, never wider than the margin itself, so
    it thins to nothing rather than crowding the headline on a narrow screen. */
-.hero { position: relative; overflow: clip; }
-.hero-bam {
-  position: absolute; bottom: 0; height: 100%;
+.sec-bam { position: relative; overflow: clip; }
+.edge-bam {
+  position: absolute; right: 0; bottom: 0; height: 100%;
   width: clamp(0px, calc((100vw - var(--wrap)) / 2 + var(--pad)), 200px);
   pointer-events: none; z-index: 0;
+  transform: scaleX(-1);
   -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
   mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
 }
-.hero-bam-l { left: 0; }
-.hero-bam-r { right: 0; transform: scaleX(-1); }
-.hero .wrap { position: relative; z-index: 1; }
+.sec-bam > .wrap { position: relative; z-index: 1; }
 
 /* Bamboo, because of whose name is on the door. Each cane leans on its own
    clock, from the foot, so the grove never moves as one block. */

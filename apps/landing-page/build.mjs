@@ -571,7 +571,7 @@ function hexGlyph(kind) {
           <path d="M52 61 h17"/>
           <path d="M52 70 h17"/>`,
     again: `<path d="M78.9 58.3 A19 19 0 1 1 73.4 46.6"/>
-          <path d="M65.9 44.1 L73.4 46.6 L70.9 39.1"/>
+          <path d="M66.5 42.9 L73.4 46.6 L72.3 38.9"/>
           <circle class="q-dot" cx="60" cy="60" r="3.8"/>`,
   }[kind];
 

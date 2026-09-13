@@ -64,7 +64,7 @@ ${header(depth)}
 ${body}
 </main>
 ${footer(depth)}
-${script ? `<script src="${r}pandax.js" defer></script>` : ""}
+${script ? `<script>window.PANDAX_RECORDS = ${JSON.stringify(C.hero.records)};</script>\n<script src="${r}pandax.js" defer></script>` : ""}
 </body>
 </html>
 `;
@@ -146,15 +146,15 @@ function screen(rec) {
               <span class="sc-flag">${esc(rec.label)}</span>
               <span class="sc-seal" id="scSeal"><span class="seal-dot" aria-hidden="true"></span>Sealed</span>
             </div>
-            <div class="sc-title">${esc(rec.product)} <span>${esc(rec.release)}</span></div>
-            <div class="sc-run">${id(rec.runId)}</div>
+            <div class="sc-title"><span data-f="product">${esc(rec.product)}</span> <span data-f="release">${esc(rec.release)}</span></div>
+            <div class="sc-run"><span class="id" data-f="runId">${esc(rec.runId)}</span></div>
             <div class="sc-stats">
             ${stats}
             </div>
             <ul class="sc-checks">${checks}</ul>
             <div class="sc-fix">
               <span class="fx-arrow" aria-hidden="true"></span>
-              ${id(rec.finding.cve)} in ${id(rec.finding.component)} — ${esc(rec.finding.fix)}
+              <span class="id" data-f="cve">${esc(rec.finding.cve)}</span> in <span class="id" data-f="component">${esc(rec.finding.component)}</span> — <span data-f="fix">${esc(rec.finding.fix)}</span>
             </div>
           </div>
         </div>`;
@@ -223,7 +223,7 @@ function heroSection() {
           <div class="laptop-bezel">
             <span class="laptop-camera" aria-hidden="true"></span>
             <div class="laptop-screen">
-              ${screen(h.record)}
+              ${screen(h.records[0])}
             </div>
             <div class="laptop-glare" aria-hidden="true"></div>
           </div>
@@ -503,23 +503,13 @@ function formBlock(heading, body, kind) {
 }
 
 function closingSection() {
-  const cl = C.closing;
   const c = C.contact;
   return `<section class="sec sec-close" id="contact">
-  <div class="wrap close-in">
-    <div>
-      <h2>${esc(cl.heading)}</h2>
-      <p class="lede lede-sm">${esc(cl.body)}</p>
-      <div class="acts">
-        <a class="btn" href="${cl.primary.href}">${esc(cl.primary.label)}</a>
-        <a class="btn btn-q" href="${cl.secondary.href}">${esc(cl.secondary.label)}</a>
-      </div>
-    </div>
+  <div class="wrap close-in close-one">
     ${formBlock(c.heading, c.body, "sample")}
   </div>
 </section>`;
 }
-
 
 /* --------------------------------------------------------- /artis --- */
 
@@ -566,7 +556,7 @@ function artisPage() {
     <h2>${esc(a.record.heading)}</h2>
     <p class="lede">${esc(a.record.lede)}</p>
     <div class="rec-frame">
-      ${screen(C.hero.record)}
+      ${screen(C.hero.records[0])}
     </div>
   </div>
 </section>

@@ -130,6 +130,45 @@
     addEventListener("resize", tick);
   }
 
+  /* --------------------------------------------- the machine keeps running --- */
+
+  /** Rotate the record through the example releases, so the hero is not a still. */
+  function cycle() {
+    var sc = $(".laptop-screen .sc");
+    var recs = window.PANDAX_RECORDS;
+    if (!sc || !recs || recs.length < 2 || still) return;
+
+    var at = 0;
+    function put(rec) {
+      var set = function (f, v) { var el = $('[data-f="' + f + '"]', sc); if (el) el.textContent = v; };
+      set("product", rec.product);
+      set("release", rec.release);
+      set("cve", rec.finding.cve);
+      set("component", rec.finding.component);
+      set("fix", rec.finding.fix);
+      $$(".sc-v", sc).forEach(function (el, i) {
+        if (rec.stats[i]) el.setAttribute("data-count", rec.stats[i].value);
+      });
+      var run = $('[data-f="runId"]', sc);
+      if (run) { run.textContent = rec.runId; resolve(run); }
+      $$(".sc-v", sc).forEach(countUp);
+    }
+
+    setInterval(function () {
+      at = (at + 1) % recs.length;
+      sc.classList.remove("sealed", "sealing");
+      sc.classList.add("turning");
+      setTimeout(function () {
+        put(recs[at]);
+        sc.classList.remove("turning");
+        setTimeout(function () {
+          sc.classList.add("sealing");
+          setTimeout(function () { sc.classList.add("sealed"); }, 240);
+        }, 900);
+      }, 320);
+    }, 6500);
+  }
+
   function page() {
     // Each section lights its marker and its rule as it is reached.
     $$(".sec").forEach(function (sec) {
@@ -138,6 +177,19 @@
     });
 
     if (!still) progress();
+
+    // The header takes the hero's ground while it is over it.
+    var hero = $(".hero");
+    if (hero) {
+      var overHero = function () {
+        document.body.classList.toggle("over-hero",
+          hero.getBoundingClientRect().bottom > 62);
+      };
+      overHero();
+      addEventListener("scroll", overHero, { passive: true });
+      addEventListener("resize", overHero);
+    }
+    cycle();
 
     $$(".figure-v").forEach(function (el) {
       if (still) return;

@@ -329,6 +329,21 @@ and any conflicting generic-feed result in the signed bundle. See
 [vendor advisories and backports](docs/vendor-intelligence.md) and the
 [example catalogue](docs/vendor-intelligence-example.json).
 
+### Product exposure analysis
+
+PandaX can combine reviewed build flags, feature configuration, network
+exposure, SBOM dependency paths, and approved runtime observations:
+
+```powershell
+uv run pandax exposure validate .\exposure-context.json
+uv run pandax scan .\product.zip --exposure-context .\exposure-context.json
+```
+
+The result explains whether the supplied evidence supports reachability,
+supports non-reachability, conflicts, or remains insufficient. It does not make
+the final decision or start a CRA deadline. See the [exposure analysis guide](docs/exposure-analysis.md)
+and [example context](docs/exposure-context-example.json).
+
 Vulnerability results keep [coverage, affectedness, KEV signals and product
 reachability](docs/vulnerability-coverage.md) separate. A completed source with
 no result is shown as “no finding in checked sources,” never as proof that the

@@ -55,6 +55,8 @@ from .telemetry_cli import app as telemetry_app
 app.add_typer(telemetry_app, name="telemetry")
 from .advisory_cli import app as advisory_app
 app.add_typer(advisory_app, name="advisory")
+from .exposure_cli import app as exposure_app
+app.add_typer(exposure_app, name="exposure")
 key_app = typer.Typer(add_completion=False, help="Manage the installation signing identity.")
 app.add_typer(key_app, name="key")
 
@@ -167,17 +169,21 @@ def scan(
         "--telemetry",
         help="Approved, privacy-minimised runtime evidence JSON",
     ),
+    exposure_context: Optional[Path] = typer.Option(
+        None,
+        "--exposure-context",
+        help="Reviewed build, feature and network-exposure evidence JSON",
+    ),
 ) -> None:
     """Run the full pipeline: ingest, SBOM, match, triage, Article 14, dossier."""
     from . import pipeline
 
-    stream = (
-        pipeline.run(
-            artifact, out_base=out, offline=offline, telemetry_path=telemetry
-        )
-        if telemetry is not None
-        else pipeline.run(artifact, out_base=out, offline=offline)
-    )
+    optional = {}
+    if telemetry is not None:
+        optional["telemetry_path"] = telemetry
+    if exposure_context is not None:
+        optional["exposure_context_path"] = exposure_context
+    stream = pipeline.run(artifact, out_base=out, offline=offline, **optional)
     _render_pipeline(
         artifact,
         stream,
@@ -196,17 +202,21 @@ def scan_sbom(
         "--telemetry",
         help="Approved, privacy-minimised runtime evidence JSON",
     ),
+    exposure_context: Optional[Path] = typer.Option(
+        None,
+        "--exposure-context",
+        help="Reviewed build, feature and network-exposure evidence JSON",
+    ),
 ) -> None:
     """Run from an existing JSON SBOM, skipping artifact ingest and Syft."""
     from . import pipeline
 
-    stream = (
-        pipeline.run_sbom(
-            sbom_file, out_base=out, offline=offline, telemetry_path=telemetry
-        )
-        if telemetry is not None
-        else pipeline.run_sbom(sbom_file, out_base=out, offline=offline)
-    )
+    optional = {}
+    if telemetry is not None:
+        optional["telemetry_path"] = telemetry
+    if exposure_context is not None:
+        optional["exposure_context_path"] = exposure_context
+    stream = pipeline.run_sbom(sbom_file, out_base=out, offline=offline, **optional)
     _render_pipeline(
         sbom_file,
         stream,

@@ -106,6 +106,13 @@ def build_vex(ctx: RunContext) -> dict:
                 if finding.runtime_evidence
                 else ""
             )
+            exposure_detail = (
+                " Exposure analysis is "
+                + finding.exposure_assessment.replace("_", " ")
+                + "; this is supporting evidence and still requires a company decision."
+                if finding.exposure_assessment != "not_assessed"
+                else ""
+            )
             analysis = {
                 "state": "in_triage",
                 "detail": (
@@ -115,6 +122,7 @@ def build_vex(ctx: RunContext) -> dict:
                     + f"{finding.reachability or 'unknown'}. No not_affected "
                     "determination is asserted."
                     + telemetry_detail
+                    + exposure_detail
                     + " Requires manufacturer review."
                 ),
             }
@@ -138,6 +146,10 @@ def build_vex(ctx: RunContext) -> dict:
                 {
                     "name": "pandax:runtime-evidence-status",
                     "value": finding.runtime_evidence_status,
+                },
+                {
+                    "name": "pandax:exposure-assessment",
+                    "value": finding.exposure_assessment,
                 },
             ],
         }
@@ -336,6 +348,11 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
         + (
             [ctx.ledger.ref(ctx.telemetry_assessments_path)]
             if ctx.telemetry_assessments_path is not None
+            else []
+        )
+        + (
+            [ctx.ledger.ref(ctx.exposure_assessments_path)]
+            if ctx.exposure_assessments_path is not None
             else []
         ),
         outputs=[

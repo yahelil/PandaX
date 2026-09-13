@@ -72,6 +72,25 @@ def test_refresh_deduplicates_across_repeats_and_restart(tmp_path):
     assert [event["event_type"] for event in cases[0]["events"]].count("advisory_detected") == 1
 
 
+def test_watching_comparison_resolves_to_newer_release(tmp_path):
+    watcher = setup_service(tmp_path, FakeFeeds())
+    comparison = tmp_path / "run-comparison"
+    comparison.mkdir()
+    (comparison / "manifest.json").write_text(json.dumps({
+        "product": {"name": "Demo comparison"}, "created": "2026-09-02T00:00:00Z"
+    }))
+    (comparison / "comparison.json").write_text(json.dumps({
+        "scenario": {"after": "demo-1"},
+        "runs": [{"run_id": "run-source", "release_id": "demo-1", "error": ""}],
+    }))
+
+    watch = watcher.watch("run-comparison")
+
+    assert watch["run_id"] == "run-source"
+    assert watch["product_name"] == "Demo Device"
+    assert watch["product_version"] == "1.0"
+
+
 def test_new_evidence_appends_and_outage_preserves_results(tmp_path):
     feed = FakeFeeds()
     watcher = setup_service(tmp_path, feed)

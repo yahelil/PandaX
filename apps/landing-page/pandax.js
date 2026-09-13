@@ -115,21 +115,6 @@
     })(start);
   }
 
-  /** A hairline at the top of the window, tracking how far down the page is. */
-  function progress() {
-    var bar = document.createElement("div");
-    bar.className = "prog";
-    document.body.appendChild(bar);
-    function tick() {
-      var h = document.documentElement;
-      var max = h.scrollHeight - h.clientHeight;
-      bar.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + "%";
-    }
-    tick();
-    addEventListener("scroll", tick, { passive: true });
-    addEventListener("resize", tick);
-  }
-
   /* --------------------------------------------- the machine keeps running --- */
 
   /** Rotate the record through the example releases, so the hero is not a still. */
@@ -176,19 +161,7 @@
       onView(sec, function () { sec.classList.add("lit"); }, 0.12);
     });
 
-    if (!still) progress();
 
-    // The header takes the hero's ground while it is over it.
-    var hero = $(".hero");
-    if (hero) {
-      var overHero = function () {
-        document.body.classList.toggle("over-hero",
-          hero.getBoundingClientRect().bottom > 62);
-      };
-      overHero();
-      addEventListener("scroll", overHero, { passive: true });
-      addEventListener("resize", overHero);
-    }
     cycle();
 
     $$(".figure-v").forEach(function (el) {

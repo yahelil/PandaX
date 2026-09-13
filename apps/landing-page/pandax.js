@@ -272,7 +272,40 @@
     });
   }
 
-  function init() { menu(); page(); }
+  /** Send the form without leaving the page, and say so when it lands. */
+  function contactForm() {
+    var f = $(".form");
+    if (!f || !window.fetch) return;
+    var post = f.getAttribute("data-post");
+    var done = $(".form-done");
+    if (!post || !done) return;
+
+    f.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var btn = $('button[type="submit"]', f);
+      var data = {};
+      new FormData(f).forEach(function (v, k) { data[k] = String(v).slice(0, 4000); });
+
+      if (btn) { btn.disabled = true; btn.textContent = btn.getAttribute("data-busy") || btn.textContent; }
+
+      fetch(post, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(data),
+      }).then(function (r) {
+        if (!r.ok) throw new Error(String(r.status));
+        f.hidden = true;
+        done.hidden = false;
+        done.focus();
+      }).catch(function () {
+        // Nobody is stranded: hand the message back to their mail client.
+        if (btn) { btn.disabled = false; btn.textContent = btn.getAttribute("data-idle") || btn.textContent; }
+        f.submit();
+      });
+    });
+  }
+
+  function init() { menu(); page(); contactForm(); }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

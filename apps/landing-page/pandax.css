@@ -150,6 +150,9 @@ a { color: inherit; }
 
 /* ------------------------------------------------------------ header ---- */
 
+/* The header is sticky, so anything jumped to has to clear it. */
+[id] { scroll-margin-top: 84px; }
+
 .head {
   position: sticky; top: 0; z-index: 100;
   background: rgba(242,242,240,0.86);
@@ -1505,6 +1508,15 @@ a { color: inherit; }
 .close-one { grid-template-columns: minmax(0, 620px); }
 
 .form { margin-top: 22px; display: flex; flex-direction: column; gap: 14px; }
+.form-done {
+  margin-top: 26px; padding: 20px 22px;
+  border: 1px solid var(--line); border-left: 3px solid var(--accent, var(--bronze));
+  border-radius: 4px; background: var(--bg);
+  font-size: 16.5px; line-height: 1.55; color: var(--ink);
+  max-width: 46ch;
+}
+.form-done:focus { outline: none; }
+.form button[type="submit"]:disabled { opacity: 0.55; cursor: default; }
 .form label {
   display: flex; flex-direction: column; gap: 6px;
   font-size: 14px; color: var(--body);
@@ -1695,6 +1707,7 @@ a { color: inherit; }
   mask-image: linear-gradient(to bottom, #000 68%, transparent 100%);
 }
 .act-frame { position: relative; width: min(760px, 100%); margin: 0 auto; }
+.act-act { margin-top: 40px; display: flex; justify-content: center; }
 .act-frame .rec-frame {
   margin-top: 0;
   box-shadow: 0 28px 64px -30px rgba(22, 24, 27, 0.45);

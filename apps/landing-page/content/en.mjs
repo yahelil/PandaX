@@ -293,6 +293,7 @@ export const action = {
   highlight: "Actis",
   tail: "in action?",
   body: "One run against one firmware image, and the record it seals. Components, findings, the fix that shipped, and the proof it was signed off — this is what comes out the other side.",
+  cta: { label: "See Actis", href: "/actis/" },
 };
 
 export const contact = {
@@ -300,6 +301,8 @@ export const contact = {
   body: "Tell us what you build and which release is next.",
   fields: { name: "Name", email: "Work email", company: "Company", message: "What do you build?", submit: "Send" },
   fallbackAddress: "contact@pandax.online",
+  sending: "Sending\u2026",
+  sent: "Thank you. Your message is with us, and we will come back to you shortly.",
 };
 
 export const footer = {

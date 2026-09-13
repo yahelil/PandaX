@@ -513,7 +513,7 @@
   </div>
 </section>
 
-<section class="sec sec-close sec-wash sec-wash-b sec-c2" id="contact">
+<section class="sec sec-close sec-wash sec-wash-b sec-c2" id="see">
   <div class="wrap">
     <div class="act">
       <h2 class="act-head">Ready to see <span class="hl hl-rose">Actis</span> in action?</h2>
@@ -586,12 +586,15 @@
           </span>
         </div>
       </div>
+      <div class="act-act">
+        <a class="btn" href="/actis/">See Actis</a>
+      </div>
     </div>
-    <div class="close-in close-one">
+    <div class="close-in close-one" id="contact">
       <div class="form-wrap">
       <span class="sec-n" aria-hidden="true">09</span><h2>Get in touch</h2>
       <p class="lede lede-sm">Tell us what you build and which release is next.</p>
-      <form class="form" method="post" action="mailto:contact@pandax.online" enctype="text/plain">
+      <form class="form" method="post" action="mailto:contact@pandax.online" data-post="/api/contact" enctype="text/plain">
         <input type="hidden" name="kind" value="sample">
         <p class="hp"><label>Leave this empty<input type="text" name="company_url" tabindex="-1" autocomplete="off"></label></p>
         <div class="row">
@@ -600,8 +603,9 @@
         </div>
         <label>Company<input type="text" name="company" autocomplete="organization"></label>
         <label>What do you build?<textarea name="message" rows="4"></textarea></label>
-        <button class="btn" type="submit">Send</button>
+        <button class="btn" type="submit" data-idle="Send" data-busy="Sending…">Send</button>
       </form>
+      <p class="form-done" role="status" tabindex="-1" hidden>Thank you. Your message is with us, and we will come back to you shortly.</p>
     </div>
     </div>
   </div>

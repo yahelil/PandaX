@@ -51,9 +51,11 @@ export const boot = {
 /* 1 ------------------------------------------------------------- hero --- */
 
 export const hero = {
-  headline: "Audit-ready evidence, every release",
-  /** The word that takes the highlight, matched in the headline. */
-  highlight: "Audit-ready",
+  headline: "CRA evidence, automated",
+  /** The word that takes the highlight, matched in the headline. It is the
+   *  evidence that is automated, never the compliance: promising the outcome
+   *  is a UWG exposure, and it is the sentence a scanner writes. */
+  highlight: "automated",
   subhead: "PandaX turns each release into a reviewable record: the components, the findings, the decisions, and the documents an assessor asks to see.",
   body: "Independent of any scanner, and yours to take anywhere.",
   primary: { label: "Book a 30-minute walkthrough", href: "#contact" },

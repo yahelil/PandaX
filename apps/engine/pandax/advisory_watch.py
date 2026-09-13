@@ -33,6 +33,7 @@ class AdvisoryWatchService:
     def watch(self, run_id: str, simulated: bool = False) -> dict:
         if type(simulated) is not bool:
             raise CaseError("simulated must be a boolean")
+        run_id = self._release_run(run_id)
         product, _ = self.cases.product(run_id)
         components = self.cases.run_json(run_id, "sbom.cdx.json", {}).get("components", [])
         inventory = sorted(
@@ -64,6 +65,23 @@ class AdvisoryWatchService:
                 (watch_id, run_id, product["name"], product["version"], _json(inventory), simulated, now),
             )
         return self.get(watch_id)
+
+    def _release_run(self, run_id: str) -> str:
+        comparison = self.cases.run_json(run_id, "comparison.json", None)
+        if not isinstance(comparison, dict):
+            return run_id
+        completed = [
+            item for item in comparison.get("runs", [])
+            if isinstance(item, dict) and item.get("run_id") and not item.get("error")
+        ]
+        if not completed:
+            raise CaseError("comparison has no completed release to watch")
+        after = (comparison.get("scenario") or {}).get("after")
+        selected = next(
+            (item for item in completed if item.get("release_id") == after),
+            completed[-1],
+        )
+        return str(selected["run_id"])
 
     def list(self) -> list[dict]:
         with self.cases.store._connect() as db:

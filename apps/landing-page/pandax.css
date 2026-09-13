@@ -948,15 +948,9 @@ a { color: inherit; }
   list-style: none; margin: 0; padding: 16px 18px 18px;
   position: relative; counter-reset: actis-step;
 }
-.term-lines::before {
-  content: "";
-  position: absolute; left: 34px; top: 27px; bottom: 31px;
-  width: 1px;
-  background: linear-gradient(var(--brand-l), rgba(143,178,245,0.16));
-}
 .term-lines li {
   display: grid;
-  grid-template-columns: 30px 16px 5.4rem minmax(0,1fr) auto;
+  grid-template-columns: 30px 5.4rem minmax(0,1fr) auto;
   gap: 14px; align-items: baseline;
   padding: 7px 0;
   position: relative;
@@ -970,21 +964,15 @@ a { color: inherit; }
   color: var(--brand-l); font-size: 10px;
   letter-spacing: .04em;
 }
-.term-lines li:not(.t-caret) .t-p {
-  position: relative; z-index: 1;
-  width: 16px; height: 16px; border-radius: 50%;
-  display: inline-grid; place-items: center;
-  background: var(--graphite);
-  border: 1px solid rgba(143,178,245,0.38);
-}
+.term-lines li:not(.t-caret) .t-p { display: none; }
 .term.ran .term-lines li { opacity: 1; transform: none; }
 .t-p { color: var(--brand-l); }
 .t-c { color: var(--d-ink); }
 .t-a { color: var(--d-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .t-o { color: var(--brand-l); text-align: right; white-space: nowrap; }
 
-.t-caret { grid-template-columns: 30px 16px auto !important; }
-.t-caret::before { content: ""; }
+.t-caret { grid-template-columns: 16px auto !important; }
+.t-caret::before { display: none; }
 .caret {
   display: inline-block; width: 8px; height: 15px;
   background: var(--brand-l);
@@ -2062,11 +2050,9 @@ a { color: inherit; }
   .prod-mark { width: 64px; height: 64px; }
   .bound-gate { flex-direction: row; }
   .bound-wire { width: 24px; height: 1px; }
-  .term-lines::before { left: 29px; }
-  .term-lines li { grid-template-columns: 26px 14px 4.6rem minmax(0,1fr); font-size: 12.5px; gap: 10px; }
-  .term-lines li:not(.t-caret) .t-p { width: 14px; height: 14px; }
-  .t-o { grid-column: 3 / -1; text-align: left; }
-  .t-caret { grid-template-columns: 26px 14px auto !important; }
+  .term-lines li { grid-template-columns: 26px 4.6rem minmax(0,1fr); font-size: 12.5px; gap: 10px; }
+  .t-o { grid-column: 2 / -1; text-align: left; }
+  .t-caret { grid-template-columns: 14px auto !important; }
 }
 
 @media (max-width: 560px) {

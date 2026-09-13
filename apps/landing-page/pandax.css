@@ -1063,9 +1063,11 @@ a { color: inherit; }
   gap: clamp(12px, 1.6vw, 22px);
 }
 /* Sized off the word, so the mark stays on its line at every width. */
+/* The mark carries a lattice now, so it needs a little more room than the
+   plain panda did before its detail closes up. */
 .pname-lead .pname-mark {
-  width: 0.62em; height: 0.62em;
-  margin-top: 0.06em;
+  width: 0.82em; height: 0.82em;
+  margin-top: 0.02em;
 }
 
 /* On graphite the dark button disappears; invert it. */
@@ -1523,7 +1525,7 @@ a { color: inherit; }
   transition: border-color .2s, transform .25s cubic-bezier(.3,.8,.3,1);
 }
 .prod-card a:hover { border-color: var(--brand); transform: translateY(-3px); }
-.prod-card img { width: 48px; height: 48px; }
+.prod-card img { width: 58px; height: 58px; }
 .prod-name {
   font-family: var(--disp); font-weight: 680; font-size: 24px;
   letter-spacing: -0.026em; color: var(--ink);

@@ -53,6 +53,8 @@ from .monitor_cli import app as monitor_app
 app.add_typer(monitor_app, name="monitor")
 from .telemetry_cli import app as telemetry_app
 app.add_typer(telemetry_app, name="telemetry")
+from .advisory_cli import app as advisory_app
+app.add_typer(advisory_app, name="advisory")
 key_app = typer.Typer(add_completion=False, help="Manage the installation signing identity.")
 app.add_typer(key_app, name="key")
 

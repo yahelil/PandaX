@@ -371,6 +371,107 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
     findings.extend(native_matches)
     yield ev.log(STAGE, f"vendor supplement: {len(assessments)} native determinations (bounded CVE coverage)")
 
+    # Installation-wide vendor intelligence is reviewed by the deployment's
+    # security curator. It is exact-PURL only, so a backport decision for one
+    # distribution revision cannot leak onto a similarly named package.
+    from ..vendor_intelligence import assess as assess_vendor, load_active
+
+    vendor_outputs = []
+    vendor_catalog, active_vendor_path = load_active()
+    if vendor_catalog is not None:
+        vendor_catalog_path = ctx.path("vendor-intelligence.json")
+        vendor_catalog_path.write_text(
+            json.dumps(vendor_catalog, indent=2), encoding="utf-8"
+        )
+        findings, vendor_assessments, superseded = assess_vendor(
+            ctx.components, findings, vendor_catalog
+        )
+        vendor_assessments_path = ctx.path("vendor-assessments.json")
+        vendor_assessments_path.write_text(
+            json.dumps(
+                {
+                    "schema": "pandax/vendor-assessments/v1",
+                    "catalog_version": vendor_catalog["catalog_version"],
+                    "catalog_sha256": sha256_file(active_vendor_path),
+                    "matched_entries": len(vendor_assessments),
+                    "assessments": vendor_assessments,
+                    "notice": (
+                        "Decisions apply only to the exact Package URLs shown. "
+                        "Affectedness does not establish runtime reachability."
+                    ),
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        superseded_path = ctx.path("vendor-superseded-findings.json")
+        superseded_path.write_text(
+            json.dumps(
+                {
+                    "schema": "pandax/vendor-superseded-findings/v1",
+                    "catalog_version": vendor_catalog["catalog_version"],
+                    "count": len(superseded),
+                    "findings": superseded,
+                    "notice": (
+                        "These generic-feed findings were not deleted silently. "
+                        "A reviewed exact-package vendor decision took precedence."
+                    ),
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        vendor_outputs = [
+            vendor_catalog_path,
+            vendor_assessments_path,
+            superseded_path,
+        ]
+        rows_by_purl: dict[str, list[dict]] = {}
+        for assessment in vendor_assessments:
+            rows_by_purl.setdefault(assessment["purl"], []).append(assessment)
+        components_by_purl = {
+            component.get("purl", ""): component for component in ctx.components
+        }
+        for purl, rows in rows_by_purl.items():
+            component = components_by_purl[purl]
+            coverage.append(
+                _coverage_entry(
+                    component,
+                    source="Curated vendor intelligence",
+                    source_url=rows[0]["source"]["url"],
+                    status="completed",
+                    checked_at=checked_at,
+                    query_value=purl,
+                    result_count=len(rows),
+                    reason=(
+                        "Reviewed exact-package vendor decisions were applied. "
+                        "Full vendor revisions, backports, and conflicts are preserved."
+                    ),
+                    determinations=[
+                        {
+                            "cve": row["cve"],
+                            "affectedness": row["selected_state"],
+                            "decision": row["decision"],
+                            "source_url": row["source"]["url"],
+                            "source_retrieved_at": row["source"]["retrieved_at"],
+                            "evidence": row["source"]["statement"],
+                            "review": row["review"],
+                            "backport": row.get("backport"),
+                            "conflicting_sources": row["conflicts"],
+                        }
+                        for row in rows
+                    ],
+                )
+            )
+        ctx.tool_versions["pandax_vendor_intelligence"] = vendor_catalog[
+            "catalog_version"
+        ]
+        yield ev.log(
+            STAGE,
+            f"curated vendor intelligence: {len(vendor_assessments)} exact-package "
+            f"decision(s), {len(superseded)} generic finding(s) superseded",
+        )
+
     coverage_path = _write_coverage(ctx, checked_at, coverage)
 
     # One row per (CVE, component): the same CVE can hit several components.
@@ -424,10 +525,14 @@ def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
             ctx.ledger.ref(vendor_path),
             ctx.ledger.ref(native_catalog_path),
             ctx.ledger.ref(coverage_path),
-        ],
+        ] + [ctx.ledger.ref(path) for path in vendor_outputs],
         params={"endpoint": "https://api.osv.dev/v1/querybatch", "purls": len(purls),
                 "native_rules": native_catalog["catalog_version"],
                 "native_coverage": "versioned curated advisories only",
+                "vendor_catalog": (
+                    vendor_catalog["catalog_version"] if vendor_catalog else "not installed"
+                ),
+                "vendor_matching": "exact Package URL only",
                 "coverage_schema": COVERAGE_SCHEMA},
     )
 

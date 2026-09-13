@@ -491,27 +491,28 @@ export const productsPage = {
    segment sizes, competitor reads and economics stay internal. */
 export const audience = {
   heading: "Who this is for",
-  lede: "If you build connected equipment and place it on the EU market, the Cyber Resilience Act asks you to show your work. This is for the people who have to produce that.",
+  lede: "The Act asks you to show your work. This is for whoever has to produce it.",
   fitTitle: "You are probably a fit if",
+  /* Fragments, not sentences. It is a checklist; it should read like one. */
   fit: [
-    "You manufacture connected industrial or electrical equipment and sell it into the EU.",
-    "You ship often enough that the same evidence work comes round again.",
-    "Someone has already asked you for a technical file, an SBOM, or a reporting timeline.",
-    "Today that answer is assembled by hand, by a few people, close to the release date.",
+    "You sell connected equipment into the EU",
+    "You ship often enough for the work to repeat",
+    "Someone has already asked for a technical file",
+    "Today it is assembled by hand, near the release date",
   ],
   readersTitle: "What it gives each of you",
   readers: [
     {
       who: "Product security and compliance",
-      body: "The evidence for your next release, organised and reviewable \u2014 with your test lab in the room rather than waiting on the outcome.",
+      body: "Your next release, already reviewable \u2014 with your test lab in the room.",
     },
     {
       who: "Engineering and quality leadership",
-      body: "One evidence process that repeats across every product family, instead of rebuilding the story from scratch on every release.",
+      body: "One process across every product family, instead of starting over each release.",
     },
     {
       who: "Test labs and consultancies",
-      body: "A structured evidence pack your reviewers can reuse. We do not compete with your assessment work, and we never charge on its outcome.",
+      body: "A pack your reviewers can reuse. We do not compete with your assessment.",
     },
   ],
 };

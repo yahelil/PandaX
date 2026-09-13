@@ -393,6 +393,8 @@ a { color: inherit; }
 .scene .node-out { animation: rise .7s cubic-bezier(.3,.8,.3,1) .75s forwards; }
 @keyframes rise { to { opacity: 1; transform: none; } }
 
+.node-beat { transform-box: fill-box; transform-origin: center; animation: beat 3.4s ease-in-out infinite; }
+
 .orbit {
   stroke: var(--indigo); stroke-width: 1.7; opacity: 0.4;
   stroke-dasharray: 3 9;
@@ -401,14 +403,7 @@ a { color: inherit; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* The panda sits where the components are matched — the mark's own subject,
-   drawn in the same line as everything else. */
-.panda { transform-box: fill-box; transform-origin: center; animation: beat 4.2s ease-in-out infinite; }
-.p-head, .p-ear { stroke: var(--bronze); }
-.p-ear { fill: var(--bronze); }
-.p-eye { fill: var(--ink); stroke: none; }
-.p-nose { stroke: var(--ink); stroke-width: 2; }
-@keyframes beat { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@keyframes beat { 0%,100% { transform: scale(1); } 50% { transform: scale(1.45); } }
 
 .seal { transform-box: fill-box; transform-origin: center; animation: stamp 7s ease-in-out infinite; }
 @keyframes stamp {
@@ -430,6 +425,18 @@ a { color: inherit; }
   background: linear-gradient(90deg, rgba(74,79,168,0.16), rgba(180,87,126,0.16));
   z-index: -1; border-radius: 2px;
 }
+
+/* The product page's opening, in the same language as the home page. */
+.scene-mark { max-width: 460px; }
+.mark-art { opacity: 0; animation: rise .8s cubic-bezier(.3,.8,.3,1) .3s forwards; }
+.hex { stroke: var(--bronze); opacity: 0.45; }
+.ring-a { animation-duration: 40s; }
+.ring-b { animation-duration: 56s; animation-direction: reverse; opacity: 0.26; }
+.sat circle { stroke: var(--indigo); stroke-width: 2.2; fill: var(--bg); }
+.sat { transform-box: fill-box; transform-origin: center; animation: beat 5s ease-in-out infinite; }
+.sat:nth-of-type(2) { animation-delay: .6s; }
+.sat:nth-of-type(3) { animation-delay: 1.2s; }
+.sat:nth-of-type(4) { animation-delay: 1.8s; }
 
 /* ------------------------------------------------------------ laptop --- */
 
@@ -989,6 +996,8 @@ a { color: inherit; }
 
 /* The product page is light: the name takes ink, not the graphite tokens. */
 .pname-lead { margin-bottom: 34px; }
+.prod-text .pname-word { color: var(--ink); margin-bottom: 4px; }
+.prod-text .pname-eyebrow { color: var(--body); margin-bottom: 10px; }
 .pname-lead .pname-eyebrow { color: var(--body); margin-bottom: 8px; }
 .pname-lead .pname-word {
   color: var(--ink);

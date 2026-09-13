@@ -197,7 +197,7 @@ function terminal() {
           <span class="t-o">${esc(l.out)}</span>
         </li>`).join("\n        ");
   return `<div class="term" id="term">
-      <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>artis</span></div>
+      <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>actis</span></div>
       <ol class="term-lines">
         ${lines}
         <li class="t-caret" aria-hidden="true"><span class="t-p">&rsaquo;</span><span class="caret"></span></li>
@@ -210,7 +210,7 @@ function terminal() {
 function markScene(depth) {
   const r = rel(depth);
   return `<svg class="scene scene-mark" viewBox="0 0 460 460" role="img"
-     aria-label="The Artis mark, held in a turning lattice.">
+     aria-label="The Actis mark, held in a turning lattice.">
   <defs>
     <radialGradient id="m-wash-a">
       <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.30"/>
@@ -247,7 +247,7 @@ function markScene(depth) {
     </circle>
   </g>
 
-  <image class="mark-art" href="${r}assets/artis-mark.png" x="150" y="150" width="160" height="160"/>
+  <image class="mark-art" href="${r}assets/actis-mark.png" x="150" y="150" width="160" height="160"/>
 </svg>`;
 }
 
@@ -625,17 +625,17 @@ function closingSection() {
 </section>`;
 }
 
-/* --------------------------------------------------------- /artis --- */
+/* --------------------------------------------------------- /actis --- */
 
-function artisPage() {
-  const a = C.artis;
+function actisPage() {
+  const a = C.actis;
   const pack = a.pack.items
     .map((i) => `<tr><th scope="row">${esc(i.title)}</th><td>${esc(i.body)}</td></tr>`).join("\n      ");
   const now = a.state.now.map((x) => `<li>${esc(x)}</li>`).join("");
   const building = a.state.building.map((x) => `<li>${esc(x)}</li>`).join("");
 
   return shell({
-    slug: "artis/",
+    slug: "actis/",
     ogTitle: `${esc(C.meta.product)} — ${esc(C.meta.tagline)}`,
     description: a.description,
     depth: 1,
@@ -692,7 +692,7 @@ function artisPage() {
 <section class="sec">
   <div class="wrap">
     <h2>${esc(a.pack.heading)}</h2>
-    <table class="tbl"><caption class="vh">What an Artis export contains</caption><tbody>
+    <table class="tbl"><caption class="vh">What an Actis export contains</caption><tbody>
       ${pack}
     </tbody></table>
     <p class="closer">${esc(a.pack.closing)}</p>
@@ -773,7 +773,7 @@ const privacySections = `<p class="doc-intro">${esc(C.privacyBody.intro)}</p>\n\
 
 const pages = [
   ["index.html", home],
-  ["artis/index.html", artisPage()],
+  ["actis/index.html", actisPage()],
   ["privacy/index.html", legalPage("privacy", privacySections)],
 ];
 

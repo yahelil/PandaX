@@ -13,7 +13,7 @@ export const meta = {
   lang: "en",
   domain: "pandax.online",
   brand: "PandaX",
-  product: "Artis",
+  product: "Actis",
   tagline: "Product security evidence for the EU Cyber Resilience Act",
 };
 
@@ -22,9 +22,9 @@ export const nav = {
   /** Add a product here and it appears in the header menu. */
   products: [
     {
-      name: "Artis",
-      href: "artis/",
-      mark: "assets/artis-mark.png",
+      name: "Actis",
+      href: "actis/",
+      mark: "assets/actis-mark.png",
       blurb: "Turns a release into a reviewable record",
     },
   ],
@@ -47,13 +47,13 @@ export const boot = {
 /* 1 ------------------------------------------------------------- hero --- */
 
 export const hero = {
-  headline: "Automate EU act compliance",
+  headline: "Automate CRA compliance",
   /** The word that takes the highlight, matched in the headline. */
   highlight: "Automate",
   subhead: "Product security evidence for the EU Cyber Resilience Act.",
   body: "Every release needs legal evidence. PandaX builds it.",
   primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
-  secondary: { label: "See Artis", href: "/artis/" },
+  secondary: { label: "See Actis", href: "/actis/" },
   /** The machine cycles through these. Each is a complete, consistent example. */
   records: [
     {
@@ -104,7 +104,7 @@ export const hero = {
 /* --- the engine, shown only on the product page ------------------------ */
 
 export const pipeline = {
-  heading: "Artis, running",
+  heading: "Actis, running",
   lines: [
     { cmd: "ingest",  arg: "release-4.2.1",        out: "412 components" },
     { cmd: "match",   arg: "osv · kev · epss",     out: "7 findings" },
@@ -185,7 +185,7 @@ export const workflow = {
 
 export const market = {
   heading: "What the current market lacks",
-  lede: "Current solutions detect vulnerabilities. None of them automate compliance with the EU act.",
+  lede: "Current solutions detect vulnerabilities. None of them automate CRA compliance.",
   columns: [
     {
       title: "What the market delivers",
@@ -222,7 +222,7 @@ export const manual = {
 
 export const does = {
   eyebrow: "Our product",
-  name: "Artis",
+  name: "Actis",
   heading: "PandaX automates everything",
   lede: "Connect the evidence. Draft the documents. File with approval.",
   points: [
@@ -231,7 +231,31 @@ export const does = {
     "After your company's approval, files the reports and retains a time-stamped audit trail of every submission.",
   ],
   closing: "Nothing is submitted without the company's explicit authorization.",
-  action: { label: "See what Artis produces", href: "/artis/" },
+  action: { label: "See what Actis produces", href: "/actis/" },
+};
+
+/* 7b -------------------------------------------------------- easier --- */
+
+export const easier = {
+  heading: "Product security made",
+  highlight: "easier.",
+  items: [
+    {
+      glyph: "record",
+      title: "Evidence, not just findings",
+      body: "A scanner hands you a list. Actis ties every component, finding and decision to the release that shipped, so there is something to show when proof is asked for.",
+    },
+    {
+      glyph: "document",
+      title: "The documents, generated",
+      body: "Annex VII technical documentation and the Annex V declaration, drafted in the format the regulation asks for, with the missing inputs flagged rather than guessed.",
+    },
+    {
+      glyph: "automate",
+      title: "No more rebuilding by hand",
+      body: "The work that repeats on every release — inventory, exposure, remediation proof, submission — runs once and keeps its own history.",
+    },
+  ],
 };
 
 /* 8 ------------------------------------------------------------ source --- */
@@ -254,14 +278,21 @@ export const capability = {
     { title: "Release evidence mapping", body: "Links each product release to SBOMs, tests, risks, tickets and approvals." },
     { title: "Gap review", body: "Audits evidence against Annex VII and SRP requirements to pinpoint compliance gaps." },
     { title: "Follows every update", body: "Syncs submission content across product revisions and regulatory changes." },
-    { title: "Evidence history", body: "Maintains dated, protected evidence for the retention period the EU act requires." },
+    { title: "Evidence history", body: "Maintains dated, protected evidence for the retention period the CRA requires." },
     { title: "Create legal documents", body: "Generates documents that follow the applicable legal standards." },
     { title: "Submit the reports", body: "Guides approved technical reports through submission to ENISA." },
   ],
   closing: {
     title: "Designed for small manufacturers",
-    body: "Meet the EU act without adding a dedicated legal or compliance team.",
+    body: "Meet the CRA without adding a dedicated legal or compliance team.",
   },
+};
+
+export const action = {
+  lead: "Ready to see",
+  highlight: "Actis",
+  tail: "in action?",
+  body: "One run against one firmware image, and the record it seals. Components, findings, the fix that shipped, and the proof it was signed off — this is what comes out the other side.",
 };
 
 export const contact = {
@@ -274,22 +305,22 @@ export const contact = {
 export const footer = {
   lines: ["PandaX", "Product security evidence for the EU Cyber Resilience Act"],
   links: [
-    { label: "Artis", href: "/artis/" },
+    { label: "Actis", href: "/actis/" },
     { label: "Privacy", href: "/privacy/" },
   ],
   legal:
     "PandaX produces compliance documentation. It does not issue conformity opinions, certificates or verdicts.",
 };
 
-/* ------------------------------------------------------------- /artis --- */
+/* ------------------------------------------------------------- /actis --- */
 
-export const artis = {
-  title: "Artis",
+export const actis = {
+  title: "Actis",
   description:
-    "Artis is the PandaX product: it turns a product release into the record the Cyber Resilience Act asks for.",
-  heading: "Artis",
+    "Actis is the PandaX product: it turns a product release into the record the Cyber Resilience Act asks for.",
+  heading: "Actis",
   lede: "The product. A release goes in, a reviewable record comes out.",
-  body: "Artis is built by PandaX. It reads an SBOM, matches it against public advisory sources, records what you decide about each finding, generates the documents, and seals the result to the release that shipped.",
+  body: "Actis is built by PandaX. It reads an SBOM, matches it against public advisory sources, records what you decide about each finding, generates the documents, and seals the result to the release that shipped.",
   runs: { heading: "What it does", note: "One command. The record is the output, not a by-product." },
   record: {
     heading: "What a record looks like",
@@ -303,7 +334,7 @@ export const artis = {
       { title: "Decisions", body: "What you decided, who decided it, and why." },
       { title: "Documents", body: "Annex VII technical documentation and the Annex V declaration." },
       { title: "Reporting timeline", body: "The Article 14 record, stage by stage." },
-      { title: "Sealed bundle", body: "Timestamped, and verifiable without Artis installed." },
+      { title: "Sealed bundle", body: "Timestamped, and verifiable without Actis installed." },
     ],
     closing: "Open format. You own it, and you can take it to any reviewer.",
   },

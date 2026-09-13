@@ -112,6 +112,9 @@ function footer(depth) {
     .map((l) => `<a href="${depth && l.href.startsWith("/") ? r + l.href.slice(1) : l.href}">${esc(l.label)}</a>`)
     .join("\n      ");
   return `<footer class="foot">
+  <span class="foot-mark" aria-hidden="true">
+    <img src="${r}assets/pandax-mark-ink.png" alt="" width="240" height="240" loading="lazy">
+  </span>
   <div class="wrap foot-in">
     <div class="foot-brand">
       <img src="${r}assets/favicon-512.png" alt="" width="22" height="22">
@@ -197,7 +200,7 @@ function terminal() {
           <span class="t-o">${esc(l.out)}</span>
         </li>`).join("\n        ");
   return `<div class="term" id="term">
-      <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>artis</span></div>
+      <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><span>actis</span></div>
       <ol class="term-lines">
         ${lines}
         <li class="t-caret" aria-hidden="true"><span class="t-p">&rsaquo;</span><span class="caret"></span></li>
@@ -206,76 +209,79 @@ function terminal() {
 }
 
 /** The evidence path, drawn as one line: a release goes in, a record comes out.
- *  Continuous motion, no JS — the pulse travels in CSS. */
+ *  Continuous motion, no JS — everything travels and breathes in CSS. */
 function scene() {
-  return `<svg class="scene" viewBox="14 72 528 292" role="img"
-     aria-label="A release enters, is matched and decided, and leaves as a sealed record.">
+  return `<svg class="scene" viewBox="0 0 600 460" role="img"
+     aria-label="A release enters, is matched against sources, weighed at a decision, and leaves as a sealed record.">
   <defs>
-    <linearGradient id="wash-a" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#B0801F" stop-opacity="0.30"/>
-      <stop offset="100%" stop-color="#B0801F" stop-opacity="0"/>
-    </linearGradient>
-    <linearGradient id="wash-b" x1="1" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#4A4FA8" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="#B4577E" stop-opacity="0.05"/>
-    </linearGradient>
+    <!-- Radial, and fully transparent before the edge, so nothing is clipped. -->
+    <radialGradient id="wash-a">
+      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.34"/>
+      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#D9AE55" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wash-b">
+      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.24"/>
+      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#B4577E" stop-opacity="0"/>
+    </radialGradient>
     <path id="route"
-      d="M86 214 C 150 214, 168 132, 232 132 C 292 132, 300 214, 360 214
-         C 420 214, 428 300, 474 300"/>
+      d="M108 176 C 176 176, 178 108, 246 108 C 314 108, 318 244, 386 244
+         C 442 244, 452 336, 502 336"/>
   </defs>
 
-  <!-- soft ground, so the line work is not floating on nothing -->
-  <ellipse class="wash" cx="196" cy="150" rx="150" ry="116" fill="url(#wash-a)"/>
-  <ellipse class="wash wash-2" cx="404" cy="286" rx="136" ry="104" fill="url(#wash-b)"/>
+  <circle class="wash"   cx="212" cy="178" r="162" fill="url(#wash-a)"/>
+  <circle class="wash wash-2" cx="406" cy="296" r="156" fill="url(#wash-b)"/>
 
   <g class="ink" fill="none" stroke-linecap="round" stroke-linejoin="round">
 
-    <!-- the route the evidence travels -->
     <use href="#route" class="route"/>
 
-    <!-- the release: a box, drawn open -->
+    <!-- the release, as a box being opened -->
     <g class="node node-in">
-      <path d="M30 196 L64 178 L98 196 L64 214 Z"/>
-      <path d="M30 196 L30 236 L64 254 L64 214"/>
-      <path d="M98 196 L98 236 L64 254"/>
-      <path class="thin" d="M47 205 L47 245"/>
+      <path d="M34 150 L82 124 L130 150 L82 176 Z"/>
+      <path d="M34 150 L34 208 L82 234 L82 176"/>
+      <path d="M130 150 L130 208 L82 234"/>
+      <path class="thin" d="M58 163 L58 221"/>
+      <path class="thin" d="M82 124 L82 176"/>
     </g>
 
     <!-- the lattice: the mark's own geometry, where components are matched -->
     <g class="node node-mid">
-      <path d="M232 96 L262 113 L262 147 L232 164 L202 147 L202 113 Z"/>
-      <path class="thin" d="M232 96 L232 130 M232 130 L262 147 M232 130 L202 147"/>
-      <circle class="dot" cx="232" cy="130" r="4.5"/>
-      <circle class="orbit" cx="232" cy="130" r="46"/>
+      <path d="M246 56 L290 81 L290 131 L246 156 L202 131 L202 81 Z"/>
+      <path class="thin" d="M246 56 L246 106 M246 106 L290 131 M246 106 L202 131"/>
+      <circle class="dot node-beat" cx="246" cy="106" r="6"/>
+      <circle class="orbit" cx="246" cy="106" r="70"/>
     </g>
 
-    <!-- the decision: one finding, weighed -->
+    <!-- the decision: one route taken, one not, and the choice recorded -->
     <g class="node node-dec">
-      <path d="M336 196 L384 196"/>
-      <path d="M360 182 L360 232"/>
-      <path class="thin" d="M336 196 L326 216 L346 216 Z"/>
-      <path class="thin" d="M384 196 L374 216 L394 216 Z"/>
-      <circle class="dot" cx="360" cy="176" r="4.5"/>
+      <circle cx="386" cy="244" r="26"/>
+      <path class="thin branch-off" d="M386 244 L440 206"/>
+      <path class="branch-on" d="M386 244 L440 282"/>
+      <circle class="dot" cx="386" cy="244" r="5.5"/>
+      <circle class="dot mark-off" cx="440" cy="206" r="4"/>
     </g>
 
     <!-- the record: sheets, and the seal that closes them -->
     <g class="node node-out">
-      <rect x="444" y="252" width="62" height="80" rx="4"/>
-      <path class="thin" d="M456 274 H494 M456 288 H494 M456 302 H480"/>
+      <path d="M470 286 H556 a6 6 0 0 1 6 6 V404 a6 6 0 0 1 -6 6 H470 a6 6 0 0 1 -6 -6 V292 a6 6 0 0 1 6 -6 Z"/>
+      <path class="thin" d="M486 314 H540 M486 334 H540 M486 354 H518"/>
       <g class="seal">
-        <circle cx="506" cy="330" r="17"/>
-        <path class="thin tick" d="M499 330 l5 5 l9 -11"/>
+        <circle cx="546" cy="392" r="22"/>
+        <path class="seal-tick" d="M535 393 l7 8 l15 -18"/>
       </g>
     </g>
 
     <!-- what travels the route -->
-    <circle class="pulse" r="5">
-      <animateMotion dur="7s" repeatCount="indefinite" rotate="auto">
+    <circle class="pulse" r="6">
+      <animateMotion dur="7.5s" repeatCount="indefinite">
         <mpath href="#route"/>
       </animateMotion>
     </circle>
-    <circle class="pulse pulse-2" r="3.5">
-      <animateMotion dur="7s" begin="2.3s" repeatCount="indefinite" rotate="auto">
+    <circle class="pulse pulse-2" r="4" opacity="0">
+      <animate attributeName="opacity" to="1" begin="2.5s" dur="0.01s" fill="freeze"/>
+      <animateMotion dur="7.5s" begin="2.5s" repeatCount="indefinite">
         <mpath href="#route"/>
       </animateMotion>
     </circle>
@@ -508,6 +514,56 @@ function doesSection() {
 </section>`;
 }
 
+/* 7b -------------------------------------------------------- easier --- */
+
+/** A stack of cards with one drawing on the face. The accent dot is the only
+ *  colour in it, the way a single highlight carries a whole row. */
+function cardGlyph(kind) {
+  const inner = {
+    record: `<rect x="34" y="36" width="52" height="42" rx="3"/>
+        <path d="M34 46 H86"/>
+        <circle class="g-dot" cx="46" cy="62" r="4"/>
+        <path d="M50 62 H60 M64 58 L70 54 M64 66 L70 70"/>
+        <circle cx="72" cy="52" r="3.5"/>
+        <circle cx="72" cy="72" r="3.5"/>`,
+    document: `<path d="M40 30 H74 L82 38 V84 H40 Z"/>
+        <path d="M74 30 V38 H82"/>
+        <path d="M48 50 H72 M48 58 H72 M48 66 H64"/>
+        <circle class="g-dot" cx="70" cy="74" r="7"/>
+        <path d="M66 80 L66 90 L70 87 L74 90 L74 80"/>`,
+    automate: `<circle cx="66" cy="48" r="14"/>
+        <circle class="g-dot" cx="66" cy="48" r="5"/>
+        <path d="M66 30 V36 M66 60 V66 M48 48 H54 M78 48 H84 M54 36 L58 40 M74 56 L78 60 M54 60 L58 56 M74 40 L78 36"/>
+        <path d="M36 88 V66 a5 5 0 0 1 10 0 V78 h8 a5 5 0 0 1 5 5 v5"/>`,
+  }[kind];
+  return `<svg class="cardart" viewBox="0 0 120 120" aria-hidden="true">
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <rect class="card card-3" x="22" y="22" width="86" height="86" rx="12"/>
+        <rect class="card card-2" x="16" y="16" width="86" height="86" rx="12"/>
+        <rect class="card card-1" x="10" y="10" width="86" height="86" rx="12"/>
+        <g class="glyph">${inner}</g>
+      </g>
+    </svg>`;
+}
+
+function easierSection() {
+  const e = C.easier;
+  const items = e.items
+    .map((i, n) => `<li class="ez" data-i="${n}">
+        ${cardGlyph(i.glyph)}
+        <h3>${esc(i.title)}</h3>
+        <p>${esc(i.body)}</p>
+      </li>`).join("\n      ");
+  return `<section class="sec sec-ez" id="easier">
+  <div class="wrap">
+    <h2 class="ez-head">${esc(e.heading)} <span class="hl hl-rose">${esc(e.highlight)}</span></h2>
+    <ul class="ezs">
+      ${items}
+    </ul>
+  </div>
+</section>`;
+}
+
 /* 7 ------------------------------------------------------------ source --- */
 
 function sourceSection() {
@@ -567,43 +623,120 @@ function formBlock(heading, body, kind) {
     </div>`;
 }
 
+/** The closing showcase: the product running, with the mark beside it. */
+function actionStage() {
+  const a = C.action;
+  return `<div class="act">
+      <h2 class="act-head">${esc(a.lead)} <span class="hl hl-rose">${esc(a.highlight)}</span> ${esc(a.tail)}</h2>
+      <p class="act-sub">${esc(a.body)}</p>
+      <div class="act-stage">
+        <svg class="act-art" viewBox="0 0 1200 470" aria-hidden="true" preserveAspectRatio="xMidYMax meet">
+          <defs>
+            <linearGradient id="actL" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stop-color="#4A4FA8" stop-opacity="0"/>
+              <stop offset="0.28" stop-color="#4A4FA8" stop-opacity="0.07"/>
+              <stop offset="0.62" stop-color="#4A4FA8" stop-opacity="0.17"/>
+              <stop offset="1" stop-color="#4A4FA8" stop-opacity="0.02"/>
+            </linearGradient>
+            <linearGradient id="actR" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stop-color="#B4577E" stop-opacity="0"/>
+              <stop offset="0.28" stop-color="#B4577E" stop-opacity="0.07"/>
+              <stop offset="0.66" stop-color="#B4577E" stop-opacity="0.18"/>
+              <stop offset="1" stop-color="#B4577E" stop-opacity="0.02"/>
+            </linearGradient>
+          </defs>
+          <g class="act-hill act-hill-l">
+            <path d="M-80 340 C10 340 30 200 110 200 C168 200 186 262 228 262 C276 262 296 196 352 196 C430 196 448 340 520 340 L520 470 L-80 470 Z"
+                  fill="url(#actL)"/>
+            <path d="M-80 340 C10 340 30 200 110 200 C168 200 186 262 228 262 C276 262 296 196 352 196 C430 196 448 340 520 340"
+                  fill="none" stroke="#4A4FA8" stroke-opacity="0.34" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <g class="act-hill act-hill-r">
+            <path d="M1280 312 C1190 312 1170 168 1090 168 C1030 168 1012 236 970 236 C922 236 902 172 846 172 C768 172 752 312 680 312 L680 470 L1280 470 Z"
+                  fill="url(#actR)"/>
+            <path d="M1280 312 C1190 312 1170 168 1090 168 C1030 168 1012 236 970 236 C922 236 902 172 846 172 C768 172 752 312 680 312"
+                  fill="none" stroke="#B4577E" stroke-opacity="0.34" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <g class="act-plus" stroke="#B0801F" stroke-width="1.7" stroke-linecap="round">
+            <path d="M56 132 h17 M64.5 123.5 v17"/>
+            <path d="M1148 96 h13 M1154.5 89.5 v13"/>
+            <path d="M1112 250 h10 M1117 245 v10"/>
+          </g>
+        </svg>
+        <div class="act-frame" data-cycle="1">
+          <div class="rec-frame">
+            ${screen(C.hero.records[0])}
+          </div>
+          <span class="act-mark" aria-hidden="true">
+            <img src="assets/pandax-mark-ink.png" alt="" width="46" height="46" loading="lazy">
+          </span>
+        </div>
+      </div>
+    </div>`;
+}
+
 function closingSection() {
   const c = C.contact;
   return `<section class="sec sec-close" id="contact">
-  <div class="wrap close-in close-one">
-    ${formBlock(c.heading, c.body, "sample")}
+  <div class="wrap">
+    ${actionStage()}
+    <div class="close-in close-one">
+      ${formBlock(c.heading, c.body, "sample")}
+    </div>
   </div>
 </section>`;
 }
 
-/* --------------------------------------------------------- /artis --- */
+/* --------------------------------------------------------- /actis --- */
 
-function artisPage() {
-  const a = C.artis;
+function actisPage() {
+  const a = C.actis;
   const pack = a.pack.items
     .map((i) => `<tr><th scope="row">${esc(i.title)}</th><td>${esc(i.body)}</td></tr>`).join("\n      ");
   const now = a.state.now.map((x) => `<li>${esc(x)}</li>`).join("");
   const building = a.state.building.map((x) => `<li>${esc(x)}</li>`).join("");
 
   return shell({
-    slug: "artis/",
+    slug: "actis/",
     ogTitle: `${esc(C.meta.product)} — ${esc(C.meta.tagline)}`,
     description: a.description,
     depth: 1,
     script: true,
     body: `<section class="sec sec-lead" id="top">
   <div class="wrap">
-    <div class="pname-lead">
-      <span class="pname-eyebrow">${esc(C.does.eyebrow)}</span>
-      <h1 class="pname-word">
-        <img class="pname-mark" src="../assets/artis-mark.png" alt="" width="72" height="72">
-        ${esc(a.heading)}
-      </h1>
-    </div>
-    <div class="prod-text">
-      <p class="lede">${esc(a.lede)}</p>
-      <p class="lede lede-sm">${esc(a.body)}</p>
-      <div class="acts"><a class="btn" href="${a.action.href}">${esc(a.action.label)}</a></div>
+    <div class="hero-in">
+      <div class="prod-text">
+        <div class="pname-lead">
+          <span class="pname-eyebrow">${esc(C.does.eyebrow)}</span>
+          <h1 class="pname-word">
+            <img class="pname-mark" src="../assets/actis-mark.png" alt="" width="60" height="60">
+            ${esc(a.heading)}
+          </h1>
+        </div>
+        <p class="lede">${esc(a.lede)}</p>
+        <p class="lede lede-sm">${esc(a.body)}</p>
+        <div class="acts"><a class="btn" href="${a.action.href}">${esc(a.action.label)}</a></div>
+      </div>
+      <div class="hero-stage">
+        <div class="laptop laptop-cycling">
+          <div class="laptop-lid">
+            <div class="laptop-lid-back" aria-hidden="true">
+              <img src="../assets/actis-mark-light.png" alt="" width="60" height="60">
+            </div>
+            <div class="laptop-bezel">
+              <span class="laptop-camera" aria-hidden="true"></span>
+              <div class="laptop-screen">
+                ${screen(C.hero.records[0])}
+              </div>
+              <div class="laptop-glare" aria-hidden="true"></div>
+            </div>
+          </div>
+          <div class="laptop-base">
+            ${keyboard()}
+          </div>
+          <div class="laptop-shadow" aria-hidden="true"></div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -620,22 +753,8 @@ function artisPage() {
   <div class="wrap">
     <h2>${esc(a.record.heading)}</h2>
     <p class="lede">${esc(a.record.lede)}</p>
-    <div class="hero-stage">
-      <div class="laptop">
-        <div class="laptop-lid">
-          <div class="laptop-bezel">
-            <span class="laptop-camera" aria-hidden="true"></span>
-            <div class="laptop-screen">
-              ${screen(C.hero.records[0])}
-            </div>
-            <div class="laptop-glare" aria-hidden="true"></div>
-          </div>
-        </div>
-        <div class="laptop-base">
-          ${keyboard()}
-        </div>
-        <div class="laptop-shadow" aria-hidden="true"></div>
-      </div>
+    <div class="rec-frame">
+      ${screen(C.hero.records[0])}
     </div>
   </div>
 </section>
@@ -643,7 +762,7 @@ function artisPage() {
 <section class="sec">
   <div class="wrap">
     <h2>${esc(a.pack.heading)}</h2>
-    <table class="tbl"><caption class="vh">What an Artis export contains</caption><tbody>
+    <table class="tbl"><caption class="vh">What an Actis export contains</caption><tbody>
       ${pack}
     </tbody></table>
     <p class="closer">${esc(a.pack.closing)}</p>
@@ -678,8 +797,10 @@ function rhythm(html) {
     const dark = rest.includes("sec-dark");
     // Light sections alternate ground so no two in a row read the same.
     const alt = !dark && n % 2 === 0 ? " sec-alt" : "";
+    // The washes alternate sides so the page is lit down its length.
+    const wash = dark ? "" : ` sec-wash sec-wash-${n % 4 < 2 ? "a" : "b"}`;
     const marker = `<span class="sec-n" aria-hidden="true">${num}</span>`;
-    return `<section class="sec${rest}${alt}"${mid}${marker}<h2>`;
+    return `<section class="sec${rest}${alt}${wash}"${mid}${marker}<h2>`;
   });
 }
 
@@ -691,7 +812,7 @@ const home = shell({
   body: rhythm([
     heroSection(), obligationSection(),
     growthSection(), workflowSection(), marketSection(), manualSection(),
-    doesSection(), sourceSection(), capabilitySection(), closingSection(),
+    doesSection(), easierSection(), sourceSection(), capabilitySection(), closingSection(),
   ].join("\n\n")),
   script: true,
 });
@@ -724,7 +845,7 @@ const privacySections = `<p class="doc-intro">${esc(C.privacyBody.intro)}</p>\n\
 
 const pages = [
   ["index.html", home],
-  ["artis/index.html", artisPage()],
+  ["actis/index.html", actisPage()],
   ["privacy/index.html", legalPage("privacy", privacySections)],
 ];
 

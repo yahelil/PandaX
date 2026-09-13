@@ -205,6 +205,52 @@ function terminal() {
     </div>`;
 }
 
+/** The product page's opening: the real mark, held in the same line work and
+ *  the same colour washes as the home page. */
+function markScene(depth) {
+  const r = rel(depth);
+  return `<svg class="scene scene-mark" viewBox="0 0 460 460" role="img"
+     aria-label="The Artis mark, held in a turning lattice.">
+  <defs>
+    <radialGradient id="m-wash-a">
+      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.30"/>
+      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#D9AE55" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="m-wash-b">
+      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.22"/>
+      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#B4577E" stop-opacity="0"/>
+    </radialGradient>
+    <path id="ring-mid" d="M80 230 A150 150 0 1 1 380 230 A150 150 0 1 1 80 230"/>
+  </defs>
+
+  <circle class="wash" cx="196" cy="196" r="164" fill="url(#m-wash-a)"/>
+  <circle class="wash wash-2" cx="278" cy="276" r="152" fill="url(#m-wash-b)"/>
+
+  <g class="ink" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path class="thin hex" d="M230 96 L320 148 L320 252 L230 304 L140 252 L140 148 Z"/>
+    <circle class="orbit ring-a" cx="230" cy="230" r="150"/>
+    <circle class="orbit ring-b" cx="230" cy="230" r="186"/>
+
+    <g class="sat"><circle cx="230" cy="80" r="7"/></g>
+    <g class="sat"><circle cx="380" cy="230" r="7"/></g>
+    <g class="sat"><circle cx="230" cy="380" r="7"/></g>
+    <g class="sat"><circle cx="80" cy="230" r="7"/></g>
+
+    <circle class="pulse" r="6">
+      <animateMotion dur="9s" repeatCount="indefinite"><mpath href="#ring-mid"/></animateMotion>
+    </circle>
+    <circle class="pulse pulse-2" r="4" opacity="0">
+      <animate attributeName="opacity" to="1" begin="3s" dur="0.01s" fill="freeze"/>
+      <animateMotion dur="9s" begin="3s" repeatCount="indefinite"><mpath href="#ring-mid"/></animateMotion>
+    </circle>
+  </g>
+
+  <image class="mark-art" href="${r}assets/artis-mark.png" x="150" y="150" width="160" height="160"/>
+</svg>`;
+}
+
 /** The evidence path, drawn as one line: a release goes in, a record comes out.
  *  Continuous motion, no JS — everything travels and breathes in CSS. */
 function scene() {
@@ -247,14 +293,7 @@ function scene() {
     <g class="node node-mid">
       <path d="M246 56 L290 81 L290 131 L246 156 L202 131 L202 81 Z"/>
       <path class="thin" d="M246 56 L246 106 M246 106 L290 131 M246 106 L202 131"/>
-      <g class="panda">
-        <circle class="p-ear" cx="228" cy="88" r="9"/>
-        <circle class="p-ear" cx="264" cy="88" r="9"/>
-        <circle class="p-head" cx="246" cy="104" r="21"/>
-        <ellipse class="p-eye" cx="238" cy="101" rx="4.6" ry="5.6"/>
-        <ellipse class="p-eye" cx="254" cy="101" rx="4.6" ry="5.6"/>
-        <path class="p-nose" d="M243 113 q3 3 6 0"/>
-      </g>
+      <circle class="dot node-beat" cx="246" cy="106" r="6"/>
       <circle class="orbit" cx="246" cy="106" r="70"/>
     </g>
 
@@ -283,7 +322,8 @@ function scene() {
         <mpath href="#route"/>
       </animateMotion>
     </circle>
-    <circle class="pulse pulse-2" r="4">
+    <circle class="pulse pulse-2" r="4" opacity="0">
+      <animate attributeName="opacity" to="1" begin="2.5s" dur="0.01s" fill="freeze"/>
       <animateMotion dur="7.5s" begin="2.5s" repeatCount="indefinite">
         <mpath href="#route"/>
       </animateMotion>
@@ -602,17 +642,17 @@ function artisPage() {
     script: true,
     body: `<section class="sec sec-lead" id="top">
   <div class="wrap">
-    <div class="pname-lead">
-      <span class="pname-eyebrow">${esc(C.does.eyebrow)}</span>
-      <h1 class="pname-word">
-        <img class="pname-mark" src="../assets/artis-mark.png" alt="" width="72" height="72">
-        ${esc(a.heading)}
-      </h1>
-    </div>
-    <div class="prod-text">
-      <p class="lede">${esc(a.lede)}</p>
-      <p class="lede lede-sm">${esc(a.body)}</p>
-      <div class="acts"><a class="btn" href="${a.action.href}">${esc(a.action.label)}</a></div>
+    <div class="hero-in">
+      <div class="prod-text">
+        <span class="pname-eyebrow">${esc(C.does.eyebrow)}</span>
+        <h1 class="pname-word">${esc(a.heading)}</h1>
+        <p class="lede">${esc(a.lede)}</p>
+        <p class="lede lede-sm">${esc(a.body)}</p>
+        <div class="acts"><a class="btn" href="${a.action.href}">${esc(a.action.label)}</a></div>
+      </div>
+      <div class="hero-stage">
+        ${markScene(1)}
+      </div>
     </div>
   </div>
 </section>

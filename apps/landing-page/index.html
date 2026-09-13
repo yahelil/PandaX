@@ -108,14 +108,7 @@
     <g class="node node-mid">
       <path d="M246 56 L290 81 L290 131 L246 156 L202 131 L202 81 Z"/>
       <path class="thin" d="M246 56 L246 106 M246 106 L290 131 M246 106 L202 131"/>
-      <g class="panda">
-        <circle class="p-ear" cx="228" cy="88" r="9"/>
-        <circle class="p-ear" cx="264" cy="88" r="9"/>
-        <circle class="p-head" cx="246" cy="104" r="21"/>
-        <ellipse class="p-eye" cx="238" cy="101" rx="4.6" ry="5.6"/>
-        <ellipse class="p-eye" cx="254" cy="101" rx="4.6" ry="5.6"/>
-        <path class="p-nose" d="M243 113 q3 3 6 0"/>
-      </g>
+      <circle class="dot node-beat" cx="246" cy="106" r="6"/>
       <circle class="orbit" cx="246" cy="106" r="70"/>
     </g>
 
@@ -144,7 +137,8 @@
         <mpath href="#route"/>
       </animateMotion>
     </circle>
-    <circle class="pulse pulse-2" r="4">
+    <circle class="pulse pulse-2" r="4" opacity="0">
+      <animate attributeName="opacity" to="1" begin="2.5s" dur="0.01s" fill="freeze"/>
       <animateMotion dur="7.5s" begin="2.5s" repeatCount="indefinite">
         <mpath href="#route"/>
       </animateMotion>

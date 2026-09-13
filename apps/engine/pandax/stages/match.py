@@ -115,6 +115,50 @@ def _fixed_version(advisory: dict, purl: str) -> str:
     return ""
 
 
+def findings_from_advisories(
+    components: list[dict],
+    hits: dict[str, list[str]],
+    advisories: dict[str, dict],
+    checked_at: str = "",
+) -> list[Finding]:
+    """Build the same finding records for scans and scheduled refreshes."""
+    by_purl = {component["purl"]: component for component in components}
+    findings = []
+    for purl, ids in hits.items():
+        comp = by_purl[purl]
+        for advisory_id in ids:
+            advisory = advisories[advisory_id]
+            cves = sorted(a for a in advisory.get("aliases", []) if a.startswith("CVE-"))
+            vector = _cvss_vector(advisory)
+            for cve in cves or [advisory_id]:
+                findings.append(
+                    Finding(
+                        cve=cve,
+                        osv_id=advisory_id,
+                        purl=purl,
+                        component=comp["name"],
+                        version=comp["version"],
+                        summary=(advisory.get("summary") or "").strip(),
+                        cvss_vector=vector,
+                        severity=severity_from_vector(vector),
+                        fixed_version=_fixed_version(advisory, purl),
+                        bom_ref=comp.get("bom_ref", purl),
+                        source="OSV",
+                        source_url=f"https://osv.dev/vulnerability/{advisory_id}",
+                        coverage_status="completed",
+                        affectedness="affected",
+                        affectedness_evidence=(
+                            f"OSV returned {advisory_id} for the exact versioned Package URL."
+                        ),
+                        reachability="not_assessed",
+                        query_source="OSV.dev",
+                        query_value=purl,
+                        source_retrieved_at=checked_at,
+                    )
+                )
+    return findings
+
+
 def run(ctx: RunContext, feeds: Feeds | None = None) -> ev.Stream:
     yield ev.start(STAGE, "matching components against OSV.dev")
 

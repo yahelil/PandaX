@@ -75,6 +75,34 @@ def list_cases():
     return call(lambda: service().list())
 
 
+def advisory_service():
+    from .advisory_watch import AdvisoryWatchService
+    return AdvisoryWatchService(service())
+
+
+@router.get('/api/advisory-watches')
+def list_advisory_watches():
+    return call(lambda: advisory_service().list())
+
+
+@router.post('/api/advisory-watches')
+def create_advisory_watch(body: dict):
+    return call(lambda: advisory_service().watch(body.get('source_run_id', ''), body.get('simulated', False)))
+
+
+@router.post('/api/advisory-watches/refresh')
+def refresh_advisory_watches(body: dict):
+    def refresh():
+        watch_id = body.get('watch_id')
+        replay = body.get('replay')
+        if replay is not None:
+            return advisory_service().refresh(watch_id, replay)
+        from . import server
+        loop = getattr(server.api.state, 'advisory_refresh', None)
+        return loop.refresh_now() if loop and not watch_id else advisory_service().refresh(watch_id)
+    return call(refresh)
+
+
 @router.post('/api/cases')
 def create(body: dict):
     return call(lambda: service().execute('create', body))

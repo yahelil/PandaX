@@ -150,6 +150,7 @@ a { color: inherit; }
 .head {
   position: sticky; top: 0; z-index: 100;
   background: rgba(255,255,255,0.86);
+  transition: box-shadow .25s ease, background .25s ease;
   backdrop-filter: saturate(1.4) blur(14px);
   border-bottom: 1px solid var(--line);
 }
@@ -239,6 +240,8 @@ a { color: inherit; }
   transition: background .14s;
 }
 .menu-item:hover { background: var(--bg); }
+.menu-item.is-current { background: rgba(24, 82, 196, 0.07); }
+.menu-item.is-current strong { color: var(--brand); }
 .menu-item img { display: block; flex: 0 0 auto; }
 .menu-item strong {
   display: block;
@@ -259,6 +262,20 @@ a { color: inherit; }
   transition: background .16s, border-color .16s, color .16s;
 }
 .btn:hover { background: var(--graphite); border-color: var(--graphite); }
+.btn:active { transform: translateY(0) scale(.976); box-shadow: none; }
+.btn { transition: background .18s, border-color .18s, transform .16s, box-shadow .18s; }
+
+/* A hover lift belongs to a pointer. On touch it sticks after the tap. */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px -6px rgba(15, 23, 32, 0.35); }
+  .btn-q:hover { box-shadow: 0 6px 16px -8px rgba(15, 23, 32, 0.22); }
+}
+
+/* The header, once you have left the top of the page. */
+.head.is-scrolled {
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 20px -12px rgba(15, 23, 32, 0.28);
+}
 
 .btn-q {
   background: transparent; color: var(--ink);
@@ -1469,7 +1486,10 @@ a { color: inherit; }
   padding: 11px 13px;
   width: 100%;
 }
-.form input:focus, .form textarea:focus { border-color: var(--ink); outline-offset: 1px; }
+.form input:focus, .form textarea:focus {
+  border-color: var(--brand);
+  outline: 2px solid rgba(24, 82, 196, 0.35); outline-offset: 1px;
+}
 .form textarea { resize: vertical; }
 .form .btn { align-self: flex-start; margin-top: 4px; }
 .hp { position: absolute; left: -9999px; }

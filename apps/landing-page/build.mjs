@@ -61,7 +61,7 @@ ${JSON.stringify({
 </head>
 <body${bodyClass}>
 <a class="skip" href="#main">Skip to content</a>
-${header(depth)}
+${header(depth, slug)}
 <main id="main">
 ${body}
 </main>
@@ -72,10 +72,10 @@ ${script ? `<script>window.PANDAX_RECORDS = ${JSON.stringify(C.hero.records)};</
 `;
 }
 
-function productsMenu(depth) {
+function productsMenu(depth, slug) {
   const r = rel(depth);
   const items = C.nav.products
-    .map((p) => `<a class="menu-item" href="${r}${p.href}">
+    .map((p) => `<a class="menu-item${slug === p.href ? " is-current" : ""}" href="${r}${p.href}">
           <img src="${r}${p.mark}" alt="" width="36" height="36">
           <span><strong>${esc(p.name)}</strong><small>${esc(p.blurb)}</small></span>
         </a>`).join("\n        ");
@@ -89,7 +89,7 @@ function productsMenu(depth) {
     </div>`;
 }
 
-function header(depth) {
+function header(depth, slug) {
   const r = rel(depth);
   const links = C.nav.links
     .map((l) => `<a href="${depth ? `${r}index.html${l.href}` : l.href}">${esc(l.label)}</a>`)
@@ -103,7 +103,7 @@ function header(depth) {
     <nav class="head-nav" aria-label="Sections">
         ${links}
     </nav>
-    ${productsMenu(depth)}
+    ${productsMenu(depth, slug)}
     <a class="btn btn-sm" href="${depth ? `${r}index.html#contact` : C.nav.action.href}">${esc(C.nav.action.label)}</a>
   </div>
 </header>`;
@@ -515,41 +515,6 @@ function capabilitySection() {
     <ol class="caps">
       ${items}
     </ol>
-    <div class="band">
-      <h3>${esc(c.closing.title)}</h3>
-      <p>${esc(c.closing.body)}</p>
-    </div>
-  </div>
-</section>`;
-}
-
-function manualSection() {
-  const m = C.manual;
-  const marks = ["parts", "trace", "patched", "submit"];
-  const steps = m.steps
-    .map((s, i) => `<li class="mw">
-        <span class="mw-head">
-          <span class="mw-n">${n2(i)}</span>
-          ${lineGlyph(marks[i])}
-        </span>
-        <h3>${esc(s.title)}</h3>
-        <p>${esc(s.body)}</p>
-      </li>`).join("\n      ");
-
-  return `<section class="sec" id="manual">
-  <div class="wrap">
-    <h2>${esc(m.heading)}</h2>
-    <p class="lede">${esc(m.lede)}</p>
-    <ol class="mws">
-      ${steps}
-    </ol>
-    <div class="again" aria-hidden="true">
-      <svg class="again-loop" viewBox="0 0 1000 44" preserveAspectRatio="none">
-        <path d="M990 4 v18 a14 14 0 0 1 -14 14 H24 a14 14 0 0 1 -14 -14 V4"/>
-      </svg>
-      <span class="again-tag">${esc(m.again)}</span>
-    </div>
-    <p class="note">${esc(m.clock)}</p>
   </div>
 </section>`;
 }
@@ -983,7 +948,7 @@ const home = shell({
     // The home page makes the case. How the product works in detail lives
     // on the product page, where someone has already decided to look.
     heroSection(), audienceSection(),
-    marketSection(), manualSection(),
+    marketSection(),
     doesSection(), questionsSection(),
     obligationSection(), growthSection(), workflowSection(),
     aboutSection(), closingSection(),

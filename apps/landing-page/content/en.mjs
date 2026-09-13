@@ -52,13 +52,14 @@ export const boot = {
 /* 1 ------------------------------------------------------------- hero --- */
 
 export const hero = {
-  headline: "CRA evidence, automated",
-  /** The word that takes the highlight, matched in the headline. It is the
-   *  evidence that is automated, never the compliance: promising the outcome
-   *  is a UWG exposure, and it is the sentence a scanner writes. */
-  highlight: "automated",
+  headline: "Automate CRA compliance",
+  /** The word that takes the highlight, matched in the headline.
+   *  Note for whoever edits this next: the acquisition plan rules out selling
+   *  compliance as an outcome, on UWG grounds. This wording was chosen anyway,
+   *  deliberately. Worth a German legal read before any paid campaign. */
+  highlight: "Automate",
   subhead: "PandaX turns each release into a record a reviewer can read. What shipped, what was found, what you decided, and the documents to prove it.",
-  body: "Independent of any scanner, and yours to take anywhere.",
+  body: "Every vulnerability decision needs traceable evidence. PandaX builds the record.",
   primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
   secondary: { label: "See Actis", href: "/actis/" },
   /** The machine cycles through these. Each is a complete, consistent example. */
@@ -135,7 +136,7 @@ export const obligation = {
   liveLabel: "In effect",
   points: [
     "Cybersecurity risk assessments, software architecture designs, test reports. Companies must keep these available to authorities for at least 10 years.",
-    "Penalties can reach €15 million or 2.5% of worldwide annual turnover, whichever is higher.",
+    "Penalties can reach up to €15 million or 2.5% of worldwide annual turnover, whichever is higher.",
   ],
   source:
     "European Commission Digital Strategy; Regulation (EU) 2024/2847, Articles 71 and 73.",
@@ -168,7 +169,7 @@ export const growth = {
   ],
   ai: {
     title: "The curve is not flattening",
-    body: "As AI tools speed up discovery, the number of findings that need evaluation and tracking grows with it.",
+    body: "Advancing AI tools are expected to drive a substantial increase in discoveries to evaluate and track.",
   },
   source:
     "ENISA Threat Landscape 2025; CVE Program Metrics 2020–2025. Figures from 2026 on are an exponential fit to those totals, not a forecast. The 42,595 count is ENISA's reporting period and does not line up with a calendar year.",
@@ -192,7 +193,7 @@ export const workflow = {
 
 export const market = {
   heading: "What your tools already do, and where they stop",
-  lede: "Scanners are good at finding things. The file an assessor asks to see is a different job, and it is the one Actis does.",
+  lede: "Most tools focus on vulnerability detection rather than end-to-end CRA evidence.",
   columns: [
     {
       title: "What a scanner gives you",
@@ -213,30 +214,15 @@ export const market = {
   ],
 };
 
-/* 6 ------------------------------------------------------------ manual --- */
-
-export const manual = {
-  heading: "The same work, every release",
-  lede: "One finding sets off four jobs. The next release sets off the same four, from the top.",
-  steps: [
-    { title: "Break down the release", body: "Catalogue every component and library in the release." },
-    { title: "Assess the exposure", body: "Trace each vulnerability to the affected product and version." },
-    { title: "Prove the fix shipped", body: "Gather the remediation evidence and show which release carried it." },
-    { title: "Submit the evidence", body: "Enter the required information by hand through the CRA reporting process." },
-  ],
-  again: "then all four again, next release",
-  clock: "24h early warning. 72h notification. The countdown begins with manufacturer awareness.",
-};
-
 /* 7 -------------------------------------------------------- automation --- */
 
 export const does = {
   eyebrow: "Our product",
   name: "Actis",
-  heading: "Actis does the assembling",
+  heading: "Actis automates CRA evidence workflow",
   lede: "Connect the evidence. Draft the documents. File with approval.",
   points: [
-    "Connects existing evidence from configured Jira, CI/CD, SBOM and document sources to the relevant product version.",
+    "Connects existing SBOM and document evidence to the relevant product version.",
     "Identifies missing evidence, flags missing inputs and drafts all required legal documents.",
     "After your company's approval, files the reports and retains a time-stamped audit trail of every submission.",
   ],
@@ -258,7 +244,7 @@ export const questions = {
     {
       glyph: "document",
       title: "The documents, generated",
-      body: "Annex VII technical documentation and the Annex V declaration, drafted in the format the regulation asks for, with the missing inputs flagged rather than guessed.",
+      body: "Annex VII technical documentation and the EU declaration of conformity following Annex V, drafted in the format the regulation asks for, with missing inputs flagged rather than guessed.",
     },
     {
       glyph: "again",
@@ -289,13 +275,9 @@ export const capability = {
     { title: "Gap review", body: "Checks what you have against what Annex VII asks for, and names what is missing." },
     { title: "Carries forward", body: "Keeps the record current when the product changes, and when the rules do." },
     { title: "Evidence history", body: "Maintains dated, protected evidence for the retention period the CRA requires." },
-    { title: "Drafts the documents", body: "The Annex VII technical file and the Annex V declaration, in the form they are asked for." },
-    { title: "Files the reports", body: "Takes reports you have approved through the single reporting platform, and keeps the receipt." },
+    { title: "Drafts the documents", body: "The Annex VII technical file and the EU declaration of conformity following Annex V, in the form they are asked for." },
+    { title: "Files the reports", body: "Takes reports you have approved through the CRA Single Reporting Platform and keeps the receipt." },
   ],
-  closing: {
-    title: "Built for teams without a compliance department",
-    body: "The work still gets done properly. It just does not need someone hired to do it.",
-  },
 };
 
 export const action = {
@@ -365,8 +347,8 @@ export const actis = {
       { title: "Component inventory", body: "An SBOM tied to the release that shipped." },
       { title: "Findings", body: "Each with the upgrade that clears it." },
       { title: "Decisions", body: "What you decided, who decided it, and why." },
-      { title: "Documents", body: "Annex VII technical documentation and the Annex V declaration." },
-      { title: "Reporting timeline", body: "The Article 14 record, stage by stage." },
+      { title: "Documents", body: "Annex VII technical documentation and the EU declaration of conformity following Annex V." },
+      { title: "Reporting timeline", body: "A timeline of Article 14 reporting steps and decisions." },
       { title: "Sealed bundle", body: "Timestamped, and verifiable without Actis installed." },
     ],
     closing: "Open format. You own it, and you can take it to any reviewer.",
@@ -382,7 +364,7 @@ export const actis = {
     ],
     building: [
       "The hosted workspace, for more than one person.",
-      "Connectors into Jira, CI/CD and document systems.",
+      "Connectors into document systems.",
       "Scheduled advisory monitoring that opens cases on its own.",
     ],
     nowLabel: "Working today",
@@ -418,7 +400,7 @@ export const privacyBody = {
     },
     {
       title: "What the site collects",
-      body: "Nothing on its own. This website sets no cookies, runs no analytics and embeds no third-party services, so no consent banner is needed. Nothing is stored on your device beyond what is technically necessary to serve the page.",
+      body: "This website sets no non-essential cookies, runs no analytics and embeds no third-party content. It collects contact details only when you choose to submit the contact form.",
     },
     {
       title: "Server logs",
@@ -426,11 +408,11 @@ export const privacyBody = {
     },
     {
       title: "If you write to us",
-      body: "The details you send through the contact form or by email are used to answer you, and kept for as long as the enquiry requires. Legal basis: Art. 6(1)(b) and (f) GDPR. The form posts to our own address; there is no third-party form service.",
+      body: "The details you send through the contact form or by email are used to answer you, and kept for as long as the enquiry requires. Legal basis: Art. 6(1)(b) and (f) GDPR. The form posts to an endpoint on this domain. Cloudflare processes the request as our hosting provider, and Resend delivers the message to our email inbox.",
     },
     {
       title: "Fonts and images",
-      body: "Everything is served from this domain. No request is made to Google Fonts or to any other external host, so no data reaches a third party by loading the page.",
+      body: "Fonts and images are served from this domain. The page makes no requests to third-party content or analytics providers.",
     },
     {
       title: "Hosting",
@@ -465,7 +447,7 @@ export const cookiesBody = {
     },
     {
       title: "No analytics, and no third parties",
-      body: "There is no analytics, no tag manager, no advertising pixel, no embedded video, no chat widget and no third-party form service. The fonts are served from this domain rather than from Google Fonts. Loading this page makes no request to any host but ours.",
+      body: "There is no analytics, no tag manager, no advertising pixel, no embedded video, no chat widget and no third-party form embed. The fonts are served from this domain rather than from Google Fonts. Loading this page makes no request to any host but ours.",
     },
     {
       title: "What the contact form does",

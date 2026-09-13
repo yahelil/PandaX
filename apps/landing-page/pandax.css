@@ -1621,24 +1621,83 @@ a { color: inherit; }
   stroke-linecap: round; stroke-linejoin: round;
 }
 
-.mk-todo h3 { color: var(--flag-t); border-bottom-color: rgba(224,82,60,0.34); }
+.mk-todo h3 { color: var(--brand); border-bottom-color: rgba(24,82,196,0.4); }
 .mk-todo li { color: var(--ink); }
-.mk-box {
-  width: 18px; height: 18px; margin-top: 2px;
-  border: 1.6px dashed rgba(224,82,60,0.65); border-radius: 4px;
+.mk-add {
+  width: 22px; height: 22px;
+  fill: none; stroke: var(--brand); stroke-width: 2.4;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 26; stroke-dashoffset: 26;
+  transition: stroke-dashoffset .5s cubic-bezier(.3,.8,.3,1);
 }
+.sec.lit .mk-add { stroke-dashoffset: 0; }
+.mk-todo li:nth-child(2) .mk-add { transition-delay: .1s; }
+.mk-todo li:nth-child(3) .mk-add { transition-delay: .2s; }
+.mk-todo li:nth-child(4) .mk-add { transition-delay: .3s; }
 
 /* The break between them, which is the whole argument. */
 .mk-edge { display: grid; grid-template-rows: 1fr auto 1fr; justify-items: center; gap: 12px; }
 .mk-rail { width: 1px; background: var(--line); }
-.mk-rail-dash {
-  background: repeating-linear-gradient(
-    to bottom, rgba(224,82,60,0.5) 0 5px, transparent 5px 11px);
-}
+.mk-rail-dash { background: var(--brand); opacity: 0.45; }
 .mk-stop {
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
-  color: var(--flag-t); white-space: nowrap;
+  color: var(--brand); white-space: nowrap;
   writing-mode: vertical-rl; text-orientation: mixed;
+}
+
+/* Who we are: one claim, then the three things we will not trade away. */
+.claim {
+  margin-top: 40px; padding: 34px 38px;
+  border-left: 3px solid var(--brand);
+  background: var(--surface); border-radius: 0 8px 8px 0;
+}
+.sec-alt .claim { background: var(--bg); }
+.claim-line {
+  font-family: var(--disp); font-weight: 700;
+  font-size: clamp(24px, 2.8vw, 34px); line-height: 1.12;
+  letter-spacing: -0.028em; color: var(--ink); margin: 0;
+}
+.claim-body {
+  margin: 16px 0 0; max-width: 72ch;
+  font-size: 16.5px; line-height: 1.62; color: var(--body);
+}
+
+.holds {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px;
+}
+.hold {
+  padding: 28px 28px 30px;
+  border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface);
+  transition: border-color .2s, transform .25s cubic-bezier(.3,.8,.3,1);
+}
+.sec-alt .hold { background: var(--bg); }
+.hold:hover { border-color: var(--brand); transform: translateY(-3px); }
+.hold-mark {
+  display: grid; place-items: center;
+  width: 50px; height: 50px; border-radius: 10px;
+  background: rgba(24, 82, 196, 0.09);
+}
+.hold-mark .gly { stroke: var(--brand); }
+.hold h3 { font-size: 17px; margin: 18px 0 8px; letter-spacing: -0.018em; }
+.hold p { font-size: 15.5px; color: var(--body); margin: 0; }
+
+/* The evidence, visibly moving through: two runs on offset clocks. */
+.flow-pulse {
+  position: absolute; top: 50%; left: 12%;
+  width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%;
+  background: var(--brand-l);
+  box-shadow: 0 0 0 4px rgba(143, 178, 245, 0.18);
+  opacity: 0;
+}
+.flow.lit .flow-pulse { animation: flow-run 4.2s cubic-bezier(.5,0,.5,1) infinite; }
+.flow.lit .flow-pulse-b { animation-delay: 2.1s; }
+@keyframes flow-run {
+  0%   { left: 12%; opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { left: 88%; opacity: 0; }
 }
 
 /* ------------------------------------------------------ the manual work -- */
@@ -1709,7 +1768,7 @@ a { color: inherit; }
 .sec.rise .caps > li,
 .sec.rise .mk-col,
 .sec.rise .fitbox,
-.sec.rise .about-body > p,
+.sec.rise .holds > li,
 .sec.rise .prods > li {
   opacity: 0; transform: translateY(14px);
   transition: opacity .5s ease, transform .5s cubic-bezier(.3,.8,.3,1);
@@ -1719,15 +1778,15 @@ a { color: inherit; }
 .sec.rise.lit .caps > li,
 .sec.rise.lit .mk-col,
 .sec.rise.lit .fitbox,
-.sec.rise.lit .about-body > p,
+.sec.rise.lit .holds > li,
 .sec.rise.lit .prods > li { opacity: 1; transform: none; }
 
 .sec.rise .whos > li:nth-child(1), .sec.rise .mws > li:nth-child(1),
-.sec.rise .caps > li:nth-child(1), .sec.rise .about-body > p:nth-child(1) { transition-delay: .16s; }
+.sec.rise .caps > li:nth-child(1), .sec.rise .holds > li:nth-child(1) { transition-delay: .16s; }
 .sec.rise .whos > li:nth-child(2), .sec.rise .mws > li:nth-child(2),
-.sec.rise .caps > li:nth-child(2), .sec.rise .about-body > p:nth-child(2) { transition-delay: .24s; }
+.sec.rise .caps > li:nth-child(2), .sec.rise .holds > li:nth-child(2) { transition-delay: .24s; }
 .sec.rise .whos > li:nth-child(3), .sec.rise .mws > li:nth-child(3),
-.sec.rise .caps > li:nth-child(3), .sec.rise .about-body > p:nth-child(3) { transition-delay: .32s; }
+.sec.rise .caps > li:nth-child(3), .sec.rise .holds > li:nth-child(3) { transition-delay: .32s; }
 .sec.rise .mws > li:nth-child(4), .sec.rise .caps > li:nth-child(4) { transition-delay: .40s; }
 .sec.rise .caps > li:nth-child(5) { transition-delay: .48s; }
 .sec.rise .caps > li:nth-child(6) { transition-delay: .56s; }
@@ -1796,7 +1855,8 @@ a { color: inherit; }
   .fits { grid-template-columns: 1fr; }
   .mk { grid-template-columns: 1fr; gap: 34px; }
   .mk-edge { display: none; }
-  .whos, .mws { grid-template-columns: 1fr; }
+  .whos, .mws, .holds { grid-template-columns: 1fr; }
+  .claim { padding: 26px 24px; }
   .again { display: none; }
   .foot-cols { grid-template-columns: 1fr 1fr; gap: 28px 24px; }
   .qs { grid-template-columns: 1fr; }
@@ -1846,7 +1906,8 @@ a { color: inherit; }
   .laptop-cycling .laptop-lid-back { animation: none !important; opacity: 0 !important; }
   .scene .node { opacity: 1 !important; transform: none !important; animation: none !important; }
   .again-loop { animation: none !important; }
-  .tickmark { stroke-dashoffset: 0 !important; }
+  .tickmark, .mk-add { stroke-dashoffset: 0 !important; }
+  .flow-pulse { display: none; }
   .pulse { display: none; }
 }
 

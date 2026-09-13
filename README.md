@@ -311,6 +311,39 @@ declare a component reachable, make a vulnerability reportable, or start a CRA
 deadline. `telemetry-assessments.json` clearly marks matched and unmatched
 observations and every decision that still needs a person.
 
+### Vendor advisories and backported fixes
+
+Generic feeds can incorrectly flag a distribution package when its vendor has
+backported a security fix without changing the upstream version. An authorized
+security curator can install reviewed, exact-package vendor decisions:
+
+```powershell
+uv run pandax advisory validate .\vendor-intelligence.json
+uv run pandax advisory install .\vendor-intelligence.json
+uv run pandax advisory status
+```
+
+PandaX matches these decisions only to an exact, versioned Package URL. It keeps
+the official source, complete vendor revision, patch reference, review record,
+and any conflicting generic-feed result in the signed bundle. See
+[vendor advisories and backports](docs/vendor-intelligence.md) and the
+[example catalogue](docs/vendor-intelligence-example.json).
+
+### Product exposure analysis
+
+PandaX can combine reviewed build flags, feature configuration, network
+exposure, SBOM dependency paths, and approved runtime observations:
+
+```powershell
+uv run pandax exposure validate .\exposure-context.json
+uv run pandax scan .\product.zip --exposure-context .\exposure-context.json
+```
+
+The result explains whether the supplied evidence supports reachability,
+supports non-reachability, conflicts, or remains insufficient. It does not make
+the final decision or start a CRA deadline. See the [exposure analysis guide](docs/exposure-analysis.md)
+and [example context](docs/exposure-context-example.json).
+
 Vulnerability results keep [coverage, affectedness, KEV signals and product
 reachability](docs/vulnerability-coverage.md) separate. A completed source with
 no result is shown as “no finding in checked sources,” never as proof that the

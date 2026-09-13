@@ -55,6 +55,7 @@ def _finding_digest(finding: dict[str, Any]) -> str:
             "cve", "purl", "component", "version", "severity", "fixed_version",
             "kev", "affectedness", "reachability", "source_url",
             "runtime_evidence_status", "runtime_evidence",
+            "exposure_assessment", "exposure_evidence",
         )
     }
     return hashlib.sha256(_json(important).encode()).hexdigest()
@@ -126,12 +127,20 @@ def pipeline_runner(policy: dict[str, Any], out_base: Path) -> Path:
     telemetry_path = (
         Path(policy["telemetry_path"]) if policy.get("telemetry_path") else None
     )
+    exposure_context_path = (
+        Path(policy["exposure_context_path"])
+        if policy.get("exposure_context_path")
+        else None
+    )
+    optional = {}
+    if telemetry_path is not None:
+        optional["telemetry_path"] = telemetry_path
+    if exposure_context_path is not None:
+        optional["exposure_context_path"] = exposure_context_path
     stream = (
-        pipeline.run_sbom(
-            source, out_base=out_base, telemetry_path=telemetry_path
-        )
+        pipeline.run_sbom(source, out_base=out_base, **optional)
         if policy["source_type"] == "sbom"
-        else pipeline.run(source, out_base=out_base, telemetry_path=telemetry_path)
+        else pipeline.run(source, out_base=out_base, **optional)
     )
     run_dir: Path | None = None
     try:
@@ -169,6 +178,7 @@ class MonitoringStore:
                     source_path TEXT NOT NULL,
                     source_type TEXT NOT NULL,
                     telemetry_path TEXT,
+                    exposure_context_path TEXT,
                     interval_minutes INTEGER NOT NULL,
                     enabled INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL,
@@ -227,6 +237,10 @@ class MonitoringStore:
                 db.execute(
                     "ALTER TABLE monitoring_policies ADD COLUMN telemetry_path TEXT"
                 )
+            if "exposure_context_path" not in columns:
+                db.execute(
+                    "ALTER TABLE monitoring_policies ADD COLUMN exposure_context_path TEXT"
+                )
 
     def add_policy(
         self,
@@ -235,6 +249,7 @@ class MonitoringStore:
         source_type: str = "artifact",
         interval_minutes: int = 360,
         telemetry: Path | None = None,
+        exposure_context: Path | None = None,
         now: dt.datetime | None = None,
     ) -> dict[str, Any]:
         if not name.strip():
@@ -255,17 +270,28 @@ class MonitoringStore:
                 telemetry_summary(telemetry_resolved)
             except (OSError, ValueError) as exc:
                 raise MonitoringError(str(exc)) from exc
+        exposure_resolved: Path | None = None
+        if exposure_context is not None:
+            exposure_resolved = Path(exposure_context).resolve()
+            try:
+                from .exposure import summary as exposure_summary
+
+                exposure_summary(exposure_resolved)
+            except (OSError, ValueError) as exc:
+                raise MonitoringError(str(exc)) from exc
         created = _utc_now(now)
         policy_id = "monitor-" + uuid.uuid4().hex[:12]
         try:
             with self._connect() as db:
                 db.execute(
                     """INSERT INTO monitoring_policies
-                       (id, name, source_path, source_type, telemetry_path, interval_minutes,
+                       (id, name, source_path, source_type, telemetry_path,
+                        exposure_context_path, interval_minutes,
                         created_at, updated_at, next_due_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (policy_id, name.strip(), str(resolved), source_type,
                      str(telemetry_resolved) if telemetry_resolved else None,
+                     str(exposure_resolved) if exposure_resolved else None,
                      interval_minutes, created, created, created),
                 )
         except sqlite3.IntegrityError as exc:
@@ -343,12 +369,21 @@ class MonitoringStore:
 
         source = Path(policy["source_path"])
         telemetry = Path(policy["telemetry_path"]) if policy.get("telemetry_path") else None
+        exposure_context = (
+            Path(policy["exposure_context_path"])
+            if policy.get("exposure_context_path")
+            else None
+        )
         run_dir: Path | None = None
         try:
             if not source.exists():
                 raise ScanExecutionError(f"monitoring source not found: {source}")
             if telemetry is not None and not telemetry.exists():
                 raise ScanExecutionError(f"monitoring telemetry not found: {telemetry}")
+            if exposure_context is not None and not exposure_context.exists():
+                raise ScanExecutionError(
+                    f"monitoring exposure context not found: {exposure_context}"
+                )
             run_dir = (runner or pipeline_runner)(policy, self.path.parent / "monitoring-runs")
             findings = _read_json(run_dir / "findings.json", [])
             if not isinstance(findings, list):

@@ -47,9 +47,9 @@
         Our products<span class="menu-chev" aria-hidden="true"></span>
       </button>
       <div class="menu-panel" id="menuPanel">
-        <a class="menu-item" href="artis/">
-          <img src="assets/artis-mark.png" alt="" width="36" height="36">
-          <span><strong>Artis</strong><small>Turns a release into a reviewable record</small></span>
+        <a class="menu-item" href="actis/">
+          <img src="assets/actis-mark.png" alt="" width="36" height="36">
+          <span><strong>Actis</strong><small>Turns a release into a reviewable record</small></span>
         </a>
       </div>
     </div>
@@ -60,83 +60,86 @@
 <section class="hero" id="top">
   <div class="wrap hero-in">
     <div class="hero-copy">
-      <h1><span class="hl">Automate</span> EU act compliance</h1>
+      <h1><span class="hl">Automate</span> CRA compliance</h1>
       <p class="lede">Product security evidence for the EU Cyber Resilience Act.</p>
       <p class="lede lede-sm">Every release needs legal evidence. PandaX builds it.</p>
       <div class="acts">
         <a class="btn" href="#contact">Book a 30-minute walkthrough</a>
-        <a class="btn btn-q" href="/artis/">See Artis</a>
+        <a class="btn btn-q" href="/actis/">See Actis</a>
       </div>
     </div>
     <div class="hero-stage">
-      <svg class="scene" viewBox="14 72 528 292" role="img"
-     aria-label="A release enters, is matched and decided, and leaves as a sealed record.">
+      <svg class="scene" viewBox="0 0 600 460" role="img"
+     aria-label="A release enters, is matched against sources, weighed at a decision, and leaves as a sealed record.">
   <defs>
-    <linearGradient id="wash-a" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#B0801F" stop-opacity="0.30"/>
-      <stop offset="100%" stop-color="#B0801F" stop-opacity="0"/>
-    </linearGradient>
-    <linearGradient id="wash-b" x1="1" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#4A4FA8" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="#B4577E" stop-opacity="0.05"/>
-    </linearGradient>
+    <!-- Radial, and fully transparent before the edge, so nothing is clipped. -->
+    <radialGradient id="wash-a">
+      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.34"/>
+      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#D9AE55" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="wash-b">
+      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.24"/>
+      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#B4577E" stop-opacity="0"/>
+    </radialGradient>
     <path id="route"
-      d="M86 214 C 150 214, 168 132, 232 132 C 292 132, 300 214, 360 214
-         C 420 214, 428 300, 474 300"/>
+      d="M108 176 C 176 176, 178 108, 246 108 C 314 108, 318 244, 386 244
+         C 442 244, 452 336, 502 336"/>
   </defs>
 
-  <!-- soft ground, so the line work is not floating on nothing -->
-  <ellipse class="wash" cx="196" cy="150" rx="150" ry="116" fill="url(#wash-a)"/>
-  <ellipse class="wash wash-2" cx="404" cy="286" rx="136" ry="104" fill="url(#wash-b)"/>
+  <circle class="wash"   cx="212" cy="178" r="162" fill="url(#wash-a)"/>
+  <circle class="wash wash-2" cx="406" cy="296" r="156" fill="url(#wash-b)"/>
 
   <g class="ink" fill="none" stroke-linecap="round" stroke-linejoin="round">
 
-    <!-- the route the evidence travels -->
     <use href="#route" class="route"/>
 
-    <!-- the release: a box, drawn open -->
+    <!-- the release, as a box being opened -->
     <g class="node node-in">
-      <path d="M30 196 L64 178 L98 196 L64 214 Z"/>
-      <path d="M30 196 L30 236 L64 254 L64 214"/>
-      <path d="M98 196 L98 236 L64 254"/>
-      <path class="thin" d="M47 205 L47 245"/>
+      <path d="M34 150 L82 124 L130 150 L82 176 Z"/>
+      <path d="M34 150 L34 208 L82 234 L82 176"/>
+      <path d="M130 150 L130 208 L82 234"/>
+      <path class="thin" d="M58 163 L58 221"/>
+      <path class="thin" d="M82 124 L82 176"/>
     </g>
 
     <!-- the lattice: the mark's own geometry, where components are matched -->
     <g class="node node-mid">
-      <path d="M232 96 L262 113 L262 147 L232 164 L202 147 L202 113 Z"/>
-      <path class="thin" d="M232 96 L232 130 M232 130 L262 147 M232 130 L202 147"/>
-      <circle class="dot" cx="232" cy="130" r="4.5"/>
-      <circle class="orbit" cx="232" cy="130" r="46"/>
+      <path d="M246 56 L290 81 L290 131 L246 156 L202 131 L202 81 Z"/>
+      <path class="thin" d="M246 56 L246 106 M246 106 L290 131 M246 106 L202 131"/>
+      <circle class="dot node-beat" cx="246" cy="106" r="6"/>
+      <circle class="orbit" cx="246" cy="106" r="70"/>
     </g>
 
-    <!-- the decision: one finding, weighed -->
+    <!-- the decision: one route taken, one not, and the choice recorded -->
     <g class="node node-dec">
-      <path d="M336 196 L384 196"/>
-      <path d="M360 182 L360 232"/>
-      <path class="thin" d="M336 196 L326 216 L346 216 Z"/>
-      <path class="thin" d="M384 196 L374 216 L394 216 Z"/>
-      <circle class="dot" cx="360" cy="176" r="4.5"/>
+      <circle cx="386" cy="244" r="26"/>
+      <path class="thin branch-off" d="M386 244 L440 206"/>
+      <path class="branch-on" d="M386 244 L440 282"/>
+      <circle class="dot" cx="386" cy="244" r="5.5"/>
+      <circle class="dot mark-off" cx="440" cy="206" r="4"/>
     </g>
 
     <!-- the record: sheets, and the seal that closes them -->
     <g class="node node-out">
-      <rect x="444" y="252" width="62" height="80" rx="4"/>
-      <path class="thin" d="M456 274 H494 M456 288 H494 M456 302 H480"/>
+      <path d="M470 286 H556 a6 6 0 0 1 6 6 V404 a6 6 0 0 1 -6 6 H470 a6 6 0 0 1 -6 -6 V292 a6 6 0 0 1 6 -6 Z"/>
+      <path class="thin" d="M486 314 H540 M486 334 H540 M486 354 H518"/>
       <g class="seal">
-        <circle cx="506" cy="330" r="17"/>
-        <path class="thin tick" d="M499 330 l5 5 l9 -11"/>
+        <circle cx="546" cy="392" r="22"/>
+        <path class="seal-tick" d="M535 393 l7 8 l15 -18"/>
       </g>
     </g>
 
     <!-- what travels the route -->
-    <circle class="pulse" r="5">
-      <animateMotion dur="7s" repeatCount="indefinite" rotate="auto">
+    <circle class="pulse" r="6">
+      <animateMotion dur="7.5s" repeatCount="indefinite">
         <mpath href="#route"/>
       </animateMotion>
     </circle>
-    <circle class="pulse pulse-2" r="3.5">
-      <animateMotion dur="7s" begin="2.3s" repeatCount="indefinite" rotate="auto">
+    <circle class="pulse pulse-2" r="4" opacity="0">
+      <animate attributeName="opacity" to="1" begin="2.5s" dur="0.01s" fill="freeze"/>
+      <animateMotion dur="7.5s" begin="2.5s" repeatCount="indefinite">
         <mpath href="#route"/>
       </animateMotion>
     </circle>
@@ -146,7 +149,7 @@
   </div>
 </section>
 
-<section class="sec" id="obligation">
+<section class="sec sec-wash sec-wash-a" id="obligation">
   <div class="wrap">
     <span class="sec-n" aria-hidden="true">01</span><h2>The Cyber Resilience Act hardens vulnerability compliance</h2>
     <p class="lede">Every release needs legal evidence.</p>
@@ -172,7 +175,7 @@
   </div>
 </section>
 
-<section class="sec sec-alt" id="growth">
+<section class="sec sec-alt sec-wash sec-wash-b" id="growth">
   <div class="wrap">
     <span class="sec-n" aria-hidden="true">02</span><h2>Vulnerability discovery is accelerating</h2>
     <p class="lede">CVE reports more than doubled between 2020 and 2025.</p>
@@ -291,10 +294,10 @@
   </div>
 </section>
 
-<section class="sec sec-alt" id="market">
+<section class="sec sec-alt sec-wash sec-wash-a" id="market">
   <div class="wrap">
     <span class="sec-n" aria-hidden="true">04</span><h2>What the current market lacks</h2>
-    <p class="lede">Current solutions detect vulnerabilities. None of them automate compliance with the EU act.</p>
+    <p class="lede">Current solutions detect vulnerabilities. None of them automate CRA compliance.</p>
     <div class="mk">
       <div class="mk-col">
         <h3>What the market delivers</h3>
@@ -308,7 +311,7 @@
   </div>
 </section>
 
-<section class="sec" id="manual">
+<section class="sec sec-wash sec-wash-a" id="manual">
   <div class="wrap">
     <span class="sec-n" aria-hidden="true">05</span><h2>The manual work</h2>
     <p class="lede">Each vulnerability creates the same work again.</p>
@@ -352,7 +355,7 @@
         <span class="fl-src" data-i="3">Documents</span>
         <span class="fl-src" data-i="4">Legal</span>
       </div>
-      <div class="flow-core">Artis</div>
+      <div class="flow-core">Actis</div>
       <div class="flow-out">
         <span class="fl-doc" data-i="0">Record</span>
         <span class="fl-doc" data-i="1">Documents</span>
@@ -366,7 +369,63 @@
         <li>After your company's approval, files the reports and retains a time-stamped audit trail of every submission.</li>
     </ul>
     <p class="closer closer-dark">Nothing is submitted without the company's explicit authorization.</p>
-    <div class="acts"><a class="btn btn-light" href="/artis/">See what Artis produces</a></div>
+    <div class="acts"><a class="btn btn-light" href="/actis/">See what Actis produces</a></div>
+  </div>
+</section>
+
+<section class="sec sec-ez sec-wash sec-wash-b" id="easier">
+  <div class="wrap">
+    <h2 class="ez-head">Product security made <span class="hl hl-rose">easier.</span></h2>
+    <ul class="ezs">
+      <li class="ez" data-i="0">
+        <svg class="cardart" viewBox="0 0 120 120" aria-hidden="true">
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <rect class="card card-3" x="22" y="22" width="86" height="86" rx="12"/>
+        <rect class="card card-2" x="16" y="16" width="86" height="86" rx="12"/>
+        <rect class="card card-1" x="10" y="10" width="86" height="86" rx="12"/>
+        <g class="glyph"><rect x="34" y="36" width="52" height="42" rx="3"/>
+        <path d="M34 46 H86"/>
+        <circle class="g-dot" cx="46" cy="62" r="4"/>
+        <path d="M50 62 H60 M64 58 L70 54 M64 66 L70 70"/>
+        <circle cx="72" cy="52" r="3.5"/>
+        <circle cx="72" cy="72" r="3.5"/></g>
+      </g>
+    </svg>
+        <h3>Evidence, not just findings</h3>
+        <p>A scanner hands you a list. Actis ties every component, finding and decision to the release that shipped, so there is something to show when proof is asked for.</p>
+      </li>
+      <li class="ez" data-i="1">
+        <svg class="cardart" viewBox="0 0 120 120" aria-hidden="true">
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <rect class="card card-3" x="22" y="22" width="86" height="86" rx="12"/>
+        <rect class="card card-2" x="16" y="16" width="86" height="86" rx="12"/>
+        <rect class="card card-1" x="10" y="10" width="86" height="86" rx="12"/>
+        <g class="glyph"><path d="M40 30 H74 L82 38 V84 H40 Z"/>
+        <path d="M74 30 V38 H82"/>
+        <path d="M48 50 H72 M48 58 H72 M48 66 H64"/>
+        <circle class="g-dot" cx="70" cy="74" r="7"/>
+        <path d="M66 80 L66 90 L70 87 L74 90 L74 80"/></g>
+      </g>
+    </svg>
+        <h3>The documents, generated</h3>
+        <p>Annex VII technical documentation and the Annex V declaration, drafted in the format the regulation asks for, with the missing inputs flagged rather than guessed.</p>
+      </li>
+      <li class="ez" data-i="2">
+        <svg class="cardart" viewBox="0 0 120 120" aria-hidden="true">
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <rect class="card card-3" x="22" y="22" width="86" height="86" rx="12"/>
+        <rect class="card card-2" x="16" y="16" width="86" height="86" rx="12"/>
+        <rect class="card card-1" x="10" y="10" width="86" height="86" rx="12"/>
+        <g class="glyph"><circle cx="66" cy="48" r="14"/>
+        <circle class="g-dot" cx="66" cy="48" r="5"/>
+        <path d="M66 30 V36 M66 60 V66 M48 48 H54 M78 48 H84 M54 36 L58 40 M74 56 L78 60 M54 60 L58 56 M74 40 L78 36"/>
+        <path d="M36 88 V66 a5 5 0 0 1 10 0 V78 h8 a5 5 0 0 1 5 5 v5"/></g>
+      </g>
+    </svg>
+        <h3>No more rebuilding by hand</h3>
+        <p>The work that repeats on every release — inventory, exposure, remediation proof, submission — runs once and keeps its own history.</p>
+      </li>
+    </ul>
   </div>
 </section>
 
@@ -403,7 +462,7 @@
   </div>
 </section>
 
-<section class="sec sec-alt" id="capability">
+<section class="sec sec-alt sec-wash sec-wash-a" id="capability">
   <div class="wrap">
     <span class="sec-n" aria-hidden="true">08</span><h2>What PandaX does</h2>
     <ol class="caps">
@@ -425,7 +484,7 @@
       <li class="cap" data-i="3">
         <span class="cap-n">04</span>
         <h3>Evidence history</h3>
-        <p>Maintains dated, protected evidence for the retention period the EU act requires.</p>
+        <p>Maintains dated, protected evidence for the retention period the CRA requires.</p>
       </li>
       <li class="cap" data-i="4">
         <span class="cap-n">05</span>
@@ -440,14 +499,98 @@
     </ol>
     <div class="band">
       <h3>Designed for small manufacturers</h3>
-      <p>Meet the EU act without adding a dedicated legal or compliance team.</p>
+      <p>Meet the CRA without adding a dedicated legal or compliance team.</p>
     </div>
   </div>
 </section>
 
-<section class="sec sec-close" id="contact">
-  <div class="wrap close-in close-one">
-    <div class="form-wrap">
+<section class="sec sec-close sec-wash sec-wash-a" id="contact">
+  <div class="wrap">
+    <div class="act">
+      <h2 class="act-head">Ready to see <span class="hl hl-rose">Actis</span> in action?</h2>
+      <p class="act-sub">One run against one firmware image, and the record it seals. Components, findings, the fix that shipped, and the proof it was signed off — this is what comes out the other side.</p>
+      <div class="act-stage">
+        <svg class="act-art" viewBox="0 0 1200 470" aria-hidden="true" preserveAspectRatio="xMidYMax meet">
+          <defs>
+            <linearGradient id="actL" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stop-color="#4A4FA8" stop-opacity="0"/>
+              <stop offset="0.28" stop-color="#4A4FA8" stop-opacity="0.07"/>
+              <stop offset="0.62" stop-color="#4A4FA8" stop-opacity="0.17"/>
+              <stop offset="1" stop-color="#4A4FA8" stop-opacity="0.02"/>
+            </linearGradient>
+            <linearGradient id="actR" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stop-color="#B4577E" stop-opacity="0"/>
+              <stop offset="0.28" stop-color="#B4577E" stop-opacity="0.07"/>
+              <stop offset="0.66" stop-color="#B4577E" stop-opacity="0.18"/>
+              <stop offset="1" stop-color="#B4577E" stop-opacity="0.02"/>
+            </linearGradient>
+          </defs>
+          <g class="act-hill act-hill-l">
+            <path d="M-80 340 C10 340 30 200 110 200 C168 200 186 262 228 262 C276 262 296 196 352 196 C430 196 448 340 520 340 L520 470 L-80 470 Z"
+                  fill="url(#actL)"/>
+            <path d="M-80 340 C10 340 30 200 110 200 C168 200 186 262 228 262 C276 262 296 196 352 196 C430 196 448 340 520 340"
+                  fill="none" stroke="#4A4FA8" stroke-opacity="0.34" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <g class="act-hill act-hill-r">
+            <path d="M1280 312 C1190 312 1170 168 1090 168 C1030 168 1012 236 970 236 C922 236 902 172 846 172 C768 172 752 312 680 312 L680 470 L1280 470 Z"
+                  fill="url(#actR)"/>
+            <path d="M1280 312 C1190 312 1170 168 1090 168 C1030 168 1012 236 970 236 C922 236 902 172 846 172 C768 172 752 312 680 312"
+                  fill="none" stroke="#B4577E" stroke-opacity="0.34" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
+          <g class="act-plus" stroke="#B0801F" stroke-width="1.7" stroke-linecap="round">
+            <path d="M56 132 h17 M64.5 123.5 v17"/>
+            <path d="M1148 96 h13 M1154.5 89.5 v13"/>
+            <path d="M1112 250 h10 M1117 245 v10"/>
+          </g>
+        </svg>
+        <div class="act-frame" data-cycle="1">
+          <div class="rec-frame">
+            <div class="sc" id="sc">
+          <div class="sc-bar" aria-hidden="true">
+            <span class="sc-dots"><i></i><i></i><i></i></span>
+            <span class="sc-app">Actis</span>
+          </div>
+          <div class="sc-body">
+            <div class="sc-head">
+              <span class="sc-flag">Example record</span>
+              <span class="sc-seal" id="scSeal"><span class="seal-dot" aria-hidden="true"></span>Sealed</span>
+            </div>
+            <div class="sc-title"><span data-f="product">Gateway controller</span> <span data-f="release">4.2.1</span></div>
+            <div class="sc-run"><span class="id" data-f="runId">run-20260910-084417-c31f0a</span></div>
+            <div class="sc-stats">
+            <div class="sc-stat">
+              <span class="sc-v" data-count="412">412</span>
+              <span class="sc-l">components</span>
+            </div>
+            <div class="sc-stat">
+              <span class="sc-v" data-count="7">7</span>
+              <span class="sc-l">findings</span>
+            </div>
+            <div class="sc-stat" data-mark="1">
+              <span class="sc-v" data-count="1">1</span>
+              <span class="sc-l">needs a decision</span>
+            </div>
+            <div class="sc-stat">
+              <span class="sc-v" data-count="6 of 6">6 of 6</span>
+              <span class="sc-l">checks passed</span>
+            </div>
+            </div>
+            <ul class="sc-checks"><li data-i="0"><span class="tick" aria-hidden="true"></span>Inventory</li><li data-i="1"><span class="tick" aria-hidden="true"></span>Findings</li><li data-i="2"><span class="tick" aria-hidden="true"></span>Decisions</li><li data-i="3"><span class="tick" aria-hidden="true"></span>Timeline</li><li data-i="4"><span class="tick" aria-hidden="true"></span>Documents</li><li data-i="5"><span class="tick" aria-hidden="true"></span>Sealed</li></ul>
+            <div class="sc-fix">
+              <span class="fx-arrow" aria-hidden="true"></span>
+              <span class="id" data-f="cve">CVE-2023-46218</span> in <span class="id" data-f="component">curl 8.3.0</span> — <span data-f="fix">Upgrade to curl 8.5.0</span>
+            </div>
+          </div>
+        </div>
+          </div>
+          <span class="act-mark" aria-hidden="true">
+            <img src="assets/pandax-mark-ink.png" alt="" width="46" height="46" loading="lazy">
+          </span>
+        </div>
+      </div>
+    </div>
+    <div class="close-in close-one">
+      <div class="form-wrap">
       <span class="sec-n" aria-hidden="true">09</span><h2>Get in touch</h2>
       <p class="lede lede-sm">Tell us what you build and which release is next.</p>
       <form class="form" method="post" action="mailto:contact@pandax.online" enctype="text/plain">
@@ -462,10 +605,14 @@
         <button class="btn" type="submit">Send</button>
       </form>
     </div>
+    </div>
   </div>
 </section>
 </main>
 <footer class="foot">
+  <span class="foot-mark" aria-hidden="true">
+    <img src="assets/pandax-mark-ink.png" alt="" width="240" height="240" loading="lazy">
+  </span>
   <div class="wrap foot-in">
     <div class="foot-brand">
       <img src="assets/favicon-512.png" alt="" width="22" height="22">
@@ -473,7 +620,7 @@
       <span class="foot-tag">Product security evidence for the EU Cyber Resilience Act</span>
     </div>
     <nav class="foot-links" aria-label="Site">
-      <a href="/artis/">Artis</a>
+      <a href="/actis/">Actis</a>
       <a href="/privacy/">Privacy</a>
     </nav>
     <p class="foot-legal">PandaX produces compliance documentation. It does not issue conformity opinions, certificates or verdicts.</p>

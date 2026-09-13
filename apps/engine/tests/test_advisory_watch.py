@@ -74,6 +74,14 @@ def test_refresh_deduplicates_across_repeats_and_restart(tmp_path):
 
 def test_watching_comparison_resolves_to_newer_release(tmp_path):
     watcher = setup_service(tmp_path, FakeFeeds())
+    source = tmp_path / "run-source"
+    (source / "dossier.json").write_text(json.dumps({
+        "product": {"name": "", "version": ""},
+        "generated": "2026-09-01T00:00:00Z",
+    }))
+    (source / "release-source.json").write_text(json.dumps({
+        "name": "Demo Device", "version": "1.0"
+    }))
     comparison = tmp_path / "run-comparison"
     comparison.mkdir()
     (comparison / "manifest.json").write_text(json.dumps({

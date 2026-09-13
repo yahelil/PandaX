@@ -41,7 +41,12 @@ class CaseService:
     def product(self, run_id):
         dossier = self.run_json(run_id, 'dossier.json', {})
         manifest = self.run_json(run_id, 'manifest.json', {})
-        product = dossier.get('product') or manifest.get('product') or {}
+        release = self.run_json(run_id, 'release-source.json', {})
+        product = {}
+        for source in (release, manifest.get('product') or {}, dossier.get('product') or {}):
+            for key in ('name', 'version'):
+                if source.get(key):
+                    product[key] = source[key]
         return {'name': str(product.get('name', '')), 'version': str(product.get('version', ''))}, dossier.get('generated') or manifest.get('created')
 
     def link_run(self, db, case_id, run_id, role):

@@ -69,69 +69,67 @@
       </div>
     </div>
     <div class="hero-stage">
-      <svg class="scene" viewBox="0 0 600 460" role="img"
-     aria-label="A release enters, is matched against sources, weighed at a decision, and leaves as a sealed record.">
+      <svg class="scene" viewBox="0 0 600 440" role="img"
+     aria-label="A release enters, is checked against advisory sources, protected and sealed, and leaves as a reviewable record.">
   <defs>
-    <!-- Radial, and fully transparent before the edge, so nothing is clipped. -->
     <radialGradient id="wash-a">
-      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.34"/>
-      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.16"/>
+      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.32"/>
+      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.15"/>
       <stop offset="100%" stop-color="#D9AE55" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="wash-b">
-      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.24"/>
-      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.12"/>
+      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.22"/>
+      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.11"/>
       <stop offset="100%" stop-color="#B4577E" stop-opacity="0"/>
     </radialGradient>
     <path id="route"
-      d="M108 176 C 176 176, 178 108, 246 108 C 314 108, 318 244, 386 244
-         C 442 244, 452 336, 502 336"/>
+      d="M136 236 C 196 236, 200 196, 262 196 M 386 208 C 440 208, 448 300, 496 300"/>
+    <clipPath id="inside-shield">
+      <path d="M200 116 Q200 106 210 103 L288 82 L366 103 Q376 106 376 116 L376 214
+               Q376 268 288 302 Q200 268 200 214 Z"/>
+    </clipPath>
   </defs>
 
-  <circle class="wash"   cx="212" cy="178" r="162" fill="url(#wash-a)"/>
-  <circle class="wash wash-2" cx="406" cy="296" r="156" fill="url(#wash-b)"/>
+  <circle class="wash" cx="250" cy="180" r="176" fill="url(#wash-a)"/>
+  <circle class="wash wash-2" cx="424" cy="292" r="156" fill="url(#wash-b)"/>
 
   <g class="ink" fill="none" stroke-linecap="round" stroke-linejoin="round">
 
     <use href="#route" class="route"/>
 
-    <!-- the release, as a box being opened -->
+    <!-- the release going in -->
     <g class="node node-in">
-      <path d="M34 150 L82 124 L130 150 L82 176 Z"/>
-      <path d="M34 150 L34 208 L82 234 L82 176"/>
-      <path d="M130 150 L130 208 L82 234"/>
-      <path class="thin" d="M58 163 L58 221"/>
-      <path class="thin" d="M82 124 L82 176"/>
+      <path d="M44 208 L90 182 L136 208 L90 234 Z"/>
+      <path d="M44 208 L44 264 L90 290 L90 234"/>
+      <path d="M136 208 L136 264 L90 290"/>
+      <path class="thin" d="M67 221 L67 277"/>
+      <path class="thin" d="M90 182 L90 234"/>
     </g>
 
-    <!-- the lattice: the mark's own geometry, where components are matched -->
-    <g class="node node-mid">
-      <path d="M246 56 L290 81 L290 131 L246 156 L202 131 L202 81 Z"/>
-      <path class="thin" d="M246 56 L246 106 M246 106 L290 131 M246 106 L202 131"/>
-      <circle class="dot node-beat" cx="246" cy="106" r="6"/>
-      <circle class="orbit" cx="246" cy="106" r="70"/>
+    <!-- protected: the shield the evidence is held in -->
+    <g class="node node-shield">
+      <g clip-path="url(#inside-shield)">
+        <g class="lattice">
+          <path class="thin" d="M288 96 L340 126 L340 186 L288 216 L236 186 L236 126 Z"/>
+          <path class="thin" d="M288 96 L288 156 M288 156 L340 186 M288 156 L236 186"/>
+          <path class="thin" d="M236 126 L184 96 M340 126 L392 96 M236 186 L184 216 M340 186 L392 216"/>
+        </g>
+      </g>
+      <path class="shield" d="M200 116 Q200 106 210 103 L288 82 L366 103 Q376 106 376 116 L376 214
+                              Q376 268 288 302 Q200 268 200 214 Z"/>
+      <path class="shield-check" d="M258 188 l21 22 l44 -54"/>
     </g>
 
-    <!-- the decision: one route taken, one not, and the choice recorded -->
-    <g class="node node-dec">
-      <circle cx="386" cy="244" r="26"/>
-      <path class="thin branch-off" d="M386 244 L440 206"/>
-      <path class="branch-on" d="M386 244 L440 282"/>
-      <circle class="dot" cx="386" cy="244" r="5.5"/>
-      <circle class="dot mark-off" cx="440" cy="206" r="4"/>
-    </g>
-
-    <!-- the record: sheets, and the seal that closes them -->
+    <!-- the record coming out -->
     <g class="node node-out">
-      <path d="M470 286 H556 a6 6 0 0 1 6 6 V404 a6 6 0 0 1 -6 6 H470 a6 6 0 0 1 -6 -6 V292 a6 6 0 0 1 6 -6 Z"/>
-      <path class="thin" d="M486 314 H540 M486 334 H540 M486 354 H518"/>
+      <path d="M462 250 H548 a6 6 0 0 1 6 6 V368 a6 6 0 0 1 -6 6 H462 a6 6 0 0 1 -6 -6 V256 a6 6 0 0 1 6 -6 Z"/>
+      <path class="thin" d="M478 278 H532 M478 298 H532 M478 318 H510"/>
       <g class="seal">
-        <circle cx="546" cy="392" r="22"/>
-        <path class="seal-tick" d="M535 393 l7 8 l15 -18"/>
+        <circle cx="538" cy="356" r="22"/>
+        <path class="seal-tick" d="M527 357 l7 8 l15 -18"/>
       </g>
     </g>
 
-    <!-- what travels the route -->
     <circle class="pulse" r="6">
       <animateMotion dur="7.5s" repeatCount="indefinite">
         <mpath href="#route"/>
@@ -149,7 +147,7 @@
   </div>
 </section>
 
-<section class="sec" id="obligation">
+<section class="sec sec-wash sec-wash-a" id="obligation">
   <div class="wrap">
     <span class="sec-n" aria-hidden="true">01</span><h2>The Cyber Resilience Act hardens vulnerability compliance</h2>
     <p class="lede">Every release needs legal evidence.</p>
@@ -175,7 +173,7 @@
   </div>
 </section>
 
-<section class="sec sec-alt" id="growth">
+<section class="sec sec-alt sec-wash sec-wash-b" id="growth">
   <div class="wrap">
     <span class="sec-n" aria-hidden="true">02</span><h2>Vulnerability discovery is accelerating</h2>
     <p class="lede">CVE reports more than doubled between 2020 and 2025.</p>
@@ -294,7 +292,7 @@
   </div>
 </section>
 
-<section class="sec sec-alt" id="market">
+<section class="sec sec-alt sec-wash sec-wash-a" id="market">
   <div class="wrap">
     <span class="sec-n" aria-hidden="true">04</span><h2>What the current market lacks</h2>
     <p class="lede">Current solutions detect vulnerabilities. None of them automate CRA compliance.</p>
@@ -311,7 +309,7 @@
   </div>
 </section>
 
-<section class="sec" id="manual">
+<section class="sec sec-wash sec-wash-a" id="manual">
   <div class="wrap">
     <span class="sec-n" aria-hidden="true">05</span><h2>The manual work</h2>
     <p class="lede">Each vulnerability creates the same work again.</p>
@@ -373,7 +371,7 @@
   </div>
 </section>
 
-<section class="sec" id="source">
+<section class="sec sec-wash sec-wash-b" id="source">
   <div class="wrap">
     <span class="sec-n" aria-hidden="true">07</span><h2>Your source code never leaves your environment</h2>
     <p class="lede">PandaX works from the SBOM, not the code.</p>
@@ -406,7 +404,7 @@
   </div>
 </section>
 
-<section class="sec sec-alt" id="capability">
+<section class="sec sec-alt sec-wash sec-wash-a" id="capability">
   <div class="wrap">
     <span class="sec-n" aria-hidden="true">08</span><h2>What PandaX does</h2>
     <ol class="caps">
@@ -448,7 +446,7 @@
   </div>
 </section>
 
-<section class="sec sec-close" id="contact">
+<section class="sec sec-close sec-wash sec-wash-a" id="contact">
   <div class="wrap close-in close-one">
     <div class="form-wrap">
       <span class="sec-n" aria-hidden="true">09</span><h2>Get in touch</h2>

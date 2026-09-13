@@ -375,7 +375,20 @@
     });
   }
 
-  function init() { menu(); page(); contactForm(); sheet(); }
+  /** The header takes a shadow once the page has moved under it. */
+  function header() {
+    var head = $(".head");
+    if (!head) return;
+    var on = false;
+    var read = function () {
+      var now = (window.scrollY || document.documentElement.scrollTop) > 8;
+      if (now !== on) { on = now; head.classList.toggle("is-scrolled", on); }
+    };
+    read();
+    window.addEventListener("scroll", read, { passive: true });
+  }
+
+  function init() { menu(); page(); contactForm(); sheet(); header(); }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

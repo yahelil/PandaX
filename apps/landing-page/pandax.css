@@ -1158,14 +1158,6 @@ a { color: inherit; }
 
 /* ------------------------------------------------------------- market --- */
 
-.mk { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 0 24px; margin-top: 32px; }
-.mk-col { border: 1px solid var(--line); border-radius: 4px; padding: 24px 26px; background: var(--surface); }
-.mk-col.is-mark { border-color: rgba(24,82,196,0.45); }
-.mk-col h3 { margin-bottom: 4px; }
-.mk-col ul { list-style: none; margin: 0; padding: 0; }
-.mk-col li { padding: 12px 0; border-top: 1px solid var(--line); font-size: 16px; }
-.mk-col.is-mark li { color: var(--ink); }
-.mk-col.is-mark li::marker { color: var(--brand); }
 
 /* --------------------------------------------------------- capability --- */
 
@@ -1188,7 +1180,7 @@ a { color: inherit; }
 /* A counted marker, so the page reads as a sequence rather than a stack. */
 /* Alternating ground: consecutive light sections do not read the same. */
 .sec-alt { background: var(--surface); }
-.sec-alt .aside, .sec-alt .mk-col { background: var(--bg); }
+.sec-alt .aside { background: var(--bg); }
 
 /* The dark sections carry the subject's own texture, faintly. */
 .sec-dark { position: relative; overflow: hidden; }
@@ -1253,8 +1245,6 @@ a { color: inherit; }
 .figure-v { background: linear-gradient(92deg, var(--brand), var(--flag)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .cap-n { color: var(--brand); }
 .step-n { color: var(--accent-t, var(--brand)); }
-.mk-col.is-mark { border-color: rgba(24,82,196,0.4); }
-.mk-col.is-mark h3 { color: var(--brand); }
 
 /* ------------------------------------------------------- three cards --- */
 
@@ -1606,6 +1596,51 @@ a { color: inherit; }
 
 .gly { width: 30px; height: 30px; display: block; stroke-width: 2; }
 
+/* What you already have, and the point the line runs out. The left side is
+   settled and grey; the right side is still open boxes. */
+.mk {
+  margin-top: 36px;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 0 34px; align-items: stretch;
+}
+.mk-col h3 {
+  font-size: 16px; letter-spacing: -0.014em; margin: 0 0 18px;
+  padding-bottom: 14px; border-bottom: 1px solid var(--line);
+}
+.mk-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.mk-col li {
+  display: grid; grid-template-columns: 22px 1fr; gap: 12px;
+  align-items: start; font-size: 16px; line-height: 1.45;
+}
+
+.mk-have h3 { color: var(--body); }
+.mk-have li { color: #7C8792; }
+.mk-tick {
+  width: 22px; height: 22px;
+  fill: none; stroke: #9AA5B0; stroke-width: 2.2;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+
+.mk-todo h3 { color: var(--flag-t); border-bottom-color: rgba(224,82,60,0.34); }
+.mk-todo li { color: var(--ink); }
+.mk-box {
+  width: 18px; height: 18px; margin-top: 2px;
+  border: 1.6px dashed rgba(224,82,60,0.65); border-radius: 4px;
+}
+
+/* The break between them, which is the whole argument. */
+.mk-edge { display: grid; grid-template-rows: 1fr auto 1fr; justify-items: center; gap: 12px; }
+.mk-rail { width: 1px; background: var(--line); }
+.mk-rail-dash {
+  background: repeating-linear-gradient(
+    to bottom, rgba(224,82,60,0.5) 0 5px, transparent 5px 11px);
+}
+.mk-stop {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
+  color: var(--flag-t); white-space: nowrap;
+  writing-mode: vertical-rl; text-orientation: mixed;
+}
+
 /* ------------------------------------------------------ the manual work -- */
 
 /* The problem wears the warm note; the brand colour is kept for what we
@@ -1646,6 +1681,59 @@ a { color: inherit; }
   font-size: 14.5px; color: var(--flag-t);
 }
 .sec-alt .again-tag { background: var(--surface); }
+
+/* ------------------------------------------------------------- entrance -- */
+
+/* Each section arrives rather than being there already: the heading, then
+   its lede, then whatever it is made of. Armed by the script, so the page
+   is never left with invisible text. */
+.sec.rise > .wrap > h2,
+.sec.rise > .wrap > .lede,
+.sec.rise > .wrap > .q-head,
+.sec.rise > .wrap > .act > .act-head,
+.sec.rise > .wrap > .act > .act-sub {
+  opacity: 0; transform: translateY(12px);
+  transition: opacity .55s ease, transform .55s cubic-bezier(.3,.8,.3,1);
+}
+.sec.rise > .wrap > .lede,
+.sec.rise > .wrap > .act > .act-sub { transition-delay: .09s; }
+.sec.rise.lit > .wrap > h2,
+.sec.rise.lit > .wrap > .lede,
+.sec.rise.lit > .wrap > .q-head,
+.sec.rise.lit > .wrap > .act > .act-head,
+.sec.rise.lit > .wrap > .act > .act-sub { opacity: 1; transform: none; }
+
+/* The pieces below them come in one after another. */
+.sec.rise .whos > li,
+.sec.rise .mws > li,
+.sec.rise .caps > li,
+.sec.rise .mk-col,
+.sec.rise .fitbox,
+.sec.rise .about-body > p,
+.sec.rise .prods > li {
+  opacity: 0; transform: translateY(14px);
+  transition: opacity .5s ease, transform .5s cubic-bezier(.3,.8,.3,1);
+}
+.sec.rise.lit .whos > li,
+.sec.rise.lit .mws > li,
+.sec.rise.lit .caps > li,
+.sec.rise.lit .mk-col,
+.sec.rise.lit .fitbox,
+.sec.rise.lit .about-body > p,
+.sec.rise.lit .prods > li { opacity: 1; transform: none; }
+
+.sec.rise .whos > li:nth-child(1), .sec.rise .mws > li:nth-child(1),
+.sec.rise .caps > li:nth-child(1), .sec.rise .about-body > p:nth-child(1) { transition-delay: .16s; }
+.sec.rise .whos > li:nth-child(2), .sec.rise .mws > li:nth-child(2),
+.sec.rise .caps > li:nth-child(2), .sec.rise .about-body > p:nth-child(2) { transition-delay: .24s; }
+.sec.rise .whos > li:nth-child(3), .sec.rise .mws > li:nth-child(3),
+.sec.rise .caps > li:nth-child(3), .sec.rise .about-body > p:nth-child(3) { transition-delay: .32s; }
+.sec.rise .mws > li:nth-child(4), .sec.rise .caps > li:nth-child(4) { transition-delay: .40s; }
+.sec.rise .caps > li:nth-child(5) { transition-delay: .48s; }
+.sec.rise .caps > li:nth-child(6) { transition-delay: .56s; }
+.sec.rise .mk-col:nth-of-type(1) { transition-delay: .16s; }
+.sec.rise .mk-col:nth-of-type(2) { transition-delay: .28s; }
+.sec.rise .fitbox { transition-delay: .14s; }
 
 /* ------------------------------------------------------- responsive ---- */
 
@@ -1706,6 +1794,8 @@ a { color: inherit; }
   .mk { grid-template-columns: 1fr; gap: 18px; }
   .caps { grid-template-columns: 1fr; gap: 0; }
   .fits { grid-template-columns: 1fr; }
+  .mk { grid-template-columns: 1fr; gap: 34px; }
+  .mk-edge { display: none; }
   .whos, .mws { grid-template-columns: 1fr; }
   .again { display: none; }
   .foot-cols { grid-template-columns: 1fr 1fr; gap: 28px 24px; }

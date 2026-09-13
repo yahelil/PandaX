@@ -273,17 +273,6 @@ function terminal(depth) {
     </div>`;
 }
 
-function pipelineSection() {
-  const pl = C.pipeline;
-  return `<section class="sec sec-term" id="pipeline">
-  <div class="wrap">
-    <h2>${esc(pl.heading)}</h2>
-    ${terminal()}
-    <p class="note note-dark">${esc(pl.note)}</p>
-  </div>
-</section>`;
-}
-
 /* 2 -------------------------------------------------------- obligation --- */
 
 function obligationSection() {
@@ -312,69 +301,121 @@ function obligationSection() {
     </ol>
 
     <ul class="rule-list">${points}</ul>
-    <p class="closer">${esc(o.closing)}</p>
     <p class="src">${esc(o.source)}</p>
   </div>
 </section>`;
 }
 
-/* 3 ----------------------------------------------------------- vectors --- */
+/* 3 ------------------------------------------------------- accelerating --- */
 
-function vectorsSection() {
-  const v = C.vectors;
-  const max = Math.max(...v.bars.map((b) => b.value));
-  const bars = v.bars
-    .map((b, i) => `<div class="bar-row${b.mark ? " is-mark" : ""}" data-i="${i}">
-          <span class="bar-label">${esc(b.label)}</span>
-          <span class="bar-track"><span class="bar-fill" style="--w:${((b.value / max) * 100).toFixed(1)}%"></span></span>
-          <span class="bar-value">${b.value}%</span>
+function growthSection() {
+  const g = C.growth;
+  const max = Math.max(...g.series.map((s) => s.value));
+  const shown = new Set(["2020", "2025", "2030"]);   // label the turns, not every bar
+  const bars = g.series
+    .map((s, i) => `<div class="col${s.projected ? " is-proj" : ""}" data-i="${i}">
+          <span class="col-v">${shown.has(s.year) ? esc(Math.round(s.value / 1000)) + "K" : ""}</span>
+          <span class="col-bar" style="--h:${((s.value / max) * 100).toFixed(1)}%"></span>
+          <span class="col-y">${esc(s.year)}</span>
         </div>`).join("\n        ");
+  const rows = g.series
+    .map((s) => `<tr><th scope="row">${esc(s.year)}</th><td>${s.value.toLocaleString("en-US")}${s.projected ? " (projected)" : ""}</td></tr>`).join("");
+  const facts = g.facts
+    .map((f) => `<div class="figure"><span class="figure-v">${esc(f.value)}</span><span class="figure-l">${esc(f.label)}</span></div>`).join("\n        ");
 
-  // The data also exists as a real table: relief for the recessive greys, and
-  // the reading anyone with a screen reader gets.
-  const rows = v.bars.map((b) => `<tr><th scope="row">${esc(b.label)}</th><td>${b.value}%</td></tr>`).join("");
-
-  const facts = v.facts.map((f) => `<li>${esc(f)}</li>`).join("");
-
-  return `<section class="sec" id="vectors">
+  return `<section class="sec" id="growth">
   <div class="wrap">
-    <h2>${esc(v.heading)}</h2>
-    <p class="lede">${esc(v.lede)}</p>
+    <h2>${esc(g.heading)}</h2>
+    <p class="lede">${esc(g.lede)}</p>
 
     <figure class="chart" id="chart">
-      <figcaption class="vh">Initial access vectors, Verizon 2025 DBIR</figcaption>
-      <div class="bars">
+      <figcaption class="chart-key">
+        <span class="key key-actual">${esc(g.actualLabel)}</span>
+        <span class="key key-proj">${esc(g.projectedLabel)}</span>
+      </figcaption>
+      <div class="cols">
         ${bars}
       </div>
-      <table class="vh">
-        <caption>Initial access vectors</caption>
-        <tbody>${rows}</tbody>
-      </table>
+      <table class="vh"><caption>Annual published CVEs</caption><tbody>${rows}</tbody></table>
     </figure>
 
-    <ul class="facts">${facts}</ul>
-    <p class="src">${esc(v.source)}</p>
+    <div class="figures">
+        ${facts}
+    </div>
+
+    <div class="aside">
+      <h3>${esc(g.ai.title)}</h3>
+      <p>${esc(g.ai.body)}</p>
+    </div>
+
+    <p class="src">${esc(g.source)}</p>
   </div>
 </section>`;
 }
 
-/* 4 ----------------------------------------------------------- problem --- */
+/* 4 ---------------------------------------------------------- workflow --- */
 
-function problemSection() {
-  const p = C.problem;
-  const lines = p.lines
-    .map((l) => `<li><strong>${esc(l.lead)}</strong> ${esc(l.rest)}</li>`).join("\n        ");
-  // The same five sources that converge in section 6 — here, adrift.
-  const chips = ["Jira", "CI/CD", "SBOM", "Documents", "Legal"]
-    .map((x, i) => `<span class="chip" data-i="${i}">${esc(x)}</span>`).join("");
-  return `<section class="sec" id="problem">
+function workflowSection() {
+  const w = C.workflow;
+  const stages = w.stages
+    .map((s, i) => `<li class="wf" data-i="${i}">
+        <span class="wf-dot" aria-hidden="true"></span>
+        <span class="wf-at">${esc(s.at)}</span>
+        <h3>${esc(s.title)}</h3>
+        <p>${esc(s.body)}</p>
+      </li>`).join("\n      ");
+  return `<section class="sec sec-dark" id="workflow">
   <div class="wrap">
-    <h2>${esc(p.heading)}</h2>
-    <p class="lede">${esc(p.lede)}</p>
-    <div class="scatter" id="scatter" aria-hidden="true">${chips}</div>
-    <ul class="rule-list rule-list-lead">
-        ${lines}
-    </ul>
+    <h2>${esc(w.heading)}</h2>
+    <p class="lede lede-dark">${esc(w.lede)}</p>
+    <ol class="wfs" id="wfs">
+      <span class="wf-rail" aria-hidden="true"><i id="wfFill"></i></span>
+      ${stages}
+    </ol>
+    <p class="closer closer-dark">${esc(w.closing)}</p>
+  </div>
+</section>`;
+}
+
+/* 5 ------------------------------------------------------------ market --- */
+
+function marketSection() {
+  const m = C.market;
+  const col = (c) => `<div class="mk-col${c.mark ? " is-mark" : ""}">
+        <h3>${esc(c.title)}</h3>
+        <ul>${c.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
+      </div>`;
+  return `<section class="sec" id="market">
+  <div class="wrap">
+    <h2>${esc(m.heading)}</h2>
+    <p class="lede">${esc(m.lede)}</p>
+    <div class="mk">
+      ${m.columns.map(col).join("\n      ")}
+    </div>
+  </div>
+</section>`;
+}
+
+/* 9 -------------------------------------------------------- capability --- */
+
+function capabilitySection() {
+  const c = C.capability;
+  const items = c.items
+    .map((i, n) => `<li class="cap" data-i="${n}">
+        <span class="cap-n">${n2(n)}</span>
+        <h3>${esc(i.title)}</h3>
+        <p>${esc(i.body)}</p>
+      </li>`).join("\n      ");
+  return `<section class="sec" id="capability">
+  <div class="wrap">
+    <h2>${esc(c.heading)}</h2>
+    <ol class="caps">
+      ${items}
+    </ol>
+    <div class="band">
+      <h3>${esc(c.closing.title)}</h3>
+      <p>${esc(c.closing.body)}</p>
+    </div>
   </div>
 </section>`;
 }
@@ -398,7 +439,6 @@ function manualSection() {
       ${steps}
     </ol>
     <p class="note">${esc(m.clock)}</p>
-    <p class="closer">${esc(m.closing)}</p>
   </div>
 </section>`;
 }
@@ -471,84 +511,6 @@ function sourceSection() {
     <ul class="rule-list">
         ${points}
     </ul>
-    <p class="closer">${esc(s.closing)}</p>
-  </div>
-</section>`;
-}
-
-/* 8 ------------------------------------------------------------ useful --- */
-
-function usefulSection() {
-  const u = C.useful;
-  const items = u.items
-    .map((it, i) => `<li class="use" data-i="${i}">
-        <span class="use-n">${n2(i)}</span>
-        <h3>${esc(it.title)}</h3>
-        <p>${esc(it.body)}</p>
-      </li>`).join("\n      ");
-  return `<section class="sec" id="useful">
-  <div class="wrap">
-    <h2>${esc(u.heading)}</h2>
-    <ol class="uses">
-      ${items}
-    </ol>
-  </div>
-</section>`;
-}
-
-/* 9 --------------------------------------------------------------- who --- */
-
-function whoSection() {
-  const w = C.who;
-  const rows = w.rows
-    .map((r) => `<tr><th scope="row">${esc(r.title)}</th><td>${esc(r.body)}</td></tr>`).join("\n      ");
-  return `<section class="sec" id="who">
-  <div class="wrap">
-    <h2>${esc(w.heading)}</h2>
-    <p class="lede">${esc(w.lede)}</p>
-    <table class="tbl">
-      <caption class="vh">Who PandaX is built for</caption>
-      <tbody>
-      ${rows}
-      </tbody>
-    </table>
-    <p class="closer">${esc(w.closing)}</p>
-  </div>
-</section>`;
-}
-
-/* 10 -------------------------------------------------------------- labs --- */
-
-function labsSection() {
-  const l = C.labs;
-  const items = l.points
-    .map((p, i) => `<li data-i="${i}"><strong>${esc(p.title)}.</strong> ${esc(p.body)}</li>`).join("\n        ");
-  return `<section class="sec sec-rail" id="labs">
-  <div class="wrap">
-    <h2>${esc(l.heading)}</h2>
-    <ul class="guards" id="guards">
-        ${items}
-    </ul>
-    <p><a class="lnk" href="${l.action.href}">${esc(l.action.label)}</a></p>
-  </div>
-</section>`;
-}
-
-/* 11 --------------------------------------------------------------- faq --- */
-
-function faqSection() {
-  const f = C.faq;
-  const items = f.items
-    .map((i) => `<details class="qa">
-        <summary><span>${esc(i.q)}</span></summary>
-        <div class="qa-a"><p>${esc(i.a)}</p></div>
-      </details>`).join("\n      ");
-  return `<section class="sec" id="faq">
-  <div class="wrap">
-    <h2>${esc(f.heading)}</h2>
-    <div class="qas">
-      ${items}
-    </div>
   </div>
 </section>`;
 }
@@ -678,48 +640,11 @@ const home = shell({
   ogTitle: `${C.meta.brand} — ${C.meta.tagline}`,
   description: `${C.hero.subhead} ${C.hero.body}`,
   body: [
-    bootSection(), heroSection(), pipelineSection(), obligationSection(), vectorsSection(), problemSection(),
-    manualSection(), doesSection(), sourceSection(), usefulSection(), whoSection(), labsSection(), faqSection(), closingSection(),
+    bootSection(), heroSection(), obligationSection(),
+    growthSection(), workflowSection(), marketSection(), manualSection(),
+    doesSection(), sourceSection(), capabilitySection(), closingSection(),
   ].join("\n\n"),
   script: true,
-});
-
-const p = C.partners;
-const partnersPage = shell({
-  slug: "partners/",
-  ogTitle: `${C.meta.brand} — Partners`,
-  description: p.description,
-  depth: 1,
-  body: `<section class="sec sec-lead">
-  <div class="wrap">
-    <h1>${esc(p.heading)}</h1>
-    <p class="lede">${esc(p.intro)}</p>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="wrap">
-    <h2>${esc(p.guardrails.heading)}</h2>
-    <table class="tbl"><caption class="vh">Guardrails</caption><tbody>
-      ${p.guardrails.items.map((i) => `<tr><th scope="row">${esc(i.title)}</th><td>${esc(i.body)}</td></tr>`).join("\n      ")}
-    </tbody></table>
-  </div>
-</section>
-
-<section class="sec">
-  <div class="wrap">
-    <h2>${esc(p.models.heading)}</h2>
-    <table class="tbl"><caption class="vh">Ways to work together</caption><tbody>
-      ${p.models.items.map((i) => `<tr><th scope="row">${esc(i.title)}</th><td>${esc(i.body)}</td></tr>`).join("\n      ")}
-    </tbody></table>
-  </div>
-</section>
-
-<section class="sec sec-close">
-  <div class="wrap close-in close-one">
-    ${formBlock(p.form.heading, p.form.body, "partner")}
-  </div>
-</section>`,
 });
 
 function legalPage(key, extra) {
@@ -747,7 +672,6 @@ const privacySections = C.privacyBody.sections
 const pages = [
   ["index.html", home],
   ["artis/index.html", artisPage()],
-  ["partners/index.html", partnersPage],
   ["datenschutz/index.html", legalPage("datenschutz", privacySections)],
   ["privacy/index.html", legalPage("privacy", privacySections)],
 ];

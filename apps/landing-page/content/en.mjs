@@ -191,18 +191,20 @@ export const workflow = {
 
 export const market = {
   heading: "What your tools already do, and where they stop",
-  lede: "Scanners are good at finding things. None of them produce the file an assessor asks to see.",
+  lede: "Scanners are good at finding things. The file an assessor asks to see is a different job \u2014 and it is the one Actis does.",
   columns: [
     {
       title: "What a scanner gives you",
       items: ["Vulnerability detection", "Severity scores", "SBOMs and scan reports", "Point-in-time security findings"],
     },
     {
-      title: "What it leaves you to write",
+      /* Phrased as what arrives, not as homework. The gap has to be visible
+         or there is no reason to buy, but it is ours to close, not theirs. */
+      title: "What Actis adds",
       items: [
-        "Evidence tied to the shipped product version",
-        "Annex VII technical documentation compatibility",
-        "Risk assessment, and how the risks were addressed",
+        "Evidence tied to the version that actually shipped",
+        "The Annex VII technical documentation",
+        "The risk assessment, and how each risk was addressed",
         "An SBOM tied to the shipped image",
       ],
       mark: true,
@@ -519,9 +521,25 @@ export const audience = {
 export const about = {
   heading: "Who we are",
   lede: "PandaX is an independent European workspace for product security evidence.",
-  body: [
-    "Scanners find things. Managed services do the work on your behalf. Neither of them owns the document at the end \u2014 the technical file comes out as a by-product of somebody else's tool, and gets assembled by hand again every time a release ships.",
-    "We built PandaX to own that part. The record is the product: every component, finding and decision tied to the release that actually shipped, in a form a reviewer can read and a form you can take somewhere else.",
-    "We stay neutral about scanners, the export is portable, and we never charge on the outcome of a conformity assessment. PandaX produces documentation. It does not issue opinions, certificates or verdicts.",
+  claim: "The record is the product.",
+  claimBody: "Scanners find things. Managed services do the work on your behalf. Neither of them owns the document at the end \u2014 the technical file falls out of somebody else's tool and gets assembled by hand again on the next release. That part is ours.",
+  promisesTitle: "What we hold to",
+  promises: [
+    {
+      glyph: "neutral",
+      title: "Neutral about scanners",
+      body: "Whatever you already pay for can feed the record. We have no interest in replacing it.",
+    },
+    {
+      glyph: "portable",
+      title: "Portable by default",
+      body: "The export is yours: a form a reviewer can read, and a form you can take to someone else entirely.",
+    },
+    {
+      glyph: "impartial",
+      title: "Never paid on the outcome",
+      body: "We do not charge on the result of a conformity assessment. Our fee cannot depend on a verdict.",
+    },
   ],
+  disclaimer: "PandaX produces documentation. It does not issue conformity opinions, certificates or verdicts.",
 };

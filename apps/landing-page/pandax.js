@@ -310,7 +310,15 @@
     });
   }
 
-  function init() { menu(); page(); contactForm(); }
+  function header() {
+    var head = $(".head");
+    if (!head) return;
+    function sync() { head.classList.toggle("is-scrolled", window.scrollY > 12); }
+    sync();
+    window.addEventListener("scroll", sync, { passive: true });
+  }
+
+  function init() { header(); menu(); page(); contactForm(); }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

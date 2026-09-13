@@ -425,22 +425,40 @@ function workflowSection() {
 
 function marketSection() {
   const m = C.market;
-  const col = (c) => `<div class="mk-col${c.mark ? " is-mark" : ""}">
-        <h3>${esc(c.title)}</h3>
-        <ul>${c.items.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
-      </div>`;
+  const have = m.columns[0], left = m.columns[1];
+  const done = have.items
+    .map((i) => `<li><svg class="mk-tick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>${esc(i)}</li>`)
+    .join("\n          ");
+  const todo = left.items
+    .map((i) => `<li><span class="mk-box" aria-hidden="true"></span>${esc(i)}</li>`)
+    .join("\n          ");
+
   return `<section class="sec" id="market">
   <div class="wrap">
     <h2>${esc(m.heading)}</h2>
     <p class="lede">${esc(m.lede)}</p>
     <div class="mk">
-      ${m.columns.map(col).join("\n      ")}
+      <div class="mk-col mk-have">
+        <h3>${esc(have.title)}</h3>
+        <ul>
+          ${done}
+        </ul>
+      </div>
+      <div class="mk-edge" aria-hidden="true">
+        <span class="mk-rail"></span>
+        <span class="mk-stop">stops here</span>
+        <span class="mk-rail mk-rail-dash"></span>
+      </div>
+      <div class="mk-col mk-todo">
+        <h3>${esc(left.title)}</h3>
+        <ul>
+          ${todo}
+        </ul>
+      </div>
     </div>
   </div>
 </section>`;
 }
-
-/* 9 -------------------------------------------------------- capability --- */
 
 function capabilitySection() {
   const c = C.capability;
@@ -463,8 +481,6 @@ function capabilitySection() {
   </div>
 </section>`;
 }
-
-/* 5 ------------------------------------------------------------ manual --- */
 
 function manualSection() {
   const m = C.manual;

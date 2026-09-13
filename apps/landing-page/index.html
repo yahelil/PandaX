@@ -203,13 +203,28 @@
     <h2>What your tools already do, and where they stop</h2>
     <p class="lede">Scanners are good at finding things. None of them produce the file an assessor asks to see.</p>
     <div class="mk">
-      <div class="mk-col">
+      <div class="mk-col mk-have">
         <h3>What a scanner gives you</h3>
-        <ul><li>Vulnerability detection</li><li>Severity scores</li><li>SBOMs and scan reports</li><li>Point-in-time security findings</li></ul>
+        <ul>
+          <li><svg class="mk-tick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>Vulnerability detection</li>
+          <li><svg class="mk-tick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>Severity scores</li>
+          <li><svg class="mk-tick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>SBOMs and scan reports</li>
+          <li><svg class="mk-tick" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10.5 l4 4 L16 6"/></svg>Point-in-time security findings</li>
+        </ul>
       </div>
-      <div class="mk-col is-mark">
+      <div class="mk-edge" aria-hidden="true">
+        <span class="mk-rail"></span>
+        <span class="mk-stop">stops here</span>
+        <span class="mk-rail mk-rail-dash"></span>
+      </div>
+      <div class="mk-col mk-todo">
         <h3>What it leaves you to write</h3>
-        <ul><li>Evidence tied to the shipped product version</li><li>Annex VII technical documentation compatibility</li><li>Risk assessment, and how the risks were addressed</li><li>An SBOM tied to the shipped image</li></ul>
+        <ul>
+          <li><span class="mk-box" aria-hidden="true"></span>Evidence tied to the shipped product version</li>
+          <li><span class="mk-box" aria-hidden="true"></span>Annex VII technical documentation compatibility</li>
+          <li><span class="mk-box" aria-hidden="true"></span>Risk assessment, and how the risks were addressed</li>
+          <li><span class="mk-box" aria-hidden="true"></span>An SBOM tied to the shipped image</li>
+        </ul>
       </div>
     </div>
   </div>

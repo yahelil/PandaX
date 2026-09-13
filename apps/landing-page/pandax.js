@@ -160,8 +160,11 @@
   function page() {
     // Each section lights its marker and its rule as it is reached.
     $$(".sec").forEach(function (sec) {
-      if (still) { sec.classList.add("lit"); return; }
-      onView(sec, function () { sec.classList.add("lit"); }, 0.12);
+      if (still || !("IntersectionObserver" in window)) { sec.classList.add("lit"); return; }
+      // Armed here rather than in the stylesheet: a page that never runs this
+      // shows its content instead of hiding it.
+      sec.classList.add("rise");
+      onView(sec, function () { sec.classList.add("lit"); }, 0.1);
     });
 
 

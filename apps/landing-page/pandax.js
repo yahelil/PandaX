@@ -244,23 +244,24 @@
       }, 0.3);
     }
 
-    // Five sources, adrift. They converge again in the graphite section.
-    var scatter = $("#scatter");
-    onView(scatter, function () {
-      stagger($$(".chip", scatter), 70, "lit", scatter);
-    }, 0.4);
-
     // Only the SBOM crosses the line.
     var bound = $("#bound");
     onView(bound, function () {
       stagger($$(".bound-side-x .bound-item", bound), 130, "lit", bound);
     }, 0.35);
 
-    var guards = $("#guards");
-    onView(guards, function () { stagger($$("li", guards), 90, "lit", guards); }, 0.3);
-
     var chart = $("#chart");
-    onView(chart, function () { chart.classList.add("lit"); });
+    onView(chart, function () { chart.classList.add("lit"); }, 0.25);
+
+    // The four reporting deadlines light along their rail.
+    var wfs = $("#wfs"), wfFill = $("#wfFill");
+    if (wfs && wfFill) {
+      onView(wfs, function () {
+        wfs.classList.add("lit");
+        var vertical = matchMedia("(max-width: 860px)").matches;
+        wfFill.style[vertical ? "height" : "width"] = "100%";
+      }, 0.25);
+    }
 
     var flow = $("#flow");
     onView(flow, function () { flow.classList.add("lit"); }, 0.3);

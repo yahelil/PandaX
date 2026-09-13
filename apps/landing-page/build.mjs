@@ -140,7 +140,7 @@ function screen(rec) {
             </div>`).join("\n            ");
   const checks = rec.checks
     .map((c, i) => `<li data-i="${i}"><span class="tick" aria-hidden="true"></span>${esc(c)}</li>`).join("");
-  return `<div class="sc" id="sc">
+  return `<div class="sc">
           <div class="sc-bar" aria-hidden="true">
             <span class="sc-dots"><i></i><i></i><i></i></span>
             <span class="sc-app">${esc(C.meta.product)}</span>
@@ -148,7 +148,7 @@ function screen(rec) {
           <div class="sc-body">
             <div class="sc-head">
               <span class="sc-flag">${esc(rec.label)}</span>
-              <span class="sc-seal" id="scSeal"><span class="seal-dot" aria-hidden="true"></span>Sealed</span>
+              <span class="sc-seal"><span class="seal-dot" aria-hidden="true"></span>Sealed</span>
             </div>
             <div class="sc-title"><span data-f="product">${esc(rec.product)}</span> <span data-f="release">${esc(rec.release)}</span></div>
             <div class="sc-run"><span class="id" data-f="runId">${esc(rec.runId)}</span></div>
@@ -623,55 +623,71 @@ function formBlock(heading, body, kind) {
     </div>`;
 }
 
+/** One leaf, a lens pointing along +x before it is turned. */
+function leaf(x, y, ang, len) {
+  const a = (n) => (len * n).toFixed(1);
+  const d = `M0 0 C${a(0.42)} ${-a(0.26)} ${a(0.8)} ${-a(0.2)} ${len} 0`
+          + ` C${a(0.8)} ${a(0.2)} ${a(0.42)} ${a(0.26)} 0 0 Z`;
+  return `<path class="bam-leaf" d="${d}" transform="translate(${x} ${y}) rotate(${ang})"/>`;
+}
+
+/** A bamboo stalk: the cane, its nodes, and the leaves near the crown. */
+function stalk(s) {
+  const foot = 486;
+  let nodes = "";
+  for (let y = foot - 50; y > s.top + 28; y -= 62) {
+    nodes += `<path d="M${s.x - s.w / 2 - 2} ${y} h${s.w + 4}"/>`;
+  }
+  const leaves = s.leaves.map((l) => leaf(s.x, l[0], l[1], l[2])).join("");
+  return `<g class="bam${s.back ? " bam-back" : ""}" style="--sway:${s.sway}deg;--wait:${s.wait}s">
+            <path class="bam-stalk" d="M${s.x} ${foot} V${s.top}" stroke-width="${s.w}"/>
+            <g class="bam-node" stroke-width="${(s.w * 0.52).toFixed(1)}">${nodes}</g>
+            ${leaves}
+          </g>`;
+}
+
+/* The grove stands in the margins the frame leaves free: one cane forward,
+   one behind it, each side. More than that and it stops being a margin. */
+const GROVE = [
+  { x: 34, top: 118, w: 9, sway: 1.1, wait: 0, back: true,
+    leaves: [[146, -28, 38], [160, 198, 32]] },
+  { x: 104, top: 44, w: 13, sway: 1.5, wait: -2.6, back: false,
+    leaves: [[62, -36, 50], [76, 206, 44], [112, 16, 46], [126, 170, 38]] },
+  { x: 1096, top: 38, w: 13, sway: 1.6, wait: -3.8, back: false,
+    leaves: [[56, 212, 50], [70, -16, 44], [108, 168, 46], [122, 12, 38]] },
+  { x: 1166, top: 132, w: 9, sway: 1.2, wait: -1.4, back: true,
+    leaves: [[160, 196, 38], [174, -20, 32]] },
+];
+
+function grove() {
+  return `<svg class="act-art" viewBox="0 0 1200 470" aria-hidden="true" preserveAspectRatio="xMidYMax meet">
+          ${GROVE.map(stalk).join("\n          ")}
+        </svg>`;
+}
+
+/** The record, framed, with the grove behind it and the mark on the corner. */
+function recordStage(depth) {
+  const r = rel(depth);
+  return `<div class="act-stage">
+        ${grove()}
+        <div class="act-frame" data-cycle="1">
+          <div class="rec-frame">
+            ${screen(C.hero.records[0])}
+          </div>
+          <span class="act-mark" aria-hidden="true">
+            <img src="${r}assets/pandax-mark-ink.png" alt="" width="46" height="46" loading="lazy">
+          </span>
+        </div>
+      </div>`;
+}
+
 /** The closing showcase: the product running, with the mark beside it. */
 function actionStage() {
   const a = C.action;
   return `<div class="act">
       <h2 class="act-head">${esc(a.lead)} <span class="hl hl-rose">${esc(a.highlight)}</span> ${esc(a.tail)}</h2>
       <p class="act-sub">${esc(a.body)}</p>
-      <div class="act-stage">
-        <svg class="act-art" viewBox="0 0 1200 470" aria-hidden="true" preserveAspectRatio="xMidYMax meet">
-          <defs>
-            <linearGradient id="actL" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stop-color="#4A4FA8" stop-opacity="0"/>
-              <stop offset="0.28" stop-color="#4A4FA8" stop-opacity="0.07"/>
-              <stop offset="0.62" stop-color="#4A4FA8" stop-opacity="0.17"/>
-              <stop offset="1" stop-color="#4A4FA8" stop-opacity="0.02"/>
-            </linearGradient>
-            <linearGradient id="actR" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stop-color="#B4577E" stop-opacity="0"/>
-              <stop offset="0.28" stop-color="#B4577E" stop-opacity="0.07"/>
-              <stop offset="0.66" stop-color="#B4577E" stop-opacity="0.18"/>
-              <stop offset="1" stop-color="#B4577E" stop-opacity="0.02"/>
-            </linearGradient>
-          </defs>
-          <g class="act-hill act-hill-l">
-            <path d="M-80 340 C10 340 30 200 110 200 C168 200 186 262 228 262 C276 262 296 196 352 196 C430 196 448 340 520 340 L520 470 L-80 470 Z"
-                  fill="url(#actL)"/>
-            <path d="M-80 340 C10 340 30 200 110 200 C168 200 186 262 228 262 C276 262 296 196 352 196 C430 196 448 340 520 340"
-                  fill="none" stroke="#4A4FA8" stroke-opacity="0.34" stroke-width="1.5" stroke-linecap="round"/>
-          </g>
-          <g class="act-hill act-hill-r">
-            <path d="M1280 312 C1190 312 1170 168 1090 168 C1030 168 1012 236 970 236 C922 236 902 172 846 172 C768 172 752 312 680 312 L680 470 L1280 470 Z"
-                  fill="url(#actR)"/>
-            <path d="M1280 312 C1190 312 1170 168 1090 168 C1030 168 1012 236 970 236 C922 236 902 172 846 172 C768 172 752 312 680 312"
-                  fill="none" stroke="#B4577E" stroke-opacity="0.34" stroke-width="1.5" stroke-linecap="round"/>
-          </g>
-          <g class="act-plus" stroke="#B0801F" stroke-width="1.7" stroke-linecap="round">
-            <path d="M56 132 h17 M64.5 123.5 v17"/>
-            <path d="M1148 96 h13 M1154.5 89.5 v13"/>
-            <path d="M1112 250 h10 M1117 245 v10"/>
-          </g>
-        </svg>
-        <div class="act-frame" data-cycle="1">
-          <div class="rec-frame">
-            ${screen(C.hero.records[0])}
-          </div>
-          <span class="act-mark" aria-hidden="true">
-            <img src="assets/pandax-mark-ink.png" alt="" width="46" height="46" loading="lazy">
-          </span>
-        </div>
-      </div>
+      ${recordStage(0)}
     </div>`;
 }
 
@@ -753,9 +769,7 @@ function actisPage() {
   <div class="wrap">
     <h2>${esc(a.record.heading)}</h2>
     <p class="lede">${esc(a.record.lede)}</p>
-    <div class="rec-frame">
-      ${screen(C.hero.records[0])}
-    </div>
+    ${recordStage(1)}
   </div>
 </section>
 

@@ -292,7 +292,6 @@ function scene() {
 function heroSection() {
   const h = C.hero;
   return `<section class="hero" id="top">
-  ${heroGrove()}
   <div class="wrap hero-in">
     <div class="hero-copy">
       <h1>${esc(h.headline).replace(esc(h.highlight), `<span class="hl">${esc(h.highlight)}</span>`)}</h1>
@@ -327,7 +326,8 @@ function obligationSection() {
         </li>`;
     }).join("\n        ");
   const points = o.points.map((x) => `<li>${esc(x)}</li>`).join("");
-  return `<section class="sec" id="obligation">
+  return `<section class="sec sec-bam" id="obligation">
+  ${edgeGrove()}
   <div class="wrap">
     <h2>${esc(o.heading)}</h2>
     <p class="lede">${esc(o.lede)}</p>
@@ -682,20 +682,19 @@ function recordStage(depth) {
       </div>`;
 }
 
-/* The canes that stand in the hero's outer margins, mirrored right. */
-const HERO_GROVE = [
+/* The canes that stand at a section's right edge. */
+const EDGE_GROVE = [
   { x: 40, top: 210, w: 9.5, sway: 1.0, wait: -1.1, back: true, foot: 690,
     leaves: [[240, -28, 40], [254, 198, 34]] },
   { x: 118, top: 78, w: 13.5, sway: 1.45, wait: -3.3, back: false, foot: 690,
     leaves: [[96, -36, 52], [110, 206, 46], [148, 16, 48], [162, 170, 40]] },
 ];
 
-/** Two canes a side, sized to whatever margin the wrap leaves free. */
-function heroGrove() {
-  const art = HERO_GROVE.map(stalk).join("\n            ");
-  const svg = (side) => `<svg class="hero-bam hero-bam-${side}" viewBox="0 0 200 660"`
+/** Two canes at the right edge, sized to the margin the wrap leaves free. */
+function edgeGrove() {
+  const art = EDGE_GROVE.map(stalk).join("\n            ");
+  return `<svg class="edge-bam" viewBox="0 0 200 660"`
     + ` aria-hidden="true" preserveAspectRatio="xMinYMax slice">\n            ${art}\n          </svg>`;
-  return `${svg("l")}\n          ${svg("r")}`;
 }
 
 /** The closing showcase: the product running, with the mark beside it. */

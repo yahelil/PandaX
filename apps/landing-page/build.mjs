@@ -511,6 +511,56 @@ function doesSection() {
 </section>`;
 }
 
+/* 7b -------------------------------------------------------- easier --- */
+
+/** A stack of cards with one drawing on the face. The accent dot is the only
+ *  colour in it, the way a single highlight carries a whole row. */
+function cardGlyph(kind) {
+  const inner = {
+    record: `<rect x="34" y="36" width="52" height="42" rx="3"/>
+        <path d="M34 46 H86"/>
+        <circle class="g-dot" cx="46" cy="62" r="4"/>
+        <path d="M50 62 H60 M64 58 L70 54 M64 66 L70 70"/>
+        <circle cx="72" cy="52" r="3.5"/>
+        <circle cx="72" cy="72" r="3.5"/>`,
+    document: `<path d="M40 30 H74 L82 38 V84 H40 Z"/>
+        <path d="M74 30 V38 H82"/>
+        <path d="M48 50 H72 M48 58 H72 M48 66 H64"/>
+        <circle class="g-dot" cx="70" cy="74" r="7"/>
+        <path d="M66 80 L66 90 L70 87 L74 90 L74 80"/>`,
+    automate: `<circle cx="66" cy="48" r="14"/>
+        <circle class="g-dot" cx="66" cy="48" r="5"/>
+        <path d="M66 30 V36 M66 60 V66 M48 48 H54 M78 48 H84 M54 36 L58 40 M74 56 L78 60 M54 60 L58 56 M74 40 L78 36"/>
+        <path d="M36 88 V66 a5 5 0 0 1 10 0 V78 h8 a5 5 0 0 1 5 5 v5"/>`,
+  }[kind];
+  return `<svg class="cardart" viewBox="0 0 120 120" aria-hidden="true">
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <rect class="card card-3" x="22" y="22" width="86" height="86" rx="12"/>
+        <rect class="card card-2" x="16" y="16" width="86" height="86" rx="12"/>
+        <rect class="card card-1" x="10" y="10" width="86" height="86" rx="12"/>
+        <g class="glyph">${inner}</g>
+      </g>
+    </svg>`;
+}
+
+function easierSection() {
+  const e = C.easier;
+  const items = e.items
+    .map((i, n) => `<li class="ez" data-i="${n}">
+        ${cardGlyph(i.glyph)}
+        <h3>${esc(i.title)}</h3>
+        <p>${esc(i.body)}</p>
+      </li>`).join("\n      ");
+  return `<section class="sec sec-ez" id="easier">
+  <div class="wrap">
+    <h2 class="ez-head">${esc(e.heading)} <span class="hl hl-rose">${esc(e.highlight)}</span></h2>
+    <ul class="ezs">
+      ${items}
+    </ul>
+  </div>
+</section>`;
+}
+
 /* 7 ------------------------------------------------------------ source --- */
 
 function sourceSection() {
@@ -704,7 +754,7 @@ const home = shell({
   body: rhythm([
     heroSection(), obligationSection(),
     growthSection(), workflowSection(), marketSection(), manualSection(),
-    doesSection(), sourceSection(), capabilitySection(), closingSection(),
+    doesSection(), easierSection(), sourceSection(), capabilitySection(), closingSection(),
   ].join("\n\n")),
   script: true,
 });

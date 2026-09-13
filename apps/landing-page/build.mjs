@@ -169,6 +169,22 @@ const KEYS = [
   ["lk-sp", "fn ⌃ ⌥ ⌘ = ⌘ ⌥ ◀ ▲▼ ▶"],
 ];
 
+
+function keyboard() {
+  const rows = KEYS.map(([cls, keys]) => {
+    const cells = keys.split(" ").map((k) => {
+      if (k === "=") return `<span class="lk-bar"></span>`;
+      if (k.startsWith("|")) return `<span class="lk-w">${esc(k.slice(1))}</span>`;
+      if (k.startsWith("!")) return `<span class="lk-w2">${esc(k.slice(1))}</span>`;
+      return `<span>${esc(k)}</span>`;
+    }).join("");
+    return `<div class="lk-row ${cls}">${cells}</div>`;
+  }).join("\n          ");
+  return `<div class="laptop-keys" aria-hidden="true">
+          ${rows}
+        </div>`;
+}
+
 /** The engine, typed out. Used on the product page. */
 function terminal() {
   const pl = C.pipeline;
@@ -201,8 +217,22 @@ function heroSection() {
         <a class="btn btn-q" href="${h.secondary.href}">${esc(h.secondary.label)}</a>
       </div>
     </div>
-    <div class="rec-frame hero-rec">
-      ${screen(h.record)}
+    <div class="hero-stage">
+      <div class="laptop" aria-hidden="false">
+        <div class="laptop-lid">
+          <div class="laptop-bezel">
+            <span class="laptop-camera" aria-hidden="true"></span>
+            <div class="laptop-screen">
+              ${screen(h.record)}
+            </div>
+            <div class="laptop-glare" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="laptop-base">
+          ${keyboard()}
+        </div>
+        <div class="laptop-shadow" aria-hidden="true"></div>
+      </div>
     </div>
   </div>
 </section>`;
@@ -569,16 +599,31 @@ function artisPage() {
   });
 }
 
+
+/** Give the page rhythm: a counted marker per section, alternating grounds. */
+function rhythm(html) {
+  let n = 0;
+  return html.replace(/<section class="sec([^"]*)"([\s\S]*?)<h2>/g, (m, rest, mid) => {
+    n += 1;
+    const num = String(n).padStart(2, "0");
+    const dark = rest.includes("sec-dark");
+    // Light sections alternate ground so no two in a row read the same.
+    const alt = !dark && n % 2 === 0 ? " sec-alt" : "";
+    const marker = `<span class="sec-n" aria-hidden="true">${num}</span>`;
+    return `<section class="sec${rest}${alt}"${mid}${marker}<h2>`;
+  });
+}
+
 /* --------------------------------------------------------------- pages --- */
 
 const home = shell({
   ogTitle: `${C.meta.brand} — ${C.meta.tagline}`,
   description: `${C.hero.subhead} ${C.hero.body}`,
-  body: [
+  body: rhythm([
     heroSection(), obligationSection(),
     growthSection(), workflowSection(), marketSection(), manualSection(),
     doesSection(), sourceSection(), capabilitySection(), closingSection(),
-  ].join("\n\n"),
+  ].join("\n\n")),
   script: true,
 });
 

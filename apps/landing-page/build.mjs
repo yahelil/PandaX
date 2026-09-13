@@ -23,8 +23,9 @@ const id = (s) => `<span class="id">${esc(s)}</span>`;
 const rel = (d) => (d ? "../".repeat(d) : "");
 const n2 = (i) => String(i + 1).padStart(2, "0");
 
-function shell({ ogTitle, description, depth = 0, slug = "", body, script = false, doc = false }) {
-  const bodyClass = doc ? ' class="doc"' : "";
+function shell({ ogTitle, description, depth = 0, slug = "", body, script = false, doc = false, pageClass = "" }) {
+  const classes = [doc ? "doc" : "", pageClass].filter(Boolean).join(" ");
+  const bodyClass = classes ? ` class="${classes}"` : "";
   const r = rel(depth);
   return `<!doctype html>
 <html lang="${C.meta.lang}">
@@ -531,11 +532,9 @@ function doesSection() {
       <span class="flow-pulse flow-pulse-a"></span>
       <span class="flow-pulse flow-pulse-b"></span>
       <div class="flow-in">
-        <span class="fl-src" data-i="0">Jira</span>
-        <span class="fl-src" data-i="1">CI/CD</span>
-        <span class="fl-src" data-i="2">SBOM</span>
-        <span class="fl-src" data-i="3">Documents</span>
-        <span class="fl-src" data-i="4">Legal</span>
+        <span class="fl-src" data-i="0">SBOM</span>
+        <span class="fl-src" data-i="1">Documents</span>
+        <span class="fl-src" data-i="2">Legal</span>
       </div>
       <div class="flow-core">${esc(d.name)}</div>
       <div class="flow-out">
@@ -837,6 +836,7 @@ function actisPage() {
     description: a.description,
     depth: 1,
     script: true,
+    pageClass: "page-actis",
     body: grounds(`<section class="sec sec-lead" id="top">
   <div class="wrap">
     <div class="hero-in">
@@ -884,7 +884,7 @@ function actisPage() {
   </div>
 </section>
 
-<section class="sec">
+<section class="sec sec-proof">
   <div class="wrap">
     <h2>${esc(a.record.heading)}</h2>
     <p class="lede">${esc(a.record.lede)}</p>

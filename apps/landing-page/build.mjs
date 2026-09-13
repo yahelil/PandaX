@@ -205,116 +205,72 @@ function terminal() {
     </div>`;
 }
 
-/** The product page's opening: the real mark, held in the same line work and
- *  the same colour washes as the home page. */
-function markScene(depth) {
-  const r = rel(depth);
-  return `<svg class="scene scene-mark" viewBox="0 0 460 460" role="img"
-     aria-label="The Actis mark, held in a turning lattice.">
-  <defs>
-    <radialGradient id="m-wash-a">
-      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.30"/>
-      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.14"/>
-      <stop offset="100%" stop-color="#D9AE55" stop-opacity="0"/>
-    </radialGradient>
-    <radialGradient id="m-wash-b">
-      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.22"/>
-      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.10"/>
-      <stop offset="100%" stop-color="#B4577E" stop-opacity="0"/>
-    </radialGradient>
-    <path id="ring-mid" d="M80 230 A150 150 0 1 1 380 230 A150 150 0 1 1 80 230"/>
-  </defs>
-
-  <circle class="wash" cx="196" cy="196" r="164" fill="url(#m-wash-a)"/>
-  <circle class="wash wash-2" cx="278" cy="276" r="152" fill="url(#m-wash-b)"/>
-
-  <g class="ink" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <path class="thin hex" d="M230 96 L320 148 L320 252 L230 304 L140 252 L140 148 Z"/>
-    <circle class="orbit ring-a" cx="230" cy="230" r="150"/>
-    <circle class="orbit ring-b" cx="230" cy="230" r="186"/>
-
-    <g class="sat"><circle cx="230" cy="80" r="7"/></g>
-    <g class="sat"><circle cx="380" cy="230" r="7"/></g>
-    <g class="sat"><circle cx="230" cy="380" r="7"/></g>
-    <g class="sat"><circle cx="80" cy="230" r="7"/></g>
-
-    <circle class="pulse" r="6">
-      <animateMotion dur="9s" repeatCount="indefinite"><mpath href="#ring-mid"/></animateMotion>
-    </circle>
-    <circle class="pulse pulse-2" r="4" opacity="0">
-      <animate attributeName="opacity" to="1" begin="3s" dur="0.01s" fill="freeze"/>
-      <animateMotion dur="9s" begin="3s" repeatCount="indefinite"><mpath href="#ring-mid"/></animateMotion>
-    </circle>
-  </g>
-
-  <image class="mark-art" href="${r}assets/actis-mark.png" x="150" y="150" width="160" height="160"/>
-</svg>`;
-}
-
-/** What the product does, drawn as one line: a release goes in, is checked
- *  against the sources, is protected and sealed, and leaves as a record. */
+/** The evidence path, drawn as one line: a release goes in, a record comes out.
+ *  Continuous motion, no JS — everything travels and breathes in CSS. */
 function scene() {
-  return `<svg class="scene" viewBox="0 0 600 440" role="img"
-     aria-label="A release enters, is checked against advisory sources, protected and sealed, and leaves as a reviewable record.">
+  return `<svg class="scene" viewBox="0 0 600 460" role="img"
+     aria-label="A release enters, is matched against sources, weighed at a decision, and leaves as a sealed record.">
   <defs>
+    <!-- Radial, and fully transparent before the edge, so nothing is clipped. -->
     <radialGradient id="wash-a">
-      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.32"/>
-      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.15"/>
+      <stop offset="0%"   stop-color="#B0801F" stop-opacity="0.34"/>
+      <stop offset="55%"  stop-color="#D9AE55" stop-opacity="0.16"/>
       <stop offset="100%" stop-color="#D9AE55" stop-opacity="0"/>
     </radialGradient>
     <radialGradient id="wash-b">
-      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.22"/>
-      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.11"/>
+      <stop offset="0%"   stop-color="#4A4FA8" stop-opacity="0.24"/>
+      <stop offset="55%"  stop-color="#B4577E" stop-opacity="0.12"/>
       <stop offset="100%" stop-color="#B4577E" stop-opacity="0"/>
     </radialGradient>
     <path id="route"
-      d="M136 236 C 196 236, 200 196, 262 196 M 386 208 C 440 208, 448 300, 496 300"/>
-    <clipPath id="inside-shield">
-      <path d="M200 116 Q200 106 210 103 L288 82 L366 103 Q376 106 376 116 L376 214
-               Q376 268 288 302 Q200 268 200 214 Z"/>
-    </clipPath>
+      d="M108 176 C 176 176, 178 108, 246 108 C 314 108, 318 244, 386 244
+         C 442 244, 452 336, 502 336"/>
   </defs>
 
-  <circle class="wash" cx="250" cy="180" r="176" fill="url(#wash-a)"/>
-  <circle class="wash wash-2" cx="424" cy="292" r="156" fill="url(#wash-b)"/>
+  <circle class="wash"   cx="212" cy="178" r="162" fill="url(#wash-a)"/>
+  <circle class="wash wash-2" cx="406" cy="296" r="156" fill="url(#wash-b)"/>
 
   <g class="ink" fill="none" stroke-linecap="round" stroke-linejoin="round">
 
     <use href="#route" class="route"/>
 
-    <!-- the release going in -->
+    <!-- the release, as a box being opened -->
     <g class="node node-in">
-      <path d="M44 208 L90 182 L136 208 L90 234 Z"/>
-      <path d="M44 208 L44 264 L90 290 L90 234"/>
-      <path d="M136 208 L136 264 L90 290"/>
-      <path class="thin" d="M67 221 L67 277"/>
-      <path class="thin" d="M90 182 L90 234"/>
+      <path d="M34 150 L82 124 L130 150 L82 176 Z"/>
+      <path d="M34 150 L34 208 L82 234 L82 176"/>
+      <path d="M130 150 L130 208 L82 234"/>
+      <path class="thin" d="M58 163 L58 221"/>
+      <path class="thin" d="M82 124 L82 176"/>
     </g>
 
-    <!-- protected: the shield the evidence is held in -->
-    <g class="node node-shield">
-      <g clip-path="url(#inside-shield)">
-        <g class="lattice">
-          <path class="thin" d="M288 96 L340 126 L340 186 L288 216 L236 186 L236 126 Z"/>
-          <path class="thin" d="M288 96 L288 156 M288 156 L340 186 M288 156 L236 186"/>
-          <path class="thin" d="M236 126 L184 96 M340 126 L392 96 M236 186 L184 216 M340 186 L392 216"/>
-        </g>
-      </g>
-      <path class="shield" d="M200 116 Q200 106 210 103 L288 82 L366 103 Q376 106 376 116 L376 214
-                              Q376 268 288 302 Q200 268 200 214 Z"/>
-      <path class="shield-check" d="M258 188 l21 22 l44 -54"/>
+    <!-- the lattice: the mark's own geometry, where components are matched -->
+    <g class="node node-mid">
+      <path d="M246 56 L290 81 L290 131 L246 156 L202 131 L202 81 Z"/>
+      <path class="thin" d="M246 56 L246 106 M246 106 L290 131 M246 106 L202 131"/>
+      <circle class="dot node-beat" cx="246" cy="106" r="6"/>
+      <circle class="orbit" cx="246" cy="106" r="70"/>
     </g>
 
-    <!-- the record coming out -->
+    <!-- the decision: one route taken, one not, and the choice recorded -->
+    <g class="node node-dec">
+      <circle cx="386" cy="244" r="26"/>
+      <path class="thin branch-off" d="M386 244 L440 206"/>
+      <path class="branch-on" d="M386 244 L440 282"/>
+      <circle class="dot" cx="386" cy="244" r="5.5"/>
+      <circle class="dot mark-off" cx="440" cy="206" r="4"/>
+    </g>
+
+    <!-- the record: sheets, and the seal that closes them -->
     <g class="node node-out">
-      <path d="M462 250 H548 a6 6 0 0 1 6 6 V368 a6 6 0 0 1 -6 6 H462 a6 6 0 0 1 -6 -6 V256 a6 6 0 0 1 6 -6 Z"/>
-      <path class="thin" d="M478 278 H532 M478 298 H532 M478 318 H510"/>
+      <path d="M470 286 H556 a6 6 0 0 1 6 6 V404 a6 6 0 0 1 -6 6 H470 a6 6 0 0 1 -6 -6 V292 a6 6 0 0 1 6 -6 Z"/>
+      <path class="thin" d="M486 314 H540 M486 334 H540 M486 354 H518"/>
       <g class="seal">
-        <circle cx="538" cy="356" r="22"/>
-        <path class="seal-tick" d="M527 357 l7 8 l15 -18"/>
+        <circle cx="546" cy="392" r="22"/>
+        <path class="seal-tick" d="M535 393 l7 8 l15 -18"/>
       </g>
     </g>
 
+    <!-- what travels the route -->
     <circle class="pulse" r="6">
       <animateMotion dur="7.5s" repeatCount="indefinite">
         <mpath href="#route"/>
@@ -642,14 +598,36 @@ function actisPage() {
   <div class="wrap">
     <div class="hero-in">
       <div class="prod-text">
-        <span class="pname-eyebrow">${esc(C.does.eyebrow)}</span>
-        <h1 class="pname-word">${esc(a.heading)}</h1>
+        <div class="pname-lead">
+          <span class="pname-eyebrow">${esc(C.does.eyebrow)}</span>
+          <h1 class="pname-word">
+            <img class="pname-mark" src="../assets/actis-mark.png" alt="" width="60" height="60">
+            ${esc(a.heading)}
+          </h1>
+        </div>
         <p class="lede">${esc(a.lede)}</p>
         <p class="lede lede-sm">${esc(a.body)}</p>
         <div class="acts"><a class="btn" href="${a.action.href}">${esc(a.action.label)}</a></div>
       </div>
       <div class="hero-stage">
-        ${markScene(1)}
+        <div class="laptop laptop-cycling">
+          <div class="laptop-lid">
+            <div class="laptop-lid-back" aria-hidden="true">
+              <img src="../assets/actis-mark-light.png" alt="" width="60" height="60">
+            </div>
+            <div class="laptop-bezel">
+              <span class="laptop-camera" aria-hidden="true"></span>
+              <div class="laptop-screen">
+                ${screen(C.hero.records[0])}
+              </div>
+              <div class="laptop-glare" aria-hidden="true"></div>
+            </div>
+          </div>
+          <div class="laptop-base">
+            ${keyboard()}
+          </div>
+          <div class="laptop-shadow" aria-hidden="true"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -667,22 +645,8 @@ function actisPage() {
   <div class="wrap">
     <h2>${esc(a.record.heading)}</h2>
     <p class="lede">${esc(a.record.lede)}</p>
-    <div class="hero-stage">
-      <div class="laptop">
-        <div class="laptop-lid">
-          <div class="laptop-bezel">
-            <span class="laptop-camera" aria-hidden="true"></span>
-            <div class="laptop-screen">
-              ${screen(C.hero.records[0])}
-            </div>
-            <div class="laptop-glare" aria-hidden="true"></div>
-          </div>
-        </div>
-        <div class="laptop-base">
-          ${keyboard()}
-        </div>
-        <div class="laptop-shadow" aria-hidden="true"></div>
-      </div>
+    <div class="rec-frame">
+      ${screen(C.hero.records[0])}
     </div>
   </div>
 </section>

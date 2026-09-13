@@ -90,7 +90,9 @@ function productsMenu(depth) {
 
 function header(depth) {
   const r = rel(depth);
-  const links = depth ? "" : C.nav.links.map((l) => `<a href="${l.href}">${esc(l.label)}</a>`).join("\n        ");
+  const links = C.nav.links
+    .map((l) => `<a href="${depth ? `${r}index.html${l.href}` : l.href}">${esc(l.label)}</a>`)
+    .join("\n        ");
   return `<header class="head">
   <div class="wrap head-in">
     <a class="mark" href="${depth ? `${r}index.html` : "#top"}">
@@ -108,12 +110,18 @@ function header(depth) {
 
 function footer(depth) {
   const r = rel(depth);
-  const links = C.footer.links
-    .map((l) => `<a href="${depth && l.href.startsWith("/") ? r + l.href.slice(1) : l.href}">${esc(l.label)}</a>`)
-    .join("\n      ");
+  const to = (href) => (depth && href.startsWith("/") ? r + href.slice(1) : href);
+  const groups = C.footer.groups
+    .map((g) => `<div class="foot-col">
+        <h2>${esc(g.title)}</h2>
+        <ul>
+          ${g.links.map((l) => `<li><a href="${to(l.href)}">${esc(l.label)}</a></li>`).join("\n          ")}
+        </ul>
+      </div>`).join("\n      ");
+
   return `<footer class="foot">
   <span class="foot-mark" aria-hidden="true">
-    <img src="${r}assets/pandax-mark-ink.png" alt="" width="240" height="240" loading="lazy">
+    <img src="${r}assets/pandax-mark-ink.png" alt="" width="224" height="224" loading="lazy">
   </span>
   <div class="wrap foot-in">
     <div class="foot-brand">
@@ -121,8 +129,8 @@ function footer(depth) {
       <span>${esc(C.footer.lines[0])}</span>
       <span class="foot-tag">${esc(C.footer.lines[1])}</span>
     </div>
-    <nav class="foot-links" aria-label="Site">
-      ${links}
+    <nav class="foot-cols" aria-label="Site">
+      ${groups}
     </nav>
     <p class="foot-legal">${esc(C.footer.legal)}</p>
   </div>
@@ -640,6 +648,54 @@ function recordStage(depth) {
       </div>`;
 }
 
+/* 1b ------------------------------------------------------- audience --- */
+
+/** Before the law, before the product: who is standing here and why. */
+function audienceSection() {
+  const a = C.audience;
+  const fit = a.fit.map((x) => `<li>${esc(x)}</li>`).join("");
+  const readers = a.readers
+    .map((r) => `<li class="who">
+        <h3>${esc(r.who)}</h3>
+        <p>${esc(r.body)}</p>
+      </li>`).join("\n      ");
+
+  return `<section class="sec" id="audience">
+  <div class="wrap">
+    <h2>${esc(a.heading)}</h2>
+    <p class="lede">${esc(a.lede)}</p>
+    <div class="aud">
+      <div class="aud-fit">
+        <h3 class="aud-cap">${esc(a.fitTitle)}</h3>
+        <ul class="rule-list">${fit}</ul>
+      </div>
+      <div class="aud-who">
+        <h3 class="aud-cap">${esc(a.readersTitle)}</h3>
+        <ul class="whos">
+          ${readers}
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>`;
+}
+
+/* 9b ---------------------------------------------------------- about --- */
+
+function aboutSection() {
+  const a = C.about;
+  const body = a.body.map((t) => `<p>${esc(t)}</p>`).join("\n      ");
+  return `<section class="sec" id="about">
+  <div class="wrap">
+    <h2>${esc(a.heading)}</h2>
+    <p class="lede">${esc(a.lede)}</p>
+    <div class="about-body">
+      ${body}
+    </div>
+  </div>
+</section>`;
+}
+
 /** The closing showcase: the product running, with the mark beside it. */
 function actionStage() {
   const a = C.action;
@@ -782,9 +838,13 @@ const home = shell({
   ogTitle: `${C.meta.brand} — ${C.meta.tagline}`,
   description: `${C.hero.subhead} ${C.hero.body}`,
   body: grounds([
-    heroSection(), obligationSection(),
-    growthSection(), workflowSection(), marketSection(), manualSection(),
-    doesSection(), questionsSection(), sourceSection(), capabilitySection(), closingSection(),
+    // Her order: the customer first, then the product and what it gives
+    // them, then the law and the numbers, then who we are.
+    heroSection(), audienceSection(),
+    marketSection(), manualSection(),
+    doesSection(), questionsSection(), capabilitySection(), sourceSection(),
+    obligationSection(), growthSection(), workflowSection(),
+    aboutSection(), closingSection(),
   ].join("\n\n")),
   script: true,
 });
@@ -807,6 +867,14 @@ function legalPage(key, extra) {
   });
 }
 
+const docSections = (body) =>
+  `<p class="doc-intro">${esc(body.intro)}</p>\n\n    ` +
+  body.sections.map((s) => `<section class="doc-sec">
+      <h2>${esc(s.title)}</h2>
+      <p>${esc(s.body)}</p>
+    </section>`).join("\n\n    ");
+
+const cookiesSections = docSections(C.cookiesBody);
 const privacySections = `<p class="doc-intro">${esc(C.privacyBody.intro)}</p>\n\n    ` +
   C.privacyBody.sections
     .map((s) => `<section class="doc-s">
@@ -815,10 +883,41 @@ const privacySections = `<p class="doc-intro">${esc(C.privacyBody.intro)}</p>\n\
     </section>`)
     .join("\n\n    ");
 
+/** The product index. One today; the shape holds when there are more. */
+function productsIndex() {
+  const P = C.productsPage;
+  const items = C.nav.products
+    .map((pr) => `<li class="prod-card">
+        <a href="../${esc(pr.href)}">
+          <img src="../${esc(pr.mark)}" alt="" width="48" height="48" loading="lazy">
+          <span class="prod-name">${esc(pr.name)}</span>
+          <span class="prod-blurb">${esc(pr.blurb)}</span>
+        </a>
+      </li>`).join("\n      ");
+
+  return shell({
+    slug: "products/",
+    ogTitle: `${C.meta.brand} — ${P.title}`,
+    description: P.description,
+    depth: 1,
+    body: `<section class="sec sec-lead">
+  <div class="wrap">
+    <h1>${esc(P.heading)}</h1>
+    <p class="lede">${esc(P.lede)}</p>
+    <ul class="prods">
+      ${items}
+    </ul>
+  </div>
+</section>`,
+  });
+}
+
 const pages = [
   ["index.html", home],
   ["actis/index.html", actisPage()],
+  ["products/index.html", productsIndex()],
   ["privacy/index.html", legalPage("privacy", privacySections)],
+  ["cookies/index.html", legalPage("cookies", cookiesSections)],
 ];
 
 for (const [path, html] of pages) {

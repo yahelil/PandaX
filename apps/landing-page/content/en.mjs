@@ -4,7 +4,8 @@
  * Edit here, then run `node build.mjs`. Never edit the generated pages by hand.
  * Structured for translation: a German file would be content/de.mjs, same shape.
  *
- * House rules: sentence case. Say record, evidence, audit trail — never
+ * House rules: sentence case. No em dashes anywhere: they are the clearest
+ * tell that a machine wrote the line. Say record, evidence, audit trail, never
  * "CRA-compliant", "certified" or "guaranteed". The product reads an SBOM, so
  * the word "firmware" does not appear.
  */
@@ -126,14 +127,14 @@ export const pipeline = {
 
 export const obligation = {
   heading: "What the Act asks you to keep",
-  lede: "Not a scan report. A file that shows what you shipped, what was wrong with it, and what you did — kept for ten years.",
+  lede: "Not a scan report. A file that shows what you shipped, what was wrong with it, and what you did about it. Kept for ten years.",
   marks: [
     { date: "11 Sep 2026", iso: "2026-09-11", label: "Vulnerability-handling requirements apply", live: true },
     { date: "11 Dec 2027", iso: "2027-12-11", label: "Full CRA application" },
   ],
   liveLabel: "In effect",
   points: [
-    "Companies must maintain technical files — cybersecurity risk assessments, software architecture designs and test reports — available to authorities for at least 10 years.",
+    "Companies must keep technical files available to authorities for at least 10 years: cybersecurity risk assessments, software architecture designs and test reports.",
     "Penalties can reach €15 million or 2.5% of worldwide annual turnover, whichever is higher.",
   ],
   source:
@@ -145,7 +146,7 @@ export const obligation = {
 export const growth = {
   heading: "Vulnerability discovery is accelerating",
   lede: "CVE reports more than doubled between 2020 and 2025.",
-  /** Actual CVE Program totals, then an exponential fit — labelled as one. */
+  /** Actual CVE Program totals, then an exponential fit, labelled as one. */
   series: [
     { year: "2020", value: 18375 },
     { year: "2021", value: 20161 },
@@ -163,7 +164,7 @@ export const growth = {
   projectedLabel: "Projected",
   facts: [
     { value: "42,595", label: "New vulnerabilities disclosed in the ENISA reporting period, up 27%." },
-    { value: "33%", label: "Rated high or critical — 7% critical, 26% high." },
+    { value: "33%", label: "Rated high or critical: 7% critical, 26% high." },
   ],
   ai: {
     title: "The curve is not flattening",
@@ -177,7 +178,7 @@ export const growth = {
 
 export const workflow = {
   heading: "The clock starts when you know",
-  lede: "Both deadlines run from the moment you become aware — not from the moment you have a fix.",
+  lede: "Both deadlines run from the moment you become aware, not from the moment you have a fix.",
   stages: [
     { at: "24 hours", title: "Early warning", body: "Alerting for an actively exploited vulnerability or severe incident." },
     { at: "72 hours", title: "Notification", body: "Affected product information, measures taken and user protection steps." },
@@ -191,7 +192,7 @@ export const workflow = {
 
 export const market = {
   heading: "What your tools already do, and where they stop",
-  lede: "Scanners are good at finding things. The file an assessor asks to see is a different job \u2014 and it is the one Actis does.",
+  lede: "Scanners are good at finding things. The file an assessor asks to see is a different job, and it is the one Actis does.",
   columns: [
     {
       title: "What a scanner gives you",
@@ -262,7 +263,7 @@ export const questions = {
     {
       glyph: "again",
       title: "No more rebuilding by hand",
-      body: "The work that repeats on every release \u2014 inventory, exposure, remediation proof, submission \u2014 runs once and keeps its own history.",
+      body: "Inventory, exposure, remediation proof, submission. The work that repeats on every release runs once and keeps its own history.",
     },
   ],
 };
@@ -273,7 +274,7 @@ export const source = {
   heading: "Your source code stays where it is",
   lede: "Actis reads the SBOM. It never needs the code itself.",
   points: [
-    "You hand over an SBOM — nothing else.",
+    "You hand over an SBOM, and nothing else.",
     "The code never leaves your environment, because it is never asked for.",
     "No SBOM yet? There are tools to build one inside your environment and export only that.",
   ],
@@ -420,7 +421,7 @@ export const privacyBody = {
     },
     {
       title: "Server logs",
-      body: "The hosting provider records standard request data — IP address, time, requested file, referrer and user agent — in order to deliver and secure the site. These logs are kept only as long as that purpose requires. Legal basis: Art. 6(1)(f) GDPR.",
+      body: "To deliver and secure the site, the hosting provider records standard request data: IP address, time, requested file, referrer and user agent. These logs are kept only as long as that purpose requires. Legal basis: Art. 6(1)(f) GDPR.",
     },
     {
       title: "If you write to us",
@@ -440,7 +441,7 @@ export const privacyBody = {
     },
   ],
   // TODO(legal): once the operating entity is registered, add its legal name,
-  // registered address and — if the site keeps targeting Germany — an Impressum
+  // registered address and, if the site keeps targeting Germany, an Impressum
   // per § 5 DDG. Nothing on the page states anything untrue without them.
 };
 
@@ -491,7 +492,9 @@ export const productsPage = {
    segment sizes, competitor reads and economics stay internal. */
 export const audience = {
   heading: "Who this is for",
-  lede: "The Act asks you to show your work. This is for whoever has to produce it.",
+  /* Spelled out here: this is the first section on the page, so "the Act"
+     would arrive before anything has named it. */
+  lede: "The EU Cyber Resilience Act asks you to show your work. This is for whoever has to produce it.",
   fitTitle: "You are probably a fit if",
   /* Fragments, not sentences. It is a checklist; it should read like one. */
   fit: [
@@ -504,7 +507,7 @@ export const audience = {
   readers: [
     {
       who: "Product security and compliance",
-      body: "Your next release, already reviewable \u2014 with your test lab in the room.",
+      body: "Your next release, already reviewable, with your test lab in the room.",
     },
     {
       who: "Engineering and quality leadership",
@@ -523,7 +526,7 @@ export const about = {
   heading: "Who we are",
   lede: "PandaX is an independent European workspace for product security evidence.",
   claim: "The record is the product.",
-  claimBody: "Scanners find things. Managed services do the work on your behalf. Neither of them owns the document at the end \u2014 the technical file falls out of somebody else's tool and gets assembled by hand again on the next release. That part is ours.",
+  claimBody: "Scanners find things. Managed services do the work on your behalf. Neither of them owns the document at the end. The technical file falls out of somebody else's tool, and gets assembled by hand again on the next release. That part is ours.",
   promisesTitle: "What we hold to",
   promises: [
     {

@@ -364,7 +364,7 @@ a { color: inherit; }
 
 .scene { display: block; width: 100%; height: auto; margin-left: auto; }
 
-.scene .wash { transform-origin: center; animation: drift 14s ease-in-out infinite; }
+.scene .wash { transform-box: fill-box; transform-origin: center; animation: drift 14s ease-in-out infinite; }
 .scene .wash-2 { animation-duration: 18s; animation-direction: reverse; }
 @keyframes drift {
   0%, 100% { transform: translate(0, 0) scale(1); }
@@ -396,21 +396,32 @@ a { color: inherit; }
 .orbit {
   stroke: var(--indigo); stroke-width: 1.7; opacity: 0.4;
   stroke-dasharray: 3 9;
-  transform-origin: 232px 130px;
+  transform-box: fill-box; transform-origin: center;
   animation: spin 26s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.node-mid .dot { animation: beat 3.4s ease-in-out infinite; transform-origin: 232px 130px; }
-@keyframes beat { 0%,100% { transform: scale(1); } 50% { transform: scale(1.5); } }
+/* The panda sits where the components are matched — the mark's own subject,
+   drawn in the same line as everything else. */
+.panda { transform-box: fill-box; transform-origin: center; animation: beat 4.2s ease-in-out infinite; }
+.p-head, .p-ear { stroke: var(--bronze); }
+.p-ear { fill: var(--bronze); }
+.p-eye { fill: var(--ink); stroke: none; }
+.p-nose { stroke: var(--ink); stroke-width: 2; }
+@keyframes beat { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 
-.seal { transform-origin: 506px 330px; animation: stamp 7s ease-in-out infinite; }
+.seal { transform-box: fill-box; transform-origin: center; animation: stamp 7s ease-in-out infinite; }
 @keyframes stamp {
   0%, 62%, 100% { transform: scale(1); }
   68%           { transform: scale(1.14); }
 }
 .seal circle { stroke: var(--rose); }
-.tick { stroke: var(--rose); stroke-width: 2.6; }
+
+/* The branch taken is drawn; the one not taken stays dashed and dim. */
+.branch-on { stroke: var(--bronze); }
+.branch-off { stroke: var(--indigo); stroke-dasharray: 4 6; opacity: 0.45; }
+.mark-off { fill: var(--indigo); opacity: 0.4; }
+.seal-tick { stroke: var(--rose); stroke-width: 3; }
 
 /* One word of the headline carries the colour, the way a highlight does. */
 .hl { position: relative; color: var(--indigo); white-space: nowrap; }

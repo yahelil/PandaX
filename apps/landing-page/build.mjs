@@ -292,6 +292,7 @@ function scene() {
 function heroSection() {
   const h = C.hero;
   return `<section class="hero" id="top">
+  ${heroGrove()}
   <div class="wrap hero-in">
     <div class="hero-copy">
       <h1>${esc(h.headline).replace(esc(h.highlight), `<span class="hl">${esc(h.highlight)}</span>`)}</h1>
@@ -349,8 +350,8 @@ function growthSection() {
   const max = Math.max(...g.series.map((s) => s.value));
   const shown = new Set(["2020", "2025", "2030"]);   // label the turns, not every bar
   const bars = g.series
-    .map((s, i) => `<div class="col${s.projected ? " is-proj" : ""}" data-i="${i}">
-          <span class="col-v">${shown.has(s.year) ? esc(Math.round(s.value / 1000)) + "K" : ""}</span>
+    .map((s, i) => `<div class="col${s.projected ? " is-proj" : ""}${shown.has(s.year) ? " is-key" : ""}" data-i="${i}">
+          <span class="col-v" aria-hidden="true">${esc(Math.round(s.value / 1000))}K</span>
           <span class="col-bar" style="--h:${((s.value / max) * 100).toFixed(1)}%"></span>
           <span class="col-y">${esc(s.year)}</span>
         </div>`).join("\n        ");
@@ -633,7 +634,7 @@ function leaf(x, y, ang, len) {
 
 /** A bamboo stalk: the cane, its nodes, and the leaves near the crown. */
 function stalk(s) {
-  const foot = 486;
+  const foot = s.foot || 486;
   let nodes = "";
   for (let y = foot - 50; y > s.top + 28; y -= 62) {
     nodes += `<path d="M${s.x - s.w / 2 - 2} ${y} h${s.w + 4}"/>`;
@@ -681,6 +682,22 @@ function recordStage(depth) {
       </div>`;
 }
 
+/* The canes that stand in the hero's outer margins, mirrored right. */
+const HERO_GROVE = [
+  { x: 40, top: 210, w: 9.5, sway: 1.0, wait: -1.1, back: true, foot: 690,
+    leaves: [[240, -28, 40], [254, 198, 34]] },
+  { x: 118, top: 78, w: 13.5, sway: 1.45, wait: -3.3, back: false, foot: 690,
+    leaves: [[96, -36, 52], [110, 206, 46], [148, 16, 48], [162, 170, 40]] },
+];
+
+/** Two canes a side, sized to whatever margin the wrap leaves free. */
+function heroGrove() {
+  const art = HERO_GROVE.map(stalk).join("\n            ");
+  const svg = (side) => `<svg class="hero-bam hero-bam-${side}" viewBox="0 0 200 660"`
+    + ` aria-hidden="true" preserveAspectRatio="xMinYMax slice">\n            ${art}\n          </svg>`;
+  return `${svg("l")}\n          ${svg("r")}`;
+}
+
 /** The closing showcase: the product running, with the mark beside it. */
 function actionStage() {
   const a = C.action;
@@ -718,7 +735,7 @@ function actisPage() {
     description: a.description,
     depth: 1,
     script: true,
-    body: `<section class="sec sec-lead" id="top">
+    body: tint(`<section class="sec sec-lead" id="top">
   <div class="wrap">
     <div class="hero-in">
       <div class="prod-text">
@@ -797,7 +814,7 @@ function actisPage() {
       </div>
     </div>
   </div>
-</section>`,
+</section>`),
   });
 }
 
@@ -808,13 +825,23 @@ function rhythm(html) {
   return html.replace(/<section class="sec([^"]*)"([\s\S]*?)<h2>/g, (m, rest, mid) => {
     n += 1;
     const num = String(n).padStart(2, "0");
-    const dark = rest.includes("sec-dark");
     // Light sections alternate ground so no two in a row read the same.
-    const alt = !dark && n % 2 === 0 ? " sec-alt" : "";
+    const alt = !rest.includes("sec-dark") && n % 2 === 0 ? " sec-alt" : "";
+    const marker = `<span class="sec-n" aria-hidden="true">${num}</span>`;
+    return `<section class="sec${rest}${alt}"${mid}${marker}<h2>`;
+  });
+}
+
+/** Hand each section the next colour, and a wash to carry it down the page.
+ *  Kept apart from the numbering so the product page is coloured too. */
+function tint(html) {
+  let n = 0;
+  return html.replace(/<section class="sec([^"]*)"/g, (m, rest) => {
+    n += 1;
+    const dark = rest.includes("sec-dark") || rest.includes("sec-term");
     // The washes alternate sides so the page is lit down its length.
     const wash = dark ? "" : ` sec-wash sec-wash-${n % 4 < 2 ? "a" : "b"}`;
-    const marker = `<span class="sec-n" aria-hidden="true">${num}</span>`;
-    return `<section class="sec${rest}${alt}${wash}"${mid}${marker}<h2>`;
+    return `<section class="sec${rest}${wash} sec-c${((n - 1) % 4) + 1}"`;
   });
 }
 
@@ -823,11 +850,11 @@ function rhythm(html) {
 const home = shell({
   ogTitle: `${C.meta.brand} — ${C.meta.tagline}`,
   description: `${C.hero.subhead} ${C.hero.body}`,
-  body: rhythm([
+  body: tint(rhythm([
     heroSection(), obligationSection(),
     growthSection(), workflowSection(), marketSection(), manualSection(),
     doesSection(), easierSection(), sourceSection(), capabilitySection(), closingSection(),
-  ].join("\n\n")),
+  ].join("\n\n"))),
   script: true,
 });
 

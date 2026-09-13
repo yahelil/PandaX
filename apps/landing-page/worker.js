@@ -53,8 +53,8 @@ async function contact(request, env) {
   const lines = [
     `Name:    ${f.name}`,
     `Email:   ${f.email}`,
-    `Company: ${f.company || "—"}`,
-    `Form:    ${f.kind || "—"}`,
+    `Company: ${f.company || ","}`,
+    `Form:    ${f.kind || ","}`,
     "",
     f.message || "(no message)",
   ];
@@ -68,7 +68,7 @@ async function contact(request, env) {
         from: env.CONTACT_FROM || "PandaX site <onboarding@resend.dev>",
         to: [to],
         reply_to: f.email,
-        subject: `pandax.online — ${f.name}${f.company ? ` (${f.company})` : ""}`,
+        subject: `pandax.online, ${f.name}${f.company ? ` (${f.company})` : ""}`,
         text: lines.join("\n"),
       }),
     });

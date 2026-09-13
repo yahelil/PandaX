@@ -1,4 +1,4 @@
-/* PandaX — the entrance, and the motion on the page below it.
+/* PandaX, the entrance, and the motion on the page below it.
  *
  * Motion here only ever shows something real: a chart drawn from its data,
  * evidence converging on one record, a sequence advancing. No dependencies.
@@ -82,7 +82,7 @@
     var from = new Date(el.getAttribute("data-since") + "T00:00:00Z");
     function tick() {
       var ms = Date.now() - from.getTime();
-      if (ms < 0) { el.textContent = ""; return; }   // not yet — say nothing
+      if (ms < 0) { el.textContent = ""; return; }   // not yet, say nothing
       el.textContent = Math.floor(ms / 86400000) + "d " +
                        pad(Math.floor(ms / 3600000) % 24) + ":" +
                        pad(Math.floor(ms / 60000) % 60) + " elapsed";

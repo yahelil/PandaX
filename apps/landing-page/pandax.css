@@ -1487,9 +1487,18 @@ a { color: inherit; }
 /* ------------------------------------------------------------ footer ---- */
 
 .foot {
+  position: relative; overflow: hidden;
   border-top: 1px solid var(--line);
   padding: 44px 0 56px;
 }
+/* Cropped by the page edge, the way a mascot leans into frame. */
+.foot-mark {
+  position: absolute; right: 5%; bottom: -80px;
+  width: 240px; height: 240px;
+  opacity: 0.1; pointer-events: none;
+}
+.foot-mark img { width: 100%; height: 100%; }
+.foot-in { position: relative; }
 .foot-in { display: grid; gap: 18px; }
 .foot-brand {
   display: flex; align-items: center; gap: 9px;
@@ -1615,7 +1624,73 @@ a { color: inherit; }
   .laptop-cycling .laptop-lid { animation: none !important; transform: rotateX(0deg) !important; }
   .laptop-cycling .laptop-lid-back { animation: none !important; opacity: 0 !important; }
   .scene .node { opacity: 1 !important; transform: none !important; animation: none !important; }
+  .act-hill, .act-plus path { animation: none !important; }
+  .act-plus path { opacity: 0.7 !important; }
   .pulse { display: none; }
+}
+
+
+/* ----------------------------------------------------- closing showcase ---
+   The page ends the way it opened: the product, running. The record cycles
+   inside the frame, two soft grounds sit behind it, and the mark rests on
+   the corner so the last thing seen is the brand. */
+.act { margin: 0 0 78px; text-align: center; }
+.act-head {
+  font-family: var(--disp); font-weight: 700;
+  font-size: clamp(27px, 3.3vw, 41px); line-height: 1.08;
+  letter-spacing: -0.032em; color: var(--ink); margin: 0;
+}
+.act-sub {
+  max-width: 58ch; margin: 15px auto 0;
+  font-size: 16.5px; line-height: 1.62; color: var(--body);
+}
+.act-stage { position: relative; margin-top: 44px; padding: 40px 0 26px; }
+.act-art {
+  position: absolute; left: 50%; bottom: 0;
+  width: min(1240px, 138vw); height: 100%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.act-frame { position: relative; width: min(760px, 100%); margin: 0 auto; }
+.act-frame .rec-frame {
+  margin-top: 0;
+  box-shadow: 0 28px 64px -30px rgba(22, 24, 27, 0.45);
+}
+.act-mark {
+  position: absolute; left: -36px; bottom: -30px;
+  width: 78px; height: 78px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 12px 28px -10px rgba(22, 24, 27, 0.36);
+}
+.act-mark img { width: 46px; height: 46px; }
+
+/* The grounds drift, the way a horizon does when nothing else moves. */
+.act-hill-l { animation: act-drift-l 19s ease-in-out infinite; }
+.act-hill-r { animation: act-drift-r 23s ease-in-out infinite; }
+@keyframes act-drift-l {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(15px, -9px); }
+}
+@keyframes act-drift-r {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-17px, -7px); }
+}
+.act-plus path { opacity: 0.3; animation: act-twinkle 5.5s ease-in-out infinite; }
+.act-plus path:nth-child(2) { animation-delay: 1.7s; }
+.act-plus path:nth-child(3) { animation-delay: 3.2s; }
+@keyframes act-twinkle { 0%, 100% { opacity: 0.28; } 50% { opacity: 0.95; } }
+
+@media (max-width: 820px) {
+  .act { margin-bottom: 56px; }
+  .act-stage { margin-top: 34px; padding: 28px 0 20px; }
+  /* The fix line runs the full width here, so the mark moves to the bar. */
+  .act-mark {
+    left: auto; right: 14px; bottom: auto; top: -26px;
+    width: 60px; height: 60px;
+  }
+  .act-mark img { width: 36px; height: 36px; }
 }
 
 

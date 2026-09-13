@@ -150,6 +150,7 @@ def test_deterministic_replay_is_labeled_simulated(tmp_path):
 
 def test_background_loop_catches_up_and_stops():
     called = threading.Event()
+    called_twice = threading.Event()
 
     class Recorder:
         def __init__(self):
@@ -158,6 +159,8 @@ def test_background_loop_catches_up_and_stops():
         def refresh(self):
             self.calls += 1
             called.set()
+            if self.calls >= 2:
+                called_twice.set()
             return []
 
     recorder = Recorder()
@@ -165,7 +168,7 @@ def test_background_loop_catches_up_and_stops():
     loop.start()
     thread = loop.thread
     assert called.wait(1)
-    time.sleep(0.03)
+    assert called_twice.wait(1)
     loop.stop()
     count = recorder.calls
     time.sleep(0.03)

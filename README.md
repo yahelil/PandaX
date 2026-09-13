@@ -311,6 +311,24 @@ declare a component reachable, make a vulnerability reportable, or start a CRA
 deadline. `telemetry-assessments.json` clearly marks matched and unmatched
 observations and every decision that still needs a person.
 
+### Vendor advisories and backported fixes
+
+Generic feeds can incorrectly flag a distribution package when its vendor has
+backported a security fix without changing the upstream version. An authorized
+security curator can install reviewed, exact-package vendor decisions:
+
+```powershell
+uv run pandax advisory validate .\vendor-intelligence.json
+uv run pandax advisory install .\vendor-intelligence.json
+uv run pandax advisory status
+```
+
+PandaX matches these decisions only to an exact, versioned Package URL. It keeps
+the official source, complete vendor revision, patch reference, review record,
+and any conflicting generic-feed result in the signed bundle. See
+[vendor advisories and backports](docs/vendor-intelligence.md) and the
+[example catalogue](docs/vendor-intelligence-example.json).
+
 Vulnerability results keep [coverage, affectedness, KEV signals and product
 reachability](docs/vulnerability-coverage.md) separate. A completed source with
 no result is shown as “no finding in checked sources,” never as proof that the

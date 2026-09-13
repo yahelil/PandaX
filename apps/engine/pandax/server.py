@@ -360,6 +360,20 @@ def validate_telemetry(body: dict[str, str]) -> dict[str, Any]:
         raise HTTPException(400, str(exc)) from exc
 
 
+@api.get("/api/vendor-intelligence")
+def vendor_intelligence_status() -> dict[str, Any]:
+    """Show which administrator-curated catalogue future scans will use."""
+    try:
+        from .vendor_intelligence import load_active, summary
+
+        document, path = load_active()
+        if document is None:
+            return {"installed": False}
+        return {"installed": True, **summary(document)}
+    except (OSError, ValueError) as exc:
+        raise HTTPException(500, f"installed vendor catalogue is invalid: {exc}") from exc
+
+
 @api.get("/api/job")
 def job_status() -> dict[str, Any]:
     """Whether a run is in flight, so a reloaded page can re-attach to it."""
@@ -645,6 +659,8 @@ def summary(run_id: str) -> dict[str, Any]:
         "comparison": load("comparison.json", None),
         "release_checks": load("release-checks.json", None),
         "native_assessments": load("native-assessments.json", []),
+        "vendor_assessments": load("vendor-assessments.json", {}),
+        "vendor_superseded_findings": load("vendor-superseded-findings.json", {}),
         "coverage": coverage,
         "triage_coverage": triage_coverage,
         "manufacturer": dossier.get("manufacturer", {}),

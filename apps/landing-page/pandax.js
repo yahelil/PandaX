@@ -1,4 +1,4 @@
-/* PandaX — the entrance, and the motion on the page below it.
+/* PandaX, the entrance, and the motion on the page below it.
  *
  * Motion here only ever shows something real: a chart drawn from its data,
  * evidence converging on one record, a sequence advancing. No dependencies.
@@ -74,7 +74,7 @@
         fn();
         io.disconnect();
       });
-    }, { threshold: threshold || 0.35, rootMargin: "0px 0px -8% 0px" });
+    }, { threshold: threshold == null ? 0.35 : threshold, rootMargin: "0px 0px -8% 0px" });
     io.observe(el);
   }
 
@@ -82,7 +82,7 @@
     var from = new Date(el.getAttribute("data-since") + "T00:00:00Z");
     function tick() {
       var ms = Date.now() - from.getTime();
-      if (ms < 0) { el.textContent = ""; return; }   // not yet — say nothing
+      if (ms < 0) { el.textContent = ""; return; }   // not yet, say nothing
       el.textContent = Math.floor(ms / 86400000) + "d " +
                        pad(Math.floor(ms / 3600000) % 24) + ":" +
                        pad(Math.floor(ms / 60000) % 60) + " elapsed";
@@ -160,8 +160,11 @@
   function page() {
     // Each section lights its marker and its rule as it is reached.
     $$(".sec").forEach(function (sec) {
-      if (still) { sec.classList.add("lit"); return; }
-      onView(sec, function () { sec.classList.add("lit"); }, 0.12);
+      if (still || !("IntersectionObserver" in window)) { sec.classList.add("lit"); return; }
+      // Armed here rather than in the stylesheet: a page that never runs this
+      // shows its content instead of hiding it.
+      sec.classList.add("rise");
+      onView(sec, function () { sec.classList.add("lit"); }, 0.1);
     });
 
 
@@ -179,6 +182,15 @@
       if (still) { sc.classList.add("ran", "sealed"); return; }
       onView(sc, function () { assemble(sc); }, 0.25);
     });
+
+    // The evidence table and the two state lists, arriving in order.
+    var arrive = function (host, items, step) {
+      if (!items.length || still || !("IntersectionObserver" in window)) return;
+      host.classList.add("armed");
+      onView(host, function () { stagger(items, step, "ran", host); }, 0);
+    };
+    $$(".tbl").forEach(function (t) { arrive(t, $$("tbody tr", t), 85); });
+    $$(".rule-list").forEach(function (l) { arrive(l, $$("li", l), 80); });
 
     // The engine, typing itself out.
     var term = $("#term");
@@ -263,7 +275,120 @@
     });
   }
 
-  function init() { menu(); page(); }
+  /** Send the form without leaving the page, and say so when it lands. */
+  function contactForm() {
+    var f = $(".form");
+    if (!f || !window.fetch) return;
+    var post = f.getAttribute("data-post");
+    var done = $(".form-done");
+    if (!post || !done) return;
+
+    f.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var btn = $('button[type="submit"]', f);
+      var data = {};
+      new FormData(f).forEach(function (v, k) { data[k] = String(v).slice(0, 4000); });
+
+      if (btn) { btn.disabled = true; btn.textContent = btn.getAttribute("data-busy") || btn.textContent; }
+
+      fetch(post, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(data),
+      }).then(function (r) {
+        if (!r.ok) throw new Error(String(r.status));
+        // The whole ask goes, heading and all, and the thank-you takes its place.
+        var ask = f.closest ? f.closest(".form-ask") : null;
+        (ask || f).hidden = true;
+        done.hidden = false;
+        done.focus();
+      }).catch(function () {
+        // Nobody is stranded: hand the message back to their mail client.
+        if (btn) { btn.disabled = false; btn.textContent = btn.getAttribute("data-idle") || btn.textContent; }
+        f.submit();
+      });
+    });
+  }
+
+  /** The notices, in a panel. Escape closes it, focus goes in and comes back,
+   *  and a modified click is left alone so the real page still opens. */
+  function sheet() {
+    var box = $("#sheet");
+    if (!box) return;
+    var panel = $(".sheet-panel", box), body = $("#sheetBody"),
+        title = $("#sheetTitle"), eyebrow = $("#sheetEyebrow"), full = $("#sheetFull");
+    var last = null;
+
+    function open(key, label, href) {
+      var tpl = $('[data-sheet-body="' + key + '"]', box);
+      if (!tpl) return false;
+      last = document.activeElement;
+      title.textContent = label;
+      eyebrow.textContent = "PandaX";
+      full.setAttribute("href", href);
+      body.innerHTML = "";
+      body.appendChild(tpl.content.cloneNode(true));
+      body.scrollTop = 0;
+      box.hidden = false;
+      // a frame, so the transition has a start to move from
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { box.classList.add("open"); });
+      });
+      document.documentElement.style.overflow = "hidden";
+      panel.focus();
+      return true;
+    }
+
+    function close() {
+      if (box.hidden) return;
+      box.classList.remove("open");
+      document.documentElement.style.overflow = "";
+      var done = function () { box.hidden = true; };
+      if (still) done();
+      else setTimeout(done, 340);
+      if (last && last.focus) last.focus();
+    }
+
+    document.addEventListener("click", function (e) {
+      var link = e.target.closest ? e.target.closest("[data-sheet]") : null;
+      if (link) {
+        // cmd/ctrl/middle click, or a new tab, belongs to the browser
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        if (open(link.getAttribute("data-sheet"),
+                 link.getAttribute("data-sheet-title") || link.textContent,
+                 link.getAttribute("href"))) e.preventDefault();
+        return;
+      }
+      if (e.target.closest && e.target.closest("[data-sheet-close]")) close();
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !box.hidden) close();
+      if (e.key !== "Tab" || box.hidden) return;
+      // keep the tab ring inside the panel while it is open
+      var f = $$('a[href], button, [tabindex]:not([tabindex="-1"])', panel)
+        .filter(function (el) { return el.offsetParent !== null; });
+      if (!f.length) return;
+      var first = f[0], lastEl = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); lastEl.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); first.focus(); }
+    });
+  }
+
+  /** The header takes a shadow once the page has moved under it. */
+  function header() {
+    var head = $(".head");
+    if (!head) return;
+    var on = false;
+    var read = function () {
+      var now = (window.scrollY || document.documentElement.scrollTop) > 8;
+      if (now !== on) { on = now; head.classList.toggle("is-scrolled", on); }
+    };
+    read();
+    window.addEventListener("scroll", read, { passive: true });
+  }
+
+  function init() { menu(); page(); contactForm(); sheet(); header(); }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

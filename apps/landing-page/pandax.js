@@ -310,7 +310,85 @@
     });
   }
 
-  function init() { menu(); page(); contactForm(); }
+  /** The notices, in a panel. Escape closes it, focus goes in and comes back,
+   *  and a modified click is left alone so the real page still opens. */
+  function sheet() {
+    var box = $("#sheet");
+    if (!box) return;
+    var panel = $(".sheet-panel", box), body = $("#sheetBody"),
+        title = $("#sheetTitle"), eyebrow = $("#sheetEyebrow"), full = $("#sheetFull");
+    var last = null;
+
+    function open(key, label, href) {
+      var tpl = $('[data-sheet-body="' + key + '"]', box);
+      if (!tpl) return false;
+      last = document.activeElement;
+      title.textContent = label;
+      eyebrow.textContent = "PandaX";
+      full.setAttribute("href", href);
+      body.innerHTML = "";
+      body.appendChild(tpl.content.cloneNode(true));
+      body.scrollTop = 0;
+      box.hidden = false;
+      // a frame, so the transition has a start to move from
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () { box.classList.add("open"); });
+      });
+      document.documentElement.style.overflow = "hidden";
+      panel.focus();
+      return true;
+    }
+
+    function close() {
+      if (box.hidden) return;
+      box.classList.remove("open");
+      document.documentElement.style.overflow = "";
+      var done = function () { box.hidden = true; };
+      if (still) done();
+      else setTimeout(done, 340);
+      if (last && last.focus) last.focus();
+    }
+
+    document.addEventListener("click", function (e) {
+      var link = e.target.closest ? e.target.closest("[data-sheet]") : null;
+      if (link) {
+        // cmd/ctrl/middle click, or a new tab, belongs to the browser
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        if (open(link.getAttribute("data-sheet"),
+                 link.getAttribute("data-sheet-title") || link.textContent,
+                 link.getAttribute("href"))) e.preventDefault();
+        return;
+      }
+      if (e.target.closest && e.target.closest("[data-sheet-close]")) close();
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !box.hidden) close();
+      if (e.key !== "Tab" || box.hidden) return;
+      // keep the tab ring inside the panel while it is open
+      var f = $$('a[href], button, [tabindex]:not([tabindex="-1"])', panel)
+        .filter(function (el) { return el.offsetParent !== null; });
+      if (!f.length) return;
+      var first = f[0], lastEl = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); lastEl.focus(); }
+      else if (!e.shiftKey && document.activeElement === lastEl) { e.preventDefault(); first.focus(); }
+    });
+  }
+
+  /** The header takes a shadow once the page has moved under it. */
+  function header() {
+    var head = $(".head");
+    if (!head) return;
+    var on = false;
+    var read = function () {
+      var now = (window.scrollY || document.documentElement.scrollTop) > 8;
+      if (now !== on) { on = now; head.classList.toggle("is-scrolled", on); }
+    };
+    read();
+    window.addEventListener("scroll", read, { passive: true });
+  }
+
+  function init() { menu(); page(); contactForm(); sheet(); header(); }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

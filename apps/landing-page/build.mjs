@@ -61,7 +61,7 @@ ${JSON.stringify({
 </head>
 <body${bodyClass}>
 <a class="skip" href="#main">Skip to content</a>
-${header(depth)}
+${header(depth, slug)}
 <main id="main">
 ${body}
 </main>
@@ -72,10 +72,10 @@ ${script ? `<script>window.PANDAX_RECORDS = ${JSON.stringify(C.hero.records)};</
 `;
 }
 
-function productsMenu(depth) {
+function productsMenu(depth, slug) {
   const r = rel(depth);
   const items = C.nav.products
-    .map((p) => `<a class="menu-item" href="${r}${p.href}">
+    .map((p) => `<a class="menu-item${slug === p.href ? " is-current" : ""}" href="${r}${p.href}">
           <img src="${r}${p.mark}" alt="" width="36" height="36">
           <span><strong>${esc(p.name)}</strong><small>${esc(p.blurb)}</small></span>
         </a>`).join("\n        ");
@@ -89,7 +89,7 @@ function productsMenu(depth) {
     </div>`;
 }
 
-function header(depth) {
+function header(depth, slug) {
   const r = rel(depth);
   const links = C.nav.links
     .map((l) => `<a href="${depth ? `${r}index.html${l.href}` : l.href}">${esc(l.label)}</a>`)
@@ -103,24 +103,62 @@ function header(depth) {
     <nav class="head-nav" aria-label="Sections">
         ${links}
     </nav>
-    ${productsMenu(depth)}
+    ${productsMenu(depth, slug)}
     <a class="btn btn-sm" href="${depth ? `${r}index.html#contact` : C.nav.action.href}">${esc(C.nav.action.label)}</a>
   </div>
 </header>`;
 }
 
+/** The notices, as a panel that comes in from the side. The links still
+ *  point at the real pages, so this is an upgrade rather than a gate. */
+function sheets() {
+  const one = (key, body) => `<template data-sheet-body="${key}">
+      <p class="doc-intro">${esc(body.intro)}</p>
+      ${body.sections.map((s, i) => `<section class="doc-s">
+        <span class="doc-n">${n2(i)}</span>
+        <div><h2>${esc(s.title)}</h2><p>${esc(s.body)}</p></div>
+      </section>`).join("\n      ")}
+    </template>`;
+
+  return `<div class="sheet" id="sheet" hidden>
+  <div class="sheet-scrim" data-sheet-close></div>
+  <aside class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" tabindex="-1">
+    <header class="sheet-head">
+      <div>
+        <span class="sheet-eyebrow" id="sheetEyebrow"></span>
+        <h2 id="sheetTitle"></h2>
+      </div>
+      <button class="sheet-x" type="button" data-sheet-close aria-label="Close">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 5 l10 10 M15 5 l-10 10"/></svg>
+      </button>
+    </header>
+    <div class="sheet-body" id="sheetBody"></div>
+    <footer class="sheet-foot">
+      <a class="btn btn-q" id="sheetFull" href="/privacy/">Open the full page</a>
+    </footer>
+  </aside>
+  ${one("privacy", C.privacyBody)}
+  ${one("cookies", C.cookiesBody)}
+</div>`;
+}
+
 function footer(depth) {
   const r = rel(depth);
   const to = (href) => (depth && href.startsWith("/") ? r + href.slice(1) : href);
+  const key = (href) => (href.includes("/privacy/") ? "privacy" : href.includes("/cookies/") ? "cookies" : "");
   const groups = C.footer.groups
     .map((g) => `<div class="foot-col">
         <h2>${esc(g.title)}</h2>
         <ul>
-          ${g.links.map((l) => `<li><a href="${to(l.href)}">${esc(l.label)}</a></li>`).join("\n          ")}
+          ${g.links.map((l) => {
+            const k = key(l.href);
+            return `<li><a href="${to(l.href)}"${k ? ` data-sheet="${k}" data-sheet-title="${esc(l.label)}"` : ""}>${esc(l.label)}</a></li>`;
+          }).join("\n          ")}
         </ul>
       </div>`).join("\n      ");
 
-  return `<footer class="foot">
+  return `${sheets()}
+<footer class="foot">
   <span class="foot-mark" aria-hidden="true">
     <img src="${r}assets/pandax-mark-ink.png" alt="" width="224" height="224" loading="lazy">
   </span>
@@ -477,41 +515,6 @@ function capabilitySection() {
     <ol class="caps">
       ${items}
     </ol>
-    <div class="band">
-      <h3>${esc(c.closing.title)}</h3>
-      <p>${esc(c.closing.body)}</p>
-    </div>
-  </div>
-</section>`;
-}
-
-function manualSection() {
-  const m = C.manual;
-  const marks = ["parts", "trace", "patched", "submit"];
-  const steps = m.steps
-    .map((s, i) => `<li class="mw">
-        <span class="mw-head">
-          <span class="mw-n">${n2(i)}</span>
-          ${lineGlyph(marks[i])}
-        </span>
-        <h3>${esc(s.title)}</h3>
-        <p>${esc(s.body)}</p>
-      </li>`).join("\n      ");
-
-  return `<section class="sec" id="manual">
-  <div class="wrap">
-    <h2>${esc(m.heading)}</h2>
-    <p class="lede">${esc(m.lede)}</p>
-    <ol class="mws">
-      ${steps}
-    </ol>
-    <div class="again" aria-hidden="true">
-      <svg class="again-loop" viewBox="0 0 1000 44" preserveAspectRatio="none">
-        <path d="M990 4 v18 a14 14 0 0 1 -14 14 H24 a14 14 0 0 1 -14 -14 V4"/>
-      </svg>
-      <span class="again-tag">${esc(m.again)}</span>
-    </div>
-    <p class="note">${esc(m.clock)}</p>
   </div>
 </section>`;
 }
@@ -945,7 +948,7 @@ const home = shell({
     // The home page makes the case. How the product works in detail lives
     // on the product page, where someone has already decided to look.
     heroSection(), audienceSection(),
-    marketSection(), manualSection(),
+    marketSection(),
     doesSection(), questionsSection(),
     obligationSection(), growthSection(), workflowSection(),
     aboutSection(), closingSection(),
@@ -973,9 +976,12 @@ function legalPage(key, extra) {
 
 const docSections = (body) =>
   `<p class="doc-intro">${esc(body.intro)}</p>\n\n    ` +
-  body.sections.map((s) => `<section class="doc-sec">
-      <h2>${esc(s.title)}</h2>
-      <p>${esc(s.body)}</p>
+  body.sections.map((s, i) => `<section class="doc-s">
+      <span class="doc-n">${n2(i)}</span>
+      <div>
+        <h2>${esc(s.title)}</h2>
+        <p>${esc(s.body)}</p>
+      </div>
     </section>`).join("\n\n    ");
 
 const cookiesSections = docSections(C.cookiesBody);

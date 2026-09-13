@@ -150,6 +150,7 @@ a { color: inherit; }
 .head {
   position: sticky; top: 0; z-index: 100;
   background: rgba(255,255,255,0.86);
+  transition: box-shadow .25s ease, background .25s ease;
   backdrop-filter: saturate(1.4) blur(14px);
   border-bottom: 1px solid var(--line);
 }
@@ -239,6 +240,8 @@ a { color: inherit; }
   transition: background .14s;
 }
 .menu-item:hover { background: var(--bg); }
+.menu-item.is-current { background: rgba(24, 82, 196, 0.07); }
+.menu-item.is-current strong { color: var(--brand); }
 .menu-item img { display: block; flex: 0 0 auto; }
 .menu-item strong {
   display: block;
@@ -259,6 +262,20 @@ a { color: inherit; }
   transition: background .16s, border-color .16s, color .16s;
 }
 .btn:hover { background: var(--graphite); border-color: var(--graphite); }
+.btn:active { transform: translateY(0) scale(.976); box-shadow: none; }
+.btn { transition: background .18s, border-color .18s, transform .16s, box-shadow .18s; }
+
+/* A hover lift belongs to a pointer. On touch it sticks after the tap. */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px -6px rgba(15, 23, 32, 0.35); }
+  .btn-q:hover { box-shadow: 0 6px 16px -8px rgba(15, 23, 32, 0.22); }
+}
+
+/* The header, once you have left the top of the page. */
+.head.is-scrolled {
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 20px -12px rgba(15, 23, 32, 0.28);
+}
 
 .btn-q {
   background: transparent; color: var(--ink);
@@ -1469,7 +1486,10 @@ a { color: inherit; }
   padding: 11px 13px;
   width: 100%;
 }
-.form input:focus, .form textarea:focus { border-color: var(--ink); outline-offset: 1px; }
+.form input:focus, .form textarea:focus {
+  border-color: var(--brand);
+  outline: 2px solid rgba(24, 82, 196, 0.35); outline-offset: 1px;
+}
 .form textarea { resize: vertical; }
 .form .btn { align-self: flex-start; margin-top: 4px; }
 .hp { position: absolute; left: -9999px; }
@@ -1977,6 +1997,7 @@ a { color: inherit; }
   .again-loop { animation: none !important; }
   .tickmark, .mk-add { stroke-dashoffset: 0 !important; }
   .flow-pulse { display: none; }
+  .sheet-panel, .sheet-scrim { transition: none !important; }
   .cr, .cr-seal { animation: none !important; opacity: 1 !important; transform: none !important; }
   .pulse { display: none; }
 }
@@ -2017,21 +2038,104 @@ a { color: inherit; }
 
 /* A legal notice is a document, not a landing page: it does not want the
    marketing scale or the brand's emphasis. */
-.doc .sec-lead { padding: 64px 0 84px; }
+.doc .sec-lead { padding: 64px 0 92px; }
 .doc h1 { font-size: clamp(34px, 4vw, 46px); margin-bottom: 10px; }
 .doc-date { font-family: var(--mono); font-size: 12.5px; color: #8C9298; }
 
 .doc-intro {
-  margin: 26px 0 4px;
-  font-size: 17.5px; color: var(--ink);
-  max-width: 64ch;
-  padding-bottom: 22px; border-bottom: 1px solid var(--line);
+  margin: 26px 0 10px;
+  font-size: 18px; line-height: 1.6; color: var(--ink);
+  max-width: 62ch;
+  padding-bottom: 30px; border-bottom: 1px solid var(--line);
 }
 
-.doc-s { padding: 26px 0; border-bottom: 1px solid var(--line); }
-.doc-s h2 {
-  font-size: 18px; letter-spacing: -0.014em;
-  padding-bottom: 0; margin-bottom: 8px;
+/* A numbered rail down the left, so a long notice has a shape to it. */
+.doc-s {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr);
+  gap: 0 8px;
+  padding: 26px 0; border-bottom: 1px solid var(--line);
 }
-.doc-s h2::after { display: none; }      /* no marketing rule in a document */
-.doc-s p { font-size: 16px; max-width: 66ch; }
+.doc-n {
+  font-family: var(--mono); font-size: 12px; color: var(--brand);
+  padding-top: 3px;
+}
+.doc-s h2 {
+  font-family: var(--disp); font-weight: 660;
+  font-size: 18.5px; line-height: 1.3; letter-spacing: -0.014em;
+  padding-bottom: 0; margin: 0 0 8px; color: var(--ink);
+}
+.doc-s p { font-size: 16px; line-height: 1.62; max-width: 66ch; margin: 0; }
+
+
+/* ------------------------------------------------------------- the sheet -- */
+
+/* The notices, brought in from the side. The links behind it still point at
+   the real pages, so this adds a way in rather than replacing one. */
+.sheet { position: fixed; inset: 0; z-index: 200; }
+.sheet[hidden] { display: none; }
+.sheet-scrim {
+  position: absolute; inset: 0;
+  background: rgba(15, 23, 32, 0.42);
+  opacity: 0; transition: opacity .3s ease;
+}
+.sheet.open .sheet-scrim { opacity: 1; }
+.sheet-panel {
+  position: absolute; top: 0; right: 0; bottom: 0;
+  width: min(560px, 100%);
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+  box-shadow: -30px 0 60px -30px rgba(15, 23, 32, 0.45);
+  transform: translateX(100%);
+  transition: transform .34s cubic-bezier(.3,.8,.3,1);
+  outline: none;
+}
+.sheet.open .sheet-panel { transform: none; }
+
+.sheet-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 20px;
+  padding: 28px 30px 22px;
+  border-bottom: 1px solid var(--line);
+}
+.sheet-eyebrow {
+  display: block;
+  font-family: var(--text); font-size: 11.5px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--body); margin-bottom: 8px;
+}
+.sheet-head h2 {
+  font-family: var(--disp); font-weight: 700;
+  font-size: 27px; line-height: 1.1; letter-spacing: -0.026em;
+  margin: 0; padding: 0; color: var(--ink);
+}
+.sheet-x {
+  flex: 0 0 auto;
+  width: 36px; height: 36px; border-radius: 8px;
+  display: grid; place-items: center;
+  background: none; border: 1px solid var(--line); cursor: pointer;
+  transition: border-color .18s, background .18s;
+}
+.sheet-x:hover { border-color: var(--brand); background: rgba(24, 82, 196, 0.07); }
+.sheet-x svg { width: 15px; height: 15px; fill: none; stroke: var(--ink); stroke-width: 1.8; stroke-linecap: round; }
+
+.sheet-body {
+  flex: 1 1 auto; overflow-y: auto;
+  padding: 4px 30px 8px;
+  overscroll-behavior: contain;
+}
+.sheet-body .doc-intro { font-size: 16.5px; padding-bottom: 22px; margin-top: 22px; }
+.sheet-body .doc-s { grid-template-columns: 34px minmax(0, 1fr); padding: 20px 0; }
+.sheet-body .doc-s h2 { font-size: 16.5px; }
+.sheet-body .doc-s p { font-size: 15px; }
+.sheet-body .doc-s:last-child { border-bottom: 0; }
+
+.sheet-foot {
+  flex: 0 0 auto;
+  padding: 18px 30px 24px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 620px) {
+  .sheet-panel { width: 100%; border-left: 0; }
+  .sheet-head, .sheet-body, .sheet-foot { padding-left: 22px; padding-right: 22px; }
+}

@@ -468,26 +468,34 @@ function capabilitySection() {
 
 function manualSection() {
   const m = C.manual;
+  const marks = ["parts", "trace", "patched", "submit"];
   const steps = m.steps
-    .map((s, i) => `<li class="step" data-i="${i}">
-        <span class="step-n">${n2(i)}</span>
+    .map((s, i) => `<li class="mw">
+        <span class="mw-head">
+          <span class="mw-n">${n2(i)}</span>
+          ${lineGlyph(marks[i])}
+        </span>
         <h3>${esc(s.title)}</h3>
         <p>${esc(s.body)}</p>
       </li>`).join("\n      ");
+
   return `<section class="sec" id="manual">
   <div class="wrap">
     <h2>${esc(m.heading)}</h2>
     <p class="lede">${esc(m.lede)}</p>
-    <ol class="steps" id="steps">
-      <span class="step-line" aria-hidden="true"><i id="stepFill"></i></span>
+    <ol class="mws">
       ${steps}
     </ol>
+    <div class="again" aria-hidden="true">
+      <svg class="again-loop" viewBox="0 0 1000 44" preserveAspectRatio="none">
+        <path d="M990 4 v18 a14 14 0 0 1 -14 14 H24 a14 14 0 0 1 -14 -14 V4"/>
+      </svg>
+      <span class="again-tag">${esc(m.again)}</span>
+    </div>
     <p class="note">${esc(m.clock)}</p>
   </div>
 </section>`;
 }
-
-/* 6 -------------------------------------------------------------- does --- */
 
 function doesSection() {
   const d = C.does;
@@ -648,14 +656,47 @@ function recordStage(depth) {
       </div>`;
 }
 
+/** Monoline marks, drawn on one grid so they sit together. */
+function lineGlyph(kind) {
+  const d = {
+    // the three people in the room
+    shield: `<path d="M30 16 L48 23 v13 c0 11-7 18-18 22 -11-4-18-11-18-22 V23 Z"/>
+          <path d="M23 30 h14 M23 37 h14 M23 44 h9"/>`,
+    layers: `<path d="M30 12 L50 22 L30 32 L10 22 Z"/>
+          <path d="M10 30 L30 40 L50 30"/>
+          <path d="M10 38 L30 48 L50 38"/>`,
+    stamp: `<path d="M16 48 h28"/>
+          <path d="M20 41 h20 v5 h-20 Z"/>
+          <path d="M25 41 v-6 a5 5 0 0 1 -4 -5 v-6 a5 5 0 0 1 5 -5 h8 a5 5 0 0 1 5 5 v6 a5 5 0 0 1 -4 5 v6"/>`,
+    // the work that repeats
+    parts: `<path d="M30 10 L48 20 v20 L30 50 L12 40 V20 Z"/>
+          <path d="M12 20 L30 30 L48 20 M30 30 v20"/>`,
+    trace: `<circle cx="27" cy="27" r="13"/>
+          <path d="M36.5 36.5 L50 50"/>
+          <path d="M21 27 h12 M27 21 v12"/>`,
+    patched: `<path d="M30 11 L47 18 v12 c0 10-6.5 16.5-17 20 -10.5-3.5-17-10-17-20 V18 Z"/>
+          <path d="M22 29 l6 6 l11 -13"/>`,
+    submit: `<path d="M12 36 v10 a2 2 0 0 0 2 2 h32 a2 2 0 0 0 2 -2 V36"/>
+          <path d="M30 40 V12"/>
+          <path d="M21 21 l9 -9 l9 9"/>`,
+  }[kind];
+  return `<svg class="gly" viewBox="0 0 60 60" aria-hidden="true">
+          <g fill="none" stroke-linecap="round" stroke-linejoin="round">${d}</g>
+        </svg>`;
+}
+
 /* 1b ------------------------------------------------------- audience --- */
 
 /** Before the law, before the product: who is standing here and why. */
 function audienceSection() {
   const a = C.audience;
-  const fit = a.fit.map((x) => `<li>${esc(x)}</li>`).join("");
+  const marks = ["shield", "layers", "stamp"];
+  const fit = a.fit
+    .map((x) => `<li><svg class="tickmark" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 l4.5 4.5 L19 7"/></svg><span>${esc(x)}</span></li>`)
+    .join("\n        ");
   const readers = a.readers
-    .map((r) => `<li class="who">
+    .map((r, i) => `<li class="who">
+        <span class="who-tile">${lineGlyph(marks[i])}</span>
         <h3>${esc(r.who)}</h3>
         <p>${esc(r.body)}</p>
       </li>`).join("\n      ");
@@ -664,18 +705,18 @@ function audienceSection() {
   <div class="wrap">
     <h2>${esc(a.heading)}</h2>
     <p class="lede">${esc(a.lede)}</p>
-    <div class="aud">
-      <div class="aud-fit">
-        <h3 class="aud-cap">${esc(a.fitTitle)}</h3>
-        <ul class="rule-list">${fit}</ul>
-      </div>
-      <div class="aud-who">
-        <h3 class="aud-cap">${esc(a.readersTitle)}</h3>
-        <ul class="whos">
-          ${readers}
-        </ul>
-      </div>
+
+    <div class="fitbox">
+      <h3 class="aud-cap">${esc(a.fitTitle)}</h3>
+      <ul class="fits">
+        ${fit}
+      </ul>
     </div>
+
+    <h3 class="aud-cap aud-cap-wide">${esc(a.readersTitle)}</h3>
+    <ul class="whos">
+      ${readers}
+    </ul>
   </div>
 </section>`;
 }

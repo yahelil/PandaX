@@ -28,7 +28,11 @@ export const nav = {
       blurb: "Turns a release into a reviewable record",
     },
   ],
-  links: [],
+  links: [
+    { label: "Who it is for", href: "#audience" },
+    { label: "How it works", href: "#does" },
+    { label: "About", href: "#about" },
+  ],
   action: { label: "Book a walkthrough", href: "#contact" },
 };
 
@@ -307,9 +311,28 @@ export const contact = {
 
 export const footer = {
   lines: ["PandaX", "Product security evidence for the EU Cyber Resilience Act"],
-  links: [
-    { label: "Actis", href: "/actis/" },
-    { label: "Privacy", href: "/privacy/" },
+  groups: [
+    {
+      title: "Product",
+      links: [
+        { label: "Actis", href: "/actis/" },
+        { label: "All products", href: "/products/" },
+      ],
+    },
+    {
+      title: "Company",
+      links: [
+        { label: "Contact", href: "/#contact" },
+        { label: "Book a walkthrough", href: "/#contact" },
+      ],
+    },
+    {
+      title: "Legal",
+      links: [
+        { label: "Privacy", href: "/privacy/" },
+        { label: "Cookies", href: "/cookies/" },
+      ],
+    },
   ],
   legal:
     "PandaX produces compliance documentation. It does not issue conformity opinions, certificates or verdicts.",
@@ -370,6 +393,12 @@ export const legalPages = {
     heading: "Privacy",
     updated: "Last updated 13 September 2026.",
   },
+  cookies: {
+    title: "Cookies",
+    description: "This website sets no cookies. This page says so, and why.",
+    heading: "Cookies",
+    updated: "Last updated 13 September 2026.",
+  },
 };
 
 export const privacyBody = {
@@ -408,4 +437,88 @@ export const privacyBody = {
   // TODO(legal): once the operating entity is registered, add its legal name,
   // registered address and — if the site keeps targeting Germany — an Impressum
   // per § 5 DDG. Nothing on the page states anything untrue without them.
+};
+
+
+/* ------------------------------------------------------------- cookies --- */
+
+/* Every statement here was checked against the built site before it was
+   written: no external request is made at runtime, and no cookie is set. */
+export const cookiesBody = {
+  intro:
+    "This website sets no cookies. That is the whole notice, but the detail is below, because a page that simply asserts it is worth no more than one that does not.",
+  sections: [
+    {
+      title: "Nothing is stored on your device",
+      body: "No cookies, no local storage, no session storage, and no other identifier. Nothing is written when you arrive, and nothing is read when you come back. Opening the site twice is indistinguishable from opening it once.",
+    },
+    {
+      title: "So there is no consent banner",
+      body: "The consent requirement in Article 5(3) of the ePrivacy Directive, and in \u00a7 25 TDDDG in Germany, applies to storing or reading information on your device. Because nothing is stored or read, the requirement does not arise. A banner here would be asking permission for something that does not happen.",
+    },
+    {
+      title: "No analytics, and no third parties",
+      body: "There is no analytics, no tag manager, no advertising pixel, no embedded video, no chat widget and no third-party form service. The fonts are served from this domain rather than from Google Fonts. Loading this page makes no request to any host but ours.",
+    },
+    {
+      title: "What the contact form does",
+      body: "The form posts what you type to an endpoint on this domain, which forwards it to us so that we can reply. It sets no cookie and leaves nothing behind on your device. What happens to the message afterwards is described in the privacy notice.",
+    },
+    {
+      title: "If this changes",
+      body: "Adding anything that stores data on your device would change what this page has to say, and would bring a consent requirement with it. This notice would be updated first, not afterwards.",
+    },
+  ],
+};
+
+/* ------------------------------------------------------------ products --- */
+
+export const productsPage = {
+  title: "Our products",
+  description: "What PandaX builds, and what each one is for.",
+  heading: "Our products",
+  lede: "One product today. This page is where the next one will be listed.",
+};
+
+/* ------------------------------------------------------------ audience --- */
+
+/* Drawn from the positioning, not from the acquisition plan: the plan's
+   segment sizes, competitor reads and economics stay internal. */
+export const audience = {
+  heading: "Who this is for",
+  lede: "If you build connected equipment and place it on the EU market, the Cyber Resilience Act asks you to show your work. This is for the people who have to produce that.",
+  fitTitle: "You are probably a fit if",
+  fit: [
+    "You manufacture connected industrial or electrical equipment and sell it into the EU.",
+    "You ship firmware often enough that the evidence work repeats.",
+    "Someone has already asked you for a technical file, an SBOM, or a reporting timeline.",
+    "Today that answer is assembled by hand, by a few people, close to the release date.",
+  ],
+  readersTitle: "What it gives each of you",
+  readers: [
+    {
+      who: "Product security and compliance",
+      body: "The evidence for your next release, organised and reviewable \u2014 with your test lab in the room rather than waiting on the outcome.",
+    },
+    {
+      who: "Engineering and quality leadership",
+      body: "One evidence process that repeats across every product family, instead of rebuilding the story from scratch on every release.",
+    },
+    {
+      who: "Test labs and consultancies",
+      body: "A structured evidence pack your reviewers can reuse. We do not compete with your assessment work, and we never charge on its outcome.",
+    },
+  ],
+};
+
+/* --------------------------------------------------------------- about --- */
+
+export const about = {
+  heading: "Who we are",
+  lede: "PandaX is an independent European workspace for product security evidence.",
+  body: [
+    "Scanners find things. Managed services do the work on your behalf. Neither of them owns the document at the end \u2014 the technical file comes out as a by-product of somebody else's tool, and gets assembled by hand again every time a release ships.",
+    "We built PandaX to own that part. The record is the product: every component, finding and decision tied to the release that actually shipped, in a form a reviewer can read and a form you can take somewhere else.",
+    "We stay neutral about scanners, the export is portable, and we never charge on the outcome of a conformity assessment. PandaX produces documentation. It does not issue opinions, certificates or verdicts.",
+  ],
 };

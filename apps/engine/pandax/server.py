@@ -32,6 +32,7 @@ from .stages.sbom import is_matchable_purl
 WEB = Path(__file__).resolve().parent / "web"
 MAX_SBOM_BYTES = 50 * 1024 * 1024
 MAX_TELEMETRY_BYTES = 1024 * 1024
+MAX_EXPOSURE_CONTEXT_BYTES = 1024 * 1024
 
 api = FastAPI(title="PandaX CRA Compliance Engine", docs_url="/api/docs")
 
@@ -116,6 +117,7 @@ class Job:
         input_type: str = "artifact",
         cleanup_dir: Path | None = None,
         telemetry_path: Path | None = None,
+        exposure_context_path: Path | None = None,
     ) -> None:
         from . import pipeline
 
@@ -123,10 +125,13 @@ class Job:
 
         def worker() -> None:
             try:
+                options = {}
+                if telemetry_path is not None:
+                    options["telemetry_path"] = telemetry_path
+                if exposure_context_path is not None:
+                    options["exposure_context_path"] = exposure_context_path
                 if input_type == "sbom":
-                    stream = pipeline.run_sbom(
-                        Path(artifact), telemetry_path=telemetry_path
-                    )
+                    stream = pipeline.run_sbom(Path(artifact), **options)
                 else:
                     from .scenarios import download, run_scenario
 
@@ -141,12 +146,10 @@ class Job:
                         )
                         stream = pipeline.run(
                             download(value.removeprefix("release:")),
-                            telemetry_path=telemetry_path,
+                            **options,
                         )
                     else:
-                        stream = pipeline.run(
-                            Path(artifact), telemetry_path=telemetry_path
-                        )
+                        stream = pipeline.run(Path(artifact), **options)
                 for event in stream:
                     payload = event.as_dict()
                     if "run_dir" in event.data:
@@ -248,18 +251,39 @@ def start_scan(body: dict[str, str]) -> dict[str, Any]:
                 "one telemetry file cannot be attached to a two-release comparison; "
                 "scan the matching release directly",
             )
+    exposure_context_path = None
+    exposure_value = str(body.get("exposure_context", "")).strip()
+    if exposure_value:
+        exposure_context_path = Path(exposure_value)
+        try:
+            from .exposure import summary as exposure_summary
+
+            exposure_summary(exposure_context_path)
+        except (OSError, ValueError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        if value.startswith("scenario:"):
+            raise HTTPException(
+                400,
+                "one exposure context cannot be attached to a two-release comparison; "
+                "scan the matching release directly",
+            )
     with SCAN_LOCK:
         if CURRENT is not None and not CURRENT.finished:
             raise HTTPException(409, 'a scan is already running')
         CURRENT = Job()
-        if telemetry_path is None:
+        if telemetry_path is None and exposure_context_path is None:
             CURRENT.start(artifact)
         else:
-            CURRENT.start(artifact, telemetry_path=telemetry_path)
+            CURRENT.start(
+                artifact,
+                telemetry_path=telemetry_path,
+                exposure_context_path=exposure_context_path,
+            )
     return {
         'started': True,
         'artifact': str(artifact),
         'telemetry_attached': telemetry_path is not None,
+        'exposure_context_attached': exposure_context_path is not None,
     }
 
 
@@ -267,6 +291,7 @@ def start_scan(body: dict[str, str]) -> dict[str, Any]:
 async def start_sbom_scan(
     file: UploadFile = File(...),
     telemetry: UploadFile | None = File(None),
+    exposure_context: UploadFile | None = File(None),
 ) -> dict[str, Any]:
     """Validate and start a run from an uploaded CycloneDX or SPDX JSON SBOM."""
     global CURRENT
@@ -279,6 +304,7 @@ async def start_sbom_scan(
     filename = re.sub(r"[^A-Za-z0-9._-]", "_", filename) or "uploaded-sbom.json"
     target = upload_dir / filename
     telemetry_target: Path | None = None
+    exposure_target: Path | None = None
     size = 0
     started = False
     try:
@@ -314,13 +340,31 @@ async def start_sbom_scan(
             except (OSError, ValueError) as exc:
                 raise HTTPException(400, str(exc)) from exc
 
+        if exposure_context is not None:
+            exposure_target = upload_dir / "exposure-context.json"
+            exposure_size = 0
+            with open(exposure_target, "wb") as out:
+                while chunk := await exposure_context.read(256 * 1024):
+                    exposure_size += len(chunk)
+                    if exposure_size > MAX_EXPOSURE_CONTEXT_BYTES:
+                        raise HTTPException(
+                            413, "exposure context upload exceeds the 1 MiB limit"
+                        )
+                    out.write(chunk)
+            try:
+                from .exposure import summary as exposure_summary
+
+                exposure_summary(exposure_target)
+            except (OSError, ValueError) as exc:
+                raise HTTPException(400, str(exc)) from exc
+
         with SCAN_LOCK:
             # A product scan may have started while this file was uploading and
             # being validated, so claim the single-run slot atomically here.
             if CURRENT is not None and not CURRENT.finished:
                 raise HTTPException(409, "a scan is already running")
             CURRENT = Job()
-            if telemetry_target is None:
+            if telemetry_target is None and exposure_target is None:
                 CURRENT.start(
                     target, input_type="sbom", cleanup_dir=upload_dir
                 )
@@ -330,6 +374,7 @@ async def start_sbom_scan(
                     input_type="sbom",
                     cleanup_dir=upload_dir,
                     telemetry_path=telemetry_target,
+                    exposure_context_path=exposure_target,
                 )
         started = True
         return {
@@ -337,6 +382,7 @@ async def start_sbom_scan(
             "source_type": "sbom",
             "filename": filename,
             "telemetry_attached": telemetry_target is not None,
+            "exposure_context_attached": exposure_target is not None,
             **info,
         }
     except Exception:
@@ -347,6 +393,8 @@ async def start_sbom_scan(
         await file.close()
         if telemetry is not None:
             await telemetry.close()
+        if exposure_context is not None:
+            await exposure_context.close()
 
 
 @api.post("/api/telemetry/validate")
@@ -356,6 +404,17 @@ def validate_telemetry(body: dict[str, str]) -> dict[str, Any]:
         from .telemetry import summary as telemetry_summary
 
         return telemetry_summary(Path(str(body.get("path", ""))))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@api.post("/api/exposure/validate")
+def validate_exposure_context(body: dict[str, str]) -> dict[str, Any]:
+    """Validate reviewed exposure context without returning component details."""
+    try:
+        from .exposure import summary as exposure_summary
+
+        return exposure_summary(Path(str(body.get("path", ""))))
     except (OSError, ValueError) as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -405,6 +464,11 @@ def create_monitoring_policy(body: dict[str, Any]) -> dict[str, Any]:
             str(body.get("source_type", "artifact")),
             int(body.get("interval_minutes", 360)),
             Path(str(body["telemetry"])) if body.get("telemetry") else None,
+            (
+                Path(str(body["exposure_context"]))
+                if body.get("exposure_context")
+                else None
+            ),
         )
     except (MonitoringError, TypeError, ValueError) as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -556,6 +620,8 @@ def summary(run_id: str) -> dict[str, Any]:
         finding.setdefault("affectedness_evidence", "")
         finding.setdefault("reachability", "unknown")
         finding.setdefault("reachability_evidence", "")
+        finding.setdefault("exposure_assessment", "not_assessed")
+        finding.setdefault("exposure_evidence", {})
         finding.setdefault("query_source", "")
         finding.setdefault("query_value", "")
         finding.setdefault("source_retrieved_at", "")
@@ -661,6 +727,7 @@ def summary(run_id: str) -> dict[str, Any]:
         "native_assessments": load("native-assessments.json", []),
         "vendor_assessments": load("vendor-assessments.json", {}),
         "vendor_superseded_findings": load("vendor-superseded-findings.json", {}),
+        "exposure_assessments": load("exposure-assessments.json", {}),
         "coverage": coverage,
         "triage_coverage": triage_coverage,
         "manufacturer": dossier.get("manufacturer", {}),

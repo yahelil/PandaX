@@ -1,14 +1,7 @@
 /* PandaX — the entrance, and the motion on the page below it.
  *
- * The boot is the one cinematic moment: the lid comes up onto the PandaX mark,
- * the camera pushes into the screen, the chassis dissolves, and the page opens
- * through the transparent counter at the crossing of the X. It is driven by
- * scroll, not by a timer, so the visitor is the one moving.
- *
- * Everything below the boot moves only to show something real: a chart drawn
- * from its data, evidence converging on one record, a sequence advancing.
- *
- * GSAP is self-hosted; the site makes no external requests.
+ * Motion here only ever shows something real: a chart drawn from its data,
+ * evidence converging on one record, a sequence advancing. No dependencies.
  */
 
 (function () {
@@ -19,176 +12,57 @@
   var pad = function (n) { return (n < 10 ? "0" : "") + n; };
   var still = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  /* =====================================================================
-     BOOT — the lid opens onto the mark, then the camera flies through the
-     X at the centre of the panda and out into the page.
-     ===================================================================== */
-
-  /** True when this view came from elsewhere on the site rather than fresh. */
-  function seenAlready() {
-    var entry = (performance.getEntriesByType &&
-                 performance.getEntriesByType("navigation")[0]) || null;
-
-    // A reload is a deliberate restart: play it.
-    if (entry && entry.type === "reload") return false;
-
-    // Back and forward within the site: already seen.
-    if (entry && entry.type === "back_forward") return true;
-
-    // Otherwise it depends on where they came from. Same origin means they
-    // were just here; anything else is a first arrival.
-    try {
-      return !!document.referrer &&
-             new URL(document.referrer).origin === location.origin;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function boot() {
-    var boot = $("#boot");
-    var laptop = $("#laptop");
-    var lid = $("#laptopLid");
-    var hint = $("#bootHint");
-    var lpImg = $("#lpImg");
-
-    if (!boot || !laptop) { document.body.classList.add("entered"); return; }
-
-    document.body.classList.add("boot-on");
-
-    // A deep link wants the section, not the overture. Reduced motion wants no
-    // overture at all. And neither does someone coming back from another page
-    // on this site — sitting through it again to reach the nav is a tax on
-    // every visit. A reload still plays it.
-    var deepLink = location.hash && location.hash !== "#top";
-    if (deepLink || still || seenAlready() || !window.gsap || !window.ScrollTrigger) {
-      boot.style.display = "none";
-      document.body.classList.add("entered");
-      return;
-    }
-
-    document.body.classList.add("has-boot");
-    gsap.registerPlugin(ScrollTrigger);
-
-    var base = boot.querySelector(".laptop-base");
-    var cam = boot.querySelector(".laptop-camera");
-    var shNav = boot.querySelector(".sh-nav");
-    var swm = boot.querySelector(".swm");
-    var grade = boot.querySelector(".sh-grade");
-    var glare = boot.querySelector(".laptop-glare");
-    var lidBack = boot.querySelector(".laptop-lid-back");
-    var shadow = boot.querySelector(".laptop-shadow");
-    var small = matchMedia("(max-width: 760px)").matches;
-
-    /* Scale and offset that make the open lid exactly fill the viewport.
-       Measured with the lid flat, otherwise we would capture the closed lid
-       lying on the base and end up centred on the keyboard. */
-    function fit() {
-      var rot = gsap.getProperty(lid, "rotateX");
-      var sc = gsap.getProperty(laptop, "scale");
-      var px = gsap.getProperty(laptop, "x");
-      var py = gsap.getProperty(laptop, "y");
-      gsap.set(lid, { rotateX: 0 });
-      gsap.set(laptop, { scale: 1, x: 0, y: 0 });
-
-      var r = lid.getBoundingClientRect();
-      var lr = laptop.getBoundingClientRect();
-
-      // Scale about the centre of the LID, not of the whole chassis. The
-      // chassis is taller than the lid, so its centre sits below the screen
-      // and scaling around it walks the screen off the viewport centre.
-      gsap.set(laptop, { transformOrigin: "50% " + (r.top + r.height / 2 - lr.top) + "px" });
-
-      // Cover, not contain: we fly through the mark in the middle of the
-      // screen, so filling the viewport beats keeping the corners in frame.
-      var s = Math.max(innerWidth / r.width, innerHeight / r.height);
-      var out = {
-        s: s,
-        tx: innerWidth / 2 - (r.left + r.width / 2),
-        ty: innerHeight / 2 - (r.top + r.height / 2),
-      };
-
-      gsap.set(lid, { rotateX: rot });
-      gsap.set(laptop, { scale: sc, x: px, y: py });
-      return out;
-    }
-    var target = fit();
-
-    /* How far to push through the X. The transparent counter at the crossing
-       is about 12.8% of the artwork's width, so this is what carries its
-       edges past the corners of the screen. */
-    var PUSH = small ? 15 : 22;
-    var closedRot = small ? -108 : -100;
-
-    gsap.set(lid, { rotateX: closedRot, transformOrigin: "50% 100%" });
-    gsap.set(base, { opacity: 0 });
-    if (shadow) gsap.set(shadow, { opacity: 0 });
-    gsap.set(laptop, { scale: 1, x: 0, y: 0, transformOrigin: "50% 50%" });
-    gsap.set(lpImg, { xPercent: -49.9, yPercent: -66.6, transformOrigin: "49.9% 66.6%" });
-    gsap.to(lpImg, { opacity: 1, duration: 1.2, delay: 0.5, ease: "power2.out" });
-    if (swm) gsap.to(swm, { opacity: 1, duration: 0.8, delay: 1.15, ease: "power2.out" });
-
-    var tl = gsap.timeline({
-      defaults: { ease: "none" },
-      scrollTrigger: {
-        trigger: boot,
-        start: "top top",
-        end: function () { return "+=" + Math.round(innerHeight * 2.7); },
-        scrub: 0.6,
-        pin: true,
-        pinSpacing: true,
-        anticipatePin: 1,
-        invalidateOnRefresh: true,
-        onRefresh: function () { target = fit(); },
-      },
-    });
-
-    /* 1 — the lid comes up */
-    tl.to(lid, { rotateX: 0, duration: 0.20, ease: "power3.out" }, 0);
-    tl.to([hint, boot.querySelector(".boot-meta")], { opacity: 0, duration: 0.06 }, 0);
-    if (lidBack) tl.to(lidBack, { opacity: 0, duration: 0.04, ease: "power3.out" }, 0);
-    tl.to([base, shadow], { opacity: 1, duration: 0.09, ease: "power1.out" }, 0.03);
-    tl.to({}, { duration: 0.06 });
-
-    /* 2 — the camera pushes into the screen */
-    tl.to(laptop, {
-      duration: 0.36,
-      x: function () { return target.tx; },
-      y: function () { return target.ty; },
-      scale: function () { return target.s; },
-      ease: "power2.inOut",
-    }, 0.26);
-
-    /* 3 — the chassis dissolves; the screen becomes the page */
-    tl.to([base, cam, glare, shadow], { opacity: 0, duration: 0.12, ease: "power1.out" }, 0.52);
-    tl.to(lid, {
-      "--bezel": "0px",
-      "--radius": "0px",
-      borderColor: "rgba(255,255,255,0)",
-      boxShadow: "0 0 0 rgba(0,0,0,0)",
-      duration: 0.14, ease: "power1.out",
-    }, 0.52);
-
-    /* 4 — everything but the mark clears out of the way */
-    tl.to([shNav, swm], { opacity: 0, duration: 0.10, ease: "power1.out" }, 0.40);
-    if (grade) tl.to(grade, { opacity: 0, duration: 0.16 }, 0.48);
-
-    /* 5 — through the X. The counter is transparent, so the page ground
-           behind it simply opens up as the arms sweep past the corners. */
-    tl.to(lpImg, { scale: PUSH, duration: 0.50, ease: "power2.in" }, 0.42);
-    tl.fromTo(lpImg, { filter: "blur(0px)" },
-              { filter: "blur(12px)", duration: 0.22, ease: "power2.in" }, 0.70);
-    tl.to(lpImg, { opacity: 0, duration: 0.13, ease: "power1.out" }, 0.79);
-
-    /* 6 — the boot dissolves so the page is simply there behind it */
-    tl.to(boot, { opacity: 0, duration: 0.12, ease: "power1.inOut" }, 0.86);
-
-    /* 7 — hand off to the real page */
-    tl.add(function () { document.body.classList.add("entered"); }, 0.90);
-    tl.add(function () { document.body.classList.remove("entered"); }, 0.89);
-  }
-
   /* ==================================================== the page below --- */
+
+  /* ------------------------------------------------ the record builds --- */
+
+  var HEX = "0123456789abcdef";
+
+  /** Resolve an identifier left to right, scrambling the tail as it goes. */
+  function resolve(el) {
+    var target = el.textContent;
+    var chars = target.split("");
+    var i = 0;
+    (function step() {
+      if (i >= chars.length) { el.textContent = target; return; }
+      var out = target.slice(0, i);
+      for (var j = i; j < chars.length; j++) {
+        out += /[-:.]/.test(chars[j]) ? chars[j] : HEX[(Math.random() * 16) | 0];
+      }
+      el.textContent = out;
+      i += Math.max(1, Math.round(chars.length / 24));
+      setTimeout(step, 26);
+    })();
+  }
+
+  /** Count an integer up; leaves values like "6 of 6" alone. */
+  function countUp(el) {
+    var raw = el.getAttribute("data-count") || "";
+    var n = parseInt(raw, 10);
+    if (isNaN(n) || String(n) !== raw.trim()) return;
+    var start = performance.now();
+    (function frame(now) {
+      // Clamp both ends: a rAF timestamp can precede the captured start.
+      var t = Math.max(0, Math.min(1, (now - start) / 900));
+      el.textContent = String(Math.round(n * (1 - Math.pow(1 - t, 3))));
+      if (t < 1) requestAnimationFrame(frame);
+      else el.textContent = raw;
+    })(start);
+  }
+
+  function assemble(sc) {
+    var run = $(".sc-run .id", sc);
+    if (run) resolve(run);
+    setTimeout(function () { $$(".sc-v", sc).forEach(countUp); }, 300);
+    setTimeout(function () {
+      sc.classList.add("ran");
+      $$(".sc-checks li", sc).forEach(function (li, i) { li.style.transitionDelay = i * 90 + "ms"; });
+    }, 500);
+    setTimeout(function () {
+      sc.classList.add("sealing");
+      setTimeout(function () { sc.classList.add("sealed"); }, 260);
+    }, 1300);
+  }
 
   /** Run fn once, when el first comes into view. */
   function onView(el, fn, threshold) {
@@ -225,6 +99,12 @@
 
   function page() {
     $$(".since").forEach(elapsed);
+
+    // The record on the page builds itself once, when it is reached.
+    $$(".sc").forEach(function (sc) {
+      if (still) { sc.classList.add("ran", "sealed"); return; }
+      onView(sc, function () { assemble(sc); }, 0.25);
+    });
 
     // The engine, typing itself out.
     var term = $("#term");
@@ -309,7 +189,7 @@
     });
   }
 
-  function init() { boot(); menu(); page(); }
+  function init() { menu(); page(); }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

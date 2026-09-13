@@ -165,7 +165,6 @@ function screen(rec) {
             </div>
             <ul class="sc-checks">${checks}</ul>
             <div class="sc-fix">
-              <span class="fx-arrow" aria-hidden="true"></span>
               <span class="id" data-f="cve">${esc(rec.finding.cve)}</span> in <span class="id" data-f="component">${esc(rec.finding.component)}</span> <span class="fx-to">→</span> <span data-f="fix">${esc(rec.finding.fix)}</span>
             </div>
           </div>
@@ -667,9 +666,6 @@ function recordStage(depth) {
           <div class="rec-frame">
             ${screen(C.hero.records[0])}
           </div>
-          <span class="act-mark" aria-hidden="true">
-            <img src="${r}assets/pandax-mark-ink.png" alt="" width="46" height="46" loading="lazy">
-          </span>
         </div>
       </div>`;
 }
@@ -770,9 +766,14 @@ function aboutSection() {
         <p class="claim-line">${esc(a.claim)}</p>
         <p class="claim-body">${esc(a.claimBody)}</p>
       </div>
-      <span class="claim-mark" aria-hidden="true">
-        <img src="assets/pandax-mark-ink.png" alt="" width="72" height="72" loading="lazy">
-      </span>
+      <div class="claim-art" aria-hidden="true">
+        <span class="cr cr-1"></span>
+        <span class="cr cr-2"></span>
+        <span class="cr cr-3"></span>
+        <span class="cr-seal">
+          <img src="assets/pandax-mark-ink.png" alt="" width="52" height="52" loading="lazy">
+        </span>
+      </div>
     </div>
 
     <h3 class="aud-cap aud-cap-wide">${esc(a.promisesTitle)}</h3>

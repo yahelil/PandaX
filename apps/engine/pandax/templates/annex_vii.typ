@@ -14,6 +14,7 @@
     #v(2pt)
     #grid(
       columns: (1fr, auto),
+      column-gutter: 10pt,
       align(left)[Annex VII technical documentation · #data.product.name #data.product.version · run #data.run_id],
       align(right)[#counter(page).display("1 / 1", both: true)],
     )
@@ -61,6 +62,7 @@
 )[
   #grid(
     columns: (1fr, auto),
+    column-gutter: 8pt,
     align(left)[
       #text(weight: "bold", size: 9pt)[#e.ref  #h(3pt) #e.title]
     ],

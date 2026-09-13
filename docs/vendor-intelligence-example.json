@@ -1,0 +1,46 @@
+{
+  "schema": "pandax/vendor-intelligence/v1",
+  "catalog_version": "2026-09-13.1",
+  "curated_at": "2026-09-13T08:00:00Z",
+  "curator": {
+    "name": "PandaX security curation team",
+    "authority_attestation": true
+  },
+  "scope": "Example exact-package decision showing a distribution backport. Replace this example with reviewed official vendor evidence before use.",
+  "entries": [
+    {
+      "advisory_id": "VENDOR-SECURITY-NOTICE-2026-001",
+      "cve": "CVE-2026-10001",
+      "purl": "pkg:deb/debian/example@1.2.3-0%2Bdeb11u5?arch=amd64&distro=debian-11",
+      "component": "example",
+      "version": "1.2.3-0+deb11u5",
+      "decision": "fixed_by_backport",
+      "fixed_version": "1.2.3-0+deb11u5",
+      "source": {
+        "publisher": "Example Linux vendor",
+        "url": "https://vendor.example/security/VENDOR-SECURITY-NOTICE-2026-001",
+        "published_at": "2026-09-10T09:00:00Z",
+        "retrieved_at": "2026-09-12T09:00:00Z",
+        "statement": "The vendor package revision 0+deb11u5 contains the security patch while retaining upstream version 1.2.3."
+      },
+      "review": {
+        "reviewed_by": "Authorized security curator",
+        "reviewed_at": "2026-09-13T08:00:00Z"
+      },
+      "backport": {
+        "upstream_version": "1.2.3",
+        "vendor_revision": "0+deb11u5",
+        "patch_reference": "https://vendor.example/packages/example/changelog"
+      },
+      "conflicts": [
+        {
+          "source_name": "Generic vulnerability feed",
+          "url": "https://feed.example/CVE-2026-10001",
+          "asserted_state": "affected",
+          "retrieved_at": "2026-09-12T08:00:00Z",
+          "resolution": "The generic feed sees the unchanged upstream version. The official vendor notice for the full package revision documents the backported fix."
+        }
+      ]
+    }
+  ]
+}

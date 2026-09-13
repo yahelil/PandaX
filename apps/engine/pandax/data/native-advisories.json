@@ -1,0 +1,125 @@
+{
+  "schema": "pandax/native-advisory-catalog/v1",
+  "catalog_version": "2026-09-09.1",
+  "curated_at": "2026-09-09T00:00:00Z",
+  "scope": "Selected official curl and OpenSSL upstream advisories. This is bounded, curated coverage rather than a complete native vulnerability database.",
+  "source_precedence": [
+    "An applicable distribution advisory and full package revision take precedence for a distribution build.",
+    "The official upstream vendor advisory takes precedence for a verified upstream release.",
+    "Converted or inferred feed ranges are retained as conflicts and never silently override the applicable vendor source."
+  ],
+  "advisories": [
+    {
+      "project": "curl",
+      "component": "libcurl",
+      "cve": "CVE-2023-38545",
+      "title": "SOCKS5 heap buffer overflow",
+      "source": {
+        "name": "curl security advisory",
+        "url": "https://curl.se/docs/CVE-2023-38545.html",
+        "retrieved_at": "2026-09-07T00:00:00Z",
+        "kind": "official_vendor_advisory"
+      },
+      "affected_versions": ["8.3.0"],
+      "fixed_versions": ["8.4.0", "8.5.0"],
+      "fixed_version": "8.4.0",
+      "affectedness_evidence": "The official curl advisory identifies 8.4.0 as the fixed release for the affected 8.3.0 benchmark boundary.",
+      "reachability_note": "Requires SOCKS5 remote hostname resolution, a long hostname and a slow handshake. The heap overflow also depends on an effective download buffer below 65541 bytes."
+    },
+    {
+      "project": "curl",
+      "component": "libcurl",
+      "cve": "CVE-2023-38546",
+      "title": "Cookie injection through duplicated easy handles",
+      "source": {
+        "name": "curl security advisory",
+        "url": "https://curl.se/docs/CVE-2023-38546.html",
+        "retrieved_at": "2026-09-07T00:00:00Z",
+        "kind": "official_vendor_advisory"
+      },
+      "affected_versions": ["8.3.0"],
+      "fixed_versions": ["8.4.0", "8.5.0"],
+      "fixed_version": "8.4.0",
+      "affectedness_evidence": "The official curl advisory identifies 8.4.0 as the fixed release for the affected 8.3.0 benchmark boundary.",
+      "reachability_note": "The vulnerable behavior is in the libcurl easy-handle cookie API and is not available through the curl command-line program alone.",
+      "conflicting_sources": [
+        {
+          "applies_to_version": "8.4.0",
+          "name": "OSV converted Git range",
+          "url": "https://api.osv.dev/v1/vulns/CVE-2023-38546",
+          "retrieved_at": "2026-09-07T00:00:00Z",
+          "asserted_state": "affected",
+          "resolution": "Retained as a conflict. For the verified upstream 8.4.0 release, the official curl fixed-version statement is selected."
+        }
+      ]
+    },
+    {
+      "project": "curl",
+      "component": "libcurl",
+      "cve": "CVE-2023-46218",
+      "title": "Mixed-case cookie public suffix bypass",
+      "source": {
+        "name": "curl security advisory",
+        "url": "https://curl.se/docs/CVE-2023-46218.html",
+        "retrieved_at": "2026-09-07T00:00:00Z",
+        "kind": "official_vendor_advisory"
+      },
+      "affected_versions": ["8.3.0", "8.4.0"],
+      "fixed_versions": ["8.5.0"],
+      "fixed_version": "8.5.0",
+      "affectedness_evidence": "The official curl advisory identifies 8.5.0 as the fixed release; the curated 8.3.0 and 8.4.0 boundaries remain affected.",
+      "reachability_note": "Product exposure depends on libcurl cookie handling and Public Suffix List support."
+    },
+    {
+      "project": "openssl",
+      "component": "libssl",
+      "cve": "CVE-2014-0160",
+      "title": "TLS and DTLS heartbeat information disclosure",
+      "source": {
+        "name": "OpenSSL security advisory",
+        "url": "https://openssl-library.org/news/secadv/20140407.txt",
+        "retrieved_at": "2026-09-07T00:00:00Z",
+        "kind": "official_vendor_advisory"
+      },
+      "affected_versions": ["1.0.1f"],
+      "fixed_versions": ["1.0.1g", "1.0.1h"],
+      "fixed_version": "1.0.1g",
+      "affectedness_evidence": "The official OpenSSL advisory identifies 1.0.1g as the corrected release for the curated 1.0.1f boundary.",
+      "reachability_note": "Requires the heartbeat implementation in the deployed build and a reachable TLS or DTLS peer. OPENSSL_NO_HEARTBEATS can remove the feature."
+    },
+    {
+      "project": "openssl",
+      "component": "libssl",
+      "cve": "CVE-2014-0224",
+      "title": "ChangeCipherSpec man-in-the-middle weakness",
+      "source": {
+        "name": "OpenSSL security advisory",
+        "url": "https://openssl-library.org/news/secadv/20140605.txt",
+        "retrieved_at": "2026-09-07T00:00:00Z",
+        "kind": "official_vendor_advisory"
+      },
+      "affected_versions": ["1.0.1f", "1.0.1g"],
+      "fixed_versions": ["1.0.1h"],
+      "fixed_version": "1.0.1h",
+      "affectedness_evidence": "The official OpenSSL advisory identifies 1.0.1h as the corrected release; the curated 1.0.1f and 1.0.1g boundaries precede that fix.",
+      "reachability_note": "Successful exploitation requires vulnerable OpenSSL peers on both sides of the connection."
+    },
+    {
+      "project": "openssl",
+      "component": "libssl",
+      "cve": "CVE-2014-0195",
+      "title": "DTLS fragment buffer overflow",
+      "source": {
+        "name": "OpenSSL security advisory",
+        "url": "https://openssl-library.org/news/secadv/20140605.txt",
+        "retrieved_at": "2026-09-07T00:00:00Z",
+        "kind": "official_vendor_advisory"
+      },
+      "affected_versions": ["1.0.1f", "1.0.1g"],
+      "fixed_versions": ["1.0.1h"],
+      "fixed_version": "1.0.1h",
+      "affectedness_evidence": "The official OpenSSL advisory identifies 1.0.1h as the corrected release; the curated 1.0.1f and 1.0.1g boundaries precede that fix.",
+      "reachability_note": "The vulnerable behavior is in DTLS. A TLS-only deployment does not establish reachability."
+    }
+  ]
+}

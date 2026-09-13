@@ -26,11 +26,14 @@ from . import events as ev
 from .cases import CaseError, CaseStore
 from .stages.clock import parse_timestamp
 from .context import OUT_DIR, ROOT
-from .evidence import verify_run
+from .evidence import TrustedKeyConfigurationError, verify_bundle
+from .monitoring import MonitoringError, MonitoringStore
 from .stages.sbom import is_matchable_purl
 
 WEB = Path(__file__).resolve().parent / "web"
 MAX_SBOM_BYTES = 50 * 1024 * 1024
+MAX_TELEMETRY_BYTES = 1024 * 1024
+MAX_EXPOSURE_CONTEXT_BYTES = 1024 * 1024
 
 
 def _advisory_service():
@@ -58,6 +61,11 @@ api = FastAPI(title="PandaX CRA Compliance Engine", docs_url="/api/docs", lifesp
 def _case_store() -> CaseStore:
     data_dir = Path(os.environ.get("PANDAX_DATA_DIR", OUT_DIR / ".pandax"))
     return CaseStore(data_dir / "cases.sqlite3")
+
+
+def _monitor_store() -> MonitoringStore:
+    data_dir = Path(os.environ.get("PANDAX_DATA_DIR", OUT_DIR / ".pandax"))
+    return MonitoringStore(data_dir / "monitoring.sqlite3")
 
 
 def _run_json(run_id: str, name: str, default: Any) -> Any:
@@ -129,6 +137,8 @@ class Job:
         artifact: Path | str,
         input_type: str = "artifact",
         cleanup_dir: Path | None = None,
+        telemetry_path: Path | None = None,
+        exposure_context_path: Path | None = None,
     ) -> None:
         from . import pipeline
 
@@ -136,8 +146,13 @@ class Job:
 
         def worker() -> None:
             try:
+                options = {}
+                if telemetry_path is not None:
+                    options["telemetry_path"] = telemetry_path
+                if exposure_context_path is not None:
+                    options["exposure_context_path"] = exposure_context_path
                 if input_type == "sbom":
-                    stream = pipeline.run_sbom(Path(artifact))
+                    stream = pipeline.run_sbom(Path(artifact), **options)
                 else:
                     from .scenarios import download, run_scenario
 
@@ -150,9 +165,12 @@ class Job:
                                 "RUN", "Downloading / verifying official release"
                             ).as_dict()
                         )
-                        stream = pipeline.run(download(value.removeprefix("release:")))
+                        stream = pipeline.run(
+                            download(value.removeprefix("release:")),
+                            **options,
+                        )
                     else:
-                        stream = pipeline.run(Path(artifact))
+                        stream = pipeline.run(Path(artifact), **options)
                 for event in stream:
                     payload = event.as_dict()
                     if "run_dir" in event.data:
@@ -238,16 +256,64 @@ def start_scan(body: dict[str, str]) -> dict[str, Any]:
         artifact = Path(value)
         if not value or not artifact.exists():
             raise HTTPException(400, f'artifact not found: {value}')
+    telemetry_path = None
+    telemetry_value = str(body.get("telemetry", "")).strip()
+    if telemetry_value:
+        telemetry_path = Path(telemetry_value)
+        try:
+            from .telemetry import summary as telemetry_summary
+
+            telemetry_summary(telemetry_path)
+        except (OSError, ValueError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        if value.startswith("scenario:"):
+            raise HTTPException(
+                400,
+                "one telemetry file cannot be attached to a two-release comparison; "
+                "scan the matching release directly",
+            )
+    exposure_context_path = None
+    exposure_value = str(body.get("exposure_context", "")).strip()
+    if exposure_value:
+        exposure_context_path = Path(exposure_value)
+        try:
+            from .exposure import summary as exposure_summary
+
+            exposure_summary(exposure_context_path)
+        except (OSError, ValueError) as exc:
+            raise HTTPException(400, str(exc)) from exc
+        if value.startswith("scenario:"):
+            raise HTTPException(
+                400,
+                "one exposure context cannot be attached to a two-release comparison; "
+                "scan the matching release directly",
+            )
     with SCAN_LOCK:
         if CURRENT is not None and not CURRENT.finished:
             raise HTTPException(409, 'a scan is already running')
         CURRENT = Job()
-        CURRENT.start(artifact)
-    return {'started': True, 'artifact': str(artifact)}
+        if telemetry_path is None and exposure_context_path is None:
+            CURRENT.start(artifact)
+        else:
+            CURRENT.start(
+                artifact,
+                telemetry_path=telemetry_path,
+                exposure_context_path=exposure_context_path,
+            )
+    return {
+        'started': True,
+        'artifact': str(artifact),
+        'telemetry_attached': telemetry_path is not None,
+        'exposure_context_attached': exposure_context_path is not None,
+    }
 
 
 @api.post("/api/scan/sbom")
-async def start_sbom_scan(file: UploadFile = File(...)) -> dict[str, Any]:
+async def start_sbom_scan(
+    file: UploadFile = File(...),
+    telemetry: UploadFile | None = File(None),
+    exposure_context: UploadFile | None = File(None),
+) -> dict[str, Any]:
     """Validate and start a run from an uploaded CycloneDX or SPDX JSON SBOM."""
     global CURRENT
     with SCAN_LOCK:
@@ -258,6 +324,8 @@ async def start_sbom_scan(file: UploadFile = File(...)) -> dict[str, Any]:
     filename = Path(file.filename or "uploaded-sbom.json").name
     filename = re.sub(r"[^A-Za-z0-9._-]", "_", filename) or "uploaded-sbom.json"
     target = upload_dir / filename
+    telemetry_target: Path | None = None
+    exposure_target: Path | None = None
     size = 0
     started = False
     try:
@@ -275,18 +343,67 @@ async def start_sbom_scan(file: UploadFile = File(...)) -> dict[str, Any]:
         except SbomError as exc:
             raise HTTPException(400, str(exc)) from exc
 
+        if telemetry is not None:
+            telemetry_target = upload_dir / "runtime-telemetry.json"
+            telemetry_size = 0
+            with open(telemetry_target, "wb") as out:
+                while chunk := await telemetry.read(256 * 1024):
+                    telemetry_size += len(chunk)
+                    if telemetry_size > MAX_TELEMETRY_BYTES:
+                        raise HTTPException(
+                            413, "telemetry upload exceeds the 1 MiB limit"
+                        )
+                    out.write(chunk)
+            try:
+                from .telemetry import summary as telemetry_summary
+
+                telemetry_summary(telemetry_target)
+            except (OSError, ValueError) as exc:
+                raise HTTPException(400, str(exc)) from exc
+
+        if exposure_context is not None:
+            exposure_target = upload_dir / "exposure-context.json"
+            exposure_size = 0
+            with open(exposure_target, "wb") as out:
+                while chunk := await exposure_context.read(256 * 1024):
+                    exposure_size += len(chunk)
+                    if exposure_size > MAX_EXPOSURE_CONTEXT_BYTES:
+                        raise HTTPException(
+                            413, "exposure context upload exceeds the 1 MiB limit"
+                        )
+                    out.write(chunk)
+            try:
+                from .exposure import summary as exposure_summary
+
+                exposure_summary(exposure_target)
+            except (OSError, ValueError) as exc:
+                raise HTTPException(400, str(exc)) from exc
+
         with SCAN_LOCK:
             # A product scan may have started while this file was uploading and
             # being validated, so claim the single-run slot atomically here.
             if CURRENT is not None and not CURRENT.finished:
                 raise HTTPException(409, "a scan is already running")
             CURRENT = Job()
-            CURRENT.start(target, input_type="sbom", cleanup_dir=upload_dir)
+            if telemetry_target is None and exposure_target is None:
+                CURRENT.start(
+                    target, input_type="sbom", cleanup_dir=upload_dir
+                )
+            else:
+                CURRENT.start(
+                    target,
+                    input_type="sbom",
+                    cleanup_dir=upload_dir,
+                    telemetry_path=telemetry_target,
+                    exposure_context_path=exposure_target,
+                )
         started = True
         return {
             "started": True,
             "source_type": "sbom",
             "filename": filename,
+            "telemetry_attached": telemetry_target is not None,
+            "exposure_context_attached": exposure_target is not None,
             **info,
         }
     except Exception:
@@ -295,6 +412,46 @@ async def start_sbom_scan(file: UploadFile = File(...)) -> dict[str, Any]:
         raise
     finally:
         await file.close()
+        if telemetry is not None:
+            await telemetry.close()
+        if exposure_context is not None:
+            await exposure_context.close()
+
+
+@api.post("/api/telemetry/validate")
+def validate_telemetry(body: dict[str, str]) -> dict[str, Any]:
+    """Validate a local telemetry summary without exposing its device rows."""
+    try:
+        from .telemetry import summary as telemetry_summary
+
+        return telemetry_summary(Path(str(body.get("path", ""))))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@api.post("/api/exposure/validate")
+def validate_exposure_context(body: dict[str, str]) -> dict[str, Any]:
+    """Validate reviewed exposure context without returning component details."""
+    try:
+        from .exposure import summary as exposure_summary
+
+        return exposure_summary(Path(str(body.get("path", ""))))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@api.get("/api/vendor-intelligence")
+def vendor_intelligence_status() -> dict[str, Any]:
+    """Show which administrator-curated catalogue future scans will use."""
+    try:
+        from .vendor_intelligence import load_active, summary
+
+        document, path = load_active()
+        if document is None:
+            return {"installed": False}
+        return {"installed": True, **summary(document)}
+    except (OSError, ValueError) as exc:
+        raise HTTPException(500, f"installed vendor catalogue is invalid: {exc}") from exc
 
 
 @api.get("/api/job")
@@ -309,6 +466,51 @@ def job_status() -> dict[str, Any]:
         "events": len(CURRENT.history),
         "input_type": CURRENT.input_type,
     }
+
+
+@api.get("/api/monitoring/policies")
+def monitoring_policies() -> list[dict[str, Any]]:
+    return _monitor_store().list_policies()
+
+
+@api.post("/api/monitoring/policies")
+def create_monitoring_policy(body: dict[str, Any]) -> dict[str, Any]:
+    try:
+        source = str(body.get("source", "")).strip()
+        if not source:
+            raise MonitoringError("monitoring source is required")
+        return _monitor_store().add_policy(
+            str(body.get("name", "")),
+            Path(source),
+            str(body.get("source_type", "artifact")),
+            int(body.get("interval_minutes", 360)),
+            Path(str(body["telemetry"])) if body.get("telemetry") else None,
+            (
+                Path(str(body["exposure_context"]))
+                if body.get("exposure_context")
+                else None
+            ),
+        )
+    except (MonitoringError, TypeError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@api.post("/api/monitoring/policies/{policy_id}/run")
+def run_monitoring_policy(policy_id: str) -> dict[str, Any]:
+    try:
+        return _monitor_store().run_policy(policy_id)
+    except MonitoringError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@api.post("/api/monitoring/run-due")
+def run_due_monitoring() -> list[dict[str, Any]]:
+    return _monitor_store().run_due()
+
+
+@api.get("/api/monitoring/alerts")
+def monitoring_alerts(policy_id: str | None = None) -> list[dict[str, Any]]:
+    return _monitor_store().list_alerts(policy_id)
 
 
 @api.get("/api/events")
@@ -381,12 +583,12 @@ def verify(run_id: str) -> dict[str, Any]:
     target = OUT_DIR / run_id
     if not target.exists():
         raise HTTPException(404, f"run not found: {run_id}")
-    checks = verify_run(target)
-    return {
-        "run_id": run_id,
-        "ok": all(c.ok for c in checks),
-        "checks": [{"name": c.name, "ok": c.ok, "detail": c.detail} for c in checks],
-    }
+    configured = os.environ.get("PANDAX_TRUSTED_KEY")
+    try:
+        result = verify_bundle(target, Path(configured) if configured else None)
+    except TrustedKeyConfigurationError as exc:
+        raise HTTPException(503, f"trusted-key configuration error: {exc}") from exc
+    return {"run_id": run_id, **result.as_dict()}
 
 
 @api.post("/api/tamper/{run_id}")
@@ -428,6 +630,58 @@ def summary(run_id: str) -> dict[str, Any]:
     dossier = load("dossier.json", {})
     manifest = load("manifest.json", {})
     sbom = load("sbom.cdx.json", {})
+    coverage = load("coverage.json", {})
+    triage_coverage = load("triage-coverage.json", {})
+
+    # Historical bundles predate Card 09. Missing facts remain unknown rather
+    # than being inferred from the presence or absence of a finding.
+    for finding in findings:
+        finding.setdefault("coverage_status", "unknown")
+        finding.setdefault("affectedness", "unknown")
+        finding.setdefault("affectedness_evidence", "")
+        finding.setdefault("reachability", "unknown")
+        finding.setdefault("reachability_evidence", "")
+        finding.setdefault("exposure_assessment", "not_assessed")
+        finding.setdefault("exposure_evidence", {})
+        finding.setdefault("query_source", "")
+        finding.setdefault("query_value", "")
+        finding.setdefault("source_retrieved_at", "")
+        finding.setdefault("kev_check_status", "unknown")
+        finding.setdefault("kev_source_url", "")
+        finding.setdefault("kev_checked_at", "")
+        finding.setdefault("epss_check_status", "unknown")
+        finding.setdefault("epss_source_url", "")
+        finding.setdefault("epss_checked_at", "")
+        if not finding.get("source_url") and finding.get("osv_id"):
+            finding["source_url"] = (
+                f"https://osv.dev/vulnerability/{finding['osv_id']}"
+            )
+
+    coverage_checks = coverage.get("checks", []) if isinstance(coverage, dict) else []
+    checks_by_ref: dict[str, list[dict[str, Any]]] = {}
+    checks_by_purl: dict[str, list[dict[str, Any]]] = {}
+    for check in coverage_checks:
+        if not isinstance(check, dict):
+            continue
+        checks_by_ref.setdefault(str(check.get("component_ref", "")), []).append(check)
+        checks_by_purl.setdefault(str(check.get("purl", "")), []).append(check)
+
+    def combined_coverage(checks: list[dict[str, Any]]) -> str:
+        statuses = {str(check.get("status", "unknown")) for check in checks}
+        for status in ("failed", "unknown", "completed", "unsupported", "unscanned"):
+            if status in statuses:
+                return status
+        return "unknown"
+
+    def combined_reachability(rows: list[dict[str, Any]]) -> str:
+        states = {str(row.get("reachability", "unknown")) for row in rows}
+        if "reachable" in states:
+            return "reachable"
+        if states == {"not_reachable"}:
+            return "not_reachable"
+        if "not_assessed" in states:
+            return "not_assessed"
+        return "unknown"
 
     components = [
         {
@@ -441,6 +695,7 @@ def summary(run_id: str) -> dict[str, Any]:
             ),
             "type": c.get("type", "library"),
             "matchable": is_matchable_purl(c.get("purl")),
+            "bom_ref": c.get("bom-ref", ""),
         }
         for c in sbom.get("components", [])
     ]
@@ -449,9 +704,25 @@ def summary(run_id: str) -> dict[str, Any]:
     kev_purls = {f["purl"] for f in findings if f.get("kev")}
     finding_counts = Counter(f["purl"] for f in findings)
     for component in components:
+        component_findings = [
+            finding for finding in findings if finding.get("purl") == component["purl"]
+        ]
+        component_checks = checks_by_ref.get(component["bom_ref"])
+        if component_checks is None:
+            component_checks = checks_by_purl.get(component["purl"], [])
         component["findings"] = finding_counts[component["purl"]]
         component["affected"] = component["purl"] in affected
         component["kev"] = component["purl"] in kev_purls
+        component["coverage_status"] = combined_coverage(component_checks)
+        component["coverage_checks"] = component_checks
+        affected_states = {
+            str(finding.get("affectedness", "unknown"))
+            for finding in component_findings
+        }
+        component["affectedness"] = (
+            "affected" if "affected" in affected_states else "unknown"
+        )
+        component["reachability"] = combined_reachability(component_findings)
 
     ledger = [
         json.loads(line)
@@ -475,6 +746,11 @@ def summary(run_id: str) -> dict[str, Any]:
         "comparison": load("comparison.json", None),
         "release_checks": load("release-checks.json", None),
         "native_assessments": load("native-assessments.json", []),
+        "vendor_assessments": load("vendor-assessments.json", {}),
+        "vendor_superseded_findings": load("vendor-superseded-findings.json", {}),
+        "exposure_assessments": load("exposure-assessments.json", {}),
+        "coverage": coverage,
+        "triage_coverage": triage_coverage,
         "manufacturer": dossier.get("manufacturer", {}),
         "generated": dossier.get("generated", manifest.get("created", "")),
         "stats": {
@@ -504,6 +780,9 @@ def summary(run_id: str) -> dict[str, Any]:
             "manifest_files": len(manifest.get("files", [])),
             "ledger_root": manifest.get("ledger_root", ""),
             "tool_versions": manifest.get("tool_versions", {}),
+            "coverage_summary": (
+                coverage.get("summary", {}) if isinstance(coverage, dict) else {}
+            ),
         },
         "verdict": decision.as_dict(),
         "components": components,

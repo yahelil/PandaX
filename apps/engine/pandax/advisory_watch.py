@@ -140,7 +140,7 @@ class AdvisoryWatchService:
                 raise CaseError("replay is missing advisory detail: " + ", ".join(sorted(missing)))
             coverage = self._coverage(replay.get("coverage"), "replay")
             source = "simulated_replay"
-        findings = findings_from_advisories(inventory, hits, advisories)
+        findings = findings_from_advisories(inventory, hits, advisories, observed_at)
         by_advisory: dict[str, list[dict]] = {}
         for finding in findings:
             by_advisory.setdefault(finding.osv_id, []).append(finding.as_dict())

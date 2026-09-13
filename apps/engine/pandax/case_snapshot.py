@@ -10,6 +10,7 @@ from pathlib import Path
 from .cases import CaseError, CaseNotFound, _utc_now
 from .case_review import attestation, record
 from .case_export import render
+from .context import signing_key_path
 from .evidence import Ledger, load_or_create_key, write_manifest
 
 
@@ -19,8 +20,9 @@ def create_snapshot(service, db, case, body):
     if type(revision) is not int or not any(r['revision'] == revision for r in case['revisions']):
         raise CaseNotFound('snapshot requires an existing report revision')
     snapshot_id = 'snapshot-' + uuid.uuid4().hex
-    # Dedicated local PoC key outside the snapshot, using the existing signer.
-    key = load_or_create_key(service.store.path.parent / 'case_signing_key.pem')
+    # Scans and case snapshots share one installation identity. The private key
+    # stays outside every exported bundle.
+    key = load_or_create_key(signing_key_path())
     with tempfile.TemporaryDirectory(prefix='case-export-', dir=service.store.path.parent) as directory:
         root = Path(directory)
         (root / 'case.json').write_text(json.dumps(case, ensure_ascii=False, indent=2), encoding='utf-8')

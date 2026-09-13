@@ -1651,7 +1651,18 @@ a { color: inherit; }
   margin-top: 40px; padding: 34px 38px;
   border-left: 3px solid var(--brand);
   background: var(--surface); border-radius: 0 8px 8px 0;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto;
+  gap: 32px; align-items: center;
 }
+/* The mark belongs here: this is the section about whose company it is. */
+.claim-mark {
+  flex: 0 0 auto;
+  width: 104px; height: 104px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--bg); border: 1px solid var(--line);
+}
+.sec-alt .claim-mark { background: var(--surface); }
+.claim-mark img { width: 66px; height: 66px; }
 .sec-alt .claim { background: var(--bg); }
 .claim-line {
   font-family: var(--disp); font-weight: 700;
@@ -1857,7 +1868,7 @@ a { color: inherit; }
   .mk { grid-template-columns: 1fr; gap: 34px; }
   .mk-edge { display: none; }
   .whos, .mws, .holds { grid-template-columns: 1fr; }
-  .claim { padding: 26px 24px; }
+  .claim { padding: 26px 24px; grid-template-columns: 1fr; gap: 22px; justify-items: start; }
   .again { display: none; }
   .foot-cols { grid-template-columns: 1fr 1fr; gap: 28px 24px; }
   .qs { grid-template-columns: 1fr; }

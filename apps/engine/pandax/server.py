@@ -827,11 +827,24 @@ from .portfolio_runtime import (
     get_analysis_repository,
     get_portfolio_identity,
     get_portfolio_repository,
+    get_release_monitoring_repository,
 )
+from .release_monitoring import monitoring_store_runner
+from .release_monitoring_api import create_release_monitoring_router
 
 api.include_router(
     create_portfolio_router(get_portfolio_repository, get_portfolio_identity)
 )
 api.include_router(
     create_analysis_router(get_analysis_repository, get_portfolio_identity)
+)
+api.include_router(
+    create_release_monitoring_router(
+        get_release_monitoring_repository,
+        monitoring_store_runner(
+            _monitor_store(),
+            lambda _organization_id, _product_id, release_id: release_id,
+        ),
+        get_portfolio_identity,
+    )
 )

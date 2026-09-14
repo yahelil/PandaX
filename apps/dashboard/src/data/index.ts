@@ -1,4 +1,4 @@
-export type { AdapterFailure, AdapterOperation, AdapterStatus, DataAdapter, DemoListener } from "./adapter";
+export type { AdapterFailure, AdapterOperation, AdapterStatus, DataAdapter, DemoListener, MaybePromise, WorkspaceSearchResult } from "./adapter";
 export { DemoProvider, useDemo } from "./DemoProvider";
 export type { DemoActions, DemoContextValue, DemoProviderProps, DemoSelectors } from "./DemoProvider";
 export { createDemoState, DEMO_IDS } from "./fixtures";
@@ -71,4 +71,6 @@ export type {
   SearchRequestOptions,
 } from "./operationsApi";
 export * from "./governanceApi";
+export { createReleaseOperationsApi, ReleaseOperationsApiError } from "./releaseOperationsApi";
+export type * from "./releaseOperationsApi";
 export * from "./types";

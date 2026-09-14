@@ -19,6 +19,7 @@ export function DocumentDetailPage() {
   const document = demo.selectors.document(documentId);
   const [comment, setComment] = useState("");
   const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
 
   if (!document) {
     return (
@@ -34,17 +35,25 @@ export function DocumentDetailPage() {
   const release = demo.selectors.release(document.releaseId);
   const canApprove = document.status === "approval_required" || document.status === "draft";
 
-  const decide = (event: FormEvent, approve: boolean) => {
+  const decide = async (event: FormEvent, approve: boolean) => {
     event.preventDefault();
-    if (approve) {
-      demo.actions.approveDocument(document.id, comment);
-      setMessage("Document approved. The immutable audit record has been updated.");
-    } else {
-      if (!comment.trim()) return;
-      demo.actions.rejectDocument(document.id, comment);
-      setMessage("Document rejected and returned for revision.");
+    if (!approve && !comment.trim()) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      if (approve) {
+        await demo.actions.approveDocument(document.id, comment);
+        setMessage("Document approved. The immutable audit record has been updated.");
+      } else {
+        await demo.actions.rejectDocument(document.id, comment);
+        setMessage("Document rejected and returned for revision.");
+      }
+      setComment("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to save the approval decision.");
+    } finally {
+      setBusy(false);
     }
-    setComment("");
   };
 
   return (
@@ -105,8 +114,8 @@ export function DocumentDetailPage() {
                   />
                 </div>
                 <div className="inline-actions">
-                  <button type="button" className="button-primary" onClick={(event) => decide(event, true)} disabled={document.completeness !== "complete"}>Approve revision</button>
-                  <button type="button" className="button-danger" onClick={(event) => decide(event, false)} disabled={!comment.trim()}>Reject</button>
+                  <button type="button" className="button-primary" onClick={(event) => { void decide(event, true) }} disabled={busy || document.completeness !== "complete"}>Approve revision</button>
+                  <button type="button" className="button-danger" onClick={(event) => { void decide(event, false) }} disabled={busy || !comment.trim()}>Reject</button>
                 </div>
               </form>
             ) : (

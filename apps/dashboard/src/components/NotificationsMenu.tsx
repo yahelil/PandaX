@@ -1,9 +1,19 @@
-import { Bell, Check, ChevronRight, RadioTower, ShieldAlert, TimerReset } from 'lucide-react'
+import { Activity, Bell, Check, ChevronRight, FileText, Info, RadioTower, ShieldAlert, TimerReset, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDemo } from '../data/DemoProvider'
 
-const alertIcons = { finding: ShieldAlert, deadline: TimerReset, monitoring: RadioTower, approval: Check }
+import type { Notification } from '../data/types'
+
+const alertIcons: Record<Notification['type'], LucideIcon> = {
+  finding: ShieldAlert,
+  deadline: TimerReset,
+  monitoring: RadioTower,
+  approval: Check,
+  document: FileText,
+  analysis: Activity,
+  system: Info,
+}
 
 function relativeTime(value: string) {
   const minutes = Math.max(1, Math.round((Date.now() - new Date(value).getTime()) / 60_000))
@@ -17,6 +27,9 @@ export function NotificationsMenu() {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const unread = notifications.filter((notification) => !notification.acknowledgedAt)
+  const acknowledge = (id: string) => {
+    void Promise.resolve(actions.acknowledgeNotification(id)).catch(() => undefined)
+  }
 
   useEffect(() => {
     const close = (event: PointerEvent) => {
@@ -36,13 +49,13 @@ export function NotificationsMenu() {
         <div className="popover notification-menu">
           <div className="popover__head">
             <span><strong>Needs your attention</strong><small>{unread.length ? `${unread.length} unread alert${unread.length === 1 ? '' : 's'}` : 'No unread alerts'}</small></span>
-            {unread.length > 0 && <button className="text-button" onClick={() => unread.forEach((item) => actions.acknowledgeNotification(item.id))}><Check size={14} /> Mark read</button>}
+            {unread.length > 0 && <button className="text-button" onClick={() => unread.forEach((item) => acknowledge(item.id))}><Check size={14} /> Mark read</button>}
           </div>
           <div className={unread.length ? 'notification-list' : 'notification-list notification-list--read'}>
             {notifications.slice(0, 5).map((notification) => {
               const Icon = alertIcons[notification.type]
               return (
-              <Link className="notification-item" to={notification.targetUrl} key={notification.id} onClick={() => { actions.acknowledgeNotification(notification.id); setOpen(false) }}>
+              <Link className="notification-item" to={notification.targetUrl} key={notification.id} onClick={() => { acknowledge(notification.id); setOpen(false) }}>
                 <span className="notification-item__icon"><Icon size={17} /></span>
                 <span><strong>{notification.title}</strong><small>{notification.body} · {relativeTime(notification.createdAt)}</small></span>
                 <ChevronRight size={16} />

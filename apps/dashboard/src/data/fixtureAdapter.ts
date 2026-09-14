@@ -1,4 +1,4 @@
-import type { AdapterStatus, DataAdapter, DemoListener } from "./adapter";
+import type { AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } from "./adapter";
 import { createDemoState, DEMO_IDS } from "./fixtures";
 import type {
   AnalysisDraft,
@@ -75,6 +75,39 @@ export class FixtureAdapter implements DataAdapter {
     return () => this.listeners.delete(listener);
   };
 
+  search = async (query: string): Promise<WorkspaceSearchResult[]> => {
+    const term = query.trim().toLowerCase();
+    if (term.length < 2) return [];
+    const matches = (value: string) => value.toLowerCase().includes(term);
+    return [
+      ...this.state.products.filter((item) => matches(`${item.name} ${item.identifier} ${item.manufacturer}`)).map((item) => ({
+        id: item.id, type: "Product" as const, title: item.name,
+        detail: `${item.identifier} · ${item.readiness.replaceAll("_", " ")}`, to: `/products/${item.id}`,
+      })),
+      ...this.state.releases.filter((item) => {
+        const product = this.state.products.find((candidate) => candidate.id === item.productId);
+        return matches(`${product?.name ?? ""} ${item.version} ${item.channel}`);
+      }).map((item) => ({
+        id: item.id, type: "Release" as const,
+        title: `${this.state.products.find((candidate) => candidate.id === item.productId)?.name ?? "Product"} v${item.version}`,
+        detail: `${item.channel} · monitoring ${item.monitoringHealth}`,
+        to: `/products/${item.productId}/releases/${item.id}`,
+      })),
+      ...this.state.findings.filter((item) => matches(`${item.reference} ${item.title} ${item.component}`)).map((item) => ({
+        id: item.id, type: "Finding" as const, title: item.reference,
+        detail: `${item.title} · ${item.priority}`, to: `/findings/${item.id}`,
+      })),
+      ...this.state.complianceItems.filter((item) => matches(`${item.title} ${item.reason} ${item.requirement}`)).map((item) => ({
+        id: item.id, type: "Compliance" as const, title: item.title,
+        detail: `${item.requirement} · ${item.status.replaceAll("_", " ")}`, to: item.targetUrl,
+      })),
+      ...this.state.documents.filter((item) => matches(`${item.name} ${item.type} ${item.format}`)).map((item) => ({
+        id: item.id, type: "Document" as const, title: item.name,
+        detail: `${item.format} · ${item.status.replaceAll("_", " ")}`, to: `/documents/${item.id}`,
+      })),
+    ].slice(0, 8);
+  };
+
   reset = (): void => {
     this.timers.forEach(clearTimeout);
     this.timers.clear();
@@ -95,6 +128,11 @@ export class FixtureAdapter implements DataAdapter {
       const notification = state.notifications.find((item) => item.id === notificationId);
       if (notification && !notification.acknowledgedAt) notification.acknowledgedAt = now();
     });
+  };
+
+  loadFindingDetail = async (findingId: EntityId): Promise<Finding | undefined> => {
+    const finding = this.state.findings.find((item) => item.id === findingId);
+    return finding ? structuredClone(finding) : undefined;
   };
 
   assignFinding = (findingId: EntityId, memberId?: EntityId): Finding => {
@@ -297,6 +335,14 @@ export class FixtureAdapter implements DataAdapter {
     return job ? structuredClone(job) : undefined;
   };
 
+  upsertAnalysisJob = (job: AnalysisJob): void => {
+    this.mutate((state) => {
+      const index = state.analysisJobs.findIndex((item) => item.id === job.id);
+      if (index === -1) state.analysisJobs.unshift(structuredClone(job));
+      else state.analysisJobs[index] = structuredClone(job);
+    });
+  };
+
   getApproval = (documentId: EntityId): Approval | undefined => {
     const approval = this.state.approvals.find((item) => item.documentId === documentId);
     return approval ? structuredClone(approval) : undefined;
@@ -323,6 +369,62 @@ export class FixtureAdapter implements DataAdapter {
       const index = state.releases.findIndex((item) => item.id === release.id);
       if (index < 0) state.releases.push(structuredClone(release));
       else state.releases[index] = structuredClone(release);
+    });
+  };
+
+  replaceOperationalState = (
+    actions: DemoState["actions"],
+    activities: DemoState["activities"],
+    notifications: DemoState["notifications"],
+  ): void => {
+    this.mutate((state) => {
+      state.actions = structuredClone(actions);
+      state.activities = structuredClone(activities);
+      state.notifications = structuredClone(notifications);
+    });
+  };
+
+  replaceFindings = (findings: Finding[]): void => {
+    this.mutate((state) => { state.findings = structuredClone(findings); });
+  };
+
+  upsertFinding = (finding: Finding): void => {
+    this.mutate((state) => {
+      const index = state.findings.findIndex((item) => item.id === finding.id);
+      if (index < 0) state.findings.push(structuredClone(finding));
+      else state.findings[index] = structuredClone(finding);
+    });
+  };
+
+  replaceGovernanceState = (
+    complianceItems: DemoState["complianceItems"],
+    documents: DemoState["documents"],
+    settings: DemoState["settings"],
+    members: DemoState["members"],
+    integrations: DemoState["integrations"],
+  ): void => {
+    this.mutate((state) => {
+      state.complianceItems = structuredClone(complianceItems);
+      state.documents = structuredClone(documents);
+      state.settings = structuredClone(settings);
+      state.members = structuredClone(members);
+      state.integrations = structuredClone(integrations);
+      if (!state.members.some((item) => item.id === state.currentUserId)) {
+        const current = state.members.find((item) => item.status === "active");
+        if (current) state.currentUserId = current.id;
+      }
+    });
+  };
+
+  replaceSettings = (settings: AppSettings): void => {
+    this.mutate((state) => { state.settings = structuredClone(settings); });
+  };
+
+  upsertDocument = (document: DocumentRecord): void => {
+    this.mutate((state) => {
+      const index = state.documents.findIndex((item) => item.id === document.id);
+      if (index < 0) state.documents.push(structuredClone(document));
+      else state.documents[index] = structuredClone(document);
     });
   };
 

@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import type { AdapterStatus, DataAdapter } from "./adapter";
+import type { AdapterStatus, DataAdapter, MaybePromise, WorkspaceSearchResult } from "./adapter";
 import { createFixtureAdapter } from "./fixtureAdapter";
 import type {
   AnalysisDraft,
@@ -46,13 +46,15 @@ export interface DemoSelectors {
 export interface DemoActions {
   reset(): void;
   refresh(): Promise<void>;
-  updateSettings<K extends keyof AppSettings>(section: K, patch: Partial<AppSettings[K]>): void;
-  acknowledgeNotification(notificationId: EntityId): void;
-  assignFinding(findingId: EntityId, memberId?: EntityId): Finding;
-  decideFinding(input: FindingDecisionInput): Finding;
-  updateRemediation(input: RemediationInput): Finding;
-  approveDocument(documentId: EntityId, comment?: string): DocumentRecord;
-  rejectDocument(documentId: EntityId, comment: string): DocumentRecord;
+  search(query: string, options?: { signal?: AbortSignal }): Promise<WorkspaceSearchResult[]>;
+  updateSettings<K extends keyof AppSettings>(section: K, patch: Partial<AppSettings[K]>): MaybePromise<void>;
+  acknowledgeNotification(notificationId: EntityId): MaybePromise<void>;
+  loadFindingDetail(findingId: EntityId, options?: { signal?: AbortSignal }): Promise<Finding | undefined>;
+  assignFinding(findingId: EntityId, memberId?: EntityId): MaybePromise<Finding>;
+  decideFinding(input: FindingDecisionInput): MaybePromise<Finding>;
+  updateRemediation(input: RemediationInput): MaybePromise<Finding>;
+  approveDocument(documentId: EntityId, comment?: string): MaybePromise<DocumentRecord>;
+  rejectDocument(documentId: EntityId, comment: string): MaybePromise<DocumentRecord>;
   createProduct(input: CreateProductInput): Promise<Product>;
   createRelease(input: CreateReleaseInput): Promise<Release>;
   previewAnalysis(draft: AnalysisDraft): Promise<AnalysisPreview>;
@@ -80,7 +82,7 @@ export interface DemoProviderProps extends PropsWithChildren {
   adapter?: DataAdapter;
 }
 
-function matchesScope(productId: EntityId, releaseId: EntityId | undefined, scope?: Scope): boolean {
+function matchesScope(productId: EntityId | undefined, releaseId: EntityId | undefined, scope?: Scope): boolean {
   if (!scope) return true;
   if (scope.productId && scope.productId !== productId) return false;
   return !scope.releaseId || scope.releaseId === releaseId;
@@ -115,8 +117,10 @@ export function DemoProvider({ adapter: providedAdapter, children }: DemoProvide
   const actions = useMemo<DemoActions>(() => ({
     reset: adapter.reset,
     refresh: adapter.refresh,
+    search: adapter.search,
     updateSettings: adapter.updateSettings,
     acknowledgeNotification: adapter.acknowledgeNotification,
+    loadFindingDetail: adapter.loadFindingDetail,
     assignFinding: adapter.assignFinding,
     decideFinding: adapter.recordFindingDecision,
     updateRemediation: adapter.updateRemediation,

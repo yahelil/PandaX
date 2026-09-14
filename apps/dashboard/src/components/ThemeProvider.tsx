@@ -16,7 +16,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const theme: Theme = setting === 'system'
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : setting
-  const setTheme = (next: Theme) => actions.updateSettings('appearance', { theme: next })
+  const setTheme = (next: Theme) => {
+    void Promise.resolve(actions.updateSettings('appearance', { theme: next })).catch(() => undefined)
+  }
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme

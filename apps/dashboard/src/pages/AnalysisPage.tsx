@@ -17,7 +17,7 @@ export function AnalysisPage() {
   const [step, setStep] = useState(1); const [inputKind, setInputKind] = useState<ReleaseArtifact["kind"]>("collector_package");
   const [file, setFile] = useState<File | null>(null); const [consent, setConsent] = useState(false); const [preview, setPreview] = useState<AnalysisPreview | null>(null); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
   if (!product || !release) return <EmptyState title="Release not found" body="Choose an existing release before starting analysis." action={<Link className="button" to="/products">Back to products</Link>} />;
-  const draft: AnalysisDraft = { productId, releaseId, version: release.version, channel: release.channel, inputKind, fileName: file?.name ?? "", fileSize: file?.size ?? 0, rawArtifactConsent: consent };
+  const draft: AnalysisDraft = { productId, releaseId, version: release.version, channel: release.channel, inputKind, fileName: file?.name ?? "", fileSize: file?.size ?? 0, file: file ?? undefined, rawArtifactConsent: consent };
   const validate = async () => { setBusy(true); setError(""); try { const result = await demo.actions.previewAnalysis(draft); setPreview(result); if (result.valid) setStep(3); } catch (err) { setError(err instanceof Error ? err.message : "Validation failed."); } finally { setBusy(false); } };
   const run = async () => { setBusy(true); setError(""); try { const job = await demo.actions.runAnalysis(draft); navigate(`/analyses/${job.id}`); } catch (err) { setError(err instanceof Error ? err.message : "Analysis could not start."); setBusy(false); } };
   return <main className="page analysis-shell">

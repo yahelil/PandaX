@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { useDemo } from '../data/DemoProvider'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
+  const { adapterStatus, actions } = useDemo()
 
   useEffect(() => {
     setSidebarOpen(false)
@@ -23,9 +25,18 @@ export function AppShell() {
       {sidebarOpen && <button className="sidebar-scrim" aria-label="Close navigation" onClick={() => setSidebarOpen(false)} />}
       <div className="app-shell__body">
         <Topbar onOpenSidebar={() => setSidebarOpen(true)} />
-        <main id="main-content" className="main-content" tabIndex={-1}>
+        <div id="main-content" className="main-content" tabIndex={-1}>
+          {adapterStatus.mode === 'production' && adapterStatus.phase === 'loading' ? (
+            <div className="adapter-status" role="status">Syncing production data…</div>
+          ) : null}
+          {adapterStatus.failure ? (
+            <div className="adapter-status adapter-status--error" role="alert">
+              <span>{adapterStatus.failure.message}</span>
+              <button type="button" onClick={() => { void actions.refresh().catch(() => undefined) }}>Retry</button>
+            </div>
+          ) : null}
           <Outlet />
-        </main>
+        </div>
       </div>
     </div>
   )

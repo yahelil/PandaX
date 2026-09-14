@@ -57,6 +57,31 @@ def product_payload(**overrides):
         "description": "Residential gateway coordinating local sensors and cloud services.",
         "cra_class": "critical",
         "classification_status": "confirmed",
+        "classification_assessment": {
+            "ruleset_version": "eu-cra-2025-2392-v1",
+            "completed_at": "2026-09-15T12:00:00Z",
+            "scope_result": "in_scope",
+            "recommended_class": "critical",
+            "classification_status": "confirmed",
+            "category_id": "critical-security-box",
+            "category_label": "Hardware device with a security box",
+            "rationale": "Declared core functionality matches CRA Annex IV(1).",
+            "readiness_score": 86,
+            "answers": [{
+                "question_id": "digital-elements",
+                "question": "Does the product contain digital elements?",
+                "answer": "yes",
+                "source": "CRA Art. 3(1)",
+            }],
+            "actions": [{
+                "id": "sbom",
+                "title": "Complete the SBOM",
+                "detail": "Add transitive dependencies.",
+                "source": "CRA Annex I, Part II(1)",
+                "state": "partial",
+            }],
+            "confirmed_at": "2026-09-15T12:00:00Z",
+        },
         "support_start": "2026-01-15",
         "support_end": "2030-12-31",
         "owner_id": "member-product-security",
@@ -122,7 +147,7 @@ def test_organization_create_list_detail_and_update(client: TestClient, reposito
     assert all(event.actor_id == "member-compliance-lead" for event in events)
 
 
-def test_product_contract_supports_portfolio_fields_and_updates(client: TestClient):
+def test_product_contract_supports_portfolio_fields_and_updates(client: TestClient, repository: PortfolioRepository):
     organization = create_organization(client)
     product = create_product(client, organization["id"])
 
@@ -134,6 +159,9 @@ def test_product_contract_supports_portfolio_fields_and_updates(client: TestClie
         "tags": [],
     } == product
     assert product["slug"] == "home-hub"
+    assert product["classification_assessment"]["ruleset_version"] == "eu-cra-2025-2392-v1"
+    event = repository.list_audit_events(organization["id"], entity_type="product", entity_id=product["id"])[0]
+    assert event.payload["classification_assessment"]["readiness_score"] == 86
     assert client.get(
         f"/v1/organizations/{organization['id']}/products"
     ).json() == [product]

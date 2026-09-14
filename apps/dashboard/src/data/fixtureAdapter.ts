@@ -464,6 +464,7 @@ export class FixtureAdapter implements DataAdapter {
         description: input.description?.trim() || "Product description not yet provided.",
         craClass: input.craClass,
         classificationStatus: input.classificationStatus,
+        classificationAssessment: input.classificationAssessment,
         supportUntil: input.supportUntil,
         ownerId: input.ownerId,
         readiness: "incomplete_evidence",

@@ -460,7 +460,7 @@ export class ProductionAdapter implements DataAdapter {
   };
 
   createProduct = async (input: CreateProductInput): Promise<Product> => this.mutation("create_product", async () => {
-    const created = await this.config.portfolioApi.createProduct(this.config.organizationId, { name: input.name, identifier: input.identifier, manufacturer: input.manufacturer, description: input.description, craClass: input.craClass, classificationStatus: input.classificationStatus, supportStart: new Date().toISOString().slice(0, 10), supportEnd: input.supportUntil, ownerId: input.ownerId });
+    const created = await this.config.portfolioApi.createProduct(this.config.organizationId, { name: input.name, identifier: input.identifier, manufacturer: input.manufacturer, description: input.description, craClass: input.craClass, classificationStatus: input.classificationStatus, classificationAssessment: input.classificationAssessment, supportStart: new Date().toISOString().slice(0, 10), supportEnd: input.supportUntil, ownerId: input.ownerId });
     this.fixture.upsertProduct(created); return created;
   });
 

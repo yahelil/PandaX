@@ -105,6 +105,44 @@ class OrganizationResponse(ApiModel):
     updated_at: datetime
 
 
+class CraAssessmentAnswer(ApiModel):
+    question_id: str = Field(min_length=1, max_length=120)
+    question: str = Field(min_length=1, max_length=600)
+    answer: str = Field(min_length=1, max_length=200)
+    source: str = Field(min_length=1, max_length=240)
+
+
+class CraAssessmentAction(ApiModel):
+    id: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=300)
+    detail: str = Field(min_length=1, max_length=1000)
+    source: str = Field(min_length=1, max_length=240)
+    state: Literal["partial", "missing"]
+
+
+class CraClassificationAssessment(ApiModel):
+    ruleset_version: str = Field(min_length=1, max_length=120)
+    completed_at: datetime
+    scope_result: Literal["in_scope", "out_of_scope", "needs_review"]
+    recommended_class: CraClass
+    classification_status: ClassificationStatus
+    category_id: str | None = Field(default=None, max_length=120)
+    category_label: str | None = Field(default=None, max_length=300)
+    rationale: str = Field(min_length=1, max_length=1000)
+    readiness_score: int = Field(ge=0, le=100)
+    answers: list[CraAssessmentAnswer] = Field(max_length=64)
+    actions: list[CraAssessmentAction] = Field(max_length=32)
+    confirmed_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_confirmation(self) -> "CraClassificationAssessment":
+        if self.classification_status == "confirmed" and self.confirmed_at is None:
+            raise ValueError("confirmed assessment requires confirmed_at")
+        if self.scope_result != "in_scope" and self.classification_status == "confirmed":
+            raise ValueError("only an in-scope assessment can be confirmed")
+        return self
+
+
 class ProductCreate(ApiModel):
     name: str = Field(min_length=1, max_length=200)
     identifier: str = Field(min_length=1, max_length=160)
@@ -113,6 +151,7 @@ class ProductCreate(ApiModel):
     description: str = Field(default="", max_length=2000)
     cra_class: CraClass
     classification_status: ClassificationStatus = "review_required"
+    classification_assessment: CraClassificationAssessment | None = None
     support_start: date
     support_end: date
     owner_id: str | None = Field(default=None, max_length=128)
@@ -121,6 +160,13 @@ class ProductCreate(ApiModel):
     def validate_support_period(self) -> "ProductCreate":
         if self.support_end < self.support_start:
             raise ValueError("support_end must be on or after support_start")
+        if self.classification_assessment is not None:
+            if self.classification_assessment.scope_result == "out_of_scope":
+                raise ValueError("an out-of-scope assessment cannot create a CRA product")
+            if self.classification_assessment.recommended_class != self.cra_class:
+                raise ValueError("cra_class must match the assessment recommendation")
+            if self.classification_assessment.classification_status != self.classification_status:
+                raise ValueError("classification_status must match the assessment")
         return self
 
 
@@ -132,6 +178,7 @@ class ProductUpdate(ApiModel):
     description: str | None = Field(default=None, max_length=2000)
     cra_class: CraClass | None = None
     classification_status: ClassificationStatus | None = None
+    classification_assessment: CraClassificationAssessment | None = None
     support_start: date | None = None
     support_end: date | None = None
     owner_id: str | None = Field(default=None, max_length=128)
@@ -159,6 +206,7 @@ class ProductResponse(ApiModel):
     description: str
     cra_class: CraClass
     classification_status: ClassificationStatus
+    classification_assessment: CraClassificationAssessment | None
     support_start: date
     support_end: date
     owner_id: str | None
@@ -311,9 +359,12 @@ def create_portfolio_router(
     )
     def create_product(body: ProductCreate, organization_id: str, repository: Repository, identity: Identity):
         _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES)
+        values = body.model_dump()
+        if body.classification_assessment is not None:
+            values["classification_assessment"] = body.classification_assessment.model_dump(mode="json")
         return _call(lambda: repository.create_product(
             organization_id,
-            **body.model_dump(),
+            **values,
             actor_id=identity.actor_id,
         ))
 
@@ -332,6 +383,8 @@ def create_portfolio_router(
     ):
         _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES)
         values = body.model_dump(exclude_unset=True, exclude={"active_release_id"})
+        if body.classification_assessment is not None:
+            values["classification_assessment"] = body.classification_assessment.model_dump(mode="json")
         product = _call(lambda: repository.update_product(
             organization_id,
             product_id,

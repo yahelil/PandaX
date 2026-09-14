@@ -1,8 +1,11 @@
 import { type FormEvent, useMemo, useState } from "react";
+import { ClipboardCheck, ShieldCheck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { usePermission } from "../auth";
 import { useDemo } from "../data/DemoProvider";
-import type { Product } from "../data/types";
+import type { CraClassificationAssessment, Product } from "../data/types";
+import { CraAssessmentWizard } from "./CraAssessmentWizard";
+import { craClassLabel } from "./craAssessment";
 import { PageHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
 import "./pages.css";
 
@@ -90,16 +93,39 @@ export function ProductsPage() {
 }
 
 function CreateProductPanel({ onCancel, onCreate, members, pending, error }: { onCancel: () => void; onCreate: (input: Parameters<ReturnType<typeof useDemo>["actions"]["createProduct"]>[0]) => Promise<void>; members: ReturnType<typeof useDemo>["state"]["members"]; pending: boolean; error?: string }) {
+  const [assessmentOpen, setAssessmentOpen] = useState(false);
+  const [assessment, setAssessment] = useState<CraClassificationAssessment>();
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!assessment || assessment.scopeResult === "out_of_scope") return;
     const data = new FormData(event.currentTarget);
     void onCreate({
       name: String(data.get("name")), identifier: String(data.get("identifier")), manufacturer: String(data.get("manufacturer")),
-      description: String(data.get("description")), craClass: String(data.get("craClass")) as "default", classificationStatus: "review_required",
-      supportUntil: String(data.get("supportUntil")), ownerId: String(data.get("ownerId")) || undefined,
+      description: String(data.get("description")), craClass: assessment.recommendedClass, classificationStatus: assessment.classificationStatus,
+      classificationAssessment: assessment, supportUntil: String(data.get("supportUntil")), ownerId: String(data.get("ownerId")) || undefined,
     });
   };
-  return <section className="panel analysis-card"><h2>Add product</h2><p>Start with the product identity and CRA scope. Register the first release next.</p><form className="form-grid" onSubmit={submit}><div className="field"><label htmlFor="product-name">Product name</label><input id="product-name" name="name" className="input-field" required placeholder="Industrial Sensor Gateway" /></div><div className="field"><label htmlFor="product-id">Product identifier</label><input id="product-id" name="identifier" className="input-field" required placeholder="ACM-GTW-620" /></div><div className="field"><label htmlFor="manufacturer">Manufacturer</label><input id="manufacturer" name="manufacturer" className="input-field" required defaultValue="Acme Devices GmbH" /></div><div className="field"><label htmlFor="cra-class">CRA class</label><select id="cra-class" name="craClass" className="select-field"><option value="default">Default</option><option value="important_i">Important class I</option><option value="important_ii">Important class II</option><option value="critical">Critical</option></select></div><div className="field"><label htmlFor="support-until">Support until</label><input id="support-until" name="supportUntil" className="input-field" type="date" required defaultValue="2031-12-31" /></div><div className="field"><label htmlFor="owner">Default owner</label><select id="owner" name="ownerId" className="select-field"><option value="">Unassigned</option>{members.filter((member) => member.status === "active").map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></div><div className="field span-2"><label htmlFor="description">Description</label><textarea id="description" name="description" className="textarea-field" placeholder="Describe the product and its connected functionality." /></div>{error ? <p className="danger-text span-2" role="alert">{error}</p> : null}<div className="inline-actions span-2"><button className="button-primary" type="submit" disabled={pending}>{pending ? "Creating product…" : "Create product"}</button><button type="button" onClick={onCancel} disabled={pending}>Cancel</button></div></form></section>;
+  return <section className="panel analysis-card create-product-panel">
+    {assessmentOpen ? <CraAssessmentWizard onCancel={() => setAssessmentOpen(false)} onComplete={(value) => { setAssessment(value); setAssessmentOpen(false); }} /> : null}
+    <div hidden={assessmentOpen}>
+      <h2>Add product</h2><p>Register the product identity, then complete the guided CRA assessment.</p>
+      <form className="form-grid" onSubmit={submit}>
+        <div className="field"><label htmlFor="product-name">Product name</label><input id="product-name" name="name" className="input-field" required placeholder="Industrial Sensor Gateway" /></div>
+        <div className="field"><label htmlFor="product-id">Product identifier</label><input id="product-id" name="identifier" className="input-field" required placeholder="ACM-GTW-620" /></div>
+        <div className="field"><label htmlFor="manufacturer">Manufacturer</label><input id="manufacturer" name="manufacturer" className="input-field" required defaultValue="Acme Devices GmbH" /></div>
+        <div className="field"><label htmlFor="support-until">Support until</label><input id="support-until" name="supportUntil" className="input-field" type="date" required defaultValue="2031-12-31" /></div>
+        <div className="field"><label htmlFor="owner">Default owner</label><select id="owner" name="ownerId" className="select-field"><option value="">Unassigned</option>{members.filter((member) => member.status === "active").map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></div>
+        <div className="field span-2"><label htmlFor="description">Description</label><textarea id="description" name="description" className="textarea-field" placeholder="Describe the product, intended purpose, connected functionality, and users." /><span className="field-hint">The description provides context; classification comes from structured assessment answers.</span></div>
+        <div className="cra-assessment-launch span-2">
+          <div className="cra-assessment-launch__icon" aria-hidden="true">{assessment ? <ShieldCheck size={22} /> : <ClipboardCheck size={22} />}</div>
+          <div><span className="field-label">CRA classification</span>{assessment ? <><strong>{assessment.scopeResult === "out_of_scope" ? "Likely outside scope" : craClassLabel(assessment.recommendedClass)}</strong><p>{assessment.rationale}</p><small>Readiness {assessment.readinessScore}% · {assessment.actions.length} actions · {assessment.classificationStatus.replaceAll("_", " ")}</small></> : <><strong>Not assessed</strong><p>Answer scope, Annex category, and readiness questions. Answers and sources will be retained.</p></>}</div>
+          <button type="button" onClick={() => setAssessmentOpen(true)}>{assessment ? "Reassess" : "Start CRA assessment"}</button>
+        </div>
+        {error ? <p className="danger-text span-2" role="alert">{error}</p> : null}
+        <div className="inline-actions span-2"><button className="button-primary" type="submit" disabled={pending || !assessment || assessment.scopeResult === "out_of_scope"}>{pending ? "Creating product…" : "Create product"}</button><button type="button" onClick={onCancel} disabled={pending}>Cancel</button>{!assessment ? <span className="field-hint">Complete the CRA assessment before creating this product.</span> : null}</div>
+      </form>
+    </div>
+  </section>;
 }
 
 function compareProducts(a: Product, b: Product, sort: SortKey) {

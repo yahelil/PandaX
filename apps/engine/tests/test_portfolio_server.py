@@ -1,5 +1,6 @@
 from datetime import date
 
+import pytest
 from fastapi.testclient import TestClient
 
 from pandax import server
@@ -11,6 +12,28 @@ from pandax.portfolio_runtime import (
     get_portfolio_repository,
 )
 from pandax.auth import Principal, Role
+
+
+def test_server_applies_browser_security_headers():
+    response = TestClient(server.api).get("/openapi.json")
+
+    assert response.status_code == 200
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-frame-options"] == "DENY"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    assert response.headers["cross-origin-opener-policy"] == "same-origin"
+    assert response.headers["permissions-policy"] == "camera=(), microphone=(), geolocation=()"
+    assert "frame-ancestors 'none'" in response.headers["content-security-policy"]
+
+
+def test_cors_origins_are_explicit_https_or_local_development():
+    assert server._allowed_cors_origins(
+        "https://dashboard.actis.example, http://localhost:4173,https://dashboard.actis.example/"
+    ) == ["https://dashboard.actis.example", "http://localhost:4173"]
+
+    for invalid in ("*", "http://dashboard.actis.example", "https://user@dashboard.actis.example", "https://dashboard.actis.example/path"):
+        with pytest.raises(ValueError, match="CORS"):
+            server._allowed_cors_origins(invalid)
 
 
 def test_server_exposes_portfolio_router_with_replaceable_repository(tmp_path):

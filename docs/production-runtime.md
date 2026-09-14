@@ -36,6 +36,11 @@ Organization admins and compliance operators can change product and release
 records. All known roles can read records in their own organization. Audit
 events record the authenticated subject for every mutation.
 
+When the dashboard and API use different origins, set `PANDAX_CORS_ORIGINS` to
+a comma-separated allowlist such as `https://dashboard.actis.example.com`.
+Wildcards, credentials in origins, paths, and non-local HTTP origins are rejected.
+Leave it empty when a same-origin reverse proxy serves both applications.
+
 ## Local commands
 
 ```bash

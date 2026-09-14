@@ -11,6 +11,7 @@
     "video:capture": "node apps/showcase-video/scripts/capture.mjs",
     "video:voiceover": "uv run --with kokoro-onnx --with soundfile python apps/showcase-video/scripts/generate_voiceover.py",
     "video:render": "remotion render apps/showcase-video/src/index.tsx ActisRealAnalysisDemo output/video/actis-real-analysis-demo.mp4 --public-dir=apps/showcase-video/public --codec=h264 --crf=18 --audio-codec=aac --overwrite --browser-executable=\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\"",
+    "video:render:client": "remotion render apps/showcase-video/src/index.tsx ActisClientDemo output/video/actis-client-demo.mp4 --public-dir=apps/showcase-video/public --codec=h264 --crf=16 --overwrite --browser-executable=\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\"",
     "video:studio": "remotion studio apps/showcase-video/src/index.tsx --public-dir=apps/showcase-video/public"
   },
   "workspaces": [

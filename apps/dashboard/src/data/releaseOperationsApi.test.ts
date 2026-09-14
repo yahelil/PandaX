@@ -137,11 +137,17 @@ describe("release operations API", () => {
       fetch: fetcher,
     });
     const file = new Blob(["{\"bomFormat\":\"CycloneDX\"}"], { type: "application/json" });
+    const runtimeTelemetry = new Blob(["{\"schema\":\"runtime\"}"], { type: "application/json" });
+    const exposureContext = new Blob(["{\"schema\":\"exposure\"}"], { type: "application/json" });
 
     const job = await api.uploadSbom(scope, {
       file,
       filename: "camera.cdx.json",
       idempotencyKey: "upload-001",
+      runtimeTelemetry,
+      runtimeTelemetryFilename: "runtime.json",
+      exposureContext,
+      exposureContextFilename: "exposure.json",
     }, { signal });
 
     expect(fetcher.mock.calls[0][0]).toBe(`https://engine.example.test${encodedBase}/analysis-jobs`);
@@ -154,6 +160,8 @@ describe("release operations API", () => {
     expect(init.body).toBeInstanceOf(FormData);
     const uploaded = (init.body as FormData).get("sbom") as File;
     expect(uploaded.name).toBe("camera.cdx.json");
+    expect(((init.body as FormData).get("telemetry") as File).name).toBe("runtime.json");
+    expect(((init.body as FormData).get("exposure_context") as File).name).toBe("exposure.json");
     expect(job).toMatchObject({
       organizationId: "org/acme", sizeBytes: 4096, status: "queued",
       preview: { matchableComponents: 140, skippedComponents: 2 },

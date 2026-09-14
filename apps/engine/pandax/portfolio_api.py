@@ -35,13 +35,37 @@ SbomStatus = Literal["missing", "partial", "validated"]
 
 @dataclass(frozen=True, slots=True)
 class PortfolioIdentity:
-    """Minimal identity passed to every route; auth replaces this dependency."""
+    """Authenticated actor and tenant boundary passed to every portfolio route."""
 
     actor_id: str
+    organization_id: str | None = None
+    roles: frozenset[str] = frozenset()
+
+
+PORTFOLIO_ROLES = frozenset({
+    "org_admin",
+    "compliance_operator",
+    "authorized_approver",
+    "security_reviewer",
+    "viewer",
+})
+PORTFOLIO_EDIT_ROLES = frozenset({"org_admin", "compliance_operator"})
 
 
 def local_identity() -> PortfolioIdentity:
-    return PortfolioIdentity(actor_id="local-demo")
+    return PortfolioIdentity(actor_id="local-demo", roles=PORTFOLIO_ROLES)
+
+
+def _authorize(
+    identity: PortfolioIdentity,
+    *,
+    organization_id: str | None = None,
+    roles: frozenset[str] = PORTFOLIO_ROLES,
+) -> None:
+    if organization_id and identity.organization_id and identity.organization_id != organization_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
+    if identity.roles.isdisjoint(roles):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
 
 
 class ApiModel(BaseModel):
@@ -245,11 +269,15 @@ def create_portfolio_router(
     Identity = Annotated[PortfolioIdentity, Depends(identity_dependency)]
 
     @router.get("/organizations", response_model=list[OrganizationResponse])
-    def list_organizations(repository: Repository, _identity: Identity):
+    def list_organizations(repository: Repository, identity: Identity):
+        _authorize(identity)
+        if identity.organization_id:
+            return [_call(lambda: repository.get_organization(identity.organization_id))]
         return _call(repository.list_organizations)
 
     @router.post("/organizations", response_model=OrganizationResponse, status_code=status.HTTP_201_CREATED)
     def create_organization(body: OrganizationCreate, repository: Repository, identity: Identity):
+        _authorize(identity, roles=frozenset({"org_admin"}))
         return _call(lambda: repository.create_organization(
             name=body.name,
             legal_name=body.legal_name,
@@ -260,16 +288,19 @@ def create_portfolio_router(
         ))
 
     @router.get("/organizations/{organization_id}", response_model=OrganizationResponse)
-    def get_organization(organization_id: str, repository: Repository, _identity: Identity):
+    def get_organization(organization_id: str, repository: Repository, identity: Identity):
+        _authorize(identity, organization_id=organization_id)
         return _call(lambda: repository.get_organization(organization_id))
 
     @router.patch("/organizations/{organization_id}", response_model=OrganizationResponse)
     def update_organization(body: OrganizationUpdate, organization_id: str, repository: Repository, identity: Identity):
+        _authorize(identity, organization_id=organization_id, roles=frozenset({"org_admin"}))
         changes = OrganizationChanges(**body.model_dump(exclude_unset=True))
         return _call(lambda: repository.update_organization(organization_id, changes, identity.actor_id))
 
     @router.get("/organizations/{organization_id}/products", response_model=list[ProductResponse])
-    def list_products(organization_id: str, repository: Repository, _identity: Identity):
+    def list_products(organization_id: str, repository: Repository, identity: Identity):
+        _authorize(identity, organization_id=organization_id)
         _call(lambda: repository.get_organization(organization_id))
         return _call(lambda: repository.list_products(organization_id))
 
@@ -279,6 +310,7 @@ def create_portfolio_router(
         status_code=status.HTTP_201_CREATED,
     )
     def create_product(body: ProductCreate, organization_id: str, repository: Repository, identity: Identity):
+        _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES)
         return _call(lambda: repository.create_product(
             organization_id,
             **body.model_dump(),
@@ -286,7 +318,8 @@ def create_portfolio_router(
         ))
 
     @router.get("/organizations/{organization_id}/products/{product_id}", response_model=ProductResponse)
-    def get_product(organization_id: str, product_id: str, repository: Repository, _identity: Identity):
+    def get_product(organization_id: str, product_id: str, repository: Repository, identity: Identity):
+        _authorize(identity, organization_id=organization_id)
         return _call(lambda: repository.get_product(organization_id, product_id))
 
     @router.patch("/organizations/{organization_id}/products/{product_id}", response_model=ProductResponse)
@@ -297,6 +330,7 @@ def create_portfolio_router(
         repository: Repository,
         identity: Identity,
     ):
+        _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES)
         values = body.model_dump(exclude_unset=True, exclude={"active_release_id"})
         product = _call(lambda: repository.update_product(
             organization_id,
@@ -317,7 +351,8 @@ def create_portfolio_router(
         "/organizations/{organization_id}/products/{product_id}/releases",
         response_model=list[ReleaseResponse],
     )
-    def list_releases(organization_id: str, product_id: str, repository: Repository, _identity: Identity):
+    def list_releases(organization_id: str, product_id: str, repository: Repository, identity: Identity):
+        _authorize(identity, organization_id=organization_id)
         _call(lambda: repository.get_product(organization_id, product_id))
         return _call(lambda: repository.list_releases(organization_id, product_id))
 
@@ -333,6 +368,7 @@ def create_portfolio_router(
         repository: Repository,
         identity: Identity,
     ):
+        _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES)
         return _call(lambda: repository.create_release(
             organization_id,
             product_id,
@@ -349,8 +385,9 @@ def create_portfolio_router(
         product_id: str,
         release_id: str,
         repository: Repository,
-        _identity: Identity,
+        identity: Identity,
     ):
+        _authorize(identity, organization_id=organization_id)
         release = _call(lambda: repository.get_release(organization_id, release_id))
         if release.product_id != product_id:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "release not found")
@@ -368,6 +405,7 @@ def create_portfolio_router(
         repository: Repository,
         identity: Identity,
     ):
+        _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES)
         release = _call(lambda: repository.get_release(organization_id, release_id))
         if release.product_id != product_id:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "release not found")

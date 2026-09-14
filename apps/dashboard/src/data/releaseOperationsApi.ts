@@ -38,7 +38,8 @@ export interface ReleaseScope {
   releaseId: string;
 }
 
-export type AnalysisJobStatus = "queued" | "running" | "completed" | "failed";
+export type AnalysisJobStatus = "queued" | "running" | "completed" | "failed" | "unsupported";
+export type AnalysisInputType = "sbom" | "collector" | "raw_artifact";
 
 export interface SbomPreview {
   format: string;
@@ -47,6 +48,7 @@ export interface SbomPreview {
   matchableComponents: number;
   skippedComponents: number;
   product: Record<string, unknown>;
+  collector?: Record<string, unknown>;
 }
 
 export interface AnalysisEvidenceLink {
@@ -71,11 +73,16 @@ export interface ReleaseAnalysisJob {
   organizationId: string;
   productId: string;
   releaseId: string;
+  inputType: AnalysisInputType;
   filename: string;
   mediaType: string;
   sizeBytes: number;
   sha256: string;
   preview: SbomPreview;
+  retainedUntil?: string;
+  inputMetadata: Record<string, unknown>;
+  consentedAt?: string;
+  consentActorId?: string;
   status: AnalysisJobStatus;
   stage: string;
   progress: number;
@@ -104,6 +111,11 @@ export interface UploadSbomInput {
   file: Blob;
   filename: string;
   idempotencyKey: string;
+}
+
+export interface UploadAnalysisInput extends UploadSbomInput {
+  inputType: Exclude<AnalysisInputType, "sbom">;
+  rawArtifactConsent?: boolean;
 }
 
 export interface AnalysisEvidenceFile {
@@ -156,6 +168,7 @@ export interface MonitoringRunEvent {
 
 export interface ReleaseOperationsApi {
   uploadSbom(scope: ReleaseScope, input: UploadSbomInput, options?: ReleaseOperationsRequestOptions): Promise<ReleaseAnalysisJob>;
+  uploadAnalysisInput(scope: ReleaseScope, input: UploadAnalysisInput, options?: ReleaseOperationsRequestOptions): Promise<ReleaseAnalysisJob>;
   listAnalysisJobs(scope: ReleaseScope, options?: ReleaseOperationsRequestOptions): Promise<ReleaseAnalysisJob[]>;
   getAnalysisJob(scope: ReleaseScope, jobId: string, options?: ReleaseOperationsRequestOptions): Promise<ReleaseAnalysisJob>;
   runAnalysisJob(scope: ReleaseScope, jobId: string, options?: ReleaseOperationsRequestOptions): Promise<ReleaseAnalysisJob>;
@@ -169,7 +182,8 @@ export interface ReleaseOperationsApi {
 
 type JsonRecord = Record<string, unknown>;
 
-const jobStatuses = ["queued", "running", "completed", "failed"] as const;
+const jobStatuses = ["queued", "running", "completed", "failed", "unsupported"] as const;
+const inputTypes = ["sbom", "collector", "raw_artifact"] as const;
 const monitoringSources = ["osv", "cisa_kev", "epss", "native_advisory", "vendor_advisory"] as const;
 const monitoringHealth = ["healthy", "degraded", "failed", "inactive"] as const;
 const eventTypes = ["started", "succeeded", "failed"] as const;
@@ -252,10 +266,13 @@ function jsonObject(item: JsonRecord, key: string): Record<string, unknown> {
 
 function parsePreview(value: unknown): SbomPreview {
   const item = object(value, "SBOM preview");
+  const collector = item.collector;
+  if (collector !== undefined && collector !== null && (typeof collector !== "object" || Array.isArray(collector))) invalid("collector must be an object or null", collector);
   return {
     format: string(item, "format"), version: string(item, "version"),
     components: integer(item, "components"), matchableComponents: integer(item, "matchable_components"),
     skippedComponents: integer(item, "skipped_components"), product: jsonObject(item, "product"),
+    collector: collector ? { ...(collector as JsonRecord) } : undefined,
   };
 }
 
@@ -298,8 +315,11 @@ function parseJob(value: unknown): ReleaseAnalysisJob {
   return {
     id: string(item, "id"), organizationId: string(item, "organization_id"),
     productId: string(item, "product_id"), releaseId: string(item, "release_id"),
+    inputType: member(item, "input_type", inputTypes),
     filename: string(item, "filename"), mediaType: string(item, "media_type"),
     sizeBytes: integer(item, "size_bytes"), sha256, preview: parsePreview(item.preview),
+    retainedUntil: optionalTimestamp(item, "retained_until"), inputMetadata: jsonObject(item, "input_metadata"),
+    consentedAt: optionalTimestamp(item, "consented_at"), consentActorId: optionalString(item, "consent_actor_id"),
     status: member(item, "status", jobStatuses), stage: string(item, "stage"), progress,
     result: rawResult === null ? undefined : parseResult(rawResult), error: optionalString(item, "error"),
     createdAt: timestamp(item, "created_at"), updatedAt: timestamp(item, "updated_at"),
@@ -465,6 +485,15 @@ export function createReleaseOperationsApi(config: ReleaseOperationsApiConfig): 
       const form = new FormData();
       form.append("sbom", input.file, input.filename);
       return parseJob(await jsonRequest(jobsPath(scope), {
+        method: "POST", headers: { "Idempotency-Key": input.idempotencyKey }, body: form,
+      }, options));
+    },
+    async uploadAnalysisInput(scope, input, options) {
+      const form = new FormData();
+      form.append("input_type", input.inputType);
+      form.append("file", input.file, input.filename);
+      if (input.inputType === "raw_artifact") form.append("raw_artifact_consent", String(input.rawArtifactConsent === true));
+      return parseJob(await jsonRequest(`${jobsPath(scope)}/inputs`, {
         method: "POST", headers: { "Idempotency-Key": input.idempotencyKey }, body: form,
       }, options));
     },

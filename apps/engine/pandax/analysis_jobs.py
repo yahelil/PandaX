@@ -325,7 +325,6 @@ class AnalysisJobRepository:
                     self.storage.delete(stored.object_key)
                     return _job_record(raced)
                 now = _utc_now()
-                unsupported = clean_type == "raw_artifact"
                 values = {
                     "id": job_id, "organization_id": organization_id,
                     "product_id": product_id, "release_id": release_id,
@@ -339,12 +338,12 @@ class AnalysisJobRepository:
                     "input_metadata": metadata,
                     "consented_at": now if clean_type == "raw_artifact" else None,
                     "consent_actor_id": clean_actor if clean_type == "raw_artifact" else None,
-                    "status": "unsupported" if unsupported else "queued",
-                    "stage": "Artifact worker unavailable" if unsupported else "Validation complete",
+                    "status": "queued",
+                    "stage": "Validation complete",
                     "progress": 0, "result": None,
-                    "error": "Raw artifact retained and validated; no production artifact-analysis worker is configured." if unsupported else None,
+                    "error": None,
                     "actor_id": clean_actor, "created_at": now, "updated_at": now,
-                    "started_at": None, "completed_at": now if unsupported else None,
+                    "started_at": None, "completed_at": None,
                 }
                 session.execute(insert(analysis_jobs).values(**values))
                 self._append_event(
@@ -355,7 +354,7 @@ class AnalysisJobRepository:
                 )
                 if clean_type == "raw_artifact":
                     self._append_event(
-                        session, job_id, kind="analysis.consent_recorded", status="unsupported",
+                        session, job_id, kind="analysis.consent_recorded", status="queued",
                         stage=values["stage"], progress=0,
                         message="Explicit raw artifact processing consent recorded",
                         details={"actor_id": clean_actor, "consented_at": now.isoformat()},
@@ -470,11 +469,16 @@ class AnalysisJobRepository:
             except (KeyError, OSError, zipfile.BadZipFile) as exc:
                 self._fail(organization_id, product_id, release_id, job_id, "retained Collector package is invalid")
                 return self.get(organization_id, product_id, release_id, job_id)
-        suffix = ".spdx.json" if job.input_format == "SPDX" else ".cdx.json"
+        suffix = (
+            str(job.input_metadata.get("extension", ".bin"))
+            if job.input_type == "raw_artifact"
+            else ".spdx.json" if job.input_format == "SPDX" else ".cdx.json"
+        )
 
         try:
-            with _temporary_sbom(content, suffix) as sbom_path:
-                for item in runner(sbom_path):
+            with _temporary_sbom(content, suffix) as input_path:
+                stream = pipeline.run(input_path) if job.input_type == "raw_artifact" else runner(input_path)
+                for item in stream:
                     progress = _event_progress(item, default=self.get(
                         organization_id, product_id, release_id, job_id
                     ).progress)
@@ -909,10 +913,10 @@ def _validate_raw(
     preview = {
         "format": "Raw artifact", "version": "1", "components": 0,
         "matchable_components": 0, "skipped_components": 0, "product": {},
-        "analysis_support": "pending_worker",
+        "analysis_support": None,
     }
     return safe_name, clean_media, preview, "Raw artifact", "1", {
-        "extension": extension, "analysis_support": "pending_worker",
+        "extension": extension,
     }
 
 

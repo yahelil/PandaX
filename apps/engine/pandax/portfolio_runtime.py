@@ -12,6 +12,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .analysis_jobs import AnalysisJobRepository
 from .auth import OIDCAuthenticator, OIDCSettings
+from .compliance import ComplianceRepository
 from .findings import FindingRepository
 from .portfolio import PortfolioRepository, create_portfolio_engine
 from .portfolio_api import PortfolioIdentity
@@ -67,6 +68,14 @@ def get_finding_repository() -> FindingRepository:
 
 
 @lru_cache(maxsize=1)
+def get_compliance_repository() -> ComplianceRepository:
+    repository = ComplianceRepository(get_portfolio_repository().engine)
+    if repository.engine.dialect.name == "sqlite":
+        repository.create_schema()
+    return repository
+
+
+@lru_cache(maxsize=1)
 def get_oidc_authenticator() -> OIDCAuthenticator:
     return OIDCAuthenticator(OIDCSettings.from_env())
 
@@ -98,4 +107,5 @@ def reset_portfolio_repository() -> None:
     get_analysis_repository.cache_clear()
     get_release_monitoring_repository.cache_clear()
     get_finding_repository.cache_clear()
+    get_compliance_repository.cache_clear()
     get_oidc_authenticator.cache_clear()

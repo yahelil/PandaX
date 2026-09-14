@@ -14,6 +14,7 @@ from typing import Any
 
 import yaml
 
+from . import __version__
 from . import events as ev
 from .context import (
     CACHE_DIR,
@@ -111,7 +112,7 @@ def _run(
         clock_speed=clock_speed,
         input_type=input_type,
     )
-    ctx.tool_versions["pandax"] = "0.1.0"
+    ctx.tool_versions["pandax"] = __version__
 
     yield ev.log(
         "RUN",
@@ -135,7 +136,7 @@ def _run(
             ctx.ledger.append(
                 stage="S1_INGEST",
                 tool="pandax.skip",
-                tool_version="0.1.0",
+                tool_version=__version__,
                 inputs=[],
                 outputs=[],
                 params={"reason": reason, "input_type": "sbom"},

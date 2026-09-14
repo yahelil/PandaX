@@ -1,0 +1,66 @@
+name: PandaX CRA evidence
+description: Analyze an SBOM and emit a sealed evidence bundle, JSON summary, and SARIF.
+
+inputs:
+  sbom:
+    description: Workspace-relative CycloneDX or SPDX JSON file.
+    required: true
+  output:
+    description: Workspace-relative output directory.
+    required: false
+    default: pandax-results
+  fail-on-kev:
+    description: Fail when CISA KEV signals require urgent manufacturer review.
+    required: false
+    default: "true"
+
+outputs:
+  summary:
+    description: Absolute path to PandaX JSON summary.
+    value: ${{ steps.scan.outputs.summary }}
+  sarif:
+    description: Absolute path to PandaX SARIF report.
+    value: ${{ steps.scan.outputs.sarif }}
+  evidence-bundle:
+    description: Absolute path to sealed evidence bundle.
+    value: ${{ steps.scan.outputs.evidence-bundle }}
+
+runs:
+  using: composite
+  steps:
+    - id: scan
+      shell: bash
+      env:
+        INPUT_SBOM: ${{ inputs.sbom }}
+        INPUT_OUTPUT: ${{ inputs.output }}
+        INPUT_FAIL_ON_KEV: ${{ inputs.fail-on-kev }}
+      run: |
+        set -euo pipefail
+        if [[ -z "$INPUT_SBOM" ]]; then
+          echo "Specify the 'sbom' input." >&2
+          exit 1
+        fi
+
+        python -m pip install "$GITHUB_ACTION_PATH"
+        output_dir="$GITHUB_WORKSPACE/$INPUT_OUTPUT"
+        summary="$GITHUB_WORKSPACE/pandax-summary.json"
+        sarif="$GITHUB_WORKSPACE/pandax.sarif"
+        mkdir -p "$output_dir"
+
+        set +e
+        pandax scan-sbom "$GITHUB_WORKSPACE/$INPUT_SBOM" --out "$output_dir" --quiet --json-output "$summary" --sarif-output "$sarif"
+        status=$?
+        set -e
+
+        if [[ ! -f "$summary" ]]; then
+          exit "$status"
+        fi
+        evidence_bundle="$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["run"]["evidence_bundle"])' "$summary")"
+        echo "summary=$summary" >> "$GITHUB_OUTPUT"
+        echo "sarif=$sarif" >> "$GITHUB_OUTPUT"
+        echo "evidence-bundle=$evidence_bundle" >> "$GITHUB_OUTPUT"
+
+        if [[ "$status" -eq 2 && "$INPUT_FAIL_ON_KEV" != "true" ]]; then
+          exit 0
+        fi
+        exit "$status"

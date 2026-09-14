@@ -4,6 +4,10 @@
   "private": true,
   "description": "PandaX Monorepo",
   "scripts": {
+    "demo": "npm run demo --workspace @pandax/dashboard",
+    "build:dashboard": "npm run build --workspace @pandax/dashboard",
+    "typecheck:dashboard": "npm run typecheck --workspace @pandax/dashboard",
+    "test:dashboard": "npm run test --workspace @pandax/dashboard",
     "video:capture": "node apps/showcase-video/scripts/capture.mjs",
     "video:voiceover": "uv run --with kokoro-onnx --with soundfile python apps/showcase-video/scripts/generate_voiceover.py",
     "video:render": "remotion render apps/showcase-video/src/index.tsx PandaXShowcase output/video/pandax-poc-showcase.mp4 --public-dir=apps/showcase-video/public --codec=h264 --crf=18 --audio-codec=aac --overwrite",

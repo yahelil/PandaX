@@ -10,8 +10,13 @@ export function AppShell() {
   const location = useLocation()
   const { adapterStatus, actions } = useDemo()
   const lastTrackedPath = useRef('')
+  const mountedPath = useRef(false)
 
   useEffect(() => {
+    if (!mountedPath.current) {
+      mountedPath.current = true
+      return
+    }
     setSidebarOpen(false)
     requestAnimationFrame(() => {
       window.scrollTo({ top: 0, left: 0 })

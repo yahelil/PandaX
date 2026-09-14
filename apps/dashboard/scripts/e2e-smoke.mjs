@@ -54,6 +54,25 @@ try {
   await waitForPreview(server);
   browser = await chromium.launch({ executablePath, headless: true });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await context.addInitScript(() => {
+    globalThis.__actisVitals = { lcp: 0, cls: 0, longTaskMs: 0 };
+    if (PerformanceObserver.supportedEntryTypes.includes("largest-contentful-paint")) {
+      new PerformanceObserver((list) => {
+        const entries = list.getEntries();
+        globalThis.__actisVitals.lcp = entries.at(-1)?.startTime ?? 0;
+      }).observe({ type: "largest-contentful-paint", buffered: true });
+    }
+    if (PerformanceObserver.supportedEntryTypes.includes("layout-shift")) {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) if (!entry.hadRecentInput) globalThis.__actisVitals.cls += entry.value;
+      }).observe({ type: "layout-shift", buffered: true });
+    }
+    if (PerformanceObserver.supportedEntryTypes.includes("longtask")) {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) globalThis.__actisVitals.longTaskMs += entry.duration;
+      }).observe({ type: "longtask", buffered: true });
+    }
+  });
   const page = await context.newPage();
   const browserErrors = [];
   page.on("console", (message) => {
@@ -65,7 +84,9 @@ try {
   await assertCoreShell(page);
   await assertSingleMain(page, "Home");
   await assertAccessibilityBasics(page, "Home");
-  for (const width of [768, 1024, 1440, 1920]) {
+  await assertKeyboardAccess(page);
+  await assertThemeContrast(page, "light");
+  for (const width of [640, 768, 1024, 1440, 1920]) {
     await page.setViewportSize({ width, height: 1000 });
     await assertNoHorizontalOverflow(page, `Home at ${width}px`);
     if (visualDir) {
@@ -80,6 +101,7 @@ try {
   await themeToggle.click();
   await page.locator("html[data-theme='dark']").waitFor();
   await assertVisible(page.getByRole("button", { name: "Use light theme" }), "dark-theme toggle");
+  await assertThemeContrast(page, "dark");
 
   await page.getByRole("link", { name: /^Products$/ }).click();
   await page.waitForURL(`${baseUrl}/products`);
@@ -103,6 +125,24 @@ try {
   await page.waitForURL(`${baseUrl}/products/product-home-hub/releases/release-hub-1-8-0`);
   await assertSingleMain(page, "Release workspace");
   await assertVisible(page.getByRole("link", { name: "Analyze release" }), "release analysis action");
+  await page.getByRole("link", { name: "Analyze release" }).click();
+  await page.waitForURL(`${baseUrl}/products/product-home-hub/releases/release-hub-1-8-0/analyze`);
+  await assertSingleMain(page, "Analysis input");
+  await assertAccessibilityBasics(page, "Analysis input");
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.locator(".upload-zone input[type=file]").setInputFiles({
+    name: "home-hub-1.8.0.zip", mimeType: "application/zip", buffer: Buffer.from("PK Actis collector evidence"),
+  });
+  await page.getByRole("button", { name: "Review and validate" }).click();
+  const digestConfirmation = page.getByLabel(/changed release contents create a new immutable analysis snapshot/i);
+  if (await digestConfirmation.count()) await digestConfirmation.check();
+  await page.getByRole("button", { name: "Validate evidence" }).click();
+  await page.getByRole("button", { name: "Continue" }).waitFor();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await page.getByRole("button", { name: "Run analysis" }).click();
+  await page.waitForURL(new RegExp(`${baseUrl}/analyses/analysis-`));
+  await assertVisible(page.getByRole("heading", { name: "Analysis complete" }), "completed analysis", 5_000);
+  await assertAccessibilityBasics(page, "Analysis result");
 
   await page.getByRole("complementary", { name: "Primary navigation" })
     .getByRole("link", { name: /^Findings / })
@@ -120,6 +160,31 @@ try {
   await page.getByLabel("Target date").fill("2026-09-18");
   await page.getByRole("button", { name: "Save remediation plan" }).click();
   await assertVisible(page.getByText("Remediation plan updated."), "remediation confirmation");
+
+  await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Compliance / }).click();
+  await page.waitForURL(`${baseUrl}/compliance`);
+  await assertSingleMain(page, "Compliance");
+  await assertAccessibilityBasics(page, "Compliance");
+  await assertVisible(page.getByRole("textbox", { name: "Search compliance work" }), "compliance search");
+  await page.getByRole("button", { name: "Deadlines" }).click();
+  await assertVisible(page.getByText("Submit initial incident notification", { exact: true }).first(), "deadline case");
+
+  await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Products$/ }).click();
+  await page.getByRole("link", { name: "Smart Camera", exact: true }).first().click();
+  await page.getByRole("navigation", { name: "Product workspace" }).getByRole("link", { name: "Documents" }).click();
+  await page.getByRole("link", { name: "EU Declaration of Conformity — Smart Camera 2.4.1" }).click();
+  await assertSingleMain(page, "Document detail");
+  await assertAccessibilityBasics(page, "Document detail");
+  await assertVisible(page.getByRole("button", { name: "Prepare download" }), "verified document download");
+  await assertVisible(page.getByRole("tab", { name: "Audit" }), "document audit history tab");
+
+  await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Settings$/ }).click();
+  await page.waitForURL(`${baseUrl}/settings/organization`);
+  await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "Appearance" }).click();
+  await assertSingleMain(page, "Settings");
+  await assertAccessibilityBasics(page, "Settings");
+  await assertVisible(page.getByRole("heading", { name: "Appearance" }), "appearance settings");
+  await assertPerformanceBudgets(page);
 
   if (browserErrors.length) {
     throw new Error(`Browser emitted errors:\n${browserErrors.join("\n")}`);
@@ -161,8 +226,10 @@ async function assertSingleMain(page, label) {
   if (count !== 1) throw new Error(`${label} must expose exactly one main landmark; found ${count}.`);
 }
 
-async function assertVisible(locator, label) {
-  if (await locator.count() < 1 || !await locator.first().isVisible()) {
+async function assertVisible(locator, label, timeout = 1_500) {
+  try {
+    await locator.first().waitFor({ state: "visible", timeout });
+  } catch {
     throw new Error(`${label} is missing or not visible.`);
   }
 }
@@ -180,9 +247,73 @@ async function assertAccessibilityBasics(page, label) {
       return !((element.getAttribute("aria-label") || element.getAttribute("title") || element.textContent || "").trim() || (element instanceof HTMLInputElement && element.labels?.length));
     });
     const unnamedImages = [...document.querySelectorAll("img")].filter((item) => !item.hasAttribute("alt") && item.getAttribute("aria-hidden") !== "true");
-    return { duplicateIds, unnamedControls: unnamedControls.length, unnamedImages: unnamedImages.length };
+    const unlabeledFields = [...document.querySelectorAll("input,select,textarea")].filter((item) => item.type !== "hidden" && !(item.labels?.length || item.getAttribute("aria-label") || item.getAttribute("aria-labelledby")));
+    const positiveTabIndex = [...document.querySelectorAll("[tabindex]")].filter((item) => Number(item.getAttribute("tabindex")) > 0);
+    const invalidReferences = [...document.querySelectorAll("[aria-labelledby],[aria-describedby]")].flatMap((item) => ["aria-labelledby", "aria-describedby"].flatMap((attribute) => (item.getAttribute(attribute) ?? "").split(/\s+/).filter(Boolean).filter((id) => !document.getElementById(id))));
+    return {
+      language: document.documentElement.lang,
+      mainHeadings: document.querySelectorAll("main h1").length,
+      duplicateIds,
+      unnamedControls: unnamedControls.length,
+      unnamedImages: unnamedImages.length,
+      unlabeledFields: unlabeledFields.length,
+      positiveTabIndex: positiveTabIndex.length,
+      invalidReferences,
+    };
   });
-  if (failures.duplicateIds.length || failures.unnamedControls || failures.unnamedImages) {
+  if (failures.language !== "en" || failures.mainHeadings !== 1 || failures.duplicateIds.length || failures.unnamedControls || failures.unnamedImages || failures.unlabeledFields || failures.positiveTabIndex || failures.invalidReferences.length) {
     throw new Error(`${label} accessibility basics failed: ${JSON.stringify(failures)}`);
   }
+}
+
+async function assertKeyboardAccess(page) {
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    window.scrollTo(0, 0);
+  });
+  await page.keyboard.press("Tab");
+  const result = await page.evaluate(() => {
+    const active = document.activeElement;
+    const style = active ? getComputedStyle(active) : null;
+    return { text: active?.textContent?.trim(), outline: style?.outlineStyle, width: style?.outlineWidth };
+  });
+  if (result.text !== "Skip to main content" || result.outline === "none" || result.width === "0px") {
+    throw new Error(`Keyboard skip navigation or visible focus failed: ${JSON.stringify(result)}`);
+  }
+  await page.keyboard.press("Enter");
+  const mainFocused = await page.evaluate(() => {
+    const target = document.getElementById("main-content");
+    return document.activeElement === target && Boolean(target?.querySelector("main"));
+  });
+  if (!mainFocused) throw new Error("Skip navigation did not move keyboard focus to main content.");
+}
+
+async function assertThemeContrast(page, theme) {
+  const ratios = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    const parse = (value) => {
+      const match = value.trim().match(/^#([0-9a-f]{6})$/i);
+      if (!match) throw new Error(`Expected a six-digit color token, got ${value}`);
+      return [0, 2, 4].map((offset) => Number.parseInt(match[1].slice(offset, offset + 2), 16) / 255);
+    };
+    const luminance = (rgb) => rgb.map((value) => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4).reduce((sum, value, index) => sum + value * [.2126, .7152, .0722][index], 0);
+    const ratio = (foreground, background) => {
+      const values = [luminance(parse(root.getPropertyValue(foreground))), luminance(parse(root.getPropertyValue(background)))].sort((a, b) => b - a);
+      return (values[0] + .05) / (values[1] + .05);
+    };
+    return { text: ratio("--text", "--surface"), muted: ratio("--text-muted", "--surface"), accent: ratio("--accent", "--surface") };
+  });
+  for (const [token, ratio] of Object.entries(ratios)) if (ratio < 4.5) throw new Error(`${theme} ${token} contrast is ${ratio.toFixed(2)}; expected at least 4.5.`);
+}
+
+async function assertPerformanceBudgets(page) {
+  await page.waitForTimeout(100);
+  const metrics = await page.evaluate(() => {
+    const navigation = performance.getEntriesByType("navigation")[0];
+    return { ...globalThis.__actisVitals, domContentLoaded: navigation?.domContentLoadedEventEnd ?? 0, domNodes: document.querySelectorAll("*").length };
+  });
+  if (metrics.lcp > 5_000 || metrics.cls > .1 || metrics.longTaskMs > 1_500 || metrics.domContentLoaded > 5_000 || metrics.domNodes > 3_000) {
+    throw new Error(`Performance budget exceeded: ${JSON.stringify(metrics)}`);
+  }
+  console.log(`Performance budgets passed: ${JSON.stringify(metrics)}`);
 }

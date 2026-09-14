@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useDemo } from "../data/DemoProvider";
 import { MetricCard, PageHeader, SectionHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
 import "./pages.css";
+import { homeSetupMode } from "./homeSetup";
 import { matchesScope, scopedPath, scopeFromParams } from "./scope";
 
 export function HomePage() {
@@ -32,18 +33,17 @@ export function HomePage() {
   const hasReview = hasAnalysis && (demo.findings.length === 0 || demo.findings.some((item) => item.decisions.length > 0));
   const hasApprover = demo.state.members.some((item) => item.status === "active" && item.roles.includes("authorized_approver"));
   const notificationsConfigured = Object.entries(demo.state.settings.notifications).some(([key, value]) => key === "emailDigest" ? value !== "off" : value === true);
-  const firstRun = !isScoped && !(hasProduct && hasRelease && hasAnalysis && hasReview && hasApprover && notificationsConfigured);
+  const setupComplete = hasProduct && hasRelease && hasAnalysis && hasReview && hasApprover && notificationsConfigured;
+  const setupMode = homeSetupMode({ isScoped, hasProduct, setupComplete });
+  const setupSteps = [
+    { label: "Create product", done: hasProduct, to: "/products" },
+    { label: "Register release", done: hasRelease, to: hasProduct ? `/products/${demo.products[0].id}?tab=releases` : "/products" },
+    { label: "Analyze release", done: hasAnalysis, to: hasRelease ? `/products/${demo.releases[0].productId}/releases/${demo.releases[0].id}/analyze` : "/products" },
+    { label: "Review initial findings", done: hasReview, to: "/findings" },
+    { label: "Assign an authorized approver and configure notifications", done: hasApprover && notificationsConfigured, to: hasApprover ? "/settings/notifications" : "/settings/team" },
+  ];
 
-  if (firstRun) {
-    const steps = [
-      { label: "Create product", done: hasProduct, to: "/products" },
-      { label: "Register release", done: hasRelease, to: hasProduct ? `/products/${demo.products[0].id}` : "/products" },
-      { label: "Analyze release", done: hasAnalysis, to: hasRelease ? `/products/${demo.releases[0].productId}/releases/${demo.releases[0].id}/analyze` : "/products" },
-      { label: "Review initial findings", done: hasReview, to: "/findings" },
-      { label: "Assign an authorized approver and configure notifications", done: hasApprover && notificationsConfigured, to: "/settings/team" },
-    ];
-    return <main className="page"><PageHeader title="Set up Actis" description="Complete these steps to establish release evidence and continuous CRA monitoring."/><section className="panel setup-panel"><ol className="setup-list">{steps.map((item, index)=><li className={item.done ? "done" : ""} key={item.label}><span aria-hidden="true">{item.done ? "✓" : index + 1}</span><div><strong>{item.label}</strong><small>{item.done ? "Complete" : "Not started"}</small></div>{!item.done && steps.slice(0,index).every((step)=>step.done) ? <Link className="button button-primary" to={item.to}>Continue setup</Link> : null}</li>)}</ol></section></main>;
-  }
+  if (setupMode === "replace") return <main className="page"><PageHeader title="Set up Actis" description="Complete these steps to establish release evidence and continuous CRA monitoring."/><SetupChecklist steps={setupSteps}/></main>;
 
   return (
     <main className="page">
@@ -51,6 +51,8 @@ export function HomePage() {
         title="Home"
         description="What needs action now, why, by when, and who owns it."
       />
+
+      {setupMode === "supplemental" ? <SetupChecklist steps={setupSteps}/> : null}
 
       {monitoring || monitoringNeedsAttention ? (
         <section className={`notice${monitoringNeedsAttention ? " notice-warning" : ""}`} aria-label="Monitoring status">
@@ -115,4 +117,8 @@ export function HomePage() {
       </div>
     </main>
   );
+}
+
+function SetupChecklist({ steps }: { steps: Array<{ label: string; done: boolean; to: string }> }) {
+  return <section className="panel setup-panel" aria-labelledby="setup-heading"><SectionHeader title="Finish setting up Actis" description="Complete the remaining steps without losing visibility of active compliance work."/><h2 className="sr-only" id="setup-heading">Setup checklist</h2><ol className="setup-list">{steps.map((item, index)=><li className={item.done ? "done" : ""} key={item.label}><span aria-hidden="true">{item.done ? "✓" : index + 1}</span><div><strong>{item.label}</strong><small>{item.done ? "Complete" : "Not started"}</small></div>{!item.done && steps.slice(0,index).every((step)=>step.done) ? <Link className="button button-primary" to={item.to}>Continue setup</Link> : null}</li>)}</ol></section>;
 }

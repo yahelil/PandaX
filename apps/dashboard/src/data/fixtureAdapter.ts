@@ -1,6 +1,7 @@
 import type { AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } from "./adapter";
 import { createDemoState, DEMO_IDS } from "./fixtures";
 import type {
+  RegisterDocumentRevisionInput,
   AnalysisDraft,
   AnalysisJob,
   AnalysisPreview,
@@ -10,12 +11,14 @@ import type {
   CreateReleaseInput,
   DemoState,
   DocumentRecord,
+  DocumentDownloadMetadata,
   EntityId,
   Finding,
   FindingDecisionInput,
   Product,
   Release,
   ReleaseMonitoringView,
+  RecordDocumentSelfFilingInput,
   RemediationInput,
 } from "./types";
 
@@ -223,6 +226,95 @@ export class FixtureAdapter implements DataAdapter {
   approveDocument = (documentId: EntityId, comment?: string): DocumentRecord => this.decideDocument(documentId, "approved", comment);
 
   rejectDocument = (documentId: EntityId, comment: string): DocumentRecord => this.decideDocument(documentId, "rejected", comment);
+
+  loadDocumentDetail = async (documentId: EntityId): Promise<DocumentRecord | undefined> => {
+    const document = this.state.documents.find((item) => item.id === documentId);
+    return document ? structuredClone(document) : undefined;
+  };
+
+  getDocumentDownload = async (documentId: EntityId, version?: number): Promise<DocumentDownloadMetadata> => {
+    const document = this.state.documents.find((item) => item.id === documentId);
+    if (!document) throw new Error(`Unknown document: ${documentId}`);
+    const selected = document.revisions?.find((item) => item.version === (version ?? document.version));
+    const format = selected?.format ?? document.format;
+    const extension = format === "PDF/A-2b" ? "pdf" : format === "ZIP" ? "zip" : "json";
+    const contentType = format === "PDF/A-2b" ? "application/pdf" : format === "ZIP" ? "application/zip" : "application/json";
+    return {
+      documentId,
+      version: selected?.version ?? document.version,
+      filename: `${slugify(document.name)}-v${selected?.version ?? document.version}.${extension}`,
+      format,
+      contentHash: selected?.contentHash ?? document.contentHash ?? "fixture-metadata-not-persisted",
+      sizeBytes: selected?.sizeBytes ?? document.sizeBytes ?? 0,
+      storageLocator: selected?.storageLocator ?? document.storageLocator ?? `fixture://documents/${documentId}/revisions/${selected?.version ?? document.version}`,
+      contentType,
+      downloadType: "storage_metadata_only",
+    };
+  };
+
+  requestDocumentApproval = (documentId: EntityId, comment?: string): DocumentRecord => {
+    let updated!: DocumentRecord;
+    this.mutate((state) => {
+      const document = state.documents.find((item) => item.id === documentId);
+      if (!document) throw new Error(`Unknown document: ${documentId}`);
+      if (document.status !== "draft") throw new Error("Only a draft revision can be submitted for approval.");
+      if (document.completeness !== "complete") throw new Error("Complete all required evidence before requesting approval.");
+      const requestedAt = now();
+      document.status = "approval_required";
+      document.updatedAt = requestedAt;
+      document.updatedBy = state.currentUserId;
+      document.audit.unshift({ id: `audit-${document.id}-${document.audit.length + 1}`, action: "approval_requested", actorId: state.currentUserId, at: requestedAt, detail: comment?.trim() || "Approval requested for the current revision." });
+      const approval: Approval = { id: `approval-${document.id}-${document.version}`, documentId, status: "requested", requestedBy: state.currentUserId, requestedAt };
+      state.approvals = state.approvals.filter((item) => item.documentId !== documentId);
+      state.approvals.push(approval);
+      document.approvalId = approval.id;
+      updated = structuredClone(document);
+    });
+    return updated;
+  };
+
+  addDocumentRevision = (input: RegisterDocumentRevisionInput): DocumentRecord => {
+    let updated!: DocumentRecord;
+    this.mutate((state) => {
+      const document = state.documents.find((item) => item.id === input.documentId);
+      if (!document) throw new Error(`Unknown document: ${input.documentId}`);
+      const createdAt = now();
+      const previousVersion = document.version;
+      document.version += 1;
+      document.format = input.format;
+      document.status = "draft";
+      document.completeness = input.completeness;
+      document.contentHash = input.contentHash;
+      document.storageLocator = input.storageLocator;
+      document.sizeBytes = input.sizeBytes;
+      document.updatedAt = createdAt;
+      document.updatedBy = state.currentUserId;
+      document.revisions = [
+        { version: document.version, format: input.format, status: "draft", completeness: input.completeness, contentHash: input.contentHash, storageLocator: input.storageLocator, sizeBytes: input.sizeBytes, createdBy: state.currentUserId, createdAt },
+        ...(document.revisions ?? []),
+      ];
+      document.audit.unshift({ id: `audit-${document.id}-${document.audit.length + 1}`, action: "edited", actorId: state.currentUserId, at: createdAt, detail: `Revision ${document.version} superseded revision ${previousVersion}.` });
+      updated = structuredClone(document);
+    });
+    return updated;
+  };
+
+  recordDocumentSelfFiling = (input: RecordDocumentSelfFilingInput): DocumentRecord => {
+    let updated!: DocumentRecord;
+    this.mutate((state) => {
+      const document = state.documents.find((item) => item.id === input.documentId);
+      if (!document) throw new Error(`Unknown document: ${input.documentId}`);
+      if (document.status !== "approved") throw new Error("Only an approved revision can be recorded as externally filed.");
+      const recordedAt = now();
+      document.status = "self_filed";
+      document.updatedAt = recordedAt;
+      document.updatedBy = state.currentUserId;
+      document.selfFilings = [{ id: `filing-${document.id}-${document.version}`, version: document.version, externalSubmissionReference: input.externalSubmissionReference, submittedAt: input.submittedAt, receiptEvidenceLocator: input.receiptEvidenceLocator, receiptContentHash: input.receiptContentHash, recordedBy: state.currentUserId, recordedAt }, ...(document.selfFilings ?? [])];
+      document.audit.unshift({ id: `audit-${document.id}-${document.audit.length + 1}`, action: "self_filed", actorId: state.currentUserId, at: recordedAt, detail: `External filing ${input.externalSubmissionReference} recorded. Actis did not submit it.` });
+      updated = structuredClone(document);
+    });
+    return updated;
+  };
 
   createProduct = async (input: CreateProductInput): Promise<Product> => {
     let created!: Product;

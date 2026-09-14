@@ -2,18 +2,21 @@ import type {
   AnalysisDraft,
   AnalysisJob,
   AnalysisPreview,
+  RegisterDocumentRevisionInput,
   AppSettings,
   Approval,
   CreateProductInput,
   CreateReleaseInput,
   DemoState,
   DocumentRecord,
+  DocumentDownloadMetadata,
   EntityId,
   Finding,
   FindingDecisionInput,
   Product,
   Release,
   ReleaseMonitoringView,
+  RecordDocumentSelfFilingInput,
   RemediationInput,
 } from "./types";
 
@@ -23,7 +26,8 @@ export type AdapterOperation =
   | "initialize" | "refresh" | "search" | "create_product" | "create_release"
   | "acknowledge_notification" | "assign_finding" | "decide_finding"
   | "update_remediation" | "load_finding" | "approve_document"
-  | "reject_document" | "update_settings" | "preview_analysis" | "run_analysis" | "run_monitoring";
+  | "reject_document" | "load_document" | "download_document" | "request_document_approval"
+  | "add_document_revision" | "self_file_document" | "update_settings" | "preview_analysis" | "run_analysis" | "run_monitoring";
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -67,6 +71,11 @@ export interface DataAdapter {
   updateRemediation(input: RemediationInput): MaybePromise<Finding>;
   approveDocument(documentId: EntityId, comment?: string): MaybePromise<DocumentRecord>;
   rejectDocument(documentId: EntityId, comment: string): MaybePromise<DocumentRecord>;
+  loadDocumentDetail(documentId: EntityId, options?: { signal?: AbortSignal }): Promise<DocumentRecord | undefined>;
+  getDocumentDownload(documentId: EntityId, version?: number): Promise<DocumentDownloadMetadata>;
+  requestDocumentApproval(documentId: EntityId, comment?: string): MaybePromise<DocumentRecord>;
+  addDocumentRevision(input: RegisterDocumentRevisionInput): MaybePromise<DocumentRecord>;
+  recordDocumentSelfFiling(input: RecordDocumentSelfFilingInput): MaybePromise<DocumentRecord>;
   createProduct(input: CreateProductInput): Promise<Product>;
   createRelease(input: CreateReleaseInput): Promise<Release>;
   previewAnalysis(draft: AnalysisDraft): Promise<AnalysisPreview>;

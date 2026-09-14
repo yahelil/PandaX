@@ -14,18 +14,21 @@ import type {
   AnalysisDraft,
   AnalysisJob,
   AnalysisPreview,
+  RegisterDocumentRevisionInput,
   AppSettings,
   ComplianceItem,
   CreateProductInput,
   CreateReleaseInput,
   DemoState,
   DocumentRecord,
+  DocumentDownloadMetadata,
   EntityId,
   Finding,
   FindingDecisionInput,
   Product,
   Release,
   ReleaseMonitoringView,
+  RecordDocumentSelfFilingInput,
   RemediationInput,
   Scope,
   TeamMember,
@@ -56,6 +59,11 @@ export interface DemoActions {
   updateRemediation(input: RemediationInput): MaybePromise<Finding>;
   approveDocument(documentId: EntityId, comment?: string): MaybePromise<DocumentRecord>;
   rejectDocument(documentId: EntityId, comment: string): MaybePromise<DocumentRecord>;
+  loadDocumentDetail(documentId: EntityId, options?: { signal?: AbortSignal }): Promise<DocumentRecord | undefined>;
+  getDocumentDownload(documentId: EntityId, version?: number): Promise<DocumentDownloadMetadata>;
+  requestDocumentApproval(documentId: EntityId, comment?: string): MaybePromise<DocumentRecord>;
+  addDocumentRevision(input: RegisterDocumentRevisionInput): MaybePromise<DocumentRecord>;
+  recordDocumentSelfFiling(input: RecordDocumentSelfFilingInput): MaybePromise<DocumentRecord>;
   createProduct(input: CreateProductInput): Promise<Product>;
   createRelease(input: CreateReleaseInput): Promise<Release>;
   previewAnalysis(draft: AnalysisDraft): Promise<AnalysisPreview>;
@@ -83,6 +91,7 @@ const DemoContext = createContext<DemoContextValue | null>(null);
 
 export interface DemoProviderProps extends PropsWithChildren {
   adapter?: DataAdapter;
+  currentUserOverride?: TeamMember;
 }
 
 function matchesScope(productId: EntityId | undefined, releaseId: EntityId | undefined, scope?: Scope): boolean {
@@ -91,7 +100,7 @@ function matchesScope(productId: EntityId | undefined, releaseId: EntityId | und
   return !scope.releaseId || scope.releaseId === releaseId;
 }
 
-export function DemoProvider({ adapter: providedAdapter, children }: DemoProviderProps) {
+export function DemoProvider({ adapter: providedAdapter, currentUserOverride, children }: DemoProviderProps) {
   const adapterRef = useRef<DataAdapter | null>(null);
   if (!adapterRef.current) adapterRef.current = providedAdapter ?? createFixtureAdapter();
   const adapter = adapterRef.current;
@@ -129,6 +138,11 @@ export function DemoProvider({ adapter: providedAdapter, children }: DemoProvide
     updateRemediation: adapter.updateRemediation,
     approveDocument: adapter.approveDocument,
     rejectDocument: adapter.rejectDocument,
+    loadDocumentDetail: adapter.loadDocumentDetail,
+    getDocumentDownload: adapter.getDocumentDownload,
+    requestDocumentApproval: adapter.requestDocumentApproval,
+    addDocumentRevision: adapter.addDocumentRevision,
+    recordDocumentSelfFiling: adapter.recordDocumentSelfFiling,
     createProduct: adapter.createProduct,
     createRelease: adapter.createRelease,
     previewAnalysis: adapter.previewAnalysis,
@@ -137,7 +151,7 @@ export function DemoProvider({ adapter: providedAdapter, children }: DemoProvide
     runReleaseMonitoring: adapter.runReleaseMonitoring,
   }), [adapter]);
 
-  const currentUser = state.members.find((item) => item.id === state.currentUserId);
+  const currentUser = currentUserOverride ?? state.members.find((item) => item.id === state.currentUserId);
   if (!currentUser) throw new Error("Demo current user is missing from team fixtures.");
 
   const value = useMemo<DemoContextValue>(() => ({

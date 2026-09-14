@@ -174,7 +174,7 @@ def test_collector_rejects_traversal_duplicates_symlinks_and_zip_bombs(setup):
             create(repository, content)
 
 
-def test_raw_requires_policy_consent_matching_type_and_records_immutable_consent(setup):
+def test_raw_requires_policy_consent_matching_type_and_records_immutable_consent(setup, monkeypatch):
     repository, storage, _ = setup
     base = dict(
         input_type="raw_artifact", filename="firmware.bin", media_type="application/octet-stream",
@@ -199,14 +199,20 @@ def test_raw_requires_policy_consent_matching_type_and_records_immutable_consent
         "org-1", "product-1", "release-1", **base,
         raw_artifact_allowed=True, raw_artifact_consent=True, retention_days=30,
     )
-    assert job.status == "unsupported"
+    assert job.status == "queued"
     assert job.consented_at and job.consent_actor_id == "reviewer"
     assert job.object_key in storage.objects and job.retained_until > job.created_at
     assert [item.kind for item in repository.events("org-1", "product-1", "release-1", job.id)] == [
         "analysis.uploaded", "analysis.consent_recorded",
     ]
-    with pytest.raises(AnalysisJobConflict, match="queued"):
-        repository.start("org-1", "product-1", "release-1", job.id)
+
+    def runner(path):
+        assert path.name.endswith(".bin") and path.read_bytes() == b"firmware"
+        yield ev.run_done("Complete", components=1, findings=0, kev=0, incidents=0)
+
+    monkeypatch.setattr("pandax.analysis_jobs.pipeline.run", runner)
+    completed = repository.run("org-1", "product-1", "release-1", job.id, lambda _: ())
+    assert completed.status == "completed"
 
 
 def test_typed_upload_api_enforces_rbac_settings_and_hides_storage_reference(setup):
@@ -231,7 +237,7 @@ def test_typed_upload_api_enforces_rbac_settings_and_hides_storage_reference(set
     )
     assert response.status_code == 201, response.text
     body = response.json()
-    assert body["input_type"] == "raw_artifact" and body["status"] == "unsupported"
+    assert body["input_type"] == "raw_artifact" and body["status"] == "queued"
     assert body["consent_actor_id"] == "reviewer" and "object_key" not in body
     events = client.get(f"{path.removesuffix('/inputs')}/{body['id']}/events").json()
     assert events and all("object_key" not in item["details"] for item in events)

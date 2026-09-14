@@ -44,10 +44,10 @@ Portfolio, finding, document-approval, notification, settings, and SBOM-analysis
 mutations are API-first and enter the client read model only after success. Adapter
 initialization and mutation failures are exposed through `adapterStatus`.
 
-Collector packages and raw product artifacts remain demo-only until the backend has
-a signed-package format, consent audit model, retention policy enforcement, and
-secure object-storage reference contract. Production never sends those inputs to
-the legacy path-based scan endpoint.
+Collector packages and consented raw product artifacts use the typed production
+analysis endpoint. Inputs are validated, retained behind the storage adapter, and
+processed by the release-scoped worker without exposing storage references to the
+browser.
 
 The browser E2E runner uses the existing `playwright-core` dependency and an
 installed Edge, Chrome, or Chromium executable. Set `ACTIS_E2E_BROWSER` when the

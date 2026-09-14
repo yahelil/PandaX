@@ -150,7 +150,8 @@ function remediationStatus(status: Remediation["status"]) {
 function mapAnalysisPreview(job: ReleaseAnalysisJob): AnalysisPreview {
   const warnings = [];
   if (job.preview.skippedComponents) warnings.push(`${job.preview.skippedComponents} components could not be matched to a package identifier.`);
-  warnings.push("Runtime reachability requires Collector or equivalent evidence.");
+  if (job.inputType === "sbom") warnings.push("Runtime reachability requires Collector or equivalent evidence.");
+  if (job.inputType === "raw_artifact") warnings.push("Component counts and coverage will be available after artifact analysis.");
   return {
     valid: true,
     releaseId: job.releaseId,
@@ -163,14 +164,14 @@ function mapAnalysisPreview(job: ReleaseAnalysisJob): AnalysisPreview {
 }
 
 function mapAnalysisJob(job: ReleaseAnalysisJob, draft: AnalysisDraft): AnalysisJob {
-  const status: AnalysisJob["status"] = job.status === "running"
+  const status: AnalysisJob["status"] = job.status === "unsupported" ? "failed" : job.status === "running"
     ? (job.stage.toLowerCase().includes("valid") ? "validating" : "analyzing")
     : job.status;
   const summary = job.result?.coverageSummary;
   const sourceCount = summary?.advisory_sources_checked ?? 0;
   const limitations = [
     ...(job.preview.skippedComponents ? [`${job.preview.skippedComponents} components could not be matched to a package identifier.`] : []),
-    "Runtime reachability requires Collector or equivalent evidence.",
+    ...(job.inputType === "sbom" ? ["Runtime reachability requires Collector or equivalent evidence."] : []),
   ];
   return {
     id: job.id,
@@ -206,6 +207,7 @@ export class ProductionAdapter implements DataAdapter {
   private readonly complianceDetails = new Map<string, ComplianceDto>();
   private readonly documentDetails = new Map<string, DocumentDetailDto>();
   private readonly uploadedAnalysis = new Map<string, ReleaseAnalysisJob>();
+  private readonly analysisIdempotencyKeys = new Map<string, string>();
   private readonly analysisTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private settingsVersion?: number;
   private analyticsConsent?: boolean;
@@ -223,7 +225,7 @@ export class ProductionAdapter implements DataAdapter {
   subscribeStatus = (listener: DemoListener) => { this.statusListeners.add(listener); return () => this.statusListeners.delete(listener); };
   initialize = async (options?: { signal?: AbortSignal }) => this.load("initialize", options);
   refresh = async (options?: { signal?: AbortSignal }) => this.load("refresh", options);
-  reset = () => { this.analysisTimers.forEach(clearTimeout); this.analysisTimers.clear(); this.uploadedAnalysis.clear(); this.analyticsConsent = undefined; this.fixture.reset(); void this.refresh(); };
+  reset = () => { this.analysisTimers.forEach(clearTimeout); this.analysisTimers.clear(); this.uploadedAnalysis.clear(); this.analysisIdempotencyKeys.clear(); this.analyticsConsent = undefined; this.fixture.reset(); void this.refresh(); };
 
   search = async (query: string, options?: { signal?: AbortSignal }): Promise<WorkspaceSearchResult[]> => {
     if (!this.config.operationsApi) return this.fixture.search(query);
@@ -466,22 +468,22 @@ export class ProductionAdapter implements DataAdapter {
   });
 
   previewAnalysis = async (draft: AnalysisDraft): Promise<AnalysisPreview> => {
-    if (!this.supportsSbom(draft)) return this.fixture.previewAnalysis(draft);
+    if (!this.supportsProductionAnalysis(draft)) return this.fixture.previewAnalysis(draft);
     return this.mutation("preview_analysis", async () => {
-      const uploaded = await this.uploadSbom(draft);
+      const uploaded = await this.uploadAnalysis(draft);
       return mapAnalysisPreview(uploaded);
     });
   };
 
   runAnalysis = async (draft: AnalysisDraft): Promise<AnalysisJob> => {
-    if (!this.supportsSbom(draft)) return this.fixture.runAnalysis(draft);
+    if (!this.supportsProductionAnalysis(draft)) return this.fixture.runAnalysis(draft);
     return this.mutation("run_analysis", async () => {
-      const uploaded = this.uploadedAnalysis.get(this.analysisKey(draft)) ?? await this.uploadSbom(draft);
+      const uploaded = this.uploadedAnalysis.get(this.analysisKey(draft)) ?? await this.uploadAnalysis(draft);
       const scope = this.analysisScope(draft);
       const started = await this.config.releaseOperationsApi!.runAnalysisJob(scope, uploaded.id);
       const mapped = mapAnalysisJob(started, draft);
       this.fixture.upsertAnalysisJob(mapped);
-      if (started.status !== "completed" && started.status !== "failed") this.pollAnalysis(scope, draft, started.id);
+      if (!this.isTerminalAnalysis(started)) this.pollAnalysis(scope, draft, started.id);
       return mapped;
     });
   };
@@ -512,13 +514,26 @@ export class ProductionAdapter implements DataAdapter {
     const revision = ++this.refreshRevision;
     this.setStatus({ mode: "production", phase: "loading", lastSyncedAt: this.status.lastSyncedAt });
     try {
-      const portfolio = Promise.all([this.config.portfolioApi.getOrganization(this.config.organizationId, options), this.config.portfolioApi.listProducts(this.config.organizationId, options)]).then(async ([organization, products]) => ({ organization, products, releases: (await Promise.all(products.map((product) => this.config.portfolioApi.listReleases(this.config.organizationId, product.id, options)))).flat() }));
+      const portfolio = Promise.all([this.config.portfolioApi.getOrganization(this.config.organizationId, options), this.config.portfolioApi.listProducts(this.config.organizationId, options)]).then(async ([organization, products]) => {
+        const releases = (await Promise.all(products.map((product) => this.config.portfolioApi.listReleases(this.config.organizationId, product.id, options)))).flat();
+        const analysisJobs = this.config.releaseOperationsApi
+          ? (await Promise.all(releases.map((release) => this.config.releaseOperationsApi!.listAnalysisJobs({ organizationId: this.config.organizationId, productId: release.productId, releaseId: release.id }, options)))).flat()
+          : [];
+        return { organization, products, releases, analysisJobs };
+      });
       const operations = this.config.operationsApi ? Promise.all([this.config.operationsApi.getHome(this.config.organizationId, { signal: options?.signal }), this.config.operationsApi.listNotifications(this.config.organizationId, { view: "unread_action", signal: options?.signal })]) : undefined;
       const findingList = this.config.findingsApi ? this.config.findingsApi.listFindings(this.config.organizationId, { view: "all" }, options) : undefined;
       const governance = this.config.governanceApi ? Promise.all([this.config.governanceApi.listCompliance(this.config.organizationId, { view: "all" }, options), this.config.governanceApi.listDocuments(this.config.organizationId, {}, options), this.config.governanceApi.getSettings(this.config.organizationId, options), this.config.governanceApi.listTeam(this.config.organizationId, options), this.config.governanceApi.listIntegrations(this.config.organizationId, options)]).then(async ([compliance, documents, settings, members, integrations]) => ({ compliance, settings, members, integrations, documentDetails: await Promise.all(documents.map((document) => this.config.governanceApi!.getDocument(this.config.organizationId, document.id, options))) })) : undefined;
       const [portfolioState, operationsState, findingsState, governanceState] = await Promise.all([portfolio, operations, findingList, governance]);
       if (revision !== this.refreshRevision) return;
       this.fixture.replacePortfolio(portfolioState.organization, portfolioState.products, portfolioState.releases);
+      if (this.config.releaseOperationsApi) {
+        const jobs = portfolioState.analysisJobs.map((job) => mapAnalysisJob(job, this.draftForJob(job, portfolioState.releases)));
+        this.fixture.replaceAnalysisJobs(jobs);
+        portfolioState.analysisJobs.filter((job) => !this.isTerminalAnalysis(job) && job.status === "running").forEach((job) => {
+          if (!this.analysisTimers.has(job.id)) this.pollAnalysis(this.analysisScope(this.draftForJob(job, portfolioState.releases) as AnalysisDraft & { releaseId: string }), this.draftForJob(job, portfolioState.releases), job.id);
+        });
+      }
       if (operationsState) {
         const [home, notifications] = operationsState;
         this.fixture.replaceOperationalState(
@@ -558,8 +573,8 @@ export class ProductionAdapter implements DataAdapter {
     return { productId: finding.productId, releaseId: finding.releaseId, version: details?.version ?? 1 };
   }
 
-  private supportsSbom(draft: AnalysisDraft): draft is AnalysisDraft & { releaseId: string; file: Blob } {
-    return draft.inputKind === "sbom" && Boolean(draft.releaseId && draft.file && this.config.releaseOperationsApi);
+  private supportsProductionAnalysis(draft: AnalysisDraft): draft is AnalysisDraft & { releaseId: string; file: Blob } {
+    return Boolean(draft.releaseId && draft.file && this.config.releaseOperationsApi);
   }
 
   private analysisScope(draft: AnalysisDraft & { releaseId: string }): ReleaseScope {
@@ -567,27 +582,50 @@ export class ProductionAdapter implements DataAdapter {
   }
 
   private analysisKey(draft: AnalysisDraft): string {
-    return `${draft.productId}:${draft.releaseId ?? "new"}:${draft.fileName}:${draft.fileSize}`;
+    return `${draft.productId}:${draft.releaseId ?? "new"}:${draft.inputKind}:${draft.fileName}:${draft.fileSize}`;
   }
 
-  private async uploadSbom(draft: AnalysisDraft & { releaseId: string; file: Blob }): Promise<ReleaseAnalysisJob> {
+  private async uploadAnalysis(draft: AnalysisDraft & { releaseId: string; file: Blob }): Promise<ReleaseAnalysisJob> {
     const key = this.analysisKey(draft);
     const existing = this.uploadedAnalysis.get(key);
     if (existing) return existing;
-    const uploaded = await this.config.releaseOperationsApi!.uploadSbom(this.analysisScope(draft), {
-      file: draft.file,
-      filename: draft.fileName,
-      idempotencyKey: `actis:${this.config.organizationId}:${key}`.slice(0, 240),
-    });
+    const idempotencyKey = this.analysisIdempotencyKeys.get(key) ?? `actis:${crypto.randomUUID()}`;
+    this.analysisIdempotencyKeys.set(key, idempotencyKey);
+    const input = { file: draft.file, filename: draft.fileName, idempotencyKey };
+    const uploaded = draft.inputKind === "sbom"
+      ? await this.config.releaseOperationsApi!.uploadSbom(this.analysisScope(draft), input)
+      : await this.config.releaseOperationsApi!.uploadAnalysisInput(this.analysisScope(draft), {
+          ...input,
+          inputType: draft.inputKind === "collector_package" ? "collector" : "raw_artifact",
+          rawArtifactConsent: draft.rawArtifactConsent,
+        });
     this.uploadedAnalysis.set(key, uploaded);
     return uploaded;
+  }
+
+  private draftForJob(job: ReleaseAnalysisJob, releases = this.getSnapshot().releases): AnalysisDraft {
+    const release = releases.find((item) => item.id === job.releaseId && item.productId === job.productId);
+    return {
+      productId: job.productId,
+      releaseId: job.releaseId,
+      version: release?.version ?? "Unknown",
+      channel: release?.channel ?? "stable",
+      inputKind: job.inputType === "collector" ? "collector_package" : job.inputType,
+      fileName: job.filename,
+      fileSize: job.sizeBytes,
+      rawArtifactConsent: Boolean(job.consentedAt),
+    };
+  }
+
+  private isTerminalAnalysis(job: ReleaseAnalysisJob): boolean {
+    return job.status === "completed" || job.status === "failed" || job.status === "unsupported";
   }
 
   private pollAnalysis(scope: ReleaseScope, draft: AnalysisDraft, jobId: string): void {
     this.analysisTimers.set(jobId, setTimeout(() => {
       void this.config.releaseOperationsApi!.getAnalysisJob(scope, jobId).then((job) => {
         this.fixture.upsertAnalysisJob(mapAnalysisJob(job, draft));
-        if (job.status === "completed" || job.status === "failed") this.analysisTimers.delete(jobId);
+        if (this.isTerminalAnalysis(job)) this.analysisTimers.delete(jobId);
         else this.pollAnalysis(scope, draft, jobId);
       }).catch((error) => {
         this.analysisTimers.delete(jobId);

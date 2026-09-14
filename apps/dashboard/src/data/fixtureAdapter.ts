@@ -571,6 +571,10 @@ export class FixtureAdapter implements DataAdapter {
     });
   };
 
+  replaceAnalysisJobs = (jobs: AnalysisJob[]): void => {
+    this.mutate((state) => { state.analysisJobs = structuredClone(jobs); });
+  };
+
   getApproval = (documentId: EntityId): Approval | undefined => {
     const approval = this.state.approvals.find((item) => item.documentId === documentId);
     return approval ? structuredClone(approval) : undefined;

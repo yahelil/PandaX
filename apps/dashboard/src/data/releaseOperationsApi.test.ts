@@ -23,11 +23,16 @@ const queuedJob = {
   organization_id: "org/acme",
   product_id: "camera product",
   release_id: "release/2.1",
+  input_type: "sbom",
   filename: "camera.cdx.json",
   media_type: "application/vnd.cyclonedx+json",
   size_bytes: 4096,
   sha256: digest,
   preview,
+  retained_until: "2036-09-14T09:00:00Z",
+  input_metadata: {},
+  consented_at: null,
+  consent_actor_id: null,
   status: "queued",
   stage: "Validated input",
   progress: 10,
@@ -154,6 +159,21 @@ describe("release operations API", () => {
       preview: { matchableComponents: 140, skippedComponents: 2 },
       result: undefined, startedAt: undefined,
     });
+  });
+
+  it("uploads Collector and consented raw-artifact inputs through the typed endpoint", async () => {
+    const collector = { ...queuedJob, input_type: "collector", filename: "collector.zip", preview: { ...preview, collector: { name: "Actis Collector", version: "1.2.0" } } };
+    const raw = { ...queuedJob, input_type: "raw_artifact", filename: "firmware.bin", preview: { ...preview, format: "Raw artifact", version: "1", components: 0, matchable_components: 0, skipped_components: 0 }, consented_at: "2026-09-14T09:00:00Z", consent_actor_id: "reviewer-1" };
+    const fetcher = fetchSequence(json(collector, 201), json(raw, 201));
+    const api = createReleaseOperationsApi({ baseUrl: "", fetch: fetcher });
+
+    await expect(api.uploadAnalysisInput(scope, { inputType: "collector", file: new Blob(["zip"]), filename: "collector.zip", idempotencyKey: "collector-1" })).resolves.toMatchObject({ inputType: "collector", preview: { collector: { name: "Actis Collector" } } });
+    await expect(api.uploadAnalysisInput(scope, { inputType: "raw_artifact", file: new Blob(["firmware"]), filename: "firmware.bin", idempotencyKey: "raw-1", rawArtifactConsent: true })).resolves.toMatchObject({ inputType: "raw_artifact", consentActorId: "reviewer-1" });
+
+    const [collectorForm, rawForm] = fetcher.mock.calls.map((call) => call[1]?.body as FormData);
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([`${encodedBase}/analysis-jobs/inputs`, `${encodedBase}/analysis-jobs/inputs`]);
+    expect(collectorForm.get("input_type")).toBe("collector");
+    expect(rawForm.get("raw_artifact_consent")).toBe("true");
   });
 
   it("lists, reads, runs, and maps job progress, result, and events", async () => {

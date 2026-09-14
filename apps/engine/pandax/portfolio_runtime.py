@@ -16,6 +16,7 @@ from .compliance import ComplianceRepository
 from .documents import DocumentRepository
 from .findings import FindingRepository
 from .home import HomeReadModel
+from .organization_settings import OrganizationSettingsRepository
 from .portfolio import PortfolioRepository, create_portfolio_engine
 from .portfolio_api import PortfolioIdentity
 from .release_monitoring import ReleaseMonitoringRepository
@@ -100,6 +101,14 @@ def get_home_read_model() -> HomeReadModel:
 
 
 @lru_cache(maxsize=1)
+def get_organization_settings_repository() -> OrganizationSettingsRepository:
+    repository = OrganizationSettingsRepository(get_portfolio_repository().engine)
+    if repository.engine.dialect.name == "sqlite":
+        repository.create_schema()
+    return repository
+
+
+@lru_cache(maxsize=1)
 def get_oidc_authenticator() -> OIDCAuthenticator:
     return OIDCAuthenticator(OIDCSettings.from_env())
 
@@ -141,4 +150,5 @@ def reset_portfolio_repository() -> None:
     get_document_repository.cache_clear()
     get_search_notification_repository.cache_clear()
     get_home_read_model.cache_clear()
+    get_organization_settings_repository.cache_clear()
     get_oidc_authenticator.cache_clear()

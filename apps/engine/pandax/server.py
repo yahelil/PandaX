@@ -853,6 +853,7 @@ from .portfolio_runtime import (
     get_authenticated_principal,
     get_finding_repository,
     get_home_read_model,
+    get_organization_settings_repository,
     get_portfolio_identity,
     get_portfolio_repository,
     get_release_monitoring_repository,
@@ -861,6 +862,7 @@ from .portfolio_runtime import (
 from .release_monitoring import monitoring_store_runner
 from .release_monitoring_api import create_release_monitoring_router
 from .search_notifications_api import create_search_notifications_router
+from .settings_api import create_settings_router
 
 api.include_router(
     create_portfolio_router(get_portfolio_repository, get_portfolio_identity)
@@ -895,4 +897,10 @@ api.include_router(
 )
 api.include_router(
     create_home_router(get_home_read_model, get_portfolio_identity)
+)
+api.include_router(
+    create_settings_router(
+        get_organization_settings_repository,
+        get_authenticated_principal,
+    )
 )

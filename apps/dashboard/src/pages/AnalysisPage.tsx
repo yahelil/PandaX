@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { usePermission } from "../auth";
 import { useDemo } from "../data/DemoProvider";
 import type { AnalysisDraft, AnalysisPreview, ReleaseArtifact } from "../data/types";
 import { Breadcrumbs, EmptyState, PageHeader } from "./PageKit";
@@ -13,10 +14,12 @@ const sourceCopy: Record<ReleaseArtifact["kind"], { title: string; body: string 
 
 export function AnalysisPage() {
   const { productId = "", releaseId = "" } = useParams(); const demo = useDemo(); const navigate = useNavigate();
+  const canRunAnalysis = usePermission("run_analysis");
   const product = demo.selectors.product(productId); const release = demo.selectors.release(releaseId);
   const [step, setStep] = useState(1); const [inputKind, setInputKind] = useState<ReleaseArtifact["kind"]>("collector_package");
   const [file, setFile] = useState<File | null>(null); const [consent, setConsent] = useState(false); const [preview, setPreview] = useState<AnalysisPreview | null>(null); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
   if (!product || !release) return <EmptyState title="Release not found" body="Choose an existing release before starting analysis." action={<Link className="button" to="/products">Back to products</Link>} />;
+  if (!canRunAnalysis) return <EmptyState title="Read-only access" body="A Security Reviewer, Compliance Operator, or Org Admin must start release analysis." action={<Link className="button" to={`/products/${product.id}/releases/${release.id}`}>Back to release</Link>} />;
   const draft: AnalysisDraft = { productId, releaseId, version: release.version, channel: release.channel, inputKind, fileName: file?.name ?? "", fileSize: file?.size ?? 0, file: file ?? undefined, rawArtifactConsent: consent };
   const validate = async () => { setBusy(true); setError(""); try { const result = await demo.actions.previewAnalysis(draft); setPreview(result); if (result.valid) setStep(3); } catch (err) { setError(err instanceof Error ? err.message : "Validation failed."); } finally { setBusy(false); } };
   const run = async () => { setBusy(true); setError(""); try { const job = await demo.actions.runAnalysis(draft); navigate(`/analyses/${job.id}`); } catch (err) { setError(err instanceof Error ? err.message : "Analysis could not start."); setBusy(false); } };

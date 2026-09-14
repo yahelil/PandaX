@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { usePermission } from "../auth";
 import { useDemo } from "../data/DemoProvider";
 import { Breadcrumbs, EmptyState, EvidenceMeter, MetricCard, SectionHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
 import "./pages.css";
@@ -11,6 +12,7 @@ export function ProductWorkspacePage() {
   const [searchParams] = useSearchParams();
   const tab = tabs.includes(searchParams.get("tab") as typeof tabs[number]) ? searchParams.get("tab") as typeof tabs[number] : "overview";
   const demo = useDemo();
+  const canRunAnalysis = usePermission("run_analysis");
   const product = demo.selectors.product(productId);
   if (!product) return <EmptyState title="Product not found" body="The product may have been removed or is outside your organization." action={<Link className="button" to="/products">Back to products</Link>} />;
   const releases = demo.releases.filter((release) => release.productId === product.id);
@@ -24,7 +26,7 @@ export function ProductWorkspacePage() {
     <section className="panel">
       <div className="workspace-hero">
         <div className="workspace-title"><span className="product-avatar" aria-hidden="true">{product.name.split(" ").map((word) => word[0]).join("")}</span><div><h1>{product.name}</h1><p>{product.identifier} · {product.manufacturer}</p></div></div>
-        <div className="inline-actions"><StatusPill value={product.readiness} /><StatusPill value={product.monitoringHealth} />{activeRelease ? <Link className="button button-primary" to={`/products/${product.id}/releases/${activeRelease.id}/analyze`}>Analyze release</Link> : null}</div>
+        <div className="inline-actions"><StatusPill value={product.readiness} /><StatusPill value={product.monitoringHealth} />{activeRelease && canRunAnalysis ? <Link className="button button-primary" to={`/products/${product.id}/releases/${activeRelease.id}/analyze`}>Analyze release</Link> : activeRelease ? <span className="button button-primary button-disabled" aria-disabled="true" title="Security Reviewer, Compliance Operator, or Org Admin permission required">Analyze release</span> : null}</div>
       </div>
       <nav className="tabs" aria-label="Product workspace">
         {tabs.map((name) => <Link className={tab === name ? "active" : ""} key={name} to={`/products/${product.id}?tab=${name}`}>{name[0].toUpperCase() + name.slice(1)}{name === "findings" && findings.length ? ` (${findings.length})` : ""}</Link>)}

@@ -1,17 +1,21 @@
 import { Check, ChevronDown, HelpCircle, LogOut, RotateCcw, UserRound } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../auth'
 import { useDemo } from '../data/DemoProvider'
 
 const roleLabels = {
   org_admin: 'Org Admin',
   compliance_operator: 'Compliance Operator',
   authorized_approver: 'Authorized Approver',
+  security_reviewer: 'Security Reviewer',
+  viewer: 'Viewer',
   read_only_auditor: 'Read-only Auditor',
 } as const
 
 export function UserMenu() {
   const { currentUser, state, actions } = useDemo()
+  const auth = useAuth()
   const [open, setOpen] = useState(false)
   const [resetDone, setResetDone] = useState(false)
   const root = useRef<HTMLDivElement>(null)
@@ -45,9 +49,9 @@ export function UserMenu() {
           </div>
           <div className="user-menu__roles"><Check size={14} /> {currentUser.roles.map((role) => roleLabels[role]).join(' · ')}</div>
           <Link to="/settings/team" className="menu-row" onClick={() => setOpen(false)}><UserRound size={17} /> Profile &amp; access</Link>
-          <button className="menu-row" onClick={resetDemo}><RotateCcw size={17} /> {resetDone ? 'Demo data restored' : 'Reset demo data'}</button>
+          {auth.mode === 'demo' ? <button className="menu-row" onClick={resetDemo}><RotateCcw size={17} /> {resetDone ? 'Demo data restored' : 'Reset demo data'}</button> : null}
           <a href="mailto:support@pandax.online" className="menu-row"><HelpCircle size={17} /> Help &amp; support</a>
-          <button className="menu-row menu-row--muted" disabled><LogOut size={17} /> Sign out unavailable in demo</button>
+          {auth.mode === 'production' ? <button className="menu-row" onClick={() => { void auth.logout() }}><LogOut size={17} /> Sign out</button> : null}
         </div>
       )}
     </div>

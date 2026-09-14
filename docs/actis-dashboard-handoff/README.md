@@ -252,7 +252,7 @@ These decisions apply to the client-facing 15-second video, not to general dashb
 
 ## Current implementation state
 
-The demo checkpoint is complete and the application has already progressed significantly into production slices. It is not 100% production-complete.
+The demo checkpoint and all code-local production slices are complete. Target-environment rollout and independent validation remain; current status is maintained in `COMPLETION.md`.
 
 Implemented:
 
@@ -269,6 +269,8 @@ Implemented:
 - Home aggregation, categorized search, and notifications.
 - Organization/team/integration settings.
 - Privacy-safe dashboard analytics.
+- Resumable SBOM, Collector, raw-artifact, runtime-telemetry, and exposure-evidence analysis.
+- Monitoring health detail, strict browser/API security policy, route-level loading, and automated release gates.
 
 Key commits:
 
@@ -281,35 +283,33 @@ Key commits:
 - Privacy-safe analytics: `ed94db5`
 - Latest integration: `12f2139`
 - Final client video: `8cc5d92`
+- Runtime evidence: `0b666cb`
+- Monitoring health: `8ab42ed`
+- Release gates: `b65b4af`
+- Route performance: `043e344`
+- Security hardening: `552b31e`
 
-Last known verification:
+Verification on 2026-09-14:
 
-- Dashboard: 123/123 tests passed, typecheck passed, production/demo builds passed, browser E2E smoke passed.
-- Engine: 506 tests passed, 22 expected skips.
+- Dashboard: 134/134 tests passed, typecheck passed, production/demo builds passed, browser E2E passed.
+- Python engine/verifier: 548 tests passed, 22 expected skips, including the real pinned scanner path.
+- Complete npm dependency audit: zero vulnerabilities.
 
-## Remaining work — highest confidence gaps
+## Remaining target-environment work
 
-1. **Complete production analysis inputs.** Production frontend currently connects SBOM; Collector/raw-artifact options still fall back to fixtures. Backend raw-artifact jobs terminate as unsupported. Implement secure upload/validation/consent and real processing for every promised input.
-2. **Make analysis truly resumable.** Hydrate/restore in-flight and completed analysis jobs after reload; ensure progress and result deep links survive navigation/session restart.
-3. **Finish analysis semantics.** Runtime telemetry/exposure evidence, changed-digest confirmation, and automatic monitoring enrollment need end-to-end completion.
-4. **Finish first-run Home.** Add the agreed setup checklist and contextual empty states; remove remaining greeting/vanity-summary behavior that conflicts with the final plan.
-5. **Add Product/Release trends.** Implement compact historical trend and distribution only when data is sufficient.
-6. **Align roles.** Current backend exposes five technical roles (`org_admin`, `compliance_operator`, `authorized_approver`, `security_reviewer`, `viewer`). Map or simplify the user-facing model to the agreed four roles, including Read-only Auditor semantics.
-7. **Complete responsive and accessibility QA.** Add visual regression at 768/1024/1440/wide; automated accessibility checks; manual keyboard and screen-reader walkthrough; zoom/text-scale checks; Core Web Vitals gates.
-8. **Production cutover.** Complete deployment configuration, customer-facing replacement, and gated legacy archive behavior. Do not delete or silently migrate legacy data.
-9. **Broaden E2E coverage.** Cover first-run → first analysis, validation warnings/failure recovery, immutable reruns, hourly monitoring/source outage, priority ordering, readiness blockers, document approval/self-filing receipts, RBAC, scope/search deep links, and browser back-state restoration.
-
-Approximate status at handoff: 70–75% of the full plan implemented. Remaining estimate: 15–25 focused engineering hours plus 1–3 days for deployment integration and manual QA, assuming no external identity-provider or infrastructure blocker.
+1. Provision production-like staging with managed PostgreSQL, object storage, secrets, workers, queues, backups, and observability.
+2. Validate the real identity provider, tenant/role claims, notification delivery, monitoring credentials, and scheduler concurrency.
+3. Run the exhaustive failure/outage/RBAC/back-navigation matrix against staging.
+4. Complete manual WCAG 2.2 AA, supported-browser, screen-reader, 200% zoom, and production Web Vitals validation.
+5. Conduct independent security/privacy review, restore drill, customer cutover, and gated legacy-archive verification.
 
 ## Recommended next execution order
 
-1. Verify current branch is clean and rerun dashboard/engine tests.
-2. Close real Collector/raw-artifact analysis gaps and resumable job hydration.
-3. Finish monitoring enrollment and digest-confirmation semantics.
-4. Correct first-run Home and role model.
-5. Complete visual/accessibility/E2E matrix.
-6. Prepare production deployment and legacy gating.
-7. Update `PLAN.md` checkoffs or create a fresh completion ledger; never claim full completion while any listed gap remains.
+1. Provision production-like staging and apply migrations.
+2. Connect real OIDC, storage, worker, notification, and monitoring services.
+3. Run the complete workflow, security, accessibility, recovery, and performance validation matrix.
+4. Pilot with customer-like data and resolve operational findings.
+5. Cut over the customer dashboard while preserving the gated legacy archive.
 
 ## Guardrails
 

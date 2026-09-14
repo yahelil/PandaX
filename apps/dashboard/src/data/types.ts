@@ -5,6 +5,8 @@ export type PriorityBand = "urgent" | "high" | "normal" | "low";
 export type ReadinessStatus = "ready" | "needs_attention" | "incomplete_evidence";
 export type MonitoringHealth = "healthy" | "degraded" | "failed" | "inactive";
 export type Severity = "critical" | "high" | "medium" | "low";
+export type CraClass = "default" | "important_i" | "important_ii" | "critical";
+export type ClassificationStatus = "confirmed" | "review_required";
 export type FindingStatus = "needs_review" | "action_required" | "in_remediation" | "accepted" | "resolved";
 export type DecisionKind = "affected" | "not_affected" | "accepted_risk" | "deferred";
 export type Role = "org_admin" | "compliance_operator" | "authorized_approver" | "read_only_auditor";
@@ -33,6 +35,36 @@ export interface TeamMember {
   status: "active" | "invited";
   lastActiveAt?: ISODate;
   version?: number;
+}
+
+export interface CraAssessmentAnswer {
+  questionId: string;
+  question: string;
+  answer: string;
+  source: string;
+}
+
+export interface CraAssessmentAction {
+  id: string;
+  title: string;
+  detail: string;
+  source: string;
+  state: "partial" | "missing";
+}
+
+export interface CraClassificationAssessment {
+  rulesetVersion: string;
+  completedAt: ISODate;
+  scopeResult: "in_scope" | "out_of_scope" | "needs_review";
+  recommendedClass: CraClass;
+  classificationStatus: ClassificationStatus;
+  categoryId?: string;
+  categoryLabel?: string;
+  rationale: string;
+  readinessScore: number;
+  answers: CraAssessmentAnswer[];
+  actions: CraAssessmentAction[];
+  confirmedAt?: ISODate;
 }
 
 export interface Integration {
@@ -86,8 +118,9 @@ export interface Product {
   identifier: string;
   manufacturer: string;
   description: string;
-  craClass: "default" | "important_i" | "important_ii" | "critical";
-  classificationStatus: "confirmed" | "review_required";
+  craClass: CraClass;
+  classificationStatus: ClassificationStatus;
+  classificationAssessment?: CraClassificationAssessment;
   supportUntil: ISODate;
   ownerId?: EntityId;
   readiness: ReadinessStatus;
@@ -533,6 +566,7 @@ export interface CreateProductInput {
   description?: string;
   craClass: Product["craClass"];
   classificationStatus: Product["classificationStatus"];
+  classificationAssessment?: CraClassificationAssessment;
   supportUntil: ISODate;
   ownerId?: EntityId;
 }

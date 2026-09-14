@@ -77,6 +77,7 @@ class ProductRecord:
     description: str
     cra_class: str
     classification_status: str
+    classification_assessment: Mapping[str, Any] | None
     support_start: date
     support_end: date
     owner_id: str | None
@@ -136,6 +137,7 @@ class ProductChanges:
     description: str | None = None
     cra_class: str | None = None
     classification_status: str | None = None
+    classification_assessment: Mapping[str, Any] | None = None
     support_start: date | None = None
     support_end: date | None = None
     owner_id: str | None = None
@@ -214,6 +216,7 @@ products = Table(
     _column("description", 2000, nullable=False, default=""),
     _required_string("cra_class", 32),
     _required_string("classification_status", 32),
+    _column("classification_assessment", JSON, nullable=True),
     _column("support_start", Date, nullable=False),
     _column("support_end", Date, nullable=False),
     _column("owner_id", 128, nullable=True),
@@ -359,6 +362,7 @@ class PortfolioRepository:
         manufacturer: str, cra_class: str, support_start: date,
         support_end: date, actor_id: str, slug: str | None = None,
         description: str = "", classification_status: str = "review_required",
+        classification_assessment: Mapping[str, Any] | None = None,
         owner_id: str | None = None, product_id: str | None = None,
         readiness: str = "incomplete_evidence", monitoring_health: str = "inactive",
     ) -> ProductRecord:
@@ -373,6 +377,7 @@ class PortfolioRepository:
             "description": description.strip(),
             "cra_class": _choice(cra_class, CRA_CLASSES, "cra_class"),
             "classification_status": _choice(classification_status, CLASSIFICATION_STATUSES, "classification_status"),
+            "classification_assessment": dict(classification_assessment) if classification_assessment is not None else None,
             "support_start": support_start,
             "support_end": support_end,
             "owner_id": owner_id,

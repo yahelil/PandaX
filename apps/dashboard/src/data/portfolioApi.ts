@@ -1,4 +1,5 @@
 import type {
+  CraClassificationAssessment,
   MonitoringHealth,
   Organization,
   Product,
@@ -61,6 +62,7 @@ export interface ProductDto {
   description: string;
   cra_class: Product["craClass"];
   classification_status: Product["classificationStatus"];
+  classification_assessment?: CraClassificationAssessmentDto | null;
   support_start: string;
   support_end: string;
   owner_id: string | null;
@@ -72,6 +74,21 @@ export interface ProductDto {
   action_count: number;
   next_deadline: string | null;
   tags: string[];
+}
+
+export interface CraClassificationAssessmentDto {
+  ruleset_version: string;
+  completed_at: string;
+  scope_result: CraClassificationAssessment["scopeResult"];
+  recommended_class: Product["craClass"];
+  classification_status: Product["classificationStatus"];
+  category_id: string | null;
+  category_label: string | null;
+  rationale: string;
+  readiness_score: number;
+  answers: Array<{ question_id: string; question: string; answer: string; source: string }>;
+  actions: Array<{ id: string; title: string; detail: string; source: string; state: "partial" | "missing" }>;
+  confirmed_at: string | null;
 }
 
 export interface ReleaseCoverageDto {
@@ -121,6 +138,7 @@ export interface CreatePortfolioProductRequest {
   description?: string;
   craClass: Product["craClass"];
   classificationStatus?: Product["classificationStatus"];
+  classificationAssessment?: CraClassificationAssessment;
   supportStart: string;
   supportEnd: string;
   ownerId?: string;
@@ -213,6 +231,13 @@ function nullableString(recordValue: JsonRecord, key: string): string | null {
   return value;
 }
 
+function optionalString(recordValue: JsonRecord, key: string): string | null {
+  const value = recordValue[key];
+  if (value === undefined || value === null) return null;
+  if (typeof value !== "string") invalid(`${key} must be a string or null`, value);
+  return value;
+}
+
 function number(recordValue: JsonRecord, key: string): number {
   const value = recordValue[key];
   if (typeof value !== "number" || !Number.isFinite(value)) invalid(`${key} must be a finite number`, value);
@@ -247,12 +272,32 @@ function parseProduct(value: unknown): ProductDto {
     identifier: string(item, "identifier"), name: string(item, "name"), manufacturer: string(item, "manufacturer"),
     description: string(item, "description"), cra_class: member(item, "cra_class", productClasses),
     classification_status: member(item, "classification_status", classificationStatuses),
+    classification_assessment: parseClassificationAssessment(item.classification_assessment),
     support_start: string(item, "support_start"), support_end: string(item, "support_end"),
     owner_id: nullableString(item, "owner_id"), readiness: member(item, "readiness", readinessStatuses),
     monitoring_health: member(item, "monitoring_health", monitoringStates),
     active_release_id: nullableString(item, "active_release_id"), created_at: string(item, "created_at"),
     updated_at: string(item, "updated_at"), action_count: number(item, "action_count"),
     next_deadline: nullableString(item, "next_deadline"), tags: stringArray(item, "tags"),
+  };
+}
+
+function parseClassificationAssessment(value: unknown): CraClassificationAssessmentDto | null {
+  if (value === undefined || value === null) return null;
+  const item = record(value, "classification assessment");
+  const answers = item.answers;
+  const actions = item.actions;
+  if (!Array.isArray(answers) || !Array.isArray(actions)) invalid("classification assessment answers and actions must be arrays", value);
+  return {
+    ruleset_version: string(item, "ruleset_version"), completed_at: string(item, "completed_at"),
+    scope_result: member(item, "scope_result", ["in_scope", "out_of_scope", "needs_review"] as const),
+    recommended_class: member(item, "recommended_class", productClasses),
+    classification_status: member(item, "classification_status", classificationStatuses),
+    category_id: optionalString(item, "category_id"), category_label: optionalString(item, "category_label"),
+    rationale: string(item, "rationale"), readiness_score: number(item, "readiness_score"),
+    answers: answers.map((value) => { const answer = record(value, "assessment answer"); return { question_id: string(answer, "question_id"), question: string(answer, "question"), answer: string(answer, "answer"), source: string(answer, "source") }; }),
+    actions: actions.map((value) => { const action = record(value, "assessment action"); return { id: string(action, "id"), title: string(action, "title"), detail: string(action, "detail"), source: string(action, "source"), state: member(action, "state", ["partial", "missing"] as const) }; }),
+    confirmed_at: optionalString(item, "confirmed_at"),
   };
 }
 
@@ -295,9 +340,41 @@ export function mapProduct(dto: ProductDto): Product {
   return {
     id: dto.id, slug: dto.slug, name: dto.name, identifier: dto.identifier, manufacturer: dto.manufacturer,
     description: dto.description, craClass: dto.cra_class, classificationStatus: dto.classification_status,
+    classificationAssessment: dto.classification_assessment ? {
+      rulesetVersion: dto.classification_assessment.ruleset_version,
+      completedAt: dto.classification_assessment.completed_at,
+      scopeResult: dto.classification_assessment.scope_result,
+      recommendedClass: dto.classification_assessment.recommended_class,
+      classificationStatus: dto.classification_assessment.classification_status,
+      categoryId: dto.classification_assessment.category_id ?? undefined,
+      categoryLabel: dto.classification_assessment.category_label ?? undefined,
+      rationale: dto.classification_assessment.rationale,
+      readinessScore: dto.classification_assessment.readiness_score,
+      answers: dto.classification_assessment.answers.map((answer) => ({ questionId: answer.question_id, question: answer.question, answer: answer.answer, source: answer.source })),
+      actions: dto.classification_assessment.actions,
+      confirmedAt: dto.classification_assessment.confirmed_at ?? undefined,
+    } : undefined,
     supportUntil: dto.support_end, ownerId: dto.owner_id ?? undefined, readiness: dto.readiness,
     monitoringHealth: dto.monitoring_health, activeReleaseId: dto.active_release_id ?? undefined,
     actionCount: dto.action_count, nextDeadline: dto.next_deadline ?? undefined, tags: dto.tags, createdAt: dto.created_at,
+  };
+}
+
+function assessmentPayload(assessment?: CraClassificationAssessment): CraClassificationAssessmentDto | undefined {
+  if (!assessment) return undefined;
+  return {
+    ruleset_version: assessment.rulesetVersion,
+    completed_at: assessment.completedAt,
+    scope_result: assessment.scopeResult,
+    recommended_class: assessment.recommendedClass,
+    classification_status: assessment.classificationStatus,
+    category_id: assessment.categoryId ?? null,
+    category_label: assessment.categoryLabel ?? null,
+    rationale: assessment.rationale,
+    readiness_score: assessment.readinessScore,
+    answers: assessment.answers.map((answer) => ({ question_id: answer.questionId, question: answer.question, answer: answer.answer, source: answer.source })),
+    actions: assessment.actions,
+    confirmed_at: assessment.confirmedAt ?? null,
   };
 }
 
@@ -402,7 +479,7 @@ export function createPortfolioApi(config: PortfolioApiConfig): PortfolioApi {
       return parseList(await request(productPath(organizationId), { method: "GET" }, options), parseProduct).map(mapProduct);
     },
     async createProduct(organizationId, input, options) {
-      const payload = { name: input.name, identifier: input.identifier, manufacturer: input.manufacturer, slug: input.slug, description: input.description, cra_class: input.craClass, classification_status: input.classificationStatus, support_start: input.supportStart, support_end: input.supportEnd, owner_id: input.ownerId };
+      const payload = { name: input.name, identifier: input.identifier, manufacturer: input.manufacturer, slug: input.slug, description: input.description, cra_class: input.craClass, classification_status: input.classificationStatus, classification_assessment: assessmentPayload(input.classificationAssessment), support_start: input.supportStart, support_end: input.supportEnd, owner_id: input.ownerId };
       return mapProduct(parseProduct(await request(productPath(organizationId), { method: "POST", body: body(payload) }, options)));
     },
     async getProduct(organizationId, productId, options) {

@@ -1,6 +1,7 @@
 """Typed HTTP interface for release SBOM analysis jobs."""
 from collections.abc import Callable, Mapping
 from datetime import datetime
+import logging
 from typing import Annotated, Any, Literal
 
 from fastapi import (
@@ -119,6 +120,7 @@ RepositoryDependency = Callable[[], AnalysisJobRepository]
 SettingsRepositoryDependency = Callable[[], OrganizationSettingsRepository]
 JobDispatcher = Callable[[Callable[[], Any]], None]
 CompletionCallback = Callable[[AnalysisJobRecord], None]
+logger = logging.getLogger(__name__)
 
 
 def create_analysis_router(
@@ -280,7 +282,22 @@ def create_analysis_router(
                 organization_id, product_id, release_id, job_id, runner
             )
             if completed.status == "completed" and completion_callback is not None:
-                completion_callback(completed)
+                try:
+                    completion_callback(completed)
+                except Exception:
+                    logger.exception("Post-analysis monitoring enrollment failed for job %s", completed.id)
+                    try:
+                        repository.record_follow_up_failure(
+                            organization_id,
+                            product_id,
+                            release_id,
+                            job_id,
+                            kind="analysis.monitoring_enrollment_failed",
+                            message="Automatic monitoring enrollment failed and requires retry.",
+                            details={"integration": "monitoring", "retry_required": True},
+                        )
+                    except Exception:
+                        logger.exception("Could not persist monitoring enrollment failure for job %s", completed.id)
         if dispatcher is None:
             background_tasks.add_task(work)
         else:

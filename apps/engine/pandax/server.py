@@ -842,11 +842,14 @@ api.include_router(case_router)
 # service deployments can replace storage without rewriting route handlers.
 from .analysis_api import create_analysis_router
 from .compliance_v1_api import create_compliance_v1_router
+from .documents_api import create_documents_router
 from .findings_api import create_findings_router
 from .portfolio_api import create_portfolio_router
 from .portfolio_runtime import (
     get_analysis_repository,
     get_compliance_repository,
+    get_document_repository,
+    get_authenticated_principal,
     get_finding_repository,
     get_portfolio_identity,
     get_portfolio_repository,
@@ -876,4 +879,7 @@ api.include_router(
 )
 api.include_router(
     create_compliance_v1_router(get_compliance_repository, get_portfolio_identity)
+)
+api.include_router(
+    create_documents_router(get_document_repository, get_authenticated_principal)
 )

@@ -5,7 +5,12 @@ from fastapi.testclient import TestClient
 from pandax import server
 from pandax.portfolio import PortfolioRepository, create_portfolio_engine
 from pandax.portfolio_api import PORTFOLIO_ROLES, PortfolioIdentity
-from pandax.portfolio_runtime import get_portfolio_identity, get_portfolio_repository
+from pandax.portfolio_runtime import (
+    get_authenticated_principal,
+    get_portfolio_identity,
+    get_portfolio_repository,
+)
+from pandax.auth import Principal, Role
 
 
 def test_server_exposes_portfolio_router_with_replaceable_repository(tmp_path):
@@ -16,6 +21,11 @@ def test_server_exposes_portfolio_router_with_replaceable_repository(tmp_path):
     server.api.dependency_overrides[get_portfolio_repository] = lambda: repository
     server.api.dependency_overrides[get_portfolio_identity] = lambda: PortfolioIdentity(
         actor_id="test-admin", roles=PORTFOLIO_ROLES
+    )
+    server.api.dependency_overrides[get_authenticated_principal] = lambda: Principal(
+        subject="test-admin",
+        organization_id="test-organization",
+        roles=frozenset({Role.ORG_ADMIN}),
     )
 
     try:
@@ -56,6 +66,8 @@ def test_server_exposes_portfolio_router_with_replaceable_repository(tmp_path):
         )
         assert "/v1/organizations/{organization_id}/findings" in server.api.openapi()["paths"]
         assert "/v1/organizations/{organization_id}/compliance" in server.api.openapi()["paths"]
+        assert "/v1/organizations/{organization_id}/documents" in server.api.openapi()["paths"]
     finally:
         server.api.dependency_overrides.pop(get_portfolio_repository, None)
         server.api.dependency_overrides.pop(get_portfolio_identity, None)
+        server.api.dependency_overrides.pop(get_authenticated_principal, None)

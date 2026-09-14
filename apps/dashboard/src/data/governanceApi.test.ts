@@ -291,7 +291,7 @@ describe("governance API", () => {
       organization: { id: "org/acme", legalName: "Acme Devices GmbH", defaultTimezone: "Europe/Berlin" },
       settings: { appearance: { theme: "system", density: "compact" }, security: { evidenceRetentionMonths: 120 } },
     });
-    expect(mapTeamMember(member)).toMatchObject({ roles: ["read_only_auditor"], status: "active" });
+    expect(mapTeamMember(member)).toMatchObject({ roles: ["security_reviewer", "viewer"], status: "active" });
     expect(mapIntegration(integration)).toMatchObject({ id: "integration/jira", type: "jira", status: "connected" });
     expect(fetcher.mock.calls.slice(0, 3).map(([url]) => url)).toEqual([
       "/v1/organizations/org%2Facme/settings",

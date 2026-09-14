@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { usePermission } from '../auth'
 import { useDemo } from '../data/DemoProvider'
 import type { DecisionKind, Remediation } from '../data/types'
 import { Breadcrumbs, EmptyState, PageHeader, SectionHeader, StatusPill, formatDate, memberName, relativeDate, titleCase } from './PageKit'
@@ -8,6 +9,8 @@ import './pages.css'
 export function FindingDetailPage() {
   const { findingId = '' } = useParams()
   const demo = useDemo()
+  const canDecide = usePermission('decide_findings')
+  const canRemediate = usePermission('manage_remediation')
   const finding = demo.findings.find((item) => item.id === findingId)
   const [decision, setDecision] = useState<DecisionKind>('affected')
   const [rationale, setRationale] = useState('')
@@ -67,7 +70,7 @@ export function FindingDetailPage() {
       <dl className="definition-grid">
         <div><dt>Component</dt><dd>{finding.component} {finding.componentVersion}</dd></div>
         <div><dt>CVSS</dt><dd>{finding.cvss.toFixed(1)} · {titleCase(finding.severity)}</dd></div>
-        <div><dt>Owner</dt><dd><select className="select-field" value={finding.assigneeId ?? ''} disabled={busy} onChange={(event) => { void perform(() => demo.actions.assignFinding(finding.id, event.target.value || undefined), 'Owner updated.') }}><option value="">Unassigned</option>{demo.state.members.filter((member) => member.status === 'active').map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></dd></div>
+        <div><dt>Owner</dt><dd><select className="select-field" value={finding.assigneeId ?? ''} disabled={busy || !canRemediate} title={!canRemediate ? 'Security Reviewer, Compliance Operator, or Org Admin permission required' : undefined} onChange={(event) => { void perform(() => demo.actions.assignFinding(finding.id, event.target.value || undefined), 'Owner updated.') }}><option value="">Unassigned</option>{demo.state.members.filter((member) => member.status === 'active').map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></dd></div>
         <div><dt>Required by</dt><dd className={finding.priority === 'urgent' ? 'danger-text' : ''}>{relativeDate(finding.dueAt)} · {formatDate(finding.dueAt, true)}</dd></div>
       </dl>
     </section>
@@ -77,18 +80,20 @@ export function FindingDetailPage() {
         <section className="panel">
           <SectionHeader title="Risk assessment and decision" description="Record a reasoned determination. Evidence remains attached to this release." />
           <form className="setting-section" onSubmit={decide}>
-            <div className="field"><label htmlFor="decision">Decision</label><select id="decision" className="select-field" value={decision} onChange={(event) => setDecision(event.target.value as DecisionKind)}><option value="affected">Affected</option><option value="not_affected">Not affected</option><option value="accepted_risk">Accept risk</option><option value="deferred">Defer decision</option></select></div>
-            <div className="field"><label htmlFor="rationale">Rationale</label><textarea id="rationale" className="textarea-field" required minLength={12} value={rationale} onChange={(event) => setRationale(event.target.value)} placeholder="Explain the decision using the available product and release evidence." /></div>
-            <div className="inline-actions"><button className="button-primary" type="submit" disabled={busy}>Record decision</button></div>
+            {!canDecide ? <div className="notice">Only an Org Admin or Security Reviewer can record risk decisions.</div> : null}
+            <div className="field"><label htmlFor="decision">Decision</label><select id="decision" className="select-field" value={decision} disabled={!canDecide} onChange={(event) => setDecision(event.target.value as DecisionKind)}><option value="affected">Affected</option><option value="not_affected">Not affected</option><option value="accepted_risk">Accept risk</option><option value="deferred">Defer decision</option></select></div>
+            <div className="field"><label htmlFor="rationale">Rationale</label><textarea id="rationale" className="textarea-field" required minLength={12} value={rationale} disabled={!canDecide} onChange={(event) => setRationale(event.target.value)} placeholder="Explain the decision using the available product and release evidence." /></div>
+            <div className="inline-actions"><button className="button-primary" type="submit" disabled={busy || !canDecide}>Record decision</button></div>
           </form>
           <ul className="timeline">{finding.decisions.map((item) => <li key={item.id}><strong>{titleCase(item.decision)} · {memberName(demo.state.members, item.decidedBy)}</strong><span>{formatDate(item.decidedAt, true)}</span><p>{item.rationale}</p></li>)}</ul>
         </section>
         <section className="panel">
           <SectionHeader title="Remediation" description="Define accountable work without turning Actis into a ticketing system." />
           <form className="setting-section" onSubmit={saveRemediation}>
-            <div className="field"><label htmlFor="plan">Plan</label><textarea id="plan" className="textarea-field" required value={plan} onChange={(event) => setPlan(event.target.value)} placeholder="Describe the update, mitigation, and verification evidence required." /></div>
-            <div className="field"><label htmlFor="target">Target date</label><input id="target" className="input-field" type="date" value={targetDate} onChange={(event) => setTargetDate(event.target.value)} /></div>
-            <div className="inline-actions"><button className="button-primary" disabled={busy}>Save remediation plan</button>{finding.remediation.status !== 'verified' ? <button type="button" disabled={busy} onClick={() => { void perform(() => demo.actions.updateRemediation({ findingId: finding.id, status: nextStatus(finding.remediation.status), plan, targetDate: targetDate || undefined }), 'Remediation status advanced.') }}>Advance status</button> : null}</div>
+            {!canRemediate ? <div className="notice">Your role can review this remediation plan but cannot change it.</div> : null}
+            <div className="field"><label htmlFor="plan">Plan</label><textarea id="plan" className="textarea-field" required value={plan} disabled={!canRemediate} onChange={(event) => setPlan(event.target.value)} placeholder="Describe the update, mitigation, and verification evidence required." /></div>
+            <div className="field"><label htmlFor="target">Target date</label><input id="target" className="input-field" type="date" value={targetDate} disabled={!canRemediate} onChange={(event) => setTargetDate(event.target.value)} /></div>
+            <div className="inline-actions"><button className="button-primary" disabled={busy || !canRemediate}>Save remediation plan</button>{finding.remediation.status !== 'verified' ? <button type="button" disabled={busy || !canRemediate} onClick={() => { void perform(() => demo.actions.updateRemediation({ findingId: finding.id, status: nextStatus(finding.remediation.status), plan, targetDate: targetDate || undefined }), 'Remediation status advanced.') }}>Advance status</button> : null}</div>
           </form>
         </section>
       </div>

@@ -1,5 +1,6 @@
 import { type FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { usePermission } from "../auth";
 import { useDemo } from "../data/DemoProvider";
 import type { Product } from "../data/types";
 import { PageHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
@@ -9,6 +10,7 @@ type SortKey = "name" | "readiness" | "actions" | "deadline";
 
 export function ProductsPage() {
   const demo = useDemo();
+  const canManagePortfolio = usePermission("manage_portfolio");
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
@@ -32,9 +34,9 @@ export function ProductsPage() {
         eyebrow="Portfolio"
         title="Products"
         description="Cybersecurity readiness, monitoring, and regulatory obligations across your portfolio."
-        actions={<button className="button button-primary" onClick={() => setAdding((value) => !value)}>Add product</button>}
+        actions={<button className="button button-primary" disabled={!canManagePortfolio} title={!canManagePortfolio ? "Org Admin or Compliance Operator permission required" : undefined} onClick={() => setAdding((value) => !value)}>Add product</button>}
       />
-      {adding ? <CreateProductPanel pending={createPending} error={createError} onCancel={() => setAdding(false)} onCreate={async (input) => {
+      {adding && canManagePortfolio ? <CreateProductPanel pending={createPending} error={createError} onCancel={() => setAdding(false)} onCreate={async (input) => {
         setCreatePending(true);
         setCreateError(undefined);
         try {

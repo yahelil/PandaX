@@ -96,8 +96,8 @@ function releaseOperations(job: ReleaseAnalysisJob): ReleaseOperationsApi {
 
 describe("ProductionAdapter", () => {
   it("keeps identical fixture mode unless every runtime setting exists", () => {
-    expect(createRuntimeDataAdapter({}).getStatusSnapshot()).toEqual({ mode: "fixture", phase: "ready" });
-    expect(createRuntimeDataAdapter({ apiUrl: "/api", organizationId: "organization-live" }).getStatusSnapshot()).toEqual({ mode: "fixture", phase: "ready" });
+    expect(createRuntimeDataAdapter({ mode: "demo" }).getStatusSnapshot()).toEqual({ mode: "fixture", phase: "ready" });
+    expect(() => createRuntimeDataAdapter({ mode: "production", apiUrl: "/api", organizationId: "organization-live" })).toThrow(/authenticated token provider/);
   });
 
   it("hydrates portfolio atomically while preserving not-yet-migrated domains", async () => {

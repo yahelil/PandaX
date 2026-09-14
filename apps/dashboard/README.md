@@ -27,17 +27,16 @@ npm run test:e2e --workspace @pandax/dashboard
 
 ## Production portfolio data
 
-Set `VITE_ACTIS_API_URL` and `VITE_ACTIS_ORGANIZATION_ID`, then install a runtime
-token provider before the application module executes:
+Demo builds explicitly set `VITE_ACTIS_MODE=demo`. Production builds must set
+`VITE_ACTIS_MODE=production`, `VITE_ACTIS_API_URL`,
+`VITE_ACTIS_ORGANIZATION_ID`, `VITE_ACTIS_OIDC_ISSUER`, and
+`VITE_ACTIS_OIDC_CLIENT_ID`. Optional variables configure redirect URI, post-logout
+redirect URI, scopes, and custom organization/role claim names.
 
-```ts
-window.__ACTIS_GET_BEARER_TOKEN__ = () => oidcSession.getAccessToken();
-```
-
-No bearer token belongs in a `VITE_*` variable: Vite embeds those values in public
-browser assets. Production deployment should serve the app through the FastAPI BFF,
-which establishes the OIDC session and supplies a short-lived token provider. If any
-production setting or provider is absent, Actis stays in deterministic fixture mode.
+The dashboard uses OIDC Authorization Code with PKCE, restores and refreshes the
+browser session, and signs out through the provider's discovery metadata. No bearer
+token belongs in a `VITE_*` variable: Vite embeds those values in public browser
+assets. Missing production configuration fails closed and never loads fixture data.
 
 The production adapter hydrates organization, products, releases, Home operations,
 findings, compliance, documents, team, integrations, and settings from `/v1`.

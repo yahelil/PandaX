@@ -18,8 +18,10 @@ from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Iterator
+from urllib.parse import urlsplit
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 
 from . import events as ev
@@ -74,7 +76,64 @@ async def lifespan(app: FastAPI):
         loop.stop()
 
 
+def _allowed_cors_origins(value: str | None = None) -> list[str]:
+    origins: list[str] = []
+    for raw_origin in (value if value is not None else os.environ.get("PANDAX_CORS_ORIGINS", "")).split(","):
+        origin = raw_origin.strip().rstrip("/")
+        if not origin:
+            continue
+        parsed = urlsplit(origin)
+        local_http = parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+        if (
+            origin == "*"
+            or (parsed.scheme != "https" and not local_http)
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("PANDAX_CORS_ORIGINS must contain explicit HTTPS origins; HTTP is limited to localhost")
+        if origin not in origins:
+            origins.append(origin)
+    return origins
+
+
 api = FastAPI(title="PandaX CRA Compliance Engine", docs_url="/api/docs", lifespan=lifespan)
+
+cors_origins = _allowed_cors_origins()
+if cors_origins:
+    api.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Accept", "Authorization", "Content-Type", "Idempotency-Key"],
+        expose_headers=["Content-Disposition", "ETag"],
+        max_age=600,
+    )
+
+
+@api.middleware("http")
+async def apply_browser_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; "
+        "base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+    )
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    if request.url.path.startswith(("/api/", "/v1/")):
+        response.headers["Cache-Control"] = "no-store"
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 
 def _case_store() -> CaseStore:

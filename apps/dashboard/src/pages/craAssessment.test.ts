@@ -4,6 +4,7 @@ import {
   IMPORTANT_I_CATEGORIES,
   READINESS_QUESTIONS,
   SCOPE_QUESTIONS,
+  assessmentCompletionAction,
   buildCraAssessment,
   craClassLabel,
   readinessScore,
@@ -16,6 +17,21 @@ describe("CRA assessment", () => {
   it("uses the legal Roman-numeral class labels", () => {
     expect(craClassLabel("important_i")).toBe("Important I");
     expect(craClassLabel("important_ii")).toBe("Important II");
+  });
+
+  it("requires confirmation before a definitive assessment can be used", () => {
+    const input = { scopeAnswers: inScope, categorySelections: { critical: "none", important_ii: "none", important_i: "none" }, readinessAnswers: {} };
+    expect(assessmentCompletionAction(buildCraAssessment(input))).toEqual({ label: "Use assessment", disabled: true });
+    expect(assessmentCompletionAction(buildCraAssessment({ ...input, confirmed: true }))).toEqual({ label: "Use assessment", disabled: false });
+  });
+
+  it("allows an uncertain assessment to be saved for specialist review", () => {
+    const assessment = buildCraAssessment({
+      scopeAnswers: { ...inScope, "commercial-supply": "not_sure" },
+      categorySelections: { critical: "not_sure" },
+      readinessAnswers: {},
+    });
+    expect(assessmentCompletionAction(assessment)).toEqual({ label: "Save for specialist review", disabled: false });
   });
 
   it("covers every current Annex III Class I category", () => {

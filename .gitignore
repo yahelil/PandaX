@@ -79,6 +79,8 @@ yarn-debug.log*
 pnpm-debug.log*
 
 # Local development and manual verification workspaces
+.serena/
+.worktrees/
 .local-test/
 .uv-plan-cache/
 .codex-build/

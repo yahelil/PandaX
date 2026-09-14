@@ -14,6 +14,7 @@ from .analysis_jobs import AnalysisJobRepository
 from .auth import OIDCAuthenticator, OIDCSettings
 from .portfolio import PortfolioRepository, create_portfolio_engine
 from .portfolio_api import PortfolioIdentity
+from .release_monitoring import ReleaseMonitoringRepository
 
 
 _bearer = HTTPBearer(auto_error=False)
@@ -49,6 +50,14 @@ def get_analysis_repository() -> AnalysisJobRepository:
 
 
 @lru_cache(maxsize=1)
+def get_release_monitoring_repository() -> ReleaseMonitoringRepository:
+    repository = ReleaseMonitoringRepository(get_portfolio_repository().engine)
+    if repository.engine.dialect.name == "sqlite":
+        repository.create_schema()
+    return repository
+
+
+@lru_cache(maxsize=1)
 def get_oidc_authenticator() -> OIDCAuthenticator:
     return OIDCAuthenticator(OIDCSettings.from_env())
 
@@ -78,4 +87,5 @@ def reset_portfolio_repository() -> None:
 
     get_portfolio_repository.cache_clear()
     get_analysis_repository.cache_clear()
+    get_release_monitoring_repository.cache_clear()
     get_oidc_authenticator.cache_clear()

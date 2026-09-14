@@ -15,7 +15,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from . import events as ev
+from . import __version__, events as ev
 from .context import CACHE_DIR, OUT_DIR, signing_key_path
 from .evidence import (
     TrustedKeyConfigurationError,
@@ -47,6 +47,25 @@ app = typer.Typer(
     no_args_is_help=True,
     help="CRA Compliance-in-a-Box: artifact in, verifiable Annex VII dossier out.",
 )
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(__version__)
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show PandaX version and exit.",
+    ),
+) -> None:
+    """Run PandaX locally or in CI."""
 from .case_cli import app as case_app
 app.add_typer(case_app, name="case")
 from .monitor_cli import app as monitor_app
@@ -121,6 +140,8 @@ def _render_pipeline(
     quiet: bool,
     input_label: str = "artifact",
     subtitle: str = "",
+    json_output: Path | None = None,
+    sarif_output: Path | None = None,
 ) -> None:
     banner(console, str(source), subtitle=subtitle, input_label=input_label)
     renderer = CliRenderer(console, verbose=not quiet)
@@ -152,6 +173,19 @@ def _render_pipeline(
         findings = [
             Finding(**row) for row in json.loads(findings_path.read_text(encoding="utf-8"))
         ]
+    if run_dir and (json_output is not None or sarif_output is not None):
+        from .ci_report import write_reports
+
+        try:
+            write_reports(
+                Path(run_dir),
+                renderer.summary,
+                json_output=json_output,
+                sarif_output=sarif_output,
+            )
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            console.print(f"[bold red]CI report failed:[/] {exc}")
+            raise typer.Exit(code=1) from exc
     renderer.final_report(findings, str(run_dir))
 
     if renderer.summary.get("kev"):
@@ -174,6 +208,12 @@ def scan(
         "--exposure-context",
         help="Reviewed build, feature and network-exposure evidence JSON",
     ),
+    json_output: Optional[Path] = typer.Option(
+        None, "--json-output", help="Write CI summary JSON outside the sealed bundle"
+    ),
+    sarif_output: Optional[Path] = typer.Option(
+        None, "--sarif-output", help="Write SARIF 2.1.0 outside the sealed bundle"
+    ),
 ) -> None:
     """Run the full pipeline: ingest, SBOM, match, triage, Article 14, dossier."""
     from . import pipeline
@@ -188,6 +228,8 @@ def scan(
         artifact,
         stream,
         quiet,
+        json_output=json_output,
+        sarif_output=sarif_output,
     )
 
 
@@ -207,6 +249,12 @@ def scan_sbom(
         "--exposure-context",
         help="Reviewed build, feature and network-exposure evidence JSON",
     ),
+    json_output: Optional[Path] = typer.Option(
+        None, "--json-output", help="Write CI summary JSON outside the sealed bundle"
+    ),
+    sarif_output: Optional[Path] = typer.Option(
+        None, "--sarif-output", help="Write SARIF 2.1.0 outside the sealed bundle"
+    ),
 ) -> None:
     """Run from an existing JSON SBOM, skipping artifact ingest and Syft."""
     from . import pipeline
@@ -223,6 +271,8 @@ def scan_sbom(
         quiet,
         input_label="SBOM",
         subtitle="format is detected automatically; input is preserved in the sealed bundle",
+        json_output=json_output,
+        sarif_output=sarif_output,
     )
 
 

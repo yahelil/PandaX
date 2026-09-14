@@ -38,6 +38,8 @@ releases. These are inventory/advisory tests, not runtime exploit tests.
 
 ## Quickstart
 
+For CI/CD integration, JSON output, and SARIF, see the [PandaX GitHub Action guide](docs/github-action.md).
+
 ```bash
 uv sync --extra dev
 uv run python tools/bootstrap.py           # pinned, digest-verified downloads

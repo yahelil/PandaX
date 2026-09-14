@@ -3,6 +3,7 @@ import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDemo } from '../data/DemoProvider'
 import type { WorkspaceSearchResult } from '../data/adapter'
+import { featureUsed } from '../data/analytics'
 
 type SearchRecord = WorkspaceSearchResult & { icon: LucideIcon }
 
@@ -20,6 +21,7 @@ export function HeaderSearch() {
   const [open, setOpen] = useState(false)
   const [remoteResults, setRemoteResults] = useState<SearchRecord[]>([])
   const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const input = useRef<HTMLInputElement>(null)
   const records = useMemo<SearchRecord[]>(() => [
@@ -69,15 +71,23 @@ export function HeaderSearch() {
     if (normalized.length < 2) {
       setRemoteResults([])
       setSearching(false)
+      setSearchError(false)
       return
     }
     const controller = new AbortController()
     const timer = window.setTimeout(() => {
       setSearching(true)
+      setSearchError(false)
       void actions.search(normalized, { signal: controller.signal })
-        .then((items) => setRemoteResults(items.map((item) => ({ ...item, icon: icons[item.type] }))))
+        .then((items) => {
+          setRemoteResults(items.map((item) => ({ ...item, icon: icons[item.type] })))
+          void Promise.resolve(actions.trackAnalytics(featureUsed('search'))).catch(() => undefined)
+        })
         .catch((error: unknown) => {
-          if (!(error instanceof DOMException && error.name === 'AbortError')) setRemoteResults([])
+          if (!(error instanceof DOMException && error.name === 'AbortError')) {
+            setRemoteResults([])
+            setSearchError(true)
+          }
         })
         .finally(() => {
           if (!controller.signal.aborted) setSearching(false)
@@ -133,6 +143,7 @@ export function HeaderSearch() {
         aria-label="Search products, releases, findings, and documents"
         aria-expanded={open}
         aria-controls="global-search-results"
+        aria-busy={searching}
       />
       {query && <button className="global-search__clear" onClick={() => setQuery('')} aria-label="Clear search"><X size={16} /></button>}
       {open && (
@@ -141,7 +152,9 @@ export function HeaderSearch() {
             <span>{query ? (searching ? 'Searching workspace…' : 'Matching workspace records') : 'Suggested'}</span>
             <kbd>/</kbd>
           </div>
-          {results.length ? results.map(({ id, type, title, detail, to, icon: Icon }) => (
+          {searchError ? (
+            <div className="search-menu__empty" role="status"><Search size={20} /><span>Search is temporarily unavailable. Try again.</span></div>
+          ) : results.length ? results.map(({ id, type, title, detail, to, icon: Icon }) => (
             <Link key={`${type}-${id}`} to={to} className="search-result" onClick={() => setOpen(false)}>
               <span className="search-result__icon"><Icon size={18} /></span>
               <span><strong>{title}</strong><small>{detail}</small></span>

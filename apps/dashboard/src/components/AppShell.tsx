@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { analyticsAreaForPath, pageViewed } from '../data/analytics'
 import { useDemo } from '../data/DemoProvider'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
@@ -8,6 +9,7 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
   const { adapterStatus, actions } = useDemo()
+  const lastTrackedPath = useRef('')
 
   useEffect(() => {
     setSidebarOpen(false)
@@ -17,6 +19,14 @@ export function AppShell() {
       requestAnimationFrame(() => window.scrollTo({ top: 0, left: 0 }))
     })
   }, [location.pathname])
+
+  useEffect(() => {
+    if (adapterStatus.phase !== 'ready' || lastTrackedPath.current === location.pathname) return
+    const area = analyticsAreaForPath(location.pathname)
+    if (!area) return
+    lastTrackedPath.current = location.pathname
+    void Promise.resolve(actions.trackAnalytics(pageViewed(area))).catch(() => undefined)
+  }, [actions, adapterStatus.phase, location.pathname])
 
   return (
     <div className="app-shell">

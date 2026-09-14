@@ -25,10 +25,28 @@ function relativeTime(value: string) {
 export function NotificationsMenu() {
   const { notifications, actions } = useDemo()
   const [open, setOpen] = useState(false)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState('')
   const root = useRef<HTMLDivElement>(null)
-  const unread = notifications.filter((notification) => !notification.acknowledgedAt)
-  const acknowledge = (id: string) => {
-    void Promise.resolve(actions.acknowledgeNotification(id)).catch(() => undefined)
+  const unread = notifications.filter((notification) => !notification.readAt)
+  const markRead = async (id: string) => {
+    setError('')
+    try {
+      await actions.markNotificationRead(id)
+    } catch {
+      setError('Could not update notification. Try again.')
+    }
+  }
+  const markAllRead = async () => {
+    setPending(true)
+    setError('')
+    try {
+      await Promise.all(unread.map((item) => actions.markNotificationRead(item.id)))
+    } catch {
+      setError('Some notifications could not be updated. Try again.')
+    } finally {
+      setPending(false)
+    }
   }
 
   useEffect(() => {
@@ -49,13 +67,14 @@ export function NotificationsMenu() {
         <div className="popover notification-menu">
           <div className="popover__head">
             <span><strong>Needs your attention</strong><small>{unread.length ? `${unread.length} unread alert${unread.length === 1 ? '' : 's'}` : 'No unread alerts'}</small></span>
-            {unread.length > 0 && <button className="text-button" onClick={() => unread.forEach((item) => acknowledge(item.id))}><Check size={14} /> Mark read</button>}
+            {unread.length > 0 && <button className="text-button" disabled={pending} onClick={() => { void markAllRead() }}><Check size={14} /> {pending ? 'Updating…' : 'Mark read'}</button>}
           </div>
+          {error ? <p className="notification-menu__error" role="alert">{error}</p> : null}
           <div className={unread.length ? 'notification-list' : 'notification-list notification-list--read'}>
             {notifications.slice(0, 5).map((notification) => {
               const Icon = alertIcons[notification.type]
               return (
-              <Link className="notification-item" to={notification.targetUrl} key={notification.id} onClick={() => { acknowledge(notification.id); setOpen(false) }}>
+              <Link className="notification-item" to={notification.targetUrl} key={notification.id} onClick={() => { void markRead(notification.id); setOpen(false) }}>
                 <span className="notification-item__icon"><Icon size={17} /></span>
                 <span><strong>{notification.title}</strong><small>{notification.body} · {relativeTime(notification.createdAt)}</small></span>
                 <ChevronRight size={16} />

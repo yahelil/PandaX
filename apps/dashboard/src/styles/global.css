@@ -341,6 +341,7 @@ button { color: inherit; }
 .search-result small { overflow: hidden; color: var(--text-muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .search-result em { color: var(--text-subtle); font-size: 10px; font-style: normal; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .search-menu__empty { display: grid; justify-items: center; gap: 7px; padding: 30px 12px; color: var(--text-muted); font-size: 13px; }
+.notification-menu__error { margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--border); background: var(--danger-bg); color: var(--danger); font-size: 12px; line-height: 1.4; }
 
 .scope-picker { position: relative; }
 .scope-picker__trigger { min-width: 210px; height: 48px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 9px; padding: 0 11px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text-muted); cursor: pointer; text-align: left; transition: border-color .16s, background .16s; }

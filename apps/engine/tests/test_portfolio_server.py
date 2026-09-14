@@ -4,7 +4,8 @@ from fastapi.testclient import TestClient
 
 from pandax import server
 from pandax.portfolio import PortfolioRepository, create_portfolio_engine
-from pandax.portfolio_runtime import get_portfolio_repository
+from pandax.portfolio_api import PORTFOLIO_ROLES, PortfolioIdentity
+from pandax.portfolio_runtime import get_portfolio_identity, get_portfolio_repository
 
 
 def test_server_exposes_portfolio_router_with_replaceable_repository(tmp_path):
@@ -13,6 +14,9 @@ def test_server_exposes_portfolio_router_with_replaceable_repository(tmp_path):
     )
     repository.create_schema()
     server.api.dependency_overrides[get_portfolio_repository] = lambda: repository
+    server.api.dependency_overrides[get_portfolio_identity] = lambda: PortfolioIdentity(
+        actor_id="test-admin", roles=PORTFOLIO_ROLES
+    )
 
     try:
         client = TestClient(server.api)
@@ -44,3 +48,4 @@ def test_server_exposes_portfolio_router_with_replaceable_repository(tmp_path):
         assert product.json()["name"] == "Smart Camera"
     finally:
         server.api.dependency_overrides.pop(get_portfolio_repository, None)
+        server.api.dependency_overrides.pop(get_portfolio_identity, None)

@@ -5,8 +5,17 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
+from fastapi import HTTPException, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from .auth import OIDCAuthenticator, OIDCSettings
 from .portfolio import PortfolioRepository, create_portfolio_engine
+from .portfolio_api import PortfolioIdentity
+
+
+_bearer = HTTPBearer(auto_error=False)
 
 
 def _database_url() -> tuple[str, bool]:
@@ -30,7 +39,33 @@ def get_portfolio_repository() -> PortfolioRepository:
     return repository
 
 
+@lru_cache(maxsize=1)
+def get_oidc_authenticator() -> OIDCAuthenticator:
+    return OIDCAuthenticator(OIDCSettings.from_env())
+
+
+async def get_portfolio_identity(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Security(_bearer)],
+) -> PortfolioIdentity:
+    """Fail closed when OIDC is unconfigured or the bearer token is invalid."""
+
+    try:
+        authenticator = get_oidc_authenticator()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OIDC authentication is not configured",
+        ) from exc
+    principal = await authenticator(credentials)
+    return PortfolioIdentity(
+        actor_id=principal.subject,
+        organization_id=principal.organization_id,
+        roles=frozenset(role.value for role in principal.roles),
+    )
+
+
 def reset_portfolio_repository() -> None:
     """Clear process wiring after configuration changes in tests or operators."""
 
     get_portfolio_repository.cache_clear()
+    get_oidc_authenticator.cache_clear()

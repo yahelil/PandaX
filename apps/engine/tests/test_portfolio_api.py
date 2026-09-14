@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 
 from pandax.portfolio import PortfolioRepository, create_portfolio_engine
-from pandax.portfolio_api import PortfolioIdentity, create_portfolio_router
+from pandax.portfolio_api import PORTFOLIO_ROLES, PortfolioIdentity, create_portfolio_router
 
 
 @pytest.fixture
@@ -30,7 +30,9 @@ def client(repository: PortfolioRepository) -> TestClient:
     app.include_router(
         create_portfolio_router(
             lambda: repository,
-            lambda: PortfolioIdentity(actor_id="member-compliance-lead"),
+            lambda: PortfolioIdentity(
+                actor_id="member-compliance-lead", roles=PORTFOLIO_ROLES
+            ),
         )
     )
     return TestClient(app)
@@ -264,4 +266,3 @@ def test_missing_parent_collections_return_404(client: TestClient):
     assert client.get(
         "/v1/organizations/missing/products/missing/releases"
     ).status_code == 404
-

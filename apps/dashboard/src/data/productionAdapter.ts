@@ -4,8 +4,8 @@ import { createGovernanceApi, GovernanceApiError, mapCompliance, mapGovernanceSe
 import { createOperationsApi, OperationsApiError, type OperationsApi, type OperationsHome, type OperationsNotification, type OperationsSearchResult } from "./operationsApi";
 import { FixtureAdapter } from "./fixtureAdapter";
 import { createPortfolioApi, PortfolioApiError, type PortfolioApi } from "./portfolioApi";
-import { createReleaseOperationsApi, ReleaseOperationsApiError, type ReleaseAnalysisJob, type ReleaseOperationsApi, type ReleaseScope } from "./releaseOperationsApi";
-import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentRecord, EntityId, Finding, FindingDecisionInput, Notification, Product, Release, Remediation, RemediationInput } from "./types";
+import { createReleaseOperationsApi, ReleaseOperationsApiError, type MonitoringRunEvent, type ReleaseAnalysisJob, type ReleaseMonitoringStatus, type ReleaseOperationsApi, type ReleaseScope } from "./releaseOperationsApi";
+import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentRecord, EntityId, Finding, FindingDecisionInput, Notification, Product, Release, ReleaseMonitoringView, Remediation, RemediationInput } from "./types";
 
 export type BearerTokenProvider = () => string | undefined | Promise<string | undefined>;
 
@@ -56,6 +56,24 @@ function mapNotification(item: OperationsNotification): Notification {
   const priority: Notification["priority"] = item.priority === "critical" ? "urgent" : item.priority === "high" ? "high" : item.priority === "medium" ? "normal" : "low";
   const type: Notification["type"] = item.kind === "compliance" ? "deadline" : item.kind;
   return { id: item.id, type, priority, title: item.title, body: item.detail, targetUrl: item.targetUrl, createdAt: item.createdAt, acknowledgedAt: item.acknowledgedAt };
+}
+
+function mapMonitoring(status: ReleaseMonitoringStatus, events: MonitoringRunEvent[]): ReleaseMonitoringView {
+  return {
+    productId: status.productId,
+    releaseId: status.releaseId,
+    enabledSources: status.enabledSources,
+    cadenceMinutes: status.cadenceMinutes,
+    enabled: status.enabled,
+    health: status.health,
+    nextCheckAt: status.nextCheckAt,
+    lastCheckAt: status.lastCheckAt,
+    lastSuccessAt: status.lastSuccessAt,
+    consecutiveFailures: status.consecutiveFailures,
+    limitations: status.limitations,
+    running: status.running,
+    recentEvents: events.map((event) => ({ id: event.id, runId: event.runId, eventType: event.eventType, trigger: event.trigger, health: event.health, message: event.message, actorId: event.actorId, occurredAt: event.occurredAt, limitations: event.limitations })),
+  };
 }
 
 function mapSearch(item: OperationsSearchResult): WorkspaceSearchResult {
@@ -260,6 +278,26 @@ export class ProductionAdapter implements DataAdapter {
   };
   getAnalysisJob = (jobId: EntityId): AnalysisJob | undefined => this.fixture.getAnalysisJob(jobId);
   getApproval = (documentId: EntityId): Approval | undefined => this.fixture.getApproval(documentId);
+
+  loadReleaseMonitoring = async (productId: EntityId, releaseId: EntityId, options?: { signal?: AbortSignal }): Promise<ReleaseMonitoringView> => {
+    if (!this.config.releaseOperationsApi) return this.fixture.loadReleaseMonitoring(productId, releaseId);
+    const scope = { organizationId: this.config.organizationId, productId, releaseId };
+    const [status, events] = await Promise.all([
+      this.config.releaseOperationsApi.getMonitoring(scope, options),
+      this.config.releaseOperationsApi.listMonitoringEvents(scope, options),
+    ]);
+    return mapMonitoring(status, events);
+  };
+
+  runReleaseMonitoring = async (productId: EntityId, releaseId: EntityId): Promise<ReleaseMonitoringView> => {
+    if (!this.config.releaseOperationsApi) return this.fixture.runReleaseMonitoring(productId, releaseId);
+    return this.mutation("run_monitoring", async () => {
+      const scope = { organizationId: this.config.organizationId, productId, releaseId };
+      const status = await this.config.releaseOperationsApi!.runMonitoring(scope);
+      const events = await this.config.releaseOperationsApi!.listMonitoringEvents(scope);
+      return mapMonitoring(status, events);
+    });
+  };
 
   private async load(operation: "initialize" | "refresh", options?: { signal?: AbortSignal }): Promise<void> {
     const revision = ++this.refreshRevision;

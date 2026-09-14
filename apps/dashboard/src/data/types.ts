@@ -124,6 +124,34 @@ export interface Release {
   createdAt: ISODate;
 }
 
+export interface ReleaseMonitoringEvent {
+  id: EntityId;
+  runId: EntityId;
+  eventType: "started" | "succeeded" | "failed";
+  trigger: "manual" | "scheduled";
+  health: MonitoringHealth;
+  message: string;
+  actorId: EntityId;
+  occurredAt: ISODate;
+  limitations: string[];
+}
+
+export interface ReleaseMonitoringView {
+  productId: EntityId;
+  releaseId: EntityId;
+  enabledSources: ("osv" | "cisa_kev" | "epss" | "native_advisory" | "vendor_advisory")[];
+  cadenceMinutes: number;
+  enabled: boolean;
+  health: MonitoringHealth;
+  nextCheckAt?: ISODate;
+  lastCheckAt?: ISODate;
+  lastSuccessAt?: ISODate;
+  consecutiveFailures: number;
+  limitations: string[];
+  running: boolean;
+  recentEvents: ReleaseMonitoringEvent[];
+}
+
 export interface FindingEvidence {
   id: EntityId;
   label: string;

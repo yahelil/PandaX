@@ -15,6 +15,7 @@ import type {
   FindingDecisionInput,
   Product,
   Release,
+  ReleaseMonitoringView,
   RemediationInput,
 } from "./types";
 
@@ -346,6 +347,39 @@ export class FixtureAdapter implements DataAdapter {
   getApproval = (documentId: EntityId): Approval | undefined => {
     const approval = this.state.approvals.find((item) => item.documentId === documentId);
     return approval ? structuredClone(approval) : undefined;
+  };
+
+  loadReleaseMonitoring = async (productId: EntityId, releaseId: EntityId): Promise<ReleaseMonitoringView> => {
+    const release = this.state.releases.find((item) => item.id === releaseId && item.productId === productId);
+    if (!release) throw new Error("Release monitoring scope not found.");
+    const occurredAt = release.lastMonitoringCheckAt ?? release.createdAt;
+    return {
+      productId, releaseId,
+      enabledSources: ["osv", "cisa_kev", "epss", "native_advisory"],
+      cadenceMinutes: 60,
+      enabled: release.status !== "end_of_support",
+      health: release.monitoringHealth,
+      nextCheckAt: release.lastMonitoringCheckAt ? new Date(new Date(release.lastMonitoringCheckAt).getTime() + 3_600_000).toISOString() : undefined,
+      lastCheckAt: release.lastMonitoringCheckAt,
+      lastSuccessAt: release.monitoringHealth === "failed" ? undefined : release.lastMonitoringCheckAt,
+      consecutiveFailures: release.monitoringHealth === "failed" ? 2 : 0,
+      limitations: release.coverage.limitations,
+      running: false,
+      recentEvents: [{ id: `monitoring-${releaseId}`, runId: `run-${releaseId}`, eventType: release.monitoringHealth === "failed" ? "failed" : "succeeded", trigger: "scheduled", health: release.monitoringHealth, message: release.monitoringHealth === "healthy" ? "Scheduled monitoring completed." : "Monitoring completed with coverage limitations.", actorId: "system", occurredAt, limitations: release.coverage.limitations }],
+    };
+  };
+
+  runReleaseMonitoring = async (productId: EntityId, releaseId: EntityId): Promise<ReleaseMonitoringView> => {
+    const checkedAt = now();
+    this.mutate((state) => {
+      const release = state.releases.find((item) => item.id === releaseId && item.productId === productId);
+      if (!release) throw new Error("Release monitoring scope not found.");
+      release.lastMonitoringCheckAt = checkedAt;
+      state.activities.unshift({ id: `activity-monitoring-${Date.now()}`, type: "monitoring", title: "Manual monitoring completed", detail: `${release.version} was checked against configured advisory sources.`, productId, releaseId, actorId: state.currentUserId, at: checkedAt, targetUrl: `/products/${productId}/releases/${releaseId}` });
+    });
+    const result = await this.loadReleaseMonitoring(productId, releaseId);
+    result.recentEvents[0] = { ...result.recentEvents[0], id: `monitoring-manual-${Date.now()}`, runId: `run-manual-${Date.now()}`, trigger: "manual", actorId: this.state.currentUserId, occurredAt: checkedAt, message: "Manual monitoring completed." };
+    return result;
   };
 
   replacePortfolio = (organization: DemoState["organization"], products: Product[], releases: Release[]): void => {

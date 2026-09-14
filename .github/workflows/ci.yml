@@ -24,6 +24,7 @@ jobs:
       - run: npm ci
       - run: npm run test:dashboard
       - run: npm run build:dashboard
+      - run: npm run test:e2e --workspace @pandax/dashboard
 
   engine:
     runs-on: ubuntu-latest

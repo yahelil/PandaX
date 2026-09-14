@@ -1,17 +1,13 @@
 import type { AdapterFailure, AdapterOperation, AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } from "./adapter";
 import { createFindingsApi, FindingApiError, type FindingsApi, type ManagedFinding } from "./findingsApi";
-import { createGovernanceApi, GovernanceApiError, mapCompliance, mapGovernanceSettings, mapIntegration, mapTeamMember, type DocumentDetailDto, type GovernanceApi } from "./governanceApi";
+import { createGovernanceApi, GovernanceApiError, mapCompliance, mapGovernanceSettings, mapIntegration, mapTeamMember, type DocumentDetailDto, type DocumentFormat, type DocumentRevisionDto, type GovernanceApi } from "./governanceApi";
 import { createOperationsApi, OperationsApiError, type OperationsApi, type OperationsHome, type OperationsNotification, type OperationsSearchResult } from "./operationsApi";
 import { FixtureAdapter } from "./fixtureAdapter";
 import { createPortfolioApi, PortfolioApiError, type PortfolioApi } from "./portfolioApi";
 import { createReleaseOperationsApi, ReleaseOperationsApiError, type MonitoringRunEvent, type ReleaseAnalysisJob, type ReleaseMonitoringStatus, type ReleaseOperationsApi, type ReleaseScope } from "./releaseOperationsApi";
-import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentRecord, EntityId, Finding, FindingDecisionInput, Notification, Product, Release, ReleaseMonitoringView, Remediation, RemediationInput } from "./types";
+import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentDownloadMetadata, DocumentRecord, DocumentRevision, EntityId, Finding, FindingDecisionInput, Notification, Product, RecordDocumentSelfFilingInput, RegisterDocumentRevisionInput, Release, ReleaseMonitoringView, Remediation, RemediationInput } from "./types";
 
 export type BearerTokenProvider = () => string | undefined | Promise<string | undefined>;
-
-declare global {
-  interface Window { __ACTIS_GET_BEARER_TOKEN__?: BearerTokenProvider }
-}
 
 export interface ProductionAdapterConfig {
   organizationId: string;
@@ -24,6 +20,7 @@ export interface ProductionAdapterConfig {
 }
 
 export interface RuntimePortfolioConfig {
+  mode: "demo" | "production";
   apiUrl?: string;
   organizationId?: string;
   getBearerToken?: BearerTokenProvider;
@@ -89,13 +86,60 @@ function mapDocumentAudit(entry: DocumentDetailDto["audit"][number]): DocumentAu
   return { id: entry.id, action: actions[entry.eventType] ?? "edited", actorId: entry.actorId, at: entry.occurredAt, detail: entry.reason ?? String(entry.details.message ?? entry.eventType.replaceAll("_", " ")) };
 }
 
-function mapDocument(detail: DocumentDetailDto): DocumentRecord {
+const documentFormats = {
+  pdf_a_2b: "PDF/A-2b",
+  cyclonedx_json: "CycloneDX JSON",
+  csaf_vex: "CSAF VEX",
+  zip: "ZIP",
+  json: "JSON",
+} as const;
+
+function documentFormat(format: DocumentFormat): DocumentRecord["format"] {
+  return documentFormats[format];
+}
+
+function governanceDocumentFormat(format: DocumentRecord["format"]): DocumentFormat {
+  const entry = Object.entries(documentFormats).find(([, label]) => label === format);
+  if (!entry) throw new Error(`Unsupported document format: ${format}`);
+  return entry[0] as DocumentFormat;
+}
+
+function documentCompleteness(provenance: Record<string, unknown>): DocumentRecord["completeness"] {
+  const value = provenance.completeness;
+  if (value === "complete" || value === "missing_inputs" || value === "limited_coverage") return value;
+  return "missing_inputs";
+}
+
+function mapDocumentRevision(item: DocumentRevisionDto): DocumentRevision {
+  const status: DocumentRevision["status"] = item.status === "pending" ? "approval_required" : item.status;
+  return {
+    version: item.revision,
+    format: documentFormat(item.format),
+    status,
+    completeness: documentCompleteness(item.provenance),
+    contentHash: item.contentHash,
+    storageLocator: item.storageLocator,
+    sizeBytes: item.sizeBytes,
+    createdBy: item.createdBy,
+    createdAt: item.createdAt,
+  };
+}
+
+export function mapDocument(detail: DocumentDetailDto): DocumentRecord {
   const item = detail.document;
-  const format = ({ pdf_a_2b: "PDF/A-2b", cyclonedx_json: "CycloneDX JSON", csaf_vex: "CSAF VEX", zip: "ZIP", json: "JSON" } as const)[item.current.format];
-  const status = ({ draft: "draft", pending: "approval_required", approved: "approved", rejected: "draft", superseded: "superseded" } as const)[item.status];
-  const rawCompleteness = item.current.provenance.completeness;
-  const completeness: DocumentRecord["completeness"] = rawCompleteness === "missing_inputs" || rawCompleteness === "limited_coverage" ? rawCompleteness : "complete";
-  return { id: item.id, productId: item.productId, releaseId: item.releaseId, caseId: item.caseId, name: item.name, type: item.kind, format, version: item.currentRevision, status, completeness, updatedAt: item.updatedAt, updatedBy: item.current.createdBy, audit: detail.audit.map(mapDocumentAudit) };
+  const format = documentFormat(item.current.format);
+  const hasCurrentFiling = detail.selfFilings.some((filing) => filing.revision === item.currentRevision);
+  const status: DocumentRecord["status"] = hasCurrentFiling ? "self_filed" : ({ draft: "draft", pending: "approval_required", approved: "approved", rejected: "draft", superseded: "superseded" } as const)[item.status];
+  return {
+    id: item.id, productId: item.productId, releaseId: item.releaseId, caseId: item.caseId,
+    name: item.name, type: item.kind, format, version: item.currentRevision, status,
+    completeness: documentCompleteness(item.current.provenance), updatedAt: item.updatedAt,
+    updatedBy: item.current.createdBy, audit: detail.audit.map(mapDocumentAudit),
+    revisions: detail.revisions.map(mapDocumentRevision),
+    approvalHistory: detail.approvalHistory.map(mapDocumentAudit),
+    selfFilings: detail.selfFilings.map((filing) => ({ id: filing.id, version: filing.revision, externalSubmissionReference: filing.externalSubmissionReference, submittedAt: filing.submittedAt, receiptEvidenceLocator: filing.receiptEvidenceLocator, receiptContentHash: filing.receiptContentHash, recordedBy: filing.recordedBy, recordedAt: filing.recordedAt })),
+    contentHash: item.current.contentHash, storageLocator: item.current.storageLocator, sizeBytes: item.current.sizeBytes,
+  };
 }
 
 function remediationStatus(status: Remediation["status"]) {
@@ -246,6 +290,63 @@ export class ProductionAdapter implements DataAdapter {
   approveDocument = async (documentId: EntityId, comment?: string): Promise<DocumentRecord> => this.config.governanceApi ? this.decideDocument(documentId, "approve", comment) : this.fixture.approveDocument(documentId, comment);
   rejectDocument = async (documentId: EntityId, comment: string): Promise<DocumentRecord> => this.config.governanceApi ? this.decideDocument(documentId, "reject", comment) : this.fixture.rejectDocument(documentId, comment);
 
+  loadDocumentDetail = async (documentId: EntityId, options?: { signal?: AbortSignal }): Promise<DocumentRecord | undefined> => {
+    if (!this.config.governanceApi) return this.fixture.loadDocumentDetail(documentId);
+    return this.mutation("load_document", async () => {
+      const detail = await this.config.governanceApi!.getDocument(this.config.organizationId, documentId, options);
+      return this.storeDocumentDetail(detail);
+    });
+  };
+
+  getDocumentDownload = async (documentId: EntityId, version?: number): Promise<DocumentDownloadMetadata> => {
+    if (!this.config.governanceApi) return this.fixture.getDocumentDownload(documentId, version);
+    const detail = this.requireDocumentDetail(documentId);
+    return this.mutation("download_document", async () => {
+      const metadata = await this.config.governanceApi!.getDownloadMetadata(this.config.organizationId, documentId, version ?? detail.document.currentRevision);
+      return { documentId: metadata.documentId, version: metadata.revision, filename: metadata.filename, format: documentFormat(metadata.format), contentHash: metadata.contentHash, sizeBytes: metadata.sizeBytes, storageLocator: metadata.storageLocator, contentType: metadata.contentType, downloadType: metadata.downloadType };
+    });
+  };
+
+  requestDocumentApproval = async (documentId: EntityId, comment?: string): Promise<DocumentRecord> => {
+    if (!this.config.governanceApi) return this.fixture.requestDocumentApproval(documentId, comment);
+    const detail = this.requireDocumentDetail(documentId);
+    return this.mutation("request_document_approval", async () => {
+      const current = detail.document.current;
+      await this.config.governanceApi!.requestDocumentApproval(this.config.organizationId, documentId, current.revision, current.status, comment);
+      return this.reloadDocument(documentId);
+    });
+  };
+
+  addDocumentRevision = async (input: RegisterDocumentRevisionInput): Promise<DocumentRecord> => {
+    if (!this.config.governanceApi) return this.fixture.addDocumentRevision(input);
+    const detail = this.requireDocumentDetail(input.documentId);
+    return this.mutation("add_document_revision", async () => {
+      await this.config.governanceApi!.addDocumentRevision(this.config.organizationId, input.documentId, {
+        expectedCurrentRevision: detail.document.currentRevision,
+        format: governanceDocumentFormat(input.format),
+        contentHash: input.contentHash,
+        storageLocator: input.storageLocator,
+        sizeBytes: input.sizeBytes,
+        provenance: { completeness: input.completeness },
+      });
+      return this.reloadDocument(input.documentId);
+    });
+  };
+
+  recordDocumentSelfFiling = async (input: RecordDocumentSelfFilingInput): Promise<DocumentRecord> => {
+    if (!this.config.governanceApi) return this.fixture.recordDocumentSelfFiling(input);
+    const detail = this.requireDocumentDetail(input.documentId);
+    return this.mutation("self_file_document", async () => {
+      await this.config.governanceApi!.recordSelfFiling(this.config.organizationId, input.documentId, detail.document.currentRevision, {
+        externalSubmissionReference: input.externalSubmissionReference,
+        submittedAt: input.submittedAt,
+        receiptEvidenceLocator: input.receiptEvidenceLocator,
+        receiptContentHash: input.receiptContentHash,
+      });
+      return this.reloadDocument(input.documentId);
+    });
+  };
+
   createProduct = async (input: CreateProductInput): Promise<Product> => this.mutation("create_product", async () => {
     const created = await this.config.portfolioApi.createProduct(this.config.organizationId, { name: input.name, identifier: input.identifier, manufacturer: input.manufacturer, description: input.description, craClass: input.craClass, classificationStatus: input.classificationStatus, supportStart: new Date().toISOString().slice(0, 10), supportEnd: input.supportUntil, ownerId: input.ownerId });
     this.fixture.upsertProduct(created); return created;
@@ -391,10 +492,26 @@ export class ProductionAdapter implements DataAdapter {
     return this.mutation(decision === "approve" ? "approve_document" : "reject_document", async () => {
       if (decision === "approve") await this.config.governanceApi!.approveDocument(this.config.organizationId, documentId, current.revision, current.status, comment);
       else await this.config.governanceApi!.rejectDocument(this.config.organizationId, documentId, current.revision, current.status, comment ?? "Revision rejected");
-      const updated = await this.config.governanceApi!.getDocument(this.config.organizationId, documentId);
-      this.documentDetails.set(documentId, updated);
-      const mapped = mapDocument(updated); this.fixture.upsertDocument(mapped); return mapped;
+      return this.reloadDocument(documentId);
     });
+  }
+
+  private requireDocumentDetail(documentId: string): DocumentDetailDto {
+    const detail = this.documentDetails.get(documentId);
+    if (!detail) throw new Error(`Unknown production document: ${documentId}`);
+    return detail;
+  }
+
+  private storeDocumentDetail(detail: DocumentDetailDto): DocumentRecord {
+    this.documentDetails.set(detail.document.id, detail);
+    const mapped = mapDocument(detail);
+    this.fixture.upsertDocument(mapped);
+    return mapped;
+  }
+
+  private async reloadDocument(documentId: string): Promise<DocumentRecord> {
+    const updated = await this.config.governanceApi!.getDocument(this.config.organizationId, documentId);
+    return this.storeDocumentDetail(updated);
   }
 
   private async mutation<T>(operation: AdapterOperation, task: () => Promise<T>): Promise<T> {
@@ -409,7 +526,10 @@ export class ProductionAdapter implements DataAdapter {
 }
 
 export function createRuntimeDataAdapter(config: RuntimePortfolioConfig): DataAdapter {
-  if (!config.apiUrl || !config.organizationId || !config.getBearerToken) return new FixtureAdapter();
+  if (config.mode === "demo") return new FixtureAdapter();
+  if (!config.apiUrl || !config.organizationId || !config.getBearerToken) {
+    throw new Error("Production data access requires API URL, organization, and an authenticated token provider.");
+  }
   const shared = { baseUrl: config.apiUrl, getBearerToken: config.getBearerToken, fetch: config.fetch };
   return new ProductionAdapter({ organizationId: config.organizationId, portfolioApi: createPortfolioApi(shared), findingsApi: createFindingsApi(shared), operationsApi: createOperationsApi(shared), governanceApi: createGovernanceApi(shared), releaseOperationsApi: createReleaseOperationsApi(shared) });
 }

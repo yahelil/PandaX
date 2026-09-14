@@ -7,7 +7,7 @@ export type MonitoringHealth = "healthy" | "degraded" | "failed" | "inactive";
 export type Severity = "critical" | "high" | "medium" | "low";
 export type FindingStatus = "needs_review" | "action_required" | "in_remediation" | "accepted" | "resolved";
 export type DecisionKind = "affected" | "not_affected" | "accepted_risk" | "deferred";
-export type Role = "org_admin" | "compliance_operator" | "authorized_approver" | "read_only_auditor";
+export type Role = "org_admin" | "compliance_operator" | "authorized_approver" | "security_reviewer" | "viewer" | "read_only_auditor";
 
 export interface Scope {
   productId?: EntityId;
@@ -268,6 +268,58 @@ export interface DocumentAuditEntry {
   detail: string;
 }
 
+export interface DocumentRevision {
+  version: number;
+  format: DocumentRecord["format"];
+  status: "draft" | "approval_required" | "approved" | "rejected" | "superseded";
+  completeness: DocumentRecord["completeness"];
+  contentHash: string;
+  storageLocator: string;
+  sizeBytes: number;
+  createdBy: EntityId;
+  createdAt: ISODate;
+}
+
+export interface DocumentSelfFiling {
+  id: EntityId;
+  version: number;
+  externalSubmissionReference: string;
+  submittedAt: ISODate;
+  receiptEvidenceLocator: string;
+  receiptContentHash?: string;
+  recordedBy: EntityId;
+  recordedAt: ISODate;
+}
+
+export interface DocumentDownloadMetadata {
+  documentId: EntityId;
+  version: number;
+  filename: string;
+  format: DocumentRecord["format"];
+  contentHash: string;
+  sizeBytes: number;
+  storageLocator: string;
+  contentType: string;
+  downloadType: "storage_metadata_only";
+}
+
+export interface RegisterDocumentRevisionInput {
+  documentId: EntityId;
+  format: DocumentRecord["format"];
+  contentHash: string;
+  storageLocator: string;
+  sizeBytes: number;
+  completeness: DocumentRecord["completeness"];
+}
+
+export interface RecordDocumentSelfFilingInput {
+  documentId: EntityId;
+  externalSubmissionReference: string;
+  submittedAt: ISODate;
+  receiptEvidenceLocator: string;
+  receiptContentHash?: string;
+}
+
 export interface DocumentRecord {
   id: EntityId;
   productId: EntityId;
@@ -283,6 +335,12 @@ export interface DocumentRecord {
   updatedBy: EntityId;
   approvalId?: EntityId;
   audit: DocumentAuditEntry[];
+  revisions?: DocumentRevision[];
+  approvalHistory?: DocumentAuditEntry[];
+  selfFilings?: DocumentSelfFiling[];
+  contentHash?: string;
+  storageLocator?: string;
+  sizeBytes?: number;
 }
 
 export interface Activity {

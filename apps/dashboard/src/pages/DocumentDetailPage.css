@@ -1,0 +1,20 @@
+.document-workflow .tabs { border-top:0; }
+.document-workflow button:disabled { cursor:not-allowed; opacity:.5; }
+.document-error { background:var(--danger-bg); border-color:var(--danger); }
+.document-download-controls { align-content:start; }
+.document-metadata { display:grid; gap:10px; margin:0; }
+.document-metadata div { display:grid; gap:4px; }
+.document-metadata dt { color:var(--text-muted); font-size:12px; }
+.document-metadata dd { margin:0; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.document-download-result { display:grid; gap:8px; padding:14px; border:1px solid var(--success); border-radius:10px; background:var(--success-bg); }
+.document-download-result span,.document-download-result small { color:var(--text-muted); }
+.document-download-result code,.document-filing-list code { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.document-table { min-width:640px; }
+.document-table small { color:var(--text-muted); }
+.document-filing-list { list-style:none; margin:0; padding:0 20px 20px; }
+.document-filing-list li { display:grid; gap:7px; padding:14px 0; border-top:1px solid var(--border); }
+.document-filing-list span,.document-filing-list small { color:var(--text-muted); font-size:12px; }
+@media(max-width:760px) {
+  .document-table-wrap { display:block; }
+  .document-workflow .tabs { padding-inline:8px; }
+}

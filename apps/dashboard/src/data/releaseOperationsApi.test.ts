@@ -168,12 +168,13 @@ describe("release operations API", () => {
     const api = createReleaseOperationsApi({ baseUrl: "", fetch: fetcher });
 
     await expect(api.uploadAnalysisInput(scope, { inputType: "collector", file: new Blob(["zip"]), filename: "collector.zip", idempotencyKey: "collector-1" })).resolves.toMatchObject({ inputType: "collector", preview: { collector: { name: "Actis Collector" } } });
-    await expect(api.uploadAnalysisInput(scope, { inputType: "raw_artifact", file: new Blob(["firmware"]), filename: "firmware.bin", idempotencyKey: "raw-1", rawArtifactConsent: true })).resolves.toMatchObject({ inputType: "raw_artifact", consentActorId: "reviewer-1" });
+    await expect(api.uploadAnalysisInput(scope, { inputType: "raw_artifact", file: new Blob(["firmware"]), filename: "firmware.bin", idempotencyKey: "raw-1", rawArtifactConsent: true, changedDigestConfirmed: true })).resolves.toMatchObject({ inputType: "raw_artifact", consentActorId: "reviewer-1" });
 
     const [collectorForm, rawForm] = fetcher.mock.calls.map((call) => call[1]?.body as FormData);
     expect(fetcher.mock.calls.map(([url]) => url)).toEqual([`${encodedBase}/analysis-jobs/inputs`, `${encodedBase}/analysis-jobs/inputs`]);
     expect(collectorForm.get("input_type")).toBe("collector");
     expect(rawForm.get("raw_artifact_consent")).toBe("true");
+    expect(rawForm.get("changed_digest_confirmed")).toBe("true");
   });
 
   it("lists, reads, runs, and maps job progress, result, and events", async () => {

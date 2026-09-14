@@ -20,8 +20,7 @@ const managedRoles: Array<{ value: ManagedRole; label: string; description: stri
   { value: "org_admin", label: "Org Admin", description: "Organization, access, integrations, and policy." },
   { value: "compliance_operator", label: "Compliance Operator", description: "Compliance workflows, evidence, and remediation." },
   { value: "authorized_approver", label: "Authorized Approver", description: "Controlled document approvals." },
-  { value: "security_reviewer", label: "Security Reviewer", description: "Finding decisions, analysis, and monitoring." },
-  { value: "viewer", label: "Viewer / Auditor", description: "Read-only workspace access." },
+  { value: "read_only_auditor", label: "Read-only Auditor", description: "Read-only workspace and audit access." },
 ];
 
 type Section = typeof sections[number]["id"];
@@ -115,7 +114,7 @@ function TeamSettings() {
   return <section className="panel">
     <div className="section-header"><div><h2>Team & Access</h2><p>Fixed roles separate operational work, approval, administration, and audit access.</p></div><button className="button-primary" type="button" disabled aria-describedby="team-invite-unavailable">Invite member</button></div>
     <div className="settings-inline-note" id="team-invite-unavailable">Invitations are provisioned by your identity provider. Role and access changes are available here.</div>
-    <div className="data-table-wrap settings-table-wrap"><table className="data-table settings-table"><thead><tr><th>Member</th><th>Title</th><th>Roles</th><th>Status</th><th>Last active</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{state.members.map((item) => <tr key={item.id}><td><div className="cell-primary"><span className="cell-strong">{item.name}</span><small>{item.email}</small></div></td><td>{item.title}</td><td>{item.roles.map((role) => role === "viewer" ? "Viewer / Auditor" : titleCase(role)).join(" · ")}</td><td><StatusPill value={item.status} /></td><td>{item.lastActiveAt ? formatDate(item.lastActiveAt, true) : "Invitation pending"}</td><td><button className="button-small" type="button" aria-expanded={editingId === item.id} onClick={() => setEditingId((current) => current === item.id ? undefined : item.id)}>{editingId === item.id ? "Close" : "Manage"}</button></td></tr>)}</tbody></table></div>
+    <div className="data-table-wrap settings-table-wrap"><table className="data-table settings-table"><thead><tr><th>Member</th><th>Title</th><th>Roles</th><th>Status</th><th>Last active</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{state.members.map((item) => <tr key={item.id}><td><div className="cell-primary"><span className="cell-strong">{item.name}</span><small>{item.email}</small></div></td><td>{item.title}</td><td>{item.roles.map(titleCase).join(" · ")}</td><td><StatusPill value={item.status} /></td><td>{item.lastActiveAt ? formatDate(item.lastActiveAt, true) : "Invitation pending"}</td><td><button className="button-small" type="button" aria-expanded={editingId === item.id} onClick={() => setEditingId((current) => current === item.id ? undefined : item.id)}>{editingId === item.id ? "Close" : "Manage"}</button></td></tr>)}</tbody></table></div>
     {member ? <TeamMemberEditor key={member.id} member={member} onClose={() => setEditingId(undefined)} /> : null}
   </section>;
 }
@@ -123,7 +122,7 @@ function TeamSettings() {
 function TeamMemberEditor({ member, onClose }: { member: TeamMember; onClose: () => void }) {
   const { actions, state } = useDemo();
   const [title, setTitle] = useState(member.title);
-  const [roles, setRoles] = useState<ManagedRole[]>(member.roles.filter((role): role is ManagedRole => role !== "read_only_auditor"));
+  const [roles, setRoles] = useState<ManagedRole[]>(member.roles);
   const mutation = useMutationFeedback();
   const toggleRole = (role: ManagedRole) => setRoles((current) => current.includes(role) ? current.filter((item) => item !== role) : [...current, role]);
   const submit = (event: FormEvent) => {

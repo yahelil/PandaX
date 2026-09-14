@@ -26,7 +26,7 @@ export function isComplianceResolved(item: ComplianceItem): boolean {
 }
 
 export function compliancePermissions(roles: readonly Role[], item: ComplianceItem) {
-  const canEdit = roles.some((role) => role === "org_admin" || role === "compliance_operator" || role === "security_reviewer");
+  const canEdit = roles.some((role) => role === "org_admin" || role === "compliance_operator");
   const canApproveRole = roles.some((role) => role === "org_admin" || role === "authorized_approver");
   return {
     canEdit,

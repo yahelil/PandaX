@@ -1,6 +1,7 @@
 import type {
   ActionItem,
   Activity,
+  AnalysisJob,
   Approval,
   ComplianceItem,
   DemoState,
@@ -60,7 +61,7 @@ const members: TeamMember[] = [
     email: "elena.rossi@acme-devices.eu",
     title: "General Counsel",
     initials: "ER",
-    roles: ["authorized_approver", "viewer"],
+    roles: ["authorized_approver", "read_only_auditor"],
     status: "active",
     lastActiveAt: "2026-09-13T15:30:00Z",
   },
@@ -70,7 +71,7 @@ const members: TeamMember[] = [
     email: "noah.williams@acme-devices.eu",
     title: "External Auditor",
     initials: "NW",
-    roles: ["viewer"],
+    roles: ["read_only_auditor"],
     status: "invited",
   },
 ];
@@ -498,6 +499,29 @@ const integrations: Integration[] = [
   { id: "integration-jira", name: "Jira Cloud", type: "jira", status: "not_connected", description: "Create remediation work items from approved findings", configuration: { site: "acme-devices.atlassian.net", project_key: "SEC" }, version: 1 },
 ];
 
+const analysisJobs: AnalysisJob[] = [
+  {
+    id: "analysis-hub-1-7-0",
+    draft: { productId: DEMO_IDS.homeHub, releaseId: DEMO_IDS.hubRelease, version: "1.8.0", channel: "stable", inputKind: "collector_package", fileName: "collector-package.zip", fileSize: 1_240_018 },
+    status: "completed",
+    progress: 100,
+    stage: "Complete",
+    createdAt: "2026-08-08T09:20:00Z",
+    updatedAt: "2026-08-08T09:23:00Z",
+    result: { releaseId: DEMO_IDS.hubRelease, newFindings: 4, changedFindings: 0, componentCount: 241, coverage: { components: 241, identifiedComponents: 239, advisorySourcesChecked: 3, advisorySourcesExpected: 3, limitations: ["Two components could not be identified."] }, resultUrl: `/products/${DEMO_IDS.homeHub}/releases/${DEMO_IDS.hubRelease}` },
+  },
+  {
+    id: "analysis-hub-1-8-0",
+    draft: { productId: DEMO_IDS.homeHub, releaseId: DEMO_IDS.hubRelease, version: "1.8.0", channel: "stable", inputKind: "collector_package", fileName: "collector-package.zip", fileSize: 1_301_742 },
+    status: "completed",
+    progress: 100,
+    stage: "Complete",
+    createdAt: "2026-09-10T14:12:00Z",
+    updatedAt: "2026-09-10T14:16:00Z",
+    result: { releaseId: DEMO_IDS.hubRelease, newFindings: 1, changedFindings: 1, componentCount: 247, coverage: { components: 247, identifiedComponents: 245, advisorySourcesChecked: 3, advisorySourcesExpected: 3, limitations: ["Two components could not be identified."] }, resultUrl: `/products/${DEMO_IDS.homeHub}/releases/${DEMO_IDS.hubRelease}` },
+  },
+];
+
 export function createDemoState(): DemoState {
   return structuredClone({
     schemaVersion: 2,
@@ -522,6 +546,6 @@ export function createDemoState(): DemoState {
     documents,
     activities,
     notifications,
-    analysisJobs: [],
+    analysisJobs,
   } satisfies DemoState);
 }

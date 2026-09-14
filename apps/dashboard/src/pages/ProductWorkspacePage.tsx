@@ -2,7 +2,7 @@ import { type FormEvent, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { usePermission } from "../auth";
 import { useDemo } from "../data/DemoProvider";
-import { Breadcrumbs, EmptyState, EvidenceMeter, MetricCard, SectionHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
+import { Breadcrumbs, EmptyState, EvidenceMeter, FindingInsights, MetricCard, SectionHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
 import "./pages.css";
 
 const tabs = ["overview", "releases", "findings", "compliance", "documents"] as const;
@@ -26,7 +26,7 @@ export function ProductWorkspacePage() {
     <section className="panel">
       <div className="workspace-hero">
         <div className="workspace-title"><span className="product-avatar" aria-hidden="true">{product.name.split(" ").map((word) => word[0]).join("")}</span><div><h1>{product.name}</h1><p>{product.identifier} · {product.manufacturer}</p></div></div>
-        <div className="inline-actions"><StatusPill value={product.readiness} /><StatusPill value={product.monitoringHealth} />{activeRelease && canRunAnalysis ? <Link className="button button-primary" to={`/products/${product.id}/releases/${activeRelease.id}/analyze`}>Analyze release</Link> : activeRelease ? <span className="button button-primary button-disabled" aria-disabled="true" title="Security Reviewer, Compliance Operator, or Org Admin permission required">Analyze release</span> : null}</div>
+        <div className="inline-actions"><StatusPill value={product.readiness} /><StatusPill value={product.monitoringHealth} />{activeRelease && canRunAnalysis ? <Link className="button button-primary" to={`/products/${product.id}/releases/${activeRelease.id}/analyze`}>Analyze release</Link> : activeRelease ? <span className="button button-primary button-disabled" aria-disabled="true" title="Compliance Operator or Organization Admin permission required">Analyze release</span> : null}</div>
       </div>
       <nav className="tabs" aria-label="Product workspace">
         {tabs.map((name) => <Link className={tab === name ? "active" : ""} key={name} to={`/products/${product.id}?tab=${name}`}>{name[0].toUpperCase() + name.slice(1)}{name === "findings" && findings.length ? ` (${findings.length})` : ""}</Link>)}
@@ -45,10 +45,12 @@ function ProductOverview({ productId }: { productId: string }) {
   const demo = useDemo(); const product = demo.selectors.product(productId)!; const release = demo.selectors.release(product.activeReleaseId);
   const findings = demo.findings.filter((item) => item.productId === productId && item.status !== "resolved");
   const actions = demo.actionItems.filter((item) => item.productId === productId && item.status === "open");
+  const analyses = demo.state.analysisJobs.filter((item) => item.draft.productId === productId);
   return <div className="overview-grid">
     <section className="metrics-grid wide"><MetricCard label="Open actions" value={actions.length} detail={actions.filter((item) => item.priority === "urgent").length ? `${actions.filter((item) => item.priority === "urgent").length} urgent` : "No urgent actions"} tone={actions.some((item) => item.priority === "urgent") ? "urgent" : "good"} /><MetricCard label="Active findings" value={findings.length} detail={`${findings.filter((item) => item.kev).length} in KEV`} /><MetricCard label="Next obligation" value={relativeDate(product.nextDeadline)} detail={formatDate(product.nextDeadline)} tone={product.nextDeadline ? "high" : "good"} /></section>
     <section className="panel"><SectionHeader title="Product scope" description="Manufacturer and CRA classification." /><dl className="definition-grid"><div><dt>Product identifier</dt><dd className="mono">{product.identifier}</dd></div><div><dt>CRA class</dt><dd>{product.craClass.replaceAll("_", " ")}</dd></div><div><dt>Support until</dt><dd>{formatDate(product.supportUntil)}</dd></div><div><dt>Default owner</dt><dd>{memberName(demo.state.members, product.ownerId)}</dd></div><div><dt>Classification</dt><dd>{product.classificationStatus.replaceAll("_", " ")}</dd></div><div><dt>Tags</dt><dd>{product.tags.join(", ")}</dd></div></dl></section>
     <section className="panel"><SectionHeader title="Active release" description="Current supported production release." action={release ? <Link className="text-link" to={`/products/${product.id}/releases/${release.id}`}>Open release</Link> : null} />{release ? <dl className="definition-grid"><div><dt>Version</dt><dd>{release.version}</dd></div><div><dt>SBOM</dt><dd><StatusPill value={release.sbomStatus} /></dd></div><div><dt>Released</dt><dd>{formatDate(release.releaseDate)}</dd></div><div><dt>Coverage</dt><dd><EvidenceMeter value={release.coverage.identifiedComponents} total={release.coverage.components} /></dd></div><div><dt>Last analysis</dt><dd>{formatDate(release.lastAnalysisAt, true)}</dd></div><div><dt>Monitoring</dt><dd><StatusPill value={release.monitoringHealth} /></dd></div></dl> : <EmptyState title="No active release" body="Register a release to begin analysis and monitoring." />}</section>
+    <FindingInsights findings={findings} analyses={analyses}/>
     <section className="panel wide"><SectionHeader title="Priority drivers" description="Why this product has its current readiness status." /><ul className="priority-list">{actions.slice(0,5).map((item) => <li className="priority-item" key={item.id}><span className={`priority-marker ${item.priority}`} /><div className="item-main"><Link to={item.targetUrl}>{item.title}</Link><p>{item.reason}</p></div><StatusPill value={item.priority} /></li>)}</ul>{!actions.length ? <EmptyState title="No open actions" body="This product has no outstanding compliance work." /> : null}</section>
   </div>;
 }

@@ -111,6 +111,7 @@ export interface UploadSbomInput {
   file: Blob;
   filename: string;
   idempotencyKey: string;
+  changedDigestConfirmed?: boolean;
 }
 
 export interface UploadAnalysisInput extends UploadSbomInput {
@@ -484,6 +485,7 @@ export function createReleaseOperationsApi(config: ReleaseOperationsApiConfig): 
     async uploadSbom(scope, input, options) {
       const form = new FormData();
       form.append("sbom", input.file, input.filename);
+      if (input.changedDigestConfirmed) form.append("changed_digest_confirmed", "true");
       return parseJob(await jsonRequest(jobsPath(scope), {
         method: "POST", headers: { "Idempotency-Key": input.idempotencyKey }, body: form,
       }, options));
@@ -492,6 +494,7 @@ export function createReleaseOperationsApi(config: ReleaseOperationsApiConfig): 
       const form = new FormData();
       form.append("input_type", input.inputType);
       form.append("file", input.file, input.filename);
+      if (input.changedDigestConfirmed) form.append("changed_digest_confirmed", "true");
       if (input.inputType === "raw_artifact") form.append("raw_artifact_consent", String(input.rawArtifactConsent === true));
       return parseJob(await jsonRequest(`${jobsPath(scope)}/inputs`, {
         method: "POST", headers: { "Idempotency-Key": input.idempotencyKey }, body: form,

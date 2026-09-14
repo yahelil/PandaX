@@ -70,7 +70,7 @@ export function FindingDetailPage() {
       <dl className="definition-grid">
         <div><dt>Component</dt><dd>{finding.component} {finding.componentVersion}</dd></div>
         <div><dt>CVSS</dt><dd>{finding.cvss.toFixed(1)} · {titleCase(finding.severity)}</dd></div>
-        <div><dt>Owner</dt><dd><select className="select-field" value={finding.assigneeId ?? ''} disabled={busy || !canRemediate} title={!canRemediate ? 'Security Reviewer, Compliance Operator, or Org Admin permission required' : undefined} onChange={(event) => { void perform(() => demo.actions.assignFinding(finding.id, event.target.value || undefined), 'Owner updated.') }}><option value="">Unassigned</option>{demo.state.members.filter((member) => member.status === 'active').map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></dd></div>
+        <div><dt>Owner</dt><dd><select className="select-field" value={finding.assigneeId ?? ''} disabled={busy || !canRemediate} title={!canRemediate ? 'Compliance Operator or Organization Admin permission required' : undefined} onChange={(event) => { void perform(() => demo.actions.assignFinding(finding.id, event.target.value || undefined), 'Owner updated.') }}><option value="">Unassigned</option>{demo.state.members.filter((member) => member.status === 'active').map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></dd></div>
         <div><dt>Required by</dt><dd className={finding.priority === 'urgent' ? 'danger-text' : ''}>{relativeDate(finding.dueAt)} · {formatDate(finding.dueAt, true)}</dd></div>
       </dl>
     </section>
@@ -80,7 +80,7 @@ export function FindingDetailPage() {
         <section className="panel">
           <SectionHeader title="Risk assessment and decision" description="Record a reasoned determination. Evidence remains attached to this release." />
           <form className="setting-section" onSubmit={decide}>
-            {!canDecide ? <div className="notice">Only an Org Admin or Security Reviewer can record risk decisions.</div> : null}
+            {!canDecide ? <div className="notice">Only a Compliance Operator or Organization Admin can record risk decisions.</div> : null}
             <div className="field"><label htmlFor="decision">Decision</label><select id="decision" className="select-field" value={decision} disabled={!canDecide} onChange={(event) => setDecision(event.target.value as DecisionKind)}><option value="affected">Affected</option><option value="not_affected">Not affected</option><option value="accepted_risk">Accept risk</option><option value="deferred">Defer decision</option></select></div>
             <div className="field"><label htmlFor="rationale">Rationale</label><textarea id="rationale" className="textarea-field" required minLength={12} value={rationale} disabled={!canDecide} onChange={(event) => setRationale(event.target.value)} placeholder="Explain the decision using the available product and release evidence." /></div>
             <div className="inline-actions"><button className="button-primary" type="submit" disabled={busy || !canDecide}>Record decision</button></div>

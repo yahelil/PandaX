@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright-core";
@@ -11,6 +11,7 @@ const viteEntry = createRequire(import.meta.url).resolve("vite");
 const viteBin = resolve(dirname(viteEntry), "../../bin/vite.js");
 const port = Number.parseInt(process.env.ACTIS_E2E_PORT ?? "4178", 10);
 const baseUrl = `http://127.0.0.1:${port}`;
+const visualDir = process.env.ACTIS_E2E_VISUAL_DIR;
 const browserCandidates = [
   process.env.ACTIS_E2E_BROWSER,
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
@@ -63,6 +64,16 @@ try {
   await page.goto(baseUrl, { waitUntil: "networkidle" });
   await assertCoreShell(page);
   await assertSingleMain(page, "Home");
+  await assertAccessibilityBasics(page, "Home");
+  for (const width of [768, 1024, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await assertNoHorizontalOverflow(page, `Home at ${width}px`);
+    if (visualDir) {
+      mkdirSync(visualDir, { recursive: true });
+      await page.screenshot({ path: join(visualDir, `home-${width}.png`), fullPage: true });
+    }
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
 
   const themeToggle = page.getByRole("button", { name: "Use dark theme" });
   await assertVisible(themeToggle, "light-theme toggle");
@@ -73,6 +84,7 @@ try {
   await page.getByRole("link", { name: /^Products$/ }).click();
   await page.waitForURL(`${baseUrl}/products`);
   await assertSingleMain(page, "Products");
+  await assertAccessibilityBasics(page, "Products");
   await assertVisible(page.getByRole("heading", { name: "Products", exact: true }), "Products heading");
   await assertVisible(page.getByRole("searchbox", { name: "Search products" }), "product search");
 
@@ -80,6 +92,12 @@ try {
   await page.waitForURL(`${baseUrl}/products/product-home-hub`);
   await assertSingleMain(page, "Product workspace");
   await assertVisible(page.getByRole("heading", { name: "Home Hub", exact: true }), "Home Hub heading");
+  await assertVisible(page.getByRole("heading", { name: "Finding insights", exact: true }), "conditional finding insights");
+  await assertVisible(page.getByRole("heading", { name: "Analysis history", exact: true }), "immutable analysis history");
+  await assertAccessibilityBasics(page, "Product workspace");
+  if (visualDir) {
+    await page.screenshot({ path: join(visualDir, "product-home-hub-dark-1440.png"), fullPage: true });
+  }
   await page.getByRole("link", { name: /^Releases$/ }).click();
   await page.getByRole("link", { name: "1.8.0", exact: true }).click();
   await page.waitForURL(`${baseUrl}/products/product-home-hub/releases/release-hub-1-8-0`);
@@ -146,5 +164,25 @@ async function assertSingleMain(page, label) {
 async function assertVisible(locator, label) {
   if (await locator.count() < 1 || !await locator.first().isVisible()) {
     throw new Error(`${label} is missing or not visible.`);
+  }
+}
+
+async function assertNoHorizontalOverflow(page, label) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
+  if (overflow) throw new Error(`${label} has horizontal page overflow.`);
+}
+
+async function assertAccessibilityBasics(page, label) {
+  const failures = await page.evaluate(() => {
+    const duplicateIds = [...document.querySelectorAll("[id]")].map((item) => item.id).filter((id, index, ids) => ids.indexOf(id) !== index);
+    const unnamedControls = [...document.querySelectorAll("button,a[href],input,select,textarea")].filter((item) => {
+      const element = item;
+      return !((element.getAttribute("aria-label") || element.getAttribute("title") || element.textContent || "").trim() || (element instanceof HTMLInputElement && element.labels?.length));
+    });
+    const unnamedImages = [...document.querySelectorAll("img")].filter((item) => !item.hasAttribute("alt") && item.getAttribute("aria-hidden") !== "true");
+    return { duplicateIds, unnamedControls: unnamedControls.length, unnamedImages: unnamedImages.length };
+  });
+  if (failures.duplicateIds.length || failures.unnamedControls || failures.unnamedImages) {
+    throw new Error(`${label} accessibility basics failed: ${JSON.stringify(failures)}`);
   }
 }

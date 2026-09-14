@@ -278,7 +278,8 @@ export class ProductionAdapter implements DataAdapter {
     const current = this.getSnapshot().members.find((item) => item.id === memberId);
     if (!current?.version) throw new Error(`Team member ${memberId} is not ready for editing.`);
     return this.mutation("update_team_member", async () => {
-      const updated = await this.config.governanceApi!.updateTeamMember(this.config.organizationId, memberId, { expectedVersion: current.version!, ...patch });
+      const roles = patch.roles?.map((role) => role === "read_only_auditor" ? "viewer" as const : role);
+      const updated = await this.config.governanceApi!.updateTeamMember(this.config.organizationId, memberId, { expectedVersion: current.version!, ...patch, roles });
       const mapped = mapTeamMember(updated);
       if (!mapped) throw new Error("Updated team member is not available in this workspace.");
       this.fixture.upsertTeamMember(mapped);
@@ -591,7 +592,7 @@ export class ProductionAdapter implements DataAdapter {
     if (existing) return existing;
     const idempotencyKey = this.analysisIdempotencyKeys.get(key) ?? `actis:${crypto.randomUUID()}`;
     this.analysisIdempotencyKeys.set(key, idempotencyKey);
-    const input = { file: draft.file, filename: draft.fileName, idempotencyKey };
+    const input = { file: draft.file, filename: draft.fileName, idempotencyKey, changedDigestConfirmed: draft.changedDigestConfirmed };
     const uploaded = draft.inputKind === "sbom"
       ? await this.config.releaseOperationsApi!.uploadSbom(this.analysisScope(draft), input)
       : await this.config.releaseOperationsApi!.uploadAnalysisInput(this.analysisScope(draft), {

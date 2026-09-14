@@ -8,8 +8,6 @@ const roleLabels = {
   org_admin: 'Org Admin',
   compliance_operator: 'Compliance Operator',
   authorized_approver: 'Authorized Approver',
-  security_reviewer: 'Security Reviewer',
-  viewer: 'Viewer',
   read_only_auditor: 'Read-only Auditor',
 } as const
 

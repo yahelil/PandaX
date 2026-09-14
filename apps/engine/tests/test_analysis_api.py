@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+from types import SimpleNamespace
+from unittest.mock import Mock
 from collections.abc import Iterator
 from datetime import date
 from pathlib import Path
@@ -16,6 +18,7 @@ from pandax.analysis_api import create_analysis_router
 from pandax.analysis_jobs import AnalysisJobRepository
 from pandax.portfolio import PortfolioRepository, create_portfolio_engine
 from pandax.portfolio_api import PortfolioIdentity
+from pandax.portfolio_runtime import enroll_completed_analysis
 
 
 def sbom_bytes() -> bytes:
@@ -100,6 +103,7 @@ def setup(tmp_path: Path) -> Iterator[dict]:
         "runner": runner,
         "digest": digest,
         "pending": [],
+        "completed": [],
     }
     engine.dispose()
 
@@ -117,6 +121,7 @@ def make_client(setup: dict, identity: PortfolioIdentity | None = None) -> TestC
             lambda: principal,
             setup["runner"],
             setup["pending"].append,
+            completion_callback=setup["completed"].append,
         )
     )
     return TestClient(app)
@@ -158,6 +163,7 @@ def test_upload_preview_run_events_and_evidence(setup):
     assert run.json()["status"] == "running"
     assert len(setup["pending"]) == 1
     setup["pending"].pop()()
+    assert [item.id for item in setup["completed"]] == [job["id"]]
     result = client.get(f"{collection(setup)}/{job['id']}").json()
     assert result["status"] == "completed"
     assert result["result"]["findings"] == 2
@@ -177,6 +183,24 @@ def test_upload_preview_run_events_and_evidence(setup):
     evidence = client.get(result["result"]["evidence"][0]["href"])
     assert evidence.status_code == 200
     assert evidence.content == b'{"signed":true}'
+
+
+def test_completed_active_release_enrolls_hourly_monitoring(monkeypatch):
+    portfolio = Mock()
+    portfolio.get_release.return_value = SimpleNamespace(status="active")
+    monitoring = Mock()
+    monkeypatch.setattr("pandax.portfolio_runtime.get_portfolio_repository", lambda: portfolio)
+    monkeypatch.setattr("pandax.portfolio_runtime.get_release_monitoring_repository", lambda: monitoring)
+
+    enroll_completed_analysis(SimpleNamespace(
+        organization_id="org-1", product_id="product-1", release_id="release-1", actor_id="operator-1",
+    ))
+
+    monitoring.configure.assert_called_once_with(
+        "org-1", "product-1", "release-1",
+        enabled_sources=("osv", "cisa_kev", "epss"), cadence_minutes=60,
+        enabled=True, actor_id="operator-1",
+    )
 
 
 def test_idempotent_http_replay_returns_same_job(setup):

@@ -12,10 +12,10 @@ export type Permission =
 
 const ALLOWED: Record<Permission, ReadonlySet<AuthRole>> = {
   manage_portfolio: new Set(["org_admin", "compliance_operator"]),
-  run_analysis: new Set(["org_admin", "compliance_operator", "security_reviewer"]),
-  run_monitoring: new Set(["org_admin", "compliance_operator", "security_reviewer"]),
-  decide_findings: new Set(["org_admin", "security_reviewer"]),
-  manage_remediation: new Set(["org_admin", "compliance_operator", "security_reviewer"]),
+  run_analysis: new Set(["org_admin", "compliance_operator"]),
+  run_monitoring: new Set(["org_admin", "compliance_operator"]),
+  decide_findings: new Set(["org_admin", "compliance_operator"]),
+  manage_remediation: new Set(["org_admin", "compliance_operator"]),
   approve_documents: new Set(["authorized_approver"]),
   manage_settings: new Set(["org_admin"]),
 };

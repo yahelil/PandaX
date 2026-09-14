@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from .analysis_jobs import AnalysisJobRepository
 from .auth import OIDCAuthenticator, OIDCSettings
 from .portfolio import PortfolioRepository, create_portfolio_engine
 from .portfolio_api import PortfolioIdentity
@@ -35,6 +36,14 @@ def get_portfolio_repository() -> PortfolioRepository:
     database_url, create_schema = _database_url()
     repository = PortfolioRepository(create_portfolio_engine(database_url))
     if create_schema:
+        repository.create_schema()
+    return repository
+
+
+@lru_cache(maxsize=1)
+def get_analysis_repository() -> AnalysisJobRepository:
+    repository = AnalysisJobRepository(get_portfolio_repository().engine)
+    if repository.engine.dialect.name == "sqlite":
         repository.create_schema()
     return repository
 
@@ -68,4 +77,5 @@ def reset_portfolio_repository() -> None:
     """Clear process wiring after configuration changes in tests or operators."""
 
     get_portfolio_repository.cache_clear()
+    get_analysis_repository.cache_clear()
     get_oidc_authenticator.cache_clear()

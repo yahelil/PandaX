@@ -1,0 +1,236 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from collections.abc import Iterator
+from datetime import date
+from pathlib import Path
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy.pool import StaticPool
+
+from pandax import events as ev
+from pandax.analysis_api import create_analysis_router
+from pandax.analysis_jobs import AnalysisJobRepository
+from pandax.portfolio import PortfolioRepository, create_portfolio_engine
+from pandax.portfolio_api import PortfolioIdentity
+
+
+def sbom_bytes() -> bytes:
+    return json.dumps(
+        {
+            "bomFormat": "CycloneDX",
+            "specVersion": "1.6",
+            "components": [
+                {
+                    "type": "library",
+                    "name": "jetty-server",
+                    "version": "11.0.17",
+                    "purl": "pkg:maven/org.eclipse.jetty/jetty-server@11.0.17",
+                }
+            ],
+        }
+    ).encode()
+
+
+@pytest.fixture
+def setup(tmp_path: Path) -> Iterator[dict]:
+    engine = create_portfolio_engine(
+        "sqlite+pysqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    portfolio = PortfolioRepository(engine)
+    repository = AnalysisJobRepository(engine)
+    repository.create_schema()
+    organization = portfolio.create_organization(
+        name="Acme Devices",
+        legal_name="Acme Devices GmbH",
+        country="DE",
+        registration_number="HRB-128991",
+        actor_id="admin",
+    )
+    product = portfolio.create_product(
+        organization.id,
+        name="Smart Camera",
+        identifier="ACM-CAM-210",
+        manufacturer="Acme Devices GmbH",
+        cra_class="important_i",
+        support_start=date(2026, 1, 1),
+        support_end=date(2030, 12, 31),
+        actor_id="admin",
+    )
+    release = portfolio.create_release(
+        organization.id,
+        product.id,
+        version="2.1.0",
+        channel="stable",
+        release_date=date(2026, 9, 1),
+        support_start=date(2026, 9, 1),
+        support_end=date(2030, 12, 31),
+        actor_id="admin",
+    )
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text('{"signed":true}', encoding="utf-8")
+    digest = hashlib.sha256(manifest.read_bytes()).hexdigest()
+
+    def runner(path: Path):
+        assert path.read_bytes() == sbom_bytes()
+        yield ev.start("S2 SBOM", "Validating SBOM")
+        yield ev.done("S2 SBOM", "SBOM ready")
+        yield ev.artifact("SEAL", "manifest.json", digest)
+        yield ev.run_done(
+            "Complete",
+            run_dir=str(tmp_path),
+            components=1,
+            findings=2,
+            kev=1,
+            incidents=0,
+            coverage_summary={"completed": 1},
+        )
+
+    yield {
+        "engine": engine,
+        "repository": repository,
+        "organization_id": organization.id,
+        "product_id": product.id,
+        "release_id": release.id,
+        "runner": runner,
+        "digest": digest,
+        "pending": [],
+    }
+    engine.dispose()
+
+
+def make_client(setup: dict, identity: PortfolioIdentity | None = None) -> TestClient:
+    principal = identity or PortfolioIdentity(
+        actor_id="security-reviewer",
+        organization_id=setup["organization_id"],
+        roles=frozenset({"security_reviewer"}),
+    )
+    app = FastAPI()
+    app.include_router(
+        create_analysis_router(
+            lambda: setup["repository"],
+            lambda: principal,
+            setup["runner"],
+            setup["pending"].append,
+        )
+    )
+    return TestClient(app)
+
+
+def collection(setup: dict) -> str:
+    return (
+        f"/v1/organizations/{setup['organization_id']}"
+        f"/products/{setup['product_id']}/releases/{setup['release_id']}/analysis-jobs"
+    )
+
+
+def upload(client: TestClient, setup: dict, *, key: str = "analysis-001"):
+    return client.post(
+        collection(setup),
+        headers={"Idempotency-Key": key},
+        files={
+            "sbom": (
+                "smart-camera.cdx.json",
+                sbom_bytes(),
+                "application/vnd.cyclonedx+json",
+            )
+        },
+    )
+
+
+def test_upload_preview_run_events_and_evidence(setup):
+    client = make_client(setup)
+
+    response = upload(client, setup)
+    assert response.status_code == 201, response.text
+    job = response.json()
+    assert job["status"] == "queued"
+    assert job["preview"]["components"] == 1
+    assert "idempotency_key" not in job
+
+    run = client.post(f"{collection(setup)}/{job['id']}/run")
+    assert run.status_code == 200, run.text
+    assert run.json()["status"] == "running"
+    assert len(setup["pending"]) == 1
+    setup["pending"].pop()()
+    result = client.get(f"{collection(setup)}/{job['id']}").json()
+    assert result["status"] == "completed"
+    assert result["result"]["findings"] == 2
+    assert result["result"]["evidence"] == [
+        {
+            "name": "manifest.json",
+            "sha256": setup["digest"],
+            "href": f"{collection(setup)}/{job['id']}/evidence/{setup['digest']}",
+        }
+    ]
+
+    events = client.get(f"{collection(setup)}/{job['id']}/events")
+    assert events.status_code == 200
+    assert events.json()[0]["kind"] == "analysis.uploaded"
+    assert events.json()[-1]["kind"] == "analysis.completed"
+
+    evidence = client.get(result["result"]["evidence"][0]["href"])
+    assert evidence.status_code == 200
+    assert evidence.content == b'{"signed":true}'
+
+
+def test_idempotent_http_replay_returns_same_job(setup):
+    client = make_client(setup)
+    first = upload(client, setup)
+    second = upload(client, setup)
+
+    assert second.status_code == 201
+    assert second.json()["id"] == first.json()["id"]
+    assert len(client.get(collection(setup)).json()) == 1
+
+
+def test_rejects_missing_key_and_invalid_sbom(setup):
+    client = make_client(setup)
+    missing_key = client.post(
+        collection(setup),
+        files={"sbom": ("sbom.json", sbom_bytes(), "application/json")},
+    )
+    invalid = client.post(
+        collection(setup),
+        headers={"Idempotency-Key": "invalid"},
+        files={"sbom": ("sbom.json", b"{}", "application/json")},
+    )
+
+    assert missing_key.status_code == 422
+    assert invalid.status_code == 422
+    assert "expected CycloneDX" in invalid.json()["detail"]
+
+
+def test_read_and_write_role_enforcement(setup):
+    viewer = make_client(
+        setup,
+        PortfolioIdentity(
+            actor_id="viewer",
+            organization_id=setup["organization_id"],
+            roles=frozenset({"viewer"}),
+        ),
+    )
+
+    assert viewer.get(collection(setup)).status_code == 200
+    assert upload(viewer, setup).status_code == 403
+
+
+def test_cross_organization_and_product_scope_are_hidden(setup):
+    wrong_tenant = make_client(
+        setup,
+        PortfolioIdentity(
+            actor_id="reviewer",
+            organization_id="another-organization",
+            roles=frozenset({"security_reviewer"}),
+        ),
+    )
+    assert wrong_tenant.get(collection(setup)).status_code == 404
+
+    client = make_client(setup)
+    wrong_product = collection(setup).replace(setup["product_id"], "wrong-product")
+    assert client.get(wrong_product).status_code == 404

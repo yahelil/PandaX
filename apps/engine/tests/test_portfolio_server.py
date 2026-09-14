@@ -46,6 +46,10 @@ def test_server_exposes_portfolio_router_with_replaceable_repository(tmp_path):
 
         assert product.status_code == 201
         assert product.json()["name"] == "Smart Camera"
+        assert any(
+            path.endswith("/analysis-jobs")
+            for path in server.api.openapi()["paths"]
+        )
     finally:
         server.api.dependency_overrides.pop(get_portfolio_repository, None)
         server.api.dependency_overrides.pop(get_portfolio_identity, None)

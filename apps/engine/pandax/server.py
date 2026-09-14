@@ -841,9 +841,11 @@ api.include_router(case_router)
 # Portfolio routing crosses a repository dependency so API tests and later
 # service deployments can replace storage without rewriting route handlers.
 from .analysis_api import create_analysis_router
+from .findings_api import create_findings_router
 from .portfolio_api import create_portfolio_router
 from .portfolio_runtime import (
     get_analysis_repository,
+    get_finding_repository,
     get_portfolio_identity,
     get_portfolio_repository,
     get_release_monitoring_repository,
@@ -866,4 +868,7 @@ api.include_router(
         ),
         get_portfolio_identity,
     )
+)
+api.include_router(
+    create_findings_router(get_finding_repository, get_portfolio_identity)
 )

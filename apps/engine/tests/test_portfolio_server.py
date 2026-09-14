@@ -54,6 +54,7 @@ def test_server_exposes_portfolio_router_with_replaceable_repository(tmp_path):
             path.endswith("/monitoring")
             for path in server.api.openapi()["paths"]
         )
+        assert "/v1/organizations/{organization_id}/findings" in server.api.openapi()["paths"]
     finally:
         server.api.dependency_overrides.pop(get_portfolio_repository, None)
         server.api.dependency_overrides.pop(get_portfolio_identity, None)

@@ -868,7 +868,11 @@ api.include_router(
     create_portfolio_router(get_portfolio_repository, get_portfolio_identity)
 )
 api.include_router(
-    create_analysis_router(get_analysis_repository, get_portfolio_identity)
+    create_analysis_router(
+        get_analysis_repository,
+        get_portfolio_identity,
+        settings_repository_dependency=get_organization_settings_repository,
+    )
 )
 api.include_router(
     create_release_monitoring_router(

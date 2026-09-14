@@ -9,6 +9,7 @@ from fastapi import (
     BackgroundTasks,
     Depends,
     File,
+    Form,
     Header,
     HTTPException,
     UploadFile,
@@ -19,6 +20,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .analysis_jobs import (
     MAX_SBOM_BYTES,
+    MAX_COLLECTOR_BYTES,
+    MAX_RAW_ARTIFACT_BYTES,
     AnalysisJobConflict,
     AnalysisJobError,
     AnalysisJobNotFound,
@@ -34,11 +37,12 @@ from .portfolio_api import (
     PortfolioIdentity,
     local_identity,
 )
+from .organization_settings import OrganizationSettingsRepository
 
 ANALYSIS_EDIT_ROLES = frozenset(
     {"org_admin", "compliance_operator", "security_reviewer"}
 )
-JobStatus = Literal["queued", "running", "completed", "failed"]
+JobStatus = Literal["queued", "running", "completed", "failed", "unsupported"]
 
 
 class ApiModel(BaseModel):
@@ -52,6 +56,8 @@ class SbomPreviewResponse(ApiModel):
     matchable_components: int
     skipped_components: int
     product: dict[str, Any] = Field(default_factory=dict)
+    collector: dict[str, Any] | None = None
+    analysis_support: Literal["pending_worker"] | None = None
 
 
 class EvidenceLinkResponse(ApiModel):
@@ -76,11 +82,16 @@ class AnalysisJobResponse(ApiModel):
     organization_id: str
     product_id: str
     release_id: str
+    input_type: Literal["sbom", "collector", "raw_artifact"]
     filename: str
     media_type: str
     size_bytes: int
     sha256: str
     preview: SbomPreviewResponse
+    retained_until: datetime | None
+    input_metadata: dict[str, Any]
+    consented_at: datetime | None
+    consent_actor_id: str | None
     status: JobStatus
     stage: str
     progress: int = Field(ge=0, le=100)
@@ -106,6 +117,7 @@ class AnalysisJobEventResponse(ApiModel):
 
 
 RepositoryDependency = Callable[[], AnalysisJobRepository]
+SettingsRepositoryDependency = Callable[[], OrganizationSettingsRepository]
 JobDispatcher = Callable[[Callable[[], Any]], None]
 
 
@@ -114,11 +126,20 @@ def create_analysis_router(
     identity_dependency: IdentityDependency = local_identity,
     runner: AnalysisRunner = pipeline_runner,
     dispatcher: JobDispatcher | None = None,
+    settings_repository_dependency: SettingsRepositoryDependency | None = None,
 ) -> APIRouter:
     """Build tenant-scoped routes with replaceable repository, identity, and runner adapters."""
     router = APIRouter(prefix="/v1", tags=["analysis"])
     Repository = Annotated[AnalysisJobRepository, Depends(repository_dependency)]
     Identity = Annotated[PortfolioIdentity, Depends(identity_dependency)]
+
+    def unavailable_settings_repository() -> OrganizationSettingsRepository:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "organization settings repository is unavailable")
+
+    SettingsRepository = Annotated[
+        OrganizationSettingsRepository,
+        Depends(settings_repository_dependency or unavailable_settings_repository),
+    ]
 
     @router.post(
         "/organizations/{organization_id}/products/{product_id}/releases/{release_id}/analysis-jobs",
@@ -148,6 +169,38 @@ def create_analysis_router(
                 actor_id=identity.actor_id,
             )
         )
+        return _job_response(job)
+
+    @router.post(
+        "/organizations/{organization_id}/products/{product_id}/releases/{release_id}/analysis-jobs/inputs",
+        response_model=AnalysisJobResponse,
+        status_code=status.HTTP_201_CREATED,
+    )
+    async def upload_analysis_input(
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        repository: Repository,
+        identity: Identity,
+        settings_repository: SettingsRepository,
+        input_type: Annotated[Literal["collector", "raw_artifact"], Form(...)],
+        file: Annotated[UploadFile, File(...)],
+        idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=128)],
+        raw_artifact_consent: Annotated[bool, Form()] = False,
+    ):
+        _authorize(identity, organization_id, ANALYSIS_EDIT_ROLES)
+        settings = settings_repository.get_settings(organization_id)
+        maximum = MAX_COLLECTOR_BYTES if input_type == "collector" else MAX_RAW_ARTIFACT_BYTES
+        content = await file.read(maximum + 1)
+        job = _call(lambda: repository.create_input(
+            organization_id, product_id, release_id,
+            input_type=input_type, filename=file.filename or "",
+            media_type=file.content_type or "", content=content,
+            idempotency_key=idempotency_key, actor_id=identity.actor_id,
+            raw_artifact_allowed=bool(settings.security["allow_raw_artifacts"]),
+            raw_artifact_consent=raw_artifact_consent,
+            retention_days=int(settings.security["evidence_retention_months"]) * 30,
+        ))
         return _job_response(job)
 
     @router.get(
@@ -303,11 +356,16 @@ def _job_response(job: AnalysisJobRecord) -> dict[str, Any]:
         "organization_id": job.organization_id,
         "product_id": job.product_id,
         "release_id": job.release_id,
+        "input_type": job.input_type,
         "filename": job.filename,
         "media_type": job.media_type,
         "size_bytes": job.size_bytes,
         "sha256": job.sha256,
         "preview": dict(job.preview),
+        "retained_until": job.retained_until,
+        "input_metadata": dict(job.input_metadata),
+        "consented_at": job.consented_at,
+        "consent_actor_id": job.consent_actor_id,
         "status": job.status,
         "stage": job.stage,
         "progress": job.progress,

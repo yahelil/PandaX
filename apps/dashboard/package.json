@@ -1,0 +1,30 @@
+{
+  "name": "@pandax/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --mode demo --configLoader runner --host 0.0.0.0",
+    "demo": "npm run build:demo && vite preview --configLoader runner --host 0.0.0.0",
+    "build": "tsc -b && vite build --configLoader runner",
+    "build:demo": "tsc -b && vite build --mode demo --configLoader runner",
+    "preview": "vite preview --configLoader runner --host 0.0.0.0",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run --root ../.. apps/dashboard/src",
+    "test:e2e": "npm run build:demo && node scripts/e2e-smoke.mjs"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "vitest": "^2.1.8"
+  }
+}

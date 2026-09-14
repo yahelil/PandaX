@@ -13,7 +13,7 @@ MODEL = MODELS / "kokoro-v1.0.int8.onnx"
 VOICES = MODELS / "voices-v1.0.bin"
 OUTPUT = ROOT / "public" / "audio"
 BASE = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
-NAMES = ("intro", "pipeline", "alert", "upgrade", "document", "outro")
+NAMES = ("proof-intro", "proof-pipeline", "proof-findings", "proof-decision", "proof-outputs", "proof-seal", "proof-tamper", "proof-outro")
 
 
 def download(url: str, destination: Path) -> None:

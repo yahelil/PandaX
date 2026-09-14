@@ -7,7 +7,7 @@
     "capture": "node scripts/capture.mjs",
     "voiceover": "uv run --with kokoro-onnx --with soundfile python scripts/generate_voiceover.py",
     "studio": "remotion studio src/index.tsx",
-    "render": "remotion render src/index.tsx ActisDashboardDemo ../../output/video/actis-dashboard-demo.mp4 --codec=h264 --crf=18 --audio-codec=aac --browser-executable=\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\""
+    "render": "remotion render src/index.tsx ActisRealAnalysisDemo ../../output/video/actis-real-analysis-demo.mp4 --codec=h264 --crf=18 --audio-codec=aac --browser-executable=\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\""
   },
   "dependencies": {
     "@remotion/cli": "4.0.524",

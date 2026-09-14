@@ -274,7 +274,12 @@ export class ProductionAdapter implements DataAdapter {
       this.fixture.replacePortfolio(portfolioState.organization, portfolioState.products, portfolioState.releases);
       if (operationsState) {
         const [home, notifications] = operationsState;
-        this.fixture.replaceOperationalState(home.actionQueue.map(mapAction), home.recentChanges.map(mapActivity), notifications.map(mapNotification));
+        this.fixture.replaceOperationalState(
+          home.actionQueue.map(mapAction),
+          home.recentChanges.map(mapActivity),
+          notifications.map(mapNotification),
+          { generatedAt: home.generatedAt, monitoring: home.monitoring, counters: home.counters, dataWarnings: home.dataWarnings },
+        );
       }
       if (findingsState) {
         findingsState.forEach((finding) => this.findingDetails.set(finding.id, finding));

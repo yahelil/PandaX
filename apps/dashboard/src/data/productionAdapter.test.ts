@@ -4,6 +4,7 @@ import { createDemoState } from "./fixtures";
 import { FixtureAdapter } from "./fixtureAdapter";
 import type { PortfolioApi } from "./portfolioApi";
 import { PortfolioApiError } from "./portfolioApi";
+import type { OperationsApi } from "./operationsApi";
 import { createRuntimeDataAdapter, ProductionAdapter } from "./productionAdapter";
 import type { ReleaseAnalysisJob, ReleaseOperationsApi } from "./releaseOperationsApi";
 import type { Organization, Product, Release } from "./types";
@@ -115,6 +116,27 @@ describe("ProductionAdapter", () => {
     expect(adapter.getSnapshot().documents).toEqual(initial.documents);
     expect(adapter.getSnapshot().settings).toEqual(initial.settings);
     expect(adapter.getStatusSnapshot()).toMatchObject({ mode: "production", phase: "ready" });
+  });
+
+  it("retains the production Home counters and monitoring summary", async () => {
+    const home = {
+      organizationId: organization.id,
+      generatedAt: "2026-09-14T10:00:00Z",
+      monitoring: { state: "stale" as const, supportedReleases: 4, configured: 3, healthy: 1, degraded: 1, failed: 0, stale: 1, inactive: 0, notConfigured: 1 },
+      counters: { actionTotal: 9, findingsNeedingAction: 3, urgentFindings: 2, reachableKevFindings: 1, complianceActions: 4, overdueObligations: 1, dueSoonObligations: 2, missingEvidence: 1, pendingApprovals: 1, documentsNeedingAction: 1, monitoringIssues: 2 },
+      actionQueue: [], recentChanges: [], dataWarnings: ["One release has stale monitoring data."],
+    };
+    const operationsApi = {
+      getHome: vi.fn(async () => home),
+      search: vi.fn(async () => ({ query: "", total: 0, groups: [] })),
+      listNotifications: vi.fn(async () => []),
+      markRead: vi.fn(), acknowledge: vi.fn(),
+    } as unknown as OperationsApi;
+    const adapter = new ProductionAdapter({ organizationId: organization.id, portfolioApi: api(), operationsApi, fixtureAdapter: new FixtureAdapter(createDemoState()) });
+
+    await adapter.initialize();
+
+    expect(adapter.getSnapshot().home).toEqual({ generatedAt: home.generatedAt, monitoring: home.monitoring, counters: home.counters, dataWarnings: home.dataWarnings });
   });
 
   it("retains existing read model and exposes typed state when hydration fails", async () => {

@@ -14,6 +14,11 @@ from .analysis_jobs import AnalysisJobRepository
 from .auth import OIDCAuthenticator, OIDCSettings, Principal
 from .compliance import ComplianceRepository
 from .documents import DocumentRepository
+from .domain_projections import (
+    ProjectedComplianceRepository,
+    ProjectedHomeReadModel,
+    ProjectedSearchNotificationRepository,
+)
 from .findings import FindingRepository
 from .home import HomeReadModel
 from .organization_settings import OrganizationSettingsRepository
@@ -73,7 +78,7 @@ def get_finding_repository() -> FindingRepository:
 
 @lru_cache(maxsize=1)
 def get_compliance_repository() -> ComplianceRepository:
-    repository = ComplianceRepository(get_portfolio_repository().engine)
+    repository = ProjectedComplianceRepository(get_portfolio_repository().engine)
     if repository.engine.dialect.name == "sqlite":
         repository.create_schema()
     return repository
@@ -89,7 +94,7 @@ def get_document_repository() -> DocumentRepository:
 
 @lru_cache(maxsize=1)
 def get_search_notification_repository() -> SearchNotificationRepository:
-    repository = SearchNotificationRepository(get_portfolio_repository().engine)
+    repository = ProjectedSearchNotificationRepository(get_portfolio_repository().engine)
     if repository.engine.dialect.name == "sqlite":
         repository.create_schema()
     return repository
@@ -97,7 +102,7 @@ def get_search_notification_repository() -> SearchNotificationRepository:
 
 @lru_cache(maxsize=1)
 def get_home_read_model() -> HomeReadModel:
-    return HomeReadModel(get_portfolio_repository().engine)
+    return ProjectedHomeReadModel(get_portfolio_repository().engine)
 
 
 @lru_cache(maxsize=1)

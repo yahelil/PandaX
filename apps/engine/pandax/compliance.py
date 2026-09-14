@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Iterator, Mapping, Protocol
-from uuid import uuid4
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 from sqlalchemy import (
     JSON,
@@ -242,6 +242,74 @@ class ComplianceRepository:
 
     def create_schema(self) -> None:
         portfolio_metadata.create_all(self.engine)
+
+    def project_release_evidence(
+        self,
+        organization_id: str,
+        actor_id: str = "domain-projector",
+    ) -> list[ComplianceItemRecord]:
+        """Idempotently project release SBOM gaps into compliance work."""
+        with Session(self.engine) as session:
+            rows = session.execute(
+                select(
+                    releases,
+                    products.c.name.label("product_name"),
+                    products.c.owner_id.label("product_owner_id"),
+                ).join(
+                    products,
+                    (products.c.id == releases.c.product_id)
+                    & (products.c.organization_id == releases.c.organization_id),
+                ).where(releases.c.organization_id == organization_id)
+            ).mappings().all()
+        projected: list[ComplianceItemRecord] = []
+        for row in rows:
+            source_id = f"{row['id']}:sbom"
+            current = self._source_item(organization_id, "release_evidence", source_id)
+            actionable = row["status"] != "end_of_support" and row["sbom_status"] != "validated"
+            if current is None:
+                if not actionable:
+                    continue
+                try:
+                    current = self.create_item(
+                        organization_id,
+                        item_id=str(uuid5(NAMESPACE_URL, f"actis:{organization_id}:release-evidence:{source_id}")),
+                        product_id=row["product_id"], release_id=row["id"],
+                        kind="missing_evidence",
+                        title=f"Complete SBOM evidence for {row['product_name']} {row['version']}",
+                        description="A validated CycloneDX or SPDX SBOM is required before release compliance evidence is complete.",
+                        priority="high" if row["sbom_status"] == "missing" else "medium",
+                        status="action_required", owner_id=row["owner_id"] or row["product_owner_id"],
+                        source_type="release_evidence", source_id=source_id, actor_id=actor_id,
+                    )
+                except ComplianceConflict:
+                    current = self._source_item(organization_id, "release_evidence", source_id)
+                    if current is None:
+                        raise
+                projected.append(current)
+                continue
+            values: dict[str, Any] = {}
+            desired_priority = "high" if row["sbom_status"] == "missing" else "medium"
+            if actionable and current.status == "resolved":
+                values.update(status="action_required", resolved_at=None)
+            elif not actionable and current.status != "resolved":
+                values.update(status="resolved", resolved_at=_utc(self.clock()))
+            if actionable and current.priority != desired_priority:
+                values["priority"] = desired_priority
+            if values:
+                current = self._write(current, values, current.version, actor_id, "compliance.release_evidence_projected")
+            projected.append(current)
+        return projected
+
+    def _source_item(
+        self, organization_id: str, source_type: str, source_id: str,
+    ) -> ComplianceItemRecord | None:
+        with Session(self.engine) as session:
+            row = session.execute(select(compliance_items).where(and_(
+                compliance_items.c.organization_id == organization_id,
+                compliance_items.c.source_type == source_type,
+                compliance_items.c.source_id == source_id,
+            ))).mappings().one_or_none()
+        return _item(row) if row is not None else None
 
     def create_item(
         self,

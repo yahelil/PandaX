@@ -5,6 +5,7 @@ import { FixtureAdapter } from "./fixtureAdapter";
 import type { PortfolioApi } from "./portfolioApi";
 import { PortfolioApiError } from "./portfolioApi";
 import { createRuntimeDataAdapter, ProductionAdapter } from "./productionAdapter";
+import type { ReleaseAnalysisJob, ReleaseOperationsApi } from "./releaseOperationsApi";
 import type { Organization, Product, Release } from "./types";
 
 const organization: Organization = {
@@ -74,6 +75,22 @@ function deferred<T>() {
     resolve = resolvePromise;
   });
   return { promise, resolve };
+}
+
+function releaseOperations(job: ReleaseAnalysisJob): ReleaseOperationsApi {
+  const unsupported = vi.fn(async () => { throw new Error("not used"); });
+  return {
+    uploadSbom: vi.fn(async () => job),
+    listAnalysisJobs: vi.fn(async () => [job]),
+    getAnalysisJob: vi.fn(async () => job),
+    runAnalysisJob: vi.fn(async () => job),
+    listAnalysisEvents: vi.fn(async () => []),
+    downloadEvidence: vi.fn(async () => ({ blob: new Blob(), contentType: "application/json" })),
+    getMonitoring: unsupported,
+    configureMonitoring: unsupported,
+    runMonitoring: unsupported,
+    listMonitoringEvents: vi.fn(async () => []),
+  };
 }
 
 describe("ProductionAdapter", () => {
@@ -164,5 +181,30 @@ describe("ProductionAdapter", () => {
       phase: "error",
       failure: { operation: "create_release", code: "conflict", status: 409 },
     });
+  });
+
+  it("uploads an SBOM once and maps the completed production analysis", async () => {
+    const initial = createDemoState();
+    const productId = initial.products[0].id;
+    const releaseId = initial.releases.find((item) => item.productId === productId)!.id;
+    const completed: ReleaseAnalysisJob = {
+      id: "analysis-live", organizationId: organization.id, productId, releaseId,
+      filename: "sbom.cdx.json", mediaType: "application/json", sizeBytes: 2,
+      sha256: "a".repeat(64),
+      preview: { format: "CycloneDX", version: "1.6", components: 42, matchableComponents: 40, skippedComponents: 2, product: {} },
+      status: "completed", stage: "Analysis complete", progress: 100,
+      result: { components: 42, findings: 5, kev: 1, incidents: 0, inputFormat: "CycloneDX", inputVersion: "1.6", coverageSummary: { new_findings: 3, changed_findings: 2, advisory_sources_checked: 4, advisory_sources_expected: 5 }, evidence: [] },
+      createdAt: "2026-09-14T08:00:00Z", updatedAt: "2026-09-14T08:01:00Z", completedAt: "2026-09-14T08:01:00Z",
+    };
+    const releaseApi = releaseOperations(completed);
+    const adapter = new ProductionAdapter({ organizationId: organization.id, portfolioApi: api(), releaseOperationsApi: releaseApi, fixtureAdapter: new FixtureAdapter(initial) });
+    const file = new Blob(["{}"], { type: "application/json" });
+    const draft = { productId, releaseId, version: "1.0.0", channel: "stable" as const, inputKind: "sbom" as const, fileName: "sbom.cdx.json", fileSize: file.size, file };
+
+    await expect(adapter.previewAnalysis(draft)).resolves.toMatchObject({ valid: true, componentCount: 42, identifiedComponentCount: 40, digest: "a".repeat(64) });
+    await expect(adapter.runAnalysis(draft)).resolves.toMatchObject({ id: "analysis-live", status: "completed", result: { newFindings: 3, changedFindings: 2, componentCount: 42 } });
+    expect(releaseApi.uploadSbom).toHaveBeenCalledTimes(1);
+    expect(releaseApi.runAnalysisJob).toHaveBeenCalledWith({ organizationId: organization.id, productId, releaseId }, "analysis-live");
+    expect(adapter.getSnapshot().analysisJobs[0].result?.coverage).toMatchObject({ identifiedComponents: 40, advisorySourcesChecked: 4, advisorySourcesExpected: 5 });
   });
 });

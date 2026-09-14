@@ -183,7 +183,7 @@ export interface ActionItem {
   priority: PriorityBand;
   title: string;
   reason: string;
-  productId: EntityId;
+  productId?: EntityId;
   releaseId?: EntityId;
   dueAt?: ISODate;
   ownerId?: EntityId;
@@ -271,7 +271,7 @@ export interface Activity {
 
 export interface Notification {
   id: EntityId;
-  type: "finding" | "deadline" | "monitoring" | "approval";
+  type: "finding" | "deadline" | "monitoring" | "approval" | "document" | "analysis" | "system";
   priority: PriorityBand;
   title: string;
   body: string;
@@ -288,6 +288,7 @@ export interface AnalysisDraft {
   inputKind: ReleaseArtifact["kind"];
   fileName: string;
   fileSize: number;
+  file?: Blob;
   rawArtifactConsent?: boolean;
 }
 

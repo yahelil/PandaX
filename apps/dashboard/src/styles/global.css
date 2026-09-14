@@ -344,6 +344,8 @@ button { color: inherit; }
 
 .main-content { min-width: 0; min-height: calc(100vh - var(--topbar-height)); padding: 30px clamp(22px, 3vw, 44px) 52px; outline: none; }
 .main-content > * { width: 100%; max-width: 1580px; margin-inline: auto; }
+.adapter-status { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-block:0 16px; padding:10px 14px; border:1px solid var(--info-border); border-radius:10px; background:var(--info-bg); color:var(--text-secondary); font-size:13px; }
+.adapter-status--error { border-color:var(--danger-border); background:var(--danger-bg); color:var(--danger); }
 .page-header-actions .button { white-space: nowrap; }
 .breadcrumbs { display: flex; align-items: center; gap: 7px; margin-bottom: -10px; color: var(--text-muted); font-size: 12px; }
 .breadcrumbs span { display: inline-flex; align-items: center; gap: 7px; }

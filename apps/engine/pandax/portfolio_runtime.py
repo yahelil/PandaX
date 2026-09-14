@@ -11,6 +11,7 @@ from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .analysis_jobs import AnalysisJobRepository
+from .analysis_storage import LocalAnalysisInputStorage
 from .auth import OIDCAuthenticator, OIDCSettings, Principal
 from .compliance import ComplianceRepository
 from .documents import DocumentRepository
@@ -54,7 +55,12 @@ def get_portfolio_repository() -> PortfolioRepository:
 
 @lru_cache(maxsize=1)
 def get_analysis_repository() -> AnalysisJobRepository:
-    repository = AnalysisJobRepository(get_portfolio_repository().engine)
+    configured = os.environ.get("PANDAX_ANALYSIS_INPUT_DIR", "").strip()
+    root = Path(configured) if configured else Path(os.environ.get("PANDAX_DATA_DIR", Path.cwd() / "output" / ".pandax")) / "analysis-objects"
+    repository = AnalysisJobRepository(
+        get_portfolio_repository().engine,
+        LocalAnalysisInputStorage(root),
+    )
     if repository.engine.dialect.name == "sqlite":
         repository.create_schema()
     return repository

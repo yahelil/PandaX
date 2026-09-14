@@ -10,8 +10,9 @@ def test_production_migrations_form_one_ordered_head():
     config.set_main_option("script_location", str(root / "alembic"))
     scripts = ScriptDirectory.from_config(config)
 
-    assert scripts.get_heads() == ["20260914_0008"]
+    assert scripts.get_heads() == ["20260914_0009"]
     assert [revision.revision for revision in scripts.walk_revisions()] == [
+        "20260914_0009",
         "20260914_0008",
         "20260914_0007",
         "20260914_0006",

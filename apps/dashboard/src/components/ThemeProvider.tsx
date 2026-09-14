@@ -13,6 +13,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null)
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { state, actions } = useDemo()
   const setting = state.settings.appearance.theme
+  const density = state.settings.appearance.density
   const theme: Theme = setting === 'system'
     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
     : setting
@@ -22,12 +23,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
+    document.documentElement.dataset.density = density
     document.documentElement.style.colorScheme = theme
     document.querySelector('meta[name="theme-color"]')?.setAttribute(
       'content',
       theme === 'dark' ? '#0b1220' : '#f5f7fb',
     )
-  }, [theme])
+  }, [density, theme])
 
   const value = useMemo(
     () => ({ theme, setTheme, toggleTheme: () => setTheme(theme === 'dark' ? 'light' : 'dark') }),

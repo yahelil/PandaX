@@ -23,7 +23,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
   const scopeSearch = scopeParams.toString()
   const badges: Record<string, number> = {
     '/findings': findings.filter((item) => item.status === 'needs_review' || item.status === 'action_required').length,
-    '/compliance': complianceItems.filter((item) => item.status !== 'complete' && (item.priority === 'urgent' || item.priority === 'high')).length,
+    '/compliance': complianceItems.filter((item) => (item.lifecycleStatus ? item.lifecycleStatus !== 'resolved' : item.status !== 'complete') && (item.priority === 'urgent' || item.priority === 'high')).length,
   }
   return (
     <aside className={`sidebar${open ? ' sidebar--open' : ''}`} aria-label="Primary navigation">

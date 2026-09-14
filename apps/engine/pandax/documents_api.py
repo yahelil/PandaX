@@ -171,9 +171,9 @@ def _call(operation: Callable[[], Result]) -> Result:
     except DocumentConflict as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except DocumentValidationError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     except DocumentError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 def create_documents_router(

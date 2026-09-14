@@ -113,9 +113,9 @@ def _call(operation: Callable[[], Result]) -> Result:
     except ComplianceConflict as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except ComplianceValidationError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     except ComplianceError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 def _authorize(

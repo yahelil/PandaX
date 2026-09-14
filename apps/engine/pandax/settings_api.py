@@ -236,9 +236,9 @@ def _call(operation: Callable[[], Result]) -> Result:
     except SettingsConflict as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except SettingsValidationError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     except SettingsError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 def create_settings_router(repository_dependency: RepositoryDependency, identity_dependency: IdentityDependency = _unauthenticated) -> APIRouter:

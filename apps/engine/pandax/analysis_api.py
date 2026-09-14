@@ -373,9 +373,9 @@ def _call(operation: Callable[[], Any]):
     except AnalysisJobConflict as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except AnalysisJobValidationError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     except AnalysisJobError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 def _job_response(job: AnalysisJobRecord) -> dict[str, Any]:

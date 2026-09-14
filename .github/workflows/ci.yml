@@ -38,7 +38,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
-      - run: uv sync --locked
+      - run: uv sync --locked --extra dev
       - run: uv run pytest apps/engine/tests -m "not slow" -q
         env:
           PYTHONPATH: apps/engine

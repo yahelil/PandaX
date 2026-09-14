@@ -854,9 +854,11 @@ from .portfolio_runtime import (
     get_portfolio_identity,
     get_portfolio_repository,
     get_release_monitoring_repository,
+    get_search_notification_repository,
 )
 from .release_monitoring import monitoring_store_runner
 from .release_monitoring_api import create_release_monitoring_router
+from .search_notifications_api import create_search_notifications_router
 
 api.include_router(
     create_portfolio_router(get_portfolio_repository, get_portfolio_identity)
@@ -882,4 +884,10 @@ api.include_router(
 )
 api.include_router(
     create_documents_router(get_document_repository, get_authenticated_principal)
+)
+api.include_router(
+    create_search_notifications_router(
+        get_search_notification_repository,
+        get_portfolio_identity,
+    )
 )

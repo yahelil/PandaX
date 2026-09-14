@@ -1,11 +1,12 @@
 import type { AdapterFailure, AdapterOperation, AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } from "./adapter";
+import { sanitizeAnalyticsEvent } from "./analytics";
 import { createFindingsApi, FindingApiError, type FindingsApi, type ManagedFinding } from "./findingsApi";
-import { createGovernanceApi, GovernanceApiError, mapCompliance, mapGovernanceSettings, mapIntegration, mapTeamMember, type DocumentDetailDto, type DocumentFormat, type DocumentRevisionDto, type GovernanceApi } from "./governanceApi";
+import { createGovernanceApi, GovernanceApiError, mapCompliance, mapGovernanceSettings, mapIntegration, mapTeamMember, type ComplianceDto, type DocumentDetailDto, type DocumentFormat, type DocumentRevisionDto, type GovernanceApi, type PrivacySafeAnalyticsEvent } from "./governanceApi";
 import { createOperationsApi, OperationsApiError, type OperationsApi, type OperationsHome, type OperationsNotification, type OperationsSearchResult } from "./operationsApi";
 import { FixtureAdapter } from "./fixtureAdapter";
 import { createPortfolioApi, PortfolioApiError, type PortfolioApi } from "./portfolioApi";
 import { createReleaseOperationsApi, ReleaseOperationsApiError, type MonitoringRunEvent, type ReleaseAnalysisJob, type ReleaseMonitoringStatus, type ReleaseOperationsApi, type ReleaseScope } from "./releaseOperationsApi";
-import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentDownloadMetadata, DocumentRecord, DocumentRevision, EntityId, Finding, FindingDecisionInput, Notification, Product, RecordDocumentSelfFilingInput, RegisterDocumentRevisionInput, Release, ReleaseMonitoringView, Remediation, RemediationInput } from "./types";
+import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, ComplianceApprovalCommand, ComplianceItem, ComplianceUpdateCommand, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentDownloadMetadata, DocumentRecord, DocumentRevision, EntityId, Finding, FindingDecisionInput, Integration, IntegrationUpdate, Notification, Organization, OrganizationProfileUpdate, Product, RecordDocumentSelfFilingInput, RegisterDocumentRevisionInput, Release, ReleaseMonitoringView, Remediation, RemediationInput, TeamMember, TeamMemberUpdate } from "./types";
 
 export type BearerTokenProvider = () => string | undefined | Promise<string | undefined>;
 
@@ -52,7 +53,7 @@ function mapActivity(item: OperationsHome["recentChanges"][number]): Activity {
 function mapNotification(item: OperationsNotification): Notification {
   const priority: Notification["priority"] = item.priority === "critical" ? "urgent" : item.priority === "high" ? "high" : item.priority === "medium" ? "normal" : "low";
   const type: Notification["type"] = item.kind === "compliance" ? "deadline" : item.kind;
-  return { id: item.id, type, priority, title: item.title, body: item.detail, targetUrl: item.targetUrl, createdAt: item.createdAt, acknowledgedAt: item.acknowledgedAt };
+  return { id: item.id, type, priority, title: item.title, body: item.detail, targetUrl: item.targetUrl, createdAt: item.createdAt, readAt: item.readAt, acknowledgedAt: item.acknowledgedAt };
 }
 
 function mapMonitoring(status: ReleaseMonitoringStatus, events: MonitoringRunEvent[]): ReleaseMonitoringView {
@@ -202,10 +203,12 @@ export class ProductionAdapter implements DataAdapter {
   private readonly dataListeners = new Set<DemoListener>();
   private readonly statusListeners = new Set<DemoListener>();
   private readonly findingDetails = new Map<string, ManagedFinding>();
+  private readonly complianceDetails = new Map<string, ComplianceDto>();
   private readonly documentDetails = new Map<string, DocumentDetailDto>();
   private readonly uploadedAnalysis = new Map<string, ReleaseAnalysisJob>();
   private readonly analysisTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private settingsVersion?: number;
+  private analyticsConsent?: boolean;
   private status: AdapterStatus = { mode: "production", phase: "loading" };
   private refreshRevision = 0;
 
@@ -220,32 +223,89 @@ export class ProductionAdapter implements DataAdapter {
   subscribeStatus = (listener: DemoListener) => { this.statusListeners.add(listener); return () => this.statusListeners.delete(listener); };
   initialize = async (options?: { signal?: AbortSignal }) => this.load("initialize", options);
   refresh = async (options?: { signal?: AbortSignal }) => this.load("refresh", options);
-  reset = () => { this.analysisTimers.forEach(clearTimeout); this.analysisTimers.clear(); this.uploadedAnalysis.clear(); this.fixture.reset(); void this.refresh(); };
+  reset = () => { this.analysisTimers.forEach(clearTimeout); this.analysisTimers.clear(); this.uploadedAnalysis.clear(); this.analyticsConsent = undefined; this.fixture.reset(); void this.refresh(); };
 
   search = async (query: string, options?: { signal?: AbortSignal }): Promise<WorkspaceSearchResult[]> => {
     if (!this.config.operationsApi) return this.fixture.search(query);
     if (query.trim().length < 2) return [];
-    return this.mutation("search", async () => {
-      const result = await this.config.operationsApi!.search(this.config.organizationId, query, { limit: 8, signal: options?.signal });
-      return result.groups.flatMap((group) => group.results).sort((a, b) => a.rank - b.rank).slice(0, 8).map(mapSearch);
-    });
+    const result = await this.config.operationsApi.search(this.config.organizationId, query, { limit: 8, signal: options?.signal });
+    return result.groups.flatMap((group) => group.results).sort((a, b) => a.rank - b.rank).slice(0, 8).map(mapSearch);
+  };
+
+  trackAnalytics = async (event: PrivacySafeAnalyticsEvent): Promise<void> => {
+    const safe = sanitizeAnalyticsEvent(event);
+    if (!safe || this.analyticsConsent !== true || !this.config.governanceApi) return;
+    try {
+      await this.config.governanceApi.ingestAnalytics(this.config.organizationId, [safe]);
+      if (this.status.analyticsFailure) this.setStatus({ ...this.status, analyticsFailure: undefined });
+    } catch (error) {
+      const item = failure("ingest_analytics", error);
+      this.setStatus({ ...this.status, analyticsFailure: { code: item.code, status: item.status, occurredAt: item.occurredAt } });
+    }
   };
 
   updateSettings = async <K extends keyof AppSettings>(section: K, patch: Partial<AppSettings[K]>): Promise<void> => {
-    if (!this.config.governanceApi || this.settingsVersion === undefined) return this.fixture.updateSettings(section, patch);
+    if (!this.config.governanceApi || this.settingsVersion === undefined) throw new Error("Production settings are not ready.");
     await this.mutation("update_settings", async () => {
       const updated = await this.config.governanceApi!.updateSettings(this.config.organizationId, { expectedVersion: this.settingsVersion!, [section]: patch });
       this.settingsVersion = updated.version;
-      this.fixture.replaceSettings(mapGovernanceSettings(updated).settings);
+      const settings = mapGovernanceSettings(updated).settings;
+      this.analyticsConsent = settings.analytics.enabled;
+      this.fixture.replaceSettings(settings);
     });
+  };
+
+  updateOrganization = async (patch: OrganizationProfileUpdate): Promise<Organization> => {
+    if (!this.config.governanceApi || this.settingsVersion === undefined) throw new Error("Production organization settings are not ready.");
+    return this.mutation("update_organization", async () => {
+      const { defaultTimezone, ...profile } = patch;
+      const updated = await this.config.governanceApi!.updateSettings(this.config.organizationId, {
+        expectedVersion: this.settingsVersion!,
+        organizationProfile: { ...profile, timezone: defaultTimezone },
+      });
+      this.settingsVersion = updated.version;
+      const mapped = mapGovernanceSettings(updated);
+      this.fixture.replaceOrganization(mapped.organization);
+      this.fixture.replaceSettings(mapped.settings);
+      return mapped.organization;
+    });
+  };
+
+  updateTeamMember = async (memberId: EntityId, patch: TeamMemberUpdate): Promise<TeamMember> => {
+    if (!this.config.governanceApi) throw new Error("Production team management is not available.");
+    const current = this.getSnapshot().members.find((item) => item.id === memberId);
+    if (!current?.version) throw new Error(`Team member ${memberId} is not ready for editing.`);
+    return this.mutation("update_team_member", async () => {
+      const updated = await this.config.governanceApi!.updateTeamMember(this.config.organizationId, memberId, { expectedVersion: current.version!, ...patch });
+      const mapped = mapTeamMember(updated);
+      if (!mapped) throw new Error("Updated team member is not available in this workspace.");
+      this.fixture.upsertTeamMember(mapped);
+      return mapped;
+    });
+  };
+
+  updateIntegration = async (integrationId: EntityId, patch: IntegrationUpdate): Promise<Integration> => {
+    if (!this.config.governanceApi) throw new Error("Production integration management is not available.");
+    const current = this.getSnapshot().integrations.find((item) => item.id === integrationId);
+    if (!current?.version) throw new Error(`Integration ${integrationId} is not ready for editing.`);
+    return this.mutation("update_integration", async () => {
+      const updated = await this.config.governanceApi!.updateIntegration(this.config.organizationId, integrationId, { expectedVersion: current.version!, ...patch });
+      const mapped = mapIntegration(updated);
+      this.fixture.upsertIntegration(mapped);
+      return mapped;
+    });
+  };
+
+  markNotificationRead = async (notificationId: EntityId): Promise<void> => {
+    if (!this.config.operationsApi) return this.fixture.markNotificationRead(notificationId);
+    const item = await this.config.operationsApi.markRead(this.config.organizationId, notificationId);
+    this.fixture.markNotificationRead(item.id);
   };
 
   acknowledgeNotification = async (notificationId: EntityId): Promise<void> => {
     if (!this.config.operationsApi) return this.fixture.acknowledgeNotification(notificationId);
-    await this.mutation("acknowledge_notification", async () => {
-      const item = await this.config.operationsApi!.acknowledge(this.config.organizationId, notificationId);
-      this.fixture.acknowledgeNotification(item.id);
-    });
+    const item = await this.config.operationsApi.acknowledge(this.config.organizationId, notificationId);
+    this.fixture.acknowledgeNotification(item.id);
   };
 
   loadFindingDetail = async (findingId: EntityId, options?: { signal?: AbortSignal }): Promise<Finding | undefined> => {
@@ -284,6 +344,54 @@ export class ProductionAdapter implements DataAdapter {
     return this.mutation("update_remediation", async () => {
       const updated = await this.config.findingsApi!.updateRemediation(this.config.organizationId, scope.productId, scope.releaseId, input.findingId, { plan: input.plan, status: remediationStatus(input.status), dueDate: input.targetDate, verificationEvidence: evidence.map((evidenceId) => ({ evidence_id: evidenceId })), expectedVersion: scope.version });
       this.findingDetails.set(updated.id, updated); this.fixture.upsertFinding(updated); return updated;
+    });
+  };
+
+  loadComplianceDetail = async (itemId: EntityId, options?: { signal?: AbortSignal }): Promise<ComplianceItem | undefined> => {
+    if (!this.config.governanceApi) return this.fixture.loadComplianceDetail(itemId);
+    return this.mutation("load_compliance", async () => {
+      const [item, audit] = await Promise.all([
+        this.config.governanceApi!.getCompliance(this.config.organizationId, itemId, options),
+        this.config.governanceApi!.listComplianceAudit(this.config.organizationId, itemId, options),
+      ]);
+      this.complianceDetails.set(item.id, item);
+      const mapped = mapCompliance(item, audit);
+      this.fixture.upsertCompliance(mapped);
+      return mapped;
+    });
+  };
+
+  updateCompliance = async (input: ComplianceUpdateCommand): Promise<ComplianceItem> => {
+    if (!this.config.governanceApi) return this.fixture.updateCompliance(input);
+    const current = this.requireComplianceDetail(input.itemId);
+    return this.mutation("update_compliance", async () => {
+      const updated = await this.config.governanceApi!.updateCompliance(this.config.organizationId, input.itemId, {
+        expectedVersion: current.version,
+        title: input.title,
+        description: input.description,
+        priority: input.priority,
+        status: input.status,
+        dueAt: input.dueAt,
+        clearDueAt: input.clearDueAt,
+        ownerId: input.ownerId,
+        clearOwner: input.clearOwner,
+        selfFilingRecordId: input.selfFilingRecordId,
+        selfFilingRecordUrl: input.selfFilingRecordUrl,
+      });
+      return this.storeCompliance(updated);
+    });
+  };
+
+  approveCompliance = async (input: ComplianceApprovalCommand): Promise<ComplianceItem> => {
+    if (!this.config.governanceApi) return this.fixture.approveCompliance(input);
+    const current = this.requireComplianceDetail(input.itemId);
+    return this.mutation("approve_compliance", async () => {
+      const updated = await this.config.governanceApi!.approveCompliance(this.config.organizationId, input.itemId, {
+        expectedVersion: current.version,
+        selfFilingRecordId: input.selfFilingRecordId,
+        selfFilingRecordUrl: input.selfFilingRecordUrl,
+      });
+      return this.storeCompliance(updated);
     });
   };
 
@@ -426,13 +534,16 @@ export class ProductionAdapter implements DataAdapter {
       }
       if (governanceState) {
         this.settingsVersion = governanceState.settings.version;
+        this.analyticsConsent = governanceState.settings.analytics.enabled;
         governanceState.documentDetails.forEach((detail) => this.documentDetails.set(detail.document.id, detail));
+        governanceState.compliance.forEach((item) => this.complianceDetails.set(item.id, item));
         this.fixture.replaceGovernanceState(
-          governanceState.compliance.flatMap((item) => { const mapped = mapCompliance(item); return mapped ? [mapped] : []; }),
+          governanceState.compliance.map((item) => mapCompliance(item)),
           governanceState.documentDetails.map(mapDocument), mapGovernanceSettings(governanceState.settings).settings,
           governanceState.members.flatMap((item) => { const mapped = mapTeamMember(item); return mapped ? [mapped] : []; }),
           governanceState.integrations.map(mapIntegration),
         );
+        this.fixture.replaceOrganization(mapGovernanceSettings(governanceState.settings).organization);
       }
       this.markReady();
     } catch (error) {
@@ -500,6 +611,20 @@ export class ProductionAdapter implements DataAdapter {
     const detail = this.documentDetails.get(documentId);
     if (!detail) throw new Error(`Unknown production document: ${documentId}`);
     return detail;
+  }
+
+  private requireComplianceDetail(itemId: string): ComplianceDto {
+    const detail = this.complianceDetails.get(itemId);
+    if (!detail) throw new Error(`Unknown production compliance item: ${itemId}`);
+    return detail;
+  }
+
+  private async storeCompliance(item: ComplianceDto): Promise<ComplianceItem> {
+    this.complianceDetails.set(item.id, item);
+    const audit = await this.config.governanceApi!.listComplianceAudit(this.config.organizationId, item.id);
+    const mapped = mapCompliance(item, audit);
+    this.fixture.upsertCompliance(mapped);
+    return mapped;
   }
 
   private storeDocumentDetail(detail: DocumentDetailDto): DocumentRecord {

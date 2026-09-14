@@ -1,11 +1,15 @@
 import type { AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } from "./adapter";
+import { sanitizeAnalyticsEvent } from "./analytics";
 import { createDemoState, DEMO_IDS } from "./fixtures";
+import type { PrivacySafeAnalyticsEvent } from "./governanceApi";
 import type {
   RegisterDocumentRevisionInput,
   AnalysisDraft,
   AnalysisJob,
   AnalysisPreview,
+  ComplianceApprovalCommand,
   AppSettings,
+  ComplianceItem,
   Approval,
   CreateProductInput,
   CreateReleaseInput,
@@ -15,11 +19,18 @@ import type {
   EntityId,
   Finding,
   FindingDecisionInput,
+  Integration,
+  IntegrationUpdate,
+  Organization,
+  OrganizationProfileUpdate,
   Product,
   Release,
   ReleaseMonitoringView,
   RecordDocumentSelfFilingInput,
   RemediationInput,
+  TeamMember,
+  TeamMemberUpdate,
+  ComplianceUpdateCommand,
 } from "./types";
 
 const STORAGE_KEY = "actis.demo-state.v1";
@@ -42,13 +53,24 @@ function digestFor(draft: AnalysisDraft): string {
   return `${(hash >>> 0).toString(16).padStart(8, "0")}8d44c7a0…${draft.fileSize.toString(16).padStart(4, "0")}`;
 }
 
+function withAnalyticsSettings(state: DemoState): DemoState {
+  const legacy = state as DemoState & { settings: AppSettings & { analytics?: AppSettings["analytics"] } };
+  return {
+    ...state,
+    settings: {
+      ...state.settings,
+      analytics: legacy.settings.analytics ?? { enabled: true, retentionDays: 90 },
+    },
+  };
+}
+
 function loadInitialState(): DemoState {
   if (typeof window === "undefined") return createDemoState();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return createDemoState();
     const parsed = JSON.parse(raw) as DemoState;
-    return parsed.schemaVersion === 2 ? parsed : createDemoState();
+    return parsed.schemaVersion === 2 ? withAnalyticsSettings(parsed) : createDemoState();
   } catch {
     return createDemoState();
   }
@@ -58,10 +80,11 @@ export class FixtureAdapter implements DataAdapter {
   private state: DemoState;
   private readonly listeners = new Set<DemoListener>();
   private readonly timers = new Set<ReturnType<typeof setTimeout>>();
+  private readonly analyticsEvents: PrivacySafeAnalyticsEvent[] = [];
   private readonly status: AdapterStatus = { mode: "fixture", phase: "ready" };
 
   constructor(initialState?: DemoState, private readonly persist = true) {
-    this.state = initialState ? structuredClone(initialState) : loadInitialState();
+    this.state = withAnalyticsSettings(initialState ? structuredClone(initialState) : loadInitialState());
   }
 
   getStatusSnapshot = (): AdapterStatus => this.status;
@@ -115,8 +138,17 @@ export class FixtureAdapter implements DataAdapter {
   reset = (): void => {
     this.timers.forEach(clearTimeout);
     this.timers.clear();
+    this.analyticsEvents.length = 0;
     this.commit(createDemoState());
   };
+
+  trackAnalytics = (event: PrivacySafeAnalyticsEvent): void => {
+    if (!this.state.settings.analytics.enabled) return;
+    const safe = sanitizeAnalyticsEvent(event);
+    if (safe) this.analyticsEvents.push(structuredClone(safe));
+  };
+
+  getTrackedAnalytics = (): readonly PrivacySafeAnalyticsEvent[] => structuredClone(this.analyticsEvents);
 
   updateSettings = <K extends keyof AppSettings>(section: K, patch: Partial<AppSettings[K]>): void => {
     this.mutate((state) => {
@@ -127,10 +159,56 @@ export class FixtureAdapter implements DataAdapter {
     });
   };
 
+  updateOrganization = (patch: OrganizationProfileUpdate): Organization => {
+    let updated!: Organization;
+    this.mutate((state) => {
+      state.organization = { ...state.organization, ...patch };
+      updated = structuredClone(state.organization);
+    });
+    return updated;
+  };
+
+  updateTeamMember = (memberId: EntityId, patch: TeamMemberUpdate): TeamMember => {
+    let updated!: TeamMember;
+    this.mutate((state) => {
+      const member = state.members.find((item) => item.id === memberId);
+      if (!member) throw new Error(`Unknown team member: ${memberId}`);
+      if (patch.roles && !patch.roles.length) throw new Error("At least one role is required.");
+      Object.assign(member, patch, { version: (member.version ?? 1) + 1 });
+      updated = structuredClone(member);
+    });
+    return updated;
+  };
+
+  updateIntegration = (integrationId: EntityId, patch: IntegrationUpdate): Integration => {
+    let updated!: Integration;
+    this.mutate((state) => {
+      const integration = state.integrations.find((item) => item.id === integrationId);
+      if (!integration) throw new Error(`Unknown integration: ${integrationId}`);
+      const { secretReference, ...values } = patch;
+      Object.assign(integration, values, { version: (integration.version ?? 1) + 1 });
+      if (secretReference === null) delete integration.secretReference;
+      else if (secretReference !== undefined) integration.secretReference = secretReference;
+      updated = structuredClone(integration);
+    });
+    return updated;
+  };
+
+  markNotificationRead = (notificationId: EntityId): void => {
+    this.mutate((state) => {
+      const notification = state.notifications.find((item) => item.id === notificationId);
+      if (notification && !notification.readAt) notification.readAt = now();
+    });
+  };
+
   acknowledgeNotification = (notificationId: EntityId): void => {
     this.mutate((state) => {
       const notification = state.notifications.find((item) => item.id === notificationId);
-      if (notification && !notification.acknowledgedAt) notification.acknowledgedAt = now();
+      if (notification && !notification.acknowledgedAt) {
+        const acknowledgedAt = now();
+        notification.readAt ??= acknowledgedAt;
+        notification.acknowledgedAt = acknowledgedAt;
+      }
     });
   };
 
@@ -219,6 +297,63 @@ export class FixtureAdapter implements DataAdapter {
         state.actions.filter((item) => item.targetUrl.endsWith(finding.id)).forEach((item) => { item.status = "completed"; });
       }
       updated = structuredClone(finding);
+    });
+    return updated;
+  };
+
+  loadComplianceDetail = async (itemId: EntityId): Promise<ComplianceItem | undefined> => {
+    const item = this.state.complianceItems.find((candidate) => candidate.id === itemId);
+    return item ? structuredClone(item) : undefined;
+  };
+
+  updateCompliance = (input: ComplianceUpdateCommand): ComplianceItem => {
+    let updated!: ComplianceItem;
+    this.mutate((state) => {
+      const item = this.requireCompliance(state, input.itemId);
+      const changedAt = now();
+      const payload: Record<string, unknown> = {};
+      if (input.title !== undefined) { item.title = input.title.trim(); payload.title = item.title; }
+      if (input.description !== undefined) { item.reason = input.description.trim(); payload.description = item.reason; }
+      if (input.priority !== undefined) {
+        item.priority = input.priority === "critical" ? "urgent" : input.priority === "medium" ? "normal" : input.priority;
+        payload.priority = input.priority;
+      }
+      if (input.status !== undefined) {
+        item.lifecycleStatus = input.status;
+        item.status = input.status === "resolved" || input.status === "approved" ? "complete" : input.status === "action_required" ? "open" : input.status === "pending_approval" ? "blocked" : "in_progress";
+        if (input.status === "acknowledged") item.acknowledgedAt = changedAt;
+        if (input.status === "resolved") item.resolvedAt = changedAt;
+        payload.status = input.status;
+      }
+      if (input.clearDueAt) { item.dueAt = undefined; payload.dueAt = null; }
+      else if (input.dueAt !== undefined) { item.dueAt = input.dueAt; payload.dueAt = input.dueAt; }
+      if (input.clearOwner) { item.ownerId = undefined; payload.ownerId = null; }
+      else if (input.ownerId !== undefined) { item.ownerId = input.ownerId; payload.ownerId = input.ownerId; }
+      if (input.selfFilingRecordId !== undefined) item.selfFilingRecordId = input.selfFilingRecordId;
+      if (input.selfFilingRecordUrl !== undefined) item.selfFilingRecordUrl = input.selfFilingRecordUrl;
+      item.version = (item.version ?? 0) + 1;
+      item.updatedAt = changedAt;
+      item.audit = [...(item.audit ?? []), { id: `compliance-audit-${item.id}-${item.version}`, action: "compliance.updated", actorId: state.currentUserId, itemVersion: item.version, occurredAt: changedAt, payload }];
+      updated = structuredClone(item);
+    });
+    return updated;
+  };
+
+  approveCompliance = (input: ComplianceApprovalCommand): ComplianceItem => {
+    let updated!: ComplianceItem;
+    this.mutate((state) => {
+      const item = this.requireCompliance(state, input.itemId);
+      const approvedAt = now();
+      item.lifecycleStatus = "approved";
+      item.status = "complete";
+      item.approvedBy = state.currentUserId;
+      item.approvedAt = approvedAt;
+      item.selfFilingRecordId = input.selfFilingRecordId ?? item.selfFilingRecordId;
+      item.selfFilingRecordUrl = input.selfFilingRecordUrl ?? item.selfFilingRecordUrl;
+      item.version = (item.version ?? 0) + 1;
+      item.updatedAt = approvedAt;
+      item.audit = [...(item.audit ?? []), { id: `compliance-audit-${item.id}-${item.version}`, action: "compliance.approved", actorId: state.currentUserId, itemVersion: item.version, occurredAt: approvedAt, payload: { selfFilingRecordId: input.selfFilingRecordId, selfFilingRecordUrl: input.selfFilingRecordUrl } }];
+      updated = structuredClone(item);
     });
     return updated;
   };
@@ -548,6 +683,34 @@ export class FixtureAdapter implements DataAdapter {
     this.mutate((state) => { state.settings = structuredClone(settings); });
   };
 
+  replaceOrganization = (organization: Organization): void => {
+    this.mutate((state) => { state.organization = structuredClone(organization); });
+  };
+
+  upsertTeamMember = (member: TeamMember): void => {
+    this.mutate((state) => {
+      const index = state.members.findIndex((item) => item.id === member.id);
+      if (index < 0) state.members.push(structuredClone(member));
+      else state.members[index] = structuredClone(member);
+    });
+  };
+
+  upsertIntegration = (integration: Integration): void => {
+    this.mutate((state) => {
+      const index = state.integrations.findIndex((item) => item.id === integration.id);
+      if (index < 0) state.integrations.push(structuredClone(integration));
+      else state.integrations[index] = structuredClone(integration);
+    });
+  };
+
+  upsertCompliance = (item: ComplianceItem): void => {
+    this.mutate((state) => {
+      const index = state.complianceItems.findIndex((candidate) => candidate.id === item.id);
+      if (index < 0) state.complianceItems.push(structuredClone(item));
+      else state.complianceItems[index] = structuredClone(item);
+    });
+  };
+
   upsertDocument = (document: DocumentRecord): void => {
     this.mutate((state) => {
       const index = state.documents.findIndex((item) => item.id === document.id);
@@ -635,6 +798,12 @@ export class FixtureAdapter implements DataAdapter {
     const finding = state.findings.find((item) => item.id === findingId);
     if (!finding) throw new Error(`Unknown finding: ${findingId}`);
     return finding;
+  }
+
+  private requireCompliance(state: DemoState, itemId: string): ComplianceItem {
+    const item = state.complianceItems.find((candidate) => candidate.id === itemId);
+    if (!item) throw new Error(`Unknown compliance item: ${itemId}`);
+    return item;
   }
 
   private mutate(change: (draft: DemoState) => void): void {

@@ -99,6 +99,20 @@ describe("FixtureAdapter demo contract", () => {
     expect(adapter.getSnapshot().actions.find((item) => item.id === "action-hub-kev")?.status).toBe("open");
   });
 
+  it("updates and approves compliance work with versioned audit events", async () => {
+    const adapter = new FixtureAdapter(createDemoState(), false);
+    const approvalId = "compliance-lock-approval";
+
+    const loaded = await adapter.loadComplianceDetail(approvalId);
+    const reassigned = adapter.updateCompliance({ itemId: approvalId, ownerId: DEMO_IDS.jane });
+    const approved = adapter.approveCompliance({ itemId: approvalId, selfFilingRecordId: "filing-24h-1" });
+
+    expect(loaded).toMatchObject({ lifecycleStatus: "pending_approval", version: 3 });
+    expect(reassigned).toMatchObject({ ownerId: DEMO_IDS.jane, version: 4, lifecycleStatus: "pending_approval" });
+    expect(approved).toMatchObject({ lifecycleStatus: "approved", version: 5, approvedBy: DEMO_IDS.jane, selfFilingRecordId: "filing-24h-1" });
+    expect(approved.audit?.map((entry) => entry.action)).toEqual(["compliance.updated", "compliance.approved"]);
+  });
+
   it("validates evidence and completes the simulated release analysis", async () => {
     vi.useFakeTimers();
     const adapter = new FixtureAdapter(createDemoState());

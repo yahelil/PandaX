@@ -2,6 +2,7 @@ import type {
   AnalysisDraft,
   AnalysisJob,
   AnalysisPreview,
+  ComplianceApprovalCommand,
   RegisterDocumentRevisionInput,
   AppSettings,
   Approval,
@@ -13,21 +14,32 @@ import type {
   EntityId,
   Finding,
   FindingDecisionInput,
+  Integration,
+  IntegrationUpdate,
+  Organization,
+  OrganizationProfileUpdate,
   Product,
   Release,
   ReleaseMonitoringView,
   RecordDocumentSelfFilingInput,
   RemediationInput,
+  ComplianceItem,
+  ComplianceUpdateCommand,
+  TeamMember,
+  TeamMemberUpdate,
 } from "./types";
+import type { PrivacySafeAnalyticsEvent } from "./governanceApi";
 
 export type DemoListener = () => void;
 
 export type AdapterOperation =
   | "initialize" | "refresh" | "search" | "create_product" | "create_release"
-  | "acknowledge_notification" | "assign_finding" | "decide_finding"
+  | "mark_notification_read" | "acknowledge_notification" | "ingest_analytics" | "assign_finding" | "decide_finding"
   | "update_remediation" | "load_finding" | "approve_document"
   | "reject_document" | "load_document" | "download_document" | "request_document_approval"
-  | "add_document_revision" | "self_file_document" | "update_settings" | "preview_analysis" | "run_analysis" | "run_monitoring";
+  | "add_document_revision" | "self_file_document" | "update_settings" | "preview_analysis" | "run_analysis" | "run_monitoring"
+  | "load_compliance" | "update_compliance" | "approve_compliance"
+  | "update_organization" | "update_team_member" | "update_integration";
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -52,6 +64,7 @@ export interface AdapterStatus {
   phase: "loading" | "ready" | "error";
   lastSyncedAt?: string;
   failure?: AdapterFailure;
+  analyticsFailure?: Pick<AdapterFailure, "code" | "status" | "occurredAt">;
 }
 
 export interface DataAdapter {
@@ -63,12 +76,20 @@ export interface DataAdapter {
   refresh(options?: { signal?: AbortSignal }): Promise<void>;
   reset(): void;
   search(query: string, options?: { signal?: AbortSignal }): Promise<WorkspaceSearchResult[]>;
+  trackAnalytics(event: PrivacySafeAnalyticsEvent): MaybePromise<void>;
   updateSettings<K extends keyof AppSettings>(section: K, patch: Partial<AppSettings[K]>): MaybePromise<void>;
+  updateOrganization(patch: OrganizationProfileUpdate): MaybePromise<Organization>;
+  updateTeamMember(memberId: EntityId, patch: TeamMemberUpdate): MaybePromise<TeamMember>;
+  updateIntegration(integrationId: EntityId, patch: IntegrationUpdate): MaybePromise<Integration>;
+  markNotificationRead(notificationId: EntityId): MaybePromise<void>;
   acknowledgeNotification(notificationId: EntityId): MaybePromise<void>;
   loadFindingDetail(findingId: EntityId, options?: { signal?: AbortSignal }): Promise<Finding | undefined>;
   assignFinding(findingId: EntityId, memberId?: EntityId): MaybePromise<Finding>;
   recordFindingDecision(input: FindingDecisionInput): MaybePromise<Finding>;
   updateRemediation(input: RemediationInput): MaybePromise<Finding>;
+  loadComplianceDetail(itemId: EntityId, options?: { signal?: AbortSignal }): Promise<ComplianceItem | undefined>;
+  updateCompliance(input: ComplianceUpdateCommand): MaybePromise<ComplianceItem>;
+  approveCompliance(input: ComplianceApprovalCommand): MaybePromise<ComplianceItem>;
   approveDocument(documentId: EntityId, comment?: string): MaybePromise<DocumentRecord>;
   rejectDocument(documentId: EntityId, comment: string): MaybePromise<DocumentRecord>;
   loadDocumentDetail(documentId: EntityId, options?: { signal?: AbortSignal }): Promise<DocumentRecord | undefined>;

@@ -32,6 +32,7 @@ export interface TeamMember {
   roles: Role[];
   status: "active" | "invited";
   lastActiveAt?: ISODate;
+  version?: number;
 }
 
 export interface Integration {
@@ -40,7 +41,10 @@ export interface Integration {
   type: "email" | "webhook" | "collector" | "jira";
   status: "connected" | "attention" | "not_connected";
   description: string;
+  configuration: Record<string, unknown>;
+  secretReference?: string;
   lastSyncAt?: ISODate;
+  version?: number;
 }
 
 export interface NotificationPreferences {
@@ -63,10 +67,16 @@ export interface AppearanceSettings {
   density: "comfortable" | "compact";
 }
 
+export interface AnalyticsSettings {
+  enabled: boolean;
+  retentionDays: number;
+}
+
 export interface AppSettings {
   notifications: NotificationPreferences;
   security: SecuritySettings;
   appearance: AppearanceSettings;
+  analytics: AnalyticsSettings;
 }
 
 export interface Product {
@@ -220,19 +230,64 @@ export interface ActionItem {
   updatedAt: ISODate;
 }
 
+export type ComplianceLifecycleStatus = "action_required" | "in_progress" | "pending_approval" | "approved" | "acknowledged" | "resolved";
+
+export interface ComplianceAuditEntry {
+  id: EntityId;
+  action: string;
+  actorId: EntityId;
+  itemVersion: number;
+  occurredAt: ISODate;
+  payload: Record<string, unknown>;
+}
+
 export interface ComplianceItem {
   id: EntityId;
   type: "readiness" | "deadline" | "missing_evidence" | "reporting_case" | "approval";
   title: string;
   requirement: string;
-  productId: EntityId;
+  productId?: EntityId;
   releaseId?: EntityId;
   priority: PriorityBand;
   status: "open" | "in_progress" | "blocked" | "complete";
+  lifecycleStatus?: ComplianceLifecycleStatus;
+  readiness?: "ready" | "review_required" | "action_required";
   dueAt?: ISODate;
   ownerId?: EntityId;
   reason: string;
   targetUrl: string;
+  sourceId?: EntityId;
+  reportingStage?: "early_warning" | "notification" | "final_report";
+  selfFilingRecordId?: EntityId;
+  selfFilingRecordUrl?: string;
+  approvedBy?: EntityId;
+  approvedAt?: ISODate;
+  acknowledgedAt?: ISODate;
+  resolvedAt?: ISODate;
+  version?: number;
+  createdAt?: ISODate;
+  updatedAt?: ISODate;
+  audit?: ComplianceAuditEntry[];
+}
+
+export interface ComplianceUpdateCommand {
+  itemId: EntityId;
+  title?: string;
+  description?: string;
+  priority?: "critical" | "high" | "medium" | "low";
+  status?: ComplianceLifecycleStatus;
+  dueAt?: ISODate;
+  clearDueAt?: boolean;
+  ownerId?: EntityId;
+  clearOwner?: boolean;
+  selfFilingRecordId?: EntityId;
+  selfFilingRecordUrl?: string;
+}
+
+export interface ComplianceApprovalCommand {
+  itemId: EntityId;
+  selfFilingRecordId?: EntityId;
+  selfFilingRecordUrl?: string;
 }
 
 export interface ReportingCase {
@@ -363,6 +418,7 @@ export interface Notification {
   body: string;
   targetUrl: string;
   createdAt: ISODate;
+  readAt?: ISODate;
   acknowledgedAt?: ISODate;
 }
 
@@ -478,6 +534,23 @@ export interface CreateReleaseInput {
   channel: Release["channel"];
   releaseDate: ISODate;
   supportedUntil: ISODate;
+}
+
+export type OrganizationProfileUpdate = Partial<Pick<Organization, "name" | "legalName" | "country" | "registrationNumber" | "defaultTimezone">>;
+
+export type ManagedRole = Exclude<Role, "read_only_auditor">;
+
+export interface TeamMemberUpdate {
+  title?: string;
+  roles?: ManagedRole[];
+  status?: "active" | "invited";
+}
+
+export interface IntegrationUpdate {
+  status?: Integration["status"];
+  description?: string;
+  configuration?: Record<string, unknown>;
+  secretReference?: string | null;
 }
 
 export interface FindingDecisionInput {

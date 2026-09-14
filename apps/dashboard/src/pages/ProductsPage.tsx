@@ -15,6 +15,8 @@ export function ProductsPage() {
   const [readiness, setReadiness] = useState("all");
   const [monitoring, setMonitoring] = useState("all");
   const [sort, setSort] = useState<SortKey>("actions");
+  const [createPending, setCreatePending] = useState(false);
+  const [createError, setCreateError] = useState<string>();
   const visible = useMemo(() => {
     const lower = query.toLowerCase();
     return demo.products
@@ -32,9 +34,17 @@ export function ProductsPage() {
         description="Cybersecurity readiness, monitoring, and regulatory obligations across your portfolio."
         actions={<button className="button button-primary" onClick={() => setAdding((value) => !value)}>Add product</button>}
       />
-      {adding ? <CreateProductPanel onCancel={() => setAdding(false)} onCreate={(input) => {
-        const created = demo.actions.createProduct(input);
-        navigate(`/products/${created.id}`);
+      {adding ? <CreateProductPanel pending={createPending} error={createError} onCancel={() => setAdding(false)} onCreate={async (input) => {
+        setCreatePending(true);
+        setCreateError(undefined);
+        try {
+          const created = await demo.actions.createProduct(input);
+          navigate(`/products/${created.id}`);
+        } catch (error) {
+          setCreateError(error instanceof Error ? error.message : "Product could not be created.");
+        } finally {
+          setCreatePending(false);
+        }
       }} members={demo.state.members} /> : null}
       <section className="panel">
         <div className="toolbar" aria-label="Product filters">
@@ -77,17 +87,17 @@ export function ProductsPage() {
   );
 }
 
-function CreateProductPanel({ onCancel, onCreate, members }: { onCancel: () => void; onCreate: (input: Parameters<ReturnType<typeof useDemo>["actions"]["createProduct"]>[0]) => void; members: ReturnType<typeof useDemo>["state"]["members"] }) {
+function CreateProductPanel({ onCancel, onCreate, members, pending, error }: { onCancel: () => void; onCreate: (input: Parameters<ReturnType<typeof useDemo>["actions"]["createProduct"]>[0]) => Promise<void>; members: ReturnType<typeof useDemo>["state"]["members"]; pending: boolean; error?: string }) {
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    onCreate({
+    void onCreate({
       name: String(data.get("name")), identifier: String(data.get("identifier")), manufacturer: String(data.get("manufacturer")),
       description: String(data.get("description")), craClass: String(data.get("craClass")) as "default", classificationStatus: "review_required",
       supportUntil: String(data.get("supportUntil")), ownerId: String(data.get("ownerId")) || undefined,
     });
   };
-  return <section className="panel analysis-card"><h2>Add product</h2><p>Start with the product identity and CRA scope. Register the first release next.</p><form className="form-grid" onSubmit={submit}><div className="field"><label htmlFor="product-name">Product name</label><input id="product-name" name="name" className="input-field" required placeholder="Industrial Sensor Gateway" /></div><div className="field"><label htmlFor="product-id">Product identifier</label><input id="product-id" name="identifier" className="input-field" required placeholder="ACM-GTW-620" /></div><div className="field"><label htmlFor="manufacturer">Manufacturer</label><input id="manufacturer" name="manufacturer" className="input-field" required defaultValue="Acme Devices GmbH" /></div><div className="field"><label htmlFor="cra-class">CRA class</label><select id="cra-class" name="craClass" className="select-field"><option value="default">Default</option><option value="important_i">Important class I</option><option value="important_ii">Important class II</option><option value="critical">Critical</option></select></div><div className="field"><label htmlFor="support-until">Support until</label><input id="support-until" name="supportUntil" className="input-field" type="date" required defaultValue="2031-12-31" /></div><div className="field"><label htmlFor="owner">Default owner</label><select id="owner" name="ownerId" className="select-field"><option value="">Unassigned</option>{members.filter((member) => member.status === "active").map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></div><div className="field span-2"><label htmlFor="description">Description</label><textarea id="description" name="description" className="textarea-field" placeholder="Describe the product and its connected functionality." /></div><div className="inline-actions span-2"><button className="button-primary" type="submit">Create product</button><button type="button" onClick={onCancel}>Cancel</button></div></form></section>;
+  return <section className="panel analysis-card"><h2>Add product</h2><p>Start with the product identity and CRA scope. Register the first release next.</p><form className="form-grid" onSubmit={submit}><div className="field"><label htmlFor="product-name">Product name</label><input id="product-name" name="name" className="input-field" required placeholder="Industrial Sensor Gateway" /></div><div className="field"><label htmlFor="product-id">Product identifier</label><input id="product-id" name="identifier" className="input-field" required placeholder="ACM-GTW-620" /></div><div className="field"><label htmlFor="manufacturer">Manufacturer</label><input id="manufacturer" name="manufacturer" className="input-field" required defaultValue="Acme Devices GmbH" /></div><div className="field"><label htmlFor="cra-class">CRA class</label><select id="cra-class" name="craClass" className="select-field"><option value="default">Default</option><option value="important_i">Important class I</option><option value="important_ii">Important class II</option><option value="critical">Critical</option></select></div><div className="field"><label htmlFor="support-until">Support until</label><input id="support-until" name="supportUntil" className="input-field" type="date" required defaultValue="2031-12-31" /></div><div className="field"><label htmlFor="owner">Default owner</label><select id="owner" name="ownerId" className="select-field"><option value="">Unassigned</option>{members.filter((member) => member.status === "active").map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></div><div className="field span-2"><label htmlFor="description">Description</label><textarea id="description" name="description" className="textarea-field" placeholder="Describe the product and its connected functionality." /></div>{error ? <p className="danger-text span-2" role="alert">{error}</p> : null}<div className="inline-actions span-2"><button className="button-primary" type="submit" disabled={pending}>{pending ? "Creating productâ€¦" : "Create product"}</button><button type="button" onClick={onCancel} disabled={pending}>Cancel</button></div></form></section>;
 }
 
 function compareProducts(a: Product, b: Product, sort: SortKey) {

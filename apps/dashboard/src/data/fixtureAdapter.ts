@@ -1,4 +1,4 @@
-import type { DataAdapter, DemoListener } from "./adapter";
+import type { AdapterStatus, DataAdapter, DemoListener } from "./adapter";
 import { createDemoState, DEMO_IDS } from "./fixtures";
 import type {
   AnalysisDraft,
@@ -54,10 +54,19 @@ export class FixtureAdapter implements DataAdapter {
   private state: DemoState;
   private readonly listeners = new Set<DemoListener>();
   private readonly timers = new Set<ReturnType<typeof setTimeout>>();
+  private readonly status: AdapterStatus = { mode: "fixture", phase: "ready" };
 
-  constructor(initialState?: DemoState) {
+  constructor(initialState?: DemoState, private readonly persist = true) {
     this.state = initialState ? structuredClone(initialState) : loadInitialState();
   }
+
+  getStatusSnapshot = (): AdapterStatus => this.status;
+
+  subscribeStatus = (_listener: DemoListener): (() => void) => () => undefined;
+
+  initialize = async (): Promise<void> => undefined;
+
+  refresh = async (): Promise<void> => undefined;
 
   getSnapshot = (): DemoState => this.state;
 
@@ -176,7 +185,7 @@ export class FixtureAdapter implements DataAdapter {
 
   rejectDocument = (documentId: EntityId, comment: string): DocumentRecord => this.decideDocument(documentId, "rejected", comment);
 
-  createProduct = (input: CreateProductInput): Product => {
+  createProduct = async (input: CreateProductInput): Promise<Product> => {
     let created!: Product;
     this.mutate((state) => {
       const suffix = state.products.length + 1;
@@ -204,7 +213,7 @@ export class FixtureAdapter implements DataAdapter {
     return structuredClone(created);
   };
 
-  createRelease = (input: CreateReleaseInput): Release => {
+  createRelease = async (input: CreateReleaseInput): Promise<Release> => {
     let created!: Release;
     this.mutate((state) => {
       const product = state.products.find((item) => item.id === input.productId);
@@ -262,7 +271,7 @@ export class FixtureAdapter implements DataAdapter {
     if (!releaseId) {
       const product = this.state.products.find((item) => item.id === draft.productId);
       if (!product) throw new Error(`Unknown product: ${draft.productId}`);
-      const createdRelease = this.createRelease({ productId: draft.productId, version: draft.version, channel: draft.channel, releaseDate: now().slice(0, 10), supportedUntil: product.supportUntil });
+      const createdRelease = await this.createRelease({ productId: draft.productId, version: draft.version, channel: draft.channel, releaseDate: now().slice(0, 10), supportedUntil: product.supportUntil });
       releaseId = createdRelease.id;
     }
 
@@ -291,6 +300,30 @@ export class FixtureAdapter implements DataAdapter {
   getApproval = (documentId: EntityId): Approval | undefined => {
     const approval = this.state.approvals.find((item) => item.documentId === documentId);
     return approval ? structuredClone(approval) : undefined;
+  };
+
+  replacePortfolio = (organization: DemoState["organization"], products: Product[], releases: Release[]): void => {
+    this.mutate((state) => {
+      state.organization = structuredClone(organization);
+      state.products = structuredClone(products);
+      state.releases = structuredClone(releases);
+    });
+  };
+
+  upsertProduct = (product: Product): void => {
+    this.mutate((state) => {
+      const index = state.products.findIndex((item) => item.id === product.id);
+      if (index < 0) state.products.push(structuredClone(product));
+      else state.products[index] = structuredClone(product);
+    });
+  };
+
+  upsertRelease = (release: Release): void => {
+    this.mutate((state) => {
+      const index = state.releases.findIndex((item) => item.id === release.id);
+      if (index < 0) state.releases.push(structuredClone(release));
+      else state.releases[index] = structuredClone(release);
+    });
   };
 
   private decideDocument(documentId: EntityId, decision: "approved" | "rejected", comment?: string): DocumentRecord {
@@ -382,7 +415,7 @@ export class FixtureAdapter implements DataAdapter {
 
   private commit(next: DemoState): void {
     this.state = next;
-    if (typeof window !== "undefined") {
+    if (this.persist && typeof window !== "undefined") {
       try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* Demo remains usable without persistence. */ }
     }
     this.listeners.forEach((listener) => listener());

@@ -2,12 +2,13 @@ import {
   createContext,
   type PropsWithChildren,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useSyncExternalStore,
 } from "react";
 
-import type { DataAdapter } from "./adapter";
+import type { AdapterStatus, DataAdapter } from "./adapter";
 import { createFixtureAdapter } from "./fixtureAdapter";
 import type {
   AnalysisDraft,
@@ -44,6 +45,7 @@ export interface DemoSelectors {
 
 export interface DemoActions {
   reset(): void;
+  refresh(): Promise<void>;
   updateSettings<K extends keyof AppSettings>(section: K, patch: Partial<AppSettings[K]>): void;
   acknowledgeNotification(notificationId: EntityId): void;
   assignFinding(findingId: EntityId, memberId?: EntityId): Finding;
@@ -51,14 +53,15 @@ export interface DemoActions {
   updateRemediation(input: RemediationInput): Finding;
   approveDocument(documentId: EntityId, comment?: string): DocumentRecord;
   rejectDocument(documentId: EntityId, comment: string): DocumentRecord;
-  createProduct(input: CreateProductInput): Product;
-  createRelease(input: CreateReleaseInput): Release;
+  createProduct(input: CreateProductInput): Promise<Product>;
+  createRelease(input: CreateReleaseInput): Promise<Release>;
   previewAnalysis(draft: AnalysisDraft): Promise<AnalysisPreview>;
   runAnalysis(draft: AnalysisDraft): Promise<AnalysisJob>;
 }
 
 export interface DemoContextValue {
   state: DemoState;
+  adapterStatus: AdapterStatus;
   currentUser: TeamMember;
   products: Product[];
   releases: Release[];
@@ -88,6 +91,13 @@ export function DemoProvider({ adapter: providedAdapter, children }: DemoProvide
   if (!adapterRef.current) adapterRef.current = providedAdapter ?? createFixtureAdapter();
   const adapter = adapterRef.current;
   const state = useSyncExternalStore(adapter.subscribe, adapter.getSnapshot, adapter.getSnapshot);
+  const adapterStatus = useSyncExternalStore(adapter.subscribeStatus, adapter.getStatusSnapshot, adapter.getStatusSnapshot);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void adapter.initialize({ signal: controller.signal });
+    return () => controller.abort();
+  }, [adapter]);
 
   const selectors = useMemo<DemoSelectors>(() => ({
     product: (id) => state.products.find((item) => item.id === id),
@@ -104,6 +114,7 @@ export function DemoProvider({ adapter: providedAdapter, children }: DemoProvide
 
   const actions = useMemo<DemoActions>(() => ({
     reset: adapter.reset,
+    refresh: adapter.refresh,
     updateSettings: adapter.updateSettings,
     acknowledgeNotification: adapter.acknowledgeNotification,
     assignFinding: adapter.assignFinding,
@@ -122,6 +133,7 @@ export function DemoProvider({ adapter: providedAdapter, children }: DemoProvide
 
   const value = useMemo<DemoContextValue>(() => ({
     state,
+    adapterStatus,
     currentUser,
     products: state.products,
     releases: state.releases,
@@ -132,7 +144,7 @@ export function DemoProvider({ adapter: providedAdapter, children }: DemoProvide
     notifications: state.notifications,
     selectors,
     actions,
-  }), [actions, currentUser, selectors, state]);
+  }), [actions, adapterStatus, currentUser, selectors, state]);
 
   return <DemoContext.Provider value={value}>{children}</DemoContext.Provider>;
 }

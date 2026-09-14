@@ -7,6 +7,7 @@ import {
   CRA_SOURCE_URL,
   READINESS_QUESTIONS,
   SCOPE_QUESTIONS,
+  assessmentCompletionAction,
   buildCraAssessment,
   craClassLabel,
   scopeOutcome,
@@ -48,6 +49,7 @@ export function CraAssessmentWizard({ onCancel, onComplete }: Props) {
     completedAt,
     confirmed,
   }), [categorySelections, completedAt, confirmed, readinessAnswers, scopeAnswers]);
+  const completionAction = assessmentCompletionAction(assessment);
 
   const finish = () => {
     setCompletedAt(new Date().toISOString());
@@ -164,7 +166,7 @@ export function CraAssessmentWizard({ onCancel, onComplete }: Props) {
       <div className="inline-actions">
         {phase === "classification" ? <button className="button-primary" type="button" disabled={!categorySelections[CLASSIFICATION_GROUPS[classificationIndex].id]} onClick={continueClassification}>Continue</button> : null}
         {phase === "result" ? <button type="button" onClick={restart}><RotateCcw size={17} /> Start over</button> : null}
-        {phase === "result" && assessment.scopeResult !== "out_of_scope" ? <button className="button-primary" type="button" onClick={() => onComplete(buildCraAssessment({ scopeAnswers, categorySelections, readinessAnswers, completedAt, confirmed }))}>Use assessment</button> : null}
+        {phase === "result" && assessment.scopeResult !== "out_of_scope" ? <button className="button-primary" type="button" disabled={completionAction.disabled} onClick={() => onComplete(buildCraAssessment({ scopeAnswers, categorySelections, readinessAnswers, completedAt, confirmed }))}>{completionAction.label}</button> : null}
         {phase === "result" && assessment.scopeResult === "out_of_scope" ? <button className="button-primary" type="button" onClick={onCancel}>Close assessment</button> : null}
       </div>
     </footer>

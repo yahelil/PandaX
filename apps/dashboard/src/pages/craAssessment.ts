@@ -11,6 +11,13 @@ export function craClassLabel(value: CraClass): string {
   return ({ default: "Default", important_i: "Important I", important_ii: "Important II", critical: "Critical" })[value];
 }
 
+export function assessmentCompletionAction(assessment: CraClassificationAssessment): { label: string; disabled: boolean } {
+  const needsSpecialistReview = assessment.scopeResult === "needs_review" || assessment.answers.some((answer) => answer.answer === "not_sure");
+  return needsSpecialistReview
+    ? { label: "Save for specialist review", disabled: false }
+    : { label: "Use assessment", disabled: assessment.classificationStatus !== "confirmed" };
+}
+
 export interface ScopeQuestion {
   id: string;
   question: string;

@@ -13,6 +13,7 @@ import type {
   FindingDecisionInput,
   Product,
   Release,
+  ReleaseMonitoringView,
   RemediationInput,
 } from "./types";
 
@@ -22,7 +23,7 @@ export type AdapterOperation =
   | "initialize" | "refresh" | "search" | "create_product" | "create_release"
   | "acknowledge_notification" | "assign_finding" | "decide_finding"
   | "update_remediation" | "load_finding" | "approve_document"
-  | "reject_document" | "update_settings" | "preview_analysis" | "run_analysis";
+  | "reject_document" | "update_settings" | "preview_analysis" | "run_analysis" | "run_monitoring";
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -72,4 +73,6 @@ export interface DataAdapter {
   runAnalysis(draft: AnalysisDraft): Promise<AnalysisJob>;
   getAnalysisJob(jobId: EntityId): AnalysisJob | undefined;
   getApproval(documentId: EntityId): Approval | undefined;
+  loadReleaseMonitoring(productId: EntityId, releaseId: EntityId, options?: { signal?: AbortSignal }): Promise<ReleaseMonitoringView>;
+  runReleaseMonitoring(productId: EntityId, releaseId: EntityId): Promise<ReleaseMonitoringView>;
 }

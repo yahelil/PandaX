@@ -6,7 +6,7 @@ import type { PortfolioApi } from "./portfolioApi";
 import { PortfolioApiError } from "./portfolioApi";
 import type { OperationsApi } from "./operationsApi";
 import { createRuntimeDataAdapter, ProductionAdapter } from "./productionAdapter";
-import type { ReleaseAnalysisJob, ReleaseOperationsApi } from "./releaseOperationsApi";
+import type { ReleaseAnalysisJob, ReleaseMonitoringStatus, ReleaseOperationsApi } from "./releaseOperationsApi";
 import type { Organization, Product, Release } from "./types";
 
 const organization: Organization = {
@@ -228,5 +228,25 @@ describe("ProductionAdapter", () => {
     expect(releaseApi.uploadSbom).toHaveBeenCalledTimes(1);
     expect(releaseApi.runAnalysisJob).toHaveBeenCalledWith({ organizationId: organization.id, productId, releaseId }, "analysis-live");
     expect(adapter.getSnapshot().analysisJobs[0].result?.coverage).toMatchObject({ identifiedComponents: 40, advisorySourcesChecked: 4, advisorySourcesExpected: 5 });
+  });
+
+  it("loads and runs persisted release monitoring with event history", async () => {
+    const monitoring: ReleaseMonitoringStatus = {
+      organizationId: organization.id, productId: product.id, releaseId: release.id,
+      enabledSources: ["osv", "cisa_kev"], cadenceMinutes: 60, enabled: true,
+      health: "degraded" as const, nextCheckAt: "2026-09-14T12:00:00Z", lastCheckAt: "2026-09-14T11:00:00Z", lastSuccessAt: "2026-09-14T10:00:00Z",
+      consecutiveFailures: 0, coverage: { checked: 2 }, limitations: ["Vendor source delayed."], running: false,
+      createdAt: "2026-09-14T08:00:00Z", updatedAt: "2026-09-14T11:00:00Z",
+    };
+    const event = { id: "event-1", runId: "run-1", sequence: 1, eventType: "succeeded" as const, trigger: "manual" as const, health: "degraded" as const, coverage: {}, limitations: monitoring.limitations, message: "Monitoring completed with limitations.", actorId: "user-1", occurredAt: "2026-09-14T11:00:00Z" };
+    const releaseApi = releaseOperations({} as ReleaseAnalysisJob);
+    releaseApi.getMonitoring = vi.fn(async () => monitoring);
+    releaseApi.runMonitoring = vi.fn(async () => monitoring);
+    releaseApi.listMonitoringEvents = vi.fn(async () => [event]);
+    const adapter = new ProductionAdapter({ organizationId: organization.id, portfolioApi: api(), releaseOperationsApi: releaseApi, fixtureAdapter: new FixtureAdapter(createDemoState()) });
+
+    await expect(adapter.loadReleaseMonitoring(product.id, release.id)).resolves.toMatchObject({ health: "degraded", enabledSources: ["osv", "cisa_kev"], recentEvents: [{ id: "event-1", trigger: "manual" }] });
+    await expect(adapter.runReleaseMonitoring(product.id, release.id)).resolves.toMatchObject({ lastCheckAt: monitoring.lastCheckAt, limitations: monitoring.limitations });
+    expect(releaseApi.runMonitoring).toHaveBeenCalledWith({ organizationId: organization.id, productId: product.id, releaseId: release.id });
   });
 });

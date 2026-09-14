@@ -130,6 +130,19 @@ describe("FixtureAdapter demo contract", () => {
     expect(adapter.getSnapshot().releases.find((item) => item.id === DEMO_IDS.thermostatRelease)).toMatchObject({ sbomStatus: "validated", monitoringHealth: "healthy", readiness: "ready" });
   });
 
+  it("persists a realistic manual monitoring check", async () => {
+    const adapter = new FixtureAdapter(createDemoState(), false);
+    const release = adapter.getSnapshot().releases[0];
+
+    const before = await adapter.loadReleaseMonitoring(release.productId, release.id);
+    const after = await adapter.runReleaseMonitoring(release.productId, release.id);
+
+    expect(before.enabledSources).toContain("cisa_kev");
+    expect(after.lastCheckAt).toBeTruthy();
+    expect(after.recentEvents[0]).toMatchObject({ trigger: "manual", eventType: "succeeded" });
+    expect(adapter.getSnapshot().activities[0]).toMatchObject({ type: "monitoring", releaseId: release.id });
+  });
+
   it("rejects raw artifacts until privacy consent is explicit", async () => {
     vi.useFakeTimers();
     const previewPromise = new FixtureAdapter(createDemoState()).previewAnalysis({

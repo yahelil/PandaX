@@ -25,6 +25,7 @@ import type {
   FindingDecisionInput,
   Product,
   Release,
+  ReleaseMonitoringView,
   RemediationInput,
   Scope,
   TeamMember,
@@ -59,6 +60,8 @@ export interface DemoActions {
   createRelease(input: CreateReleaseInput): Promise<Release>;
   previewAnalysis(draft: AnalysisDraft): Promise<AnalysisPreview>;
   runAnalysis(draft: AnalysisDraft): Promise<AnalysisJob>;
+  loadReleaseMonitoring(productId: EntityId, releaseId: EntityId, options?: { signal?: AbortSignal }): Promise<ReleaseMonitoringView>;
+  runReleaseMonitoring(productId: EntityId, releaseId: EntityId): Promise<ReleaseMonitoringView>;
 }
 
 export interface DemoContextValue {
@@ -130,6 +133,8 @@ export function DemoProvider({ adapter: providedAdapter, children }: DemoProvide
     createRelease: adapter.createRelease,
     previewAnalysis: adapter.previewAnalysis,
     runAnalysis: adapter.runAnalysis,
+    loadReleaseMonitoring: adapter.loadReleaseMonitoring,
+    runReleaseMonitoring: adapter.runReleaseMonitoring,
   }), [adapter]);
 
   const currentUser = state.members.find((item) => item.id === state.currentUserId);

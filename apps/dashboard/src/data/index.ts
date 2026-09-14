@@ -22,4 +22,53 @@ export type {
   UpdatePortfolioProductRequest,
   UpdatePortfolioReleaseRequest,
 } from "./portfolioApi";
+export { createFindingsApi, FindingApiError, mapFinding, mapFindingDetail } from "./findingsApi";
+export type {
+  ApiFindingStatus,
+  ApiRemediationStatus,
+  AssignmentRequest,
+  DecisionRequest,
+  FindingApiConfig,
+  FindingApiErrorCode,
+  FindingAuditDto,
+  FindingAuditEntry,
+  FindingDetail,
+  FindingDetailDto,
+  FindingDto,
+  FindingListFilters,
+  FindingRequestOptions,
+  FindingsApi,
+  ManagedFinding,
+  Reachability,
+  RemediationRequest,
+  VerificationEvidenceInput,
+} from "./findingsApi";
+export { createOperationsApi, OperationsApiError } from "./operationsApi";
+export type {
+  HomeActionSource,
+  HomeMonitoringState,
+  HomePriority,
+  HomeRequestOptions,
+  NotificationInboxView,
+  NotificationListOptions,
+  OperationsActionCounters,
+  OperationsApi,
+  OperationsApiConfig,
+  OperationsApiErrorCode,
+  OperationsHome,
+  OperationsHomeAction,
+  OperationsMonitoringSummary,
+  OperationsNotification,
+  OperationsNotificationKind,
+  OperationsNotificationPriority,
+  OperationsRecentChange,
+  OperationsRequestOptions,
+  OperationsSearchGroup,
+  OperationsSearchResponse,
+  OperationsSearchResult,
+  RecentChangeSource,
+  SearchCategory,
+  SearchRequestOptions,
+} from "./operationsApi";
+export * from "./governanceApi";
 export * from "./types";

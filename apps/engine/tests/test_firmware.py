@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tarfile
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -32,6 +33,7 @@ def transport(path, entries=None, status="completed"):
 
 def fake_docker(monkeypatch, status="completed"):
     monkeypatch.setattr(fw.shutil, "which", lambda _: "docker")
+    monkeypatch.setattr(fw.shutil, "disk_usage", lambda _: SimpleNamespace(free=1 << 50))
     def run(docker, src, archive, log, limits):
         transport(archive, status=status)
         log.write_text("extractor diagnostic", encoding="utf-8")
@@ -317,7 +319,6 @@ def test_archive_paths_never_call_docker(tmp_path, monkeypatch, kind):
 
 @pytest.mark.parametrize("directory,free", [("/work", 0), ("/tmp", 0), ("/work", 1)])
 def test_worker_checks_both_filesystems_with_margin(monkeypatch, directory, free):
-    from types import SimpleNamespace
     from pandax import firmware_worker as worker
     monkeypatch.setattr(worker.os, "statvfs", lambda path: SimpleNamespace(
         f_bavail=free if path == directory else 10000, f_frsize=4096,
@@ -361,7 +362,6 @@ def test_transport_report_must_match_files_and_provenance(tmp_path, change):
 
 
 def test_insufficient_disk_space_fails_before_docker(tmp_path, monkeypatch):
-    from types import SimpleNamespace
     fake_docker(monkeypatch)
     monkeypatch.setattr(fw.shutil, "disk_usage", lambda _: SimpleNamespace(free=1))
     monkeypatch.setattr(fw, "_run_container", lambda *a: pytest.fail("Docker was called"))

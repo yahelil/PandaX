@@ -23,6 +23,7 @@ export function App() {
         <Route index element={<HomePage />} />
         <Route path="products" element={<ProductsPage />} />
         <Route path="products/client-demo" element={<ClientDemoPage view="portfolio" />} />
+        <Route path="products/client-demo/home-hub" element={<ClientDemoPage view="product" />} />
         <Route path="products/client-demo/upload" element={<ClientDemoPage view="upload" />} />
         <Route path="products/client-demo/alert" element={<ClientDemoPage view="alert" />} />
         <Route path="products/:productId" element={<ProductWorkspacePage />} />

@@ -9,11 +9,13 @@ import {
 } from "react";
 
 import type { AdapterStatus, DataAdapter, MaybePromise, WorkspaceSearchResult } from "./adapter";
+import type { PrivacySafeAnalyticsEvent } from "./governanceApi";
 import { createFixtureAdapter } from "./fixtureAdapter";
 import type {
   AnalysisDraft,
   AnalysisJob,
   AnalysisPreview,
+  ComplianceApprovalCommand,
   RegisterDocumentRevisionInput,
   AppSettings,
   ComplianceItem,
@@ -25,6 +27,10 @@ import type {
   EntityId,
   Finding,
   FindingDecisionInput,
+  Integration,
+  IntegrationUpdate,
+  Organization,
+  OrganizationProfileUpdate,
   Product,
   Release,
   ReleaseMonitoringView,
@@ -32,6 +38,8 @@ import type {
   RemediationInput,
   Scope,
   TeamMember,
+  TeamMemberUpdate,
+  ComplianceUpdateCommand,
 } from "./types";
 
 export interface DemoSelectors {
@@ -51,12 +59,20 @@ export interface DemoActions {
   reset(): void;
   refresh(): Promise<void>;
   search(query: string, options?: { signal?: AbortSignal }): Promise<WorkspaceSearchResult[]>;
+  trackAnalytics(event: PrivacySafeAnalyticsEvent): MaybePromise<void>;
   updateSettings<K extends keyof AppSettings>(section: K, patch: Partial<AppSettings[K]>): MaybePromise<void>;
+  updateOrganization(patch: OrganizationProfileUpdate): MaybePromise<Organization>;
+  updateTeamMember(memberId: EntityId, patch: TeamMemberUpdate): MaybePromise<TeamMember>;
+  updateIntegration(integrationId: EntityId, patch: IntegrationUpdate): MaybePromise<Integration>;
+  markNotificationRead(notificationId: EntityId): MaybePromise<void>;
   acknowledgeNotification(notificationId: EntityId): MaybePromise<void>;
   loadFindingDetail(findingId: EntityId, options?: { signal?: AbortSignal }): Promise<Finding | undefined>;
   assignFinding(findingId: EntityId, memberId?: EntityId): MaybePromise<Finding>;
   decideFinding(input: FindingDecisionInput): MaybePromise<Finding>;
   updateRemediation(input: RemediationInput): MaybePromise<Finding>;
+  loadComplianceDetail(itemId: EntityId, options?: { signal?: AbortSignal }): Promise<ComplianceItem | undefined>;
+  updateCompliance(input: ComplianceUpdateCommand): MaybePromise<ComplianceItem>;
+  approveCompliance(input: ComplianceApprovalCommand): MaybePromise<ComplianceItem>;
   approveDocument(documentId: EntityId, comment?: string): MaybePromise<DocumentRecord>;
   rejectDocument(documentId: EntityId, comment: string): MaybePromise<DocumentRecord>;
   loadDocumentDetail(documentId: EntityId, options?: { signal?: AbortSignal }): Promise<DocumentRecord | undefined>;
@@ -130,12 +146,20 @@ export function DemoProvider({ adapter: providedAdapter, currentUserOverride, ch
     reset: adapter.reset,
     refresh: adapter.refresh,
     search: adapter.search,
+    trackAnalytics: adapter.trackAnalytics,
     updateSettings: adapter.updateSettings,
+    updateOrganization: adapter.updateOrganization,
+    updateTeamMember: adapter.updateTeamMember,
+    updateIntegration: adapter.updateIntegration,
+    markNotificationRead: adapter.markNotificationRead,
     acknowledgeNotification: adapter.acknowledgeNotification,
     loadFindingDetail: adapter.loadFindingDetail,
     assignFinding: adapter.assignFinding,
     decideFinding: adapter.recordFindingDecision,
     updateRemediation: adapter.updateRemediation,
+    loadComplianceDetail: adapter.loadComplianceDetail,
+    updateCompliance: adapter.updateCompliance,
+    approveCompliance: adapter.approveCompliance,
     approveDocument: adapter.approveDocument,
     rejectDocument: adapter.rejectDocument,
     loadDocumentDetail: adapter.loadDocumentDetail,

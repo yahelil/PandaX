@@ -60,7 +60,7 @@ const members: TeamMember[] = [
     email: "elena.rossi@acme-devices.eu",
     title: "General Counsel",
     initials: "ER",
-    roles: ["authorized_approver", "read_only_auditor"],
+    roles: ["authorized_approver", "viewer"],
     status: "active",
     lastActiveAt: "2026-09-13T15:30:00Z",
   },
@@ -70,7 +70,7 @@ const members: TeamMember[] = [
     email: "noah.williams@acme-devices.eu",
     title: "External Auditor",
     initials: "NW",
-    roles: ["read_only_auditor"],
+    roles: ["viewer"],
     status: "invited",
   },
 ];
@@ -467,12 +467,13 @@ const documents: DocumentRecord[] = [
 ];
 
 const complianceItems: ComplianceItem[] = [
-  { id: "compliance-hub-case", type: "reporting_case", title: "Assess actively exploited vulnerability", requirement: "CRA Article 14(1)", productId: DEMO_IDS.homeHub, releaseId: DEMO_IDS.hubRelease, priority: "urgent", status: "in_progress", dueAt: "2026-09-14T20:00:00Z", ownerId: DEMO_IDS.jane, reason: "CISA KEV match is confirmed present and reachable.", targetUrl: "/compliance?view=cases&case=case-hub-2026-014" },
-  { id: "compliance-lock-deadline", type: "deadline", title: "Submit initial incident notification", requirement: "CRA Article 14(2)", productId: DEMO_IDS.smartLock, releaseId: DEMO_IDS.lockRelease, priority: "urgent", status: "in_progress", dueAt: "2026-09-14T16:00:00Z", ownerId: DEMO_IDS.jane, reason: "Approval must complete before the 24-hour deadline.", targetUrl: "/documents/document-lock-report" },
-  { id: "compliance-lock-approval", type: "approval", title: "Approve notification revision 3", requirement: "Authorized approval policy", productId: DEMO_IDS.smartLock, releaseId: DEMO_IDS.lockRelease, priority: "urgent", status: "open", dueAt: "2026-09-14T17:00:00Z", ownerId: DEMO_IDS.elena, reason: "Document is complete and waiting for an authorized approver.", targetUrl: "/documents/document-lock-report" },
-  { id: "compliance-therm-evidence", type: "missing_evidence", title: "Complete Thermostat technical evidence", requirement: "CRA Annex VII", productId: DEMO_IDS.thermostat, releaseId: DEMO_IDS.thermostatRelease, priority: "normal", status: "blocked", ownerId: DEMO_IDS.jane, reason: "Firmware image and one native advisory source are missing.", targetUrl: "/documents/document-therm-evidence" },
-  { id: "compliance-gateway-readiness", type: "readiness", title: "Restore monitoring evidence freshness", requirement: "CRA Article 13(8)", productId: DEMO_IDS.edgeGateway, releaseId: DEMO_IDS.gatewayRelease, priority: "high", status: "blocked", ownerId: DEMO_IDS.marcus, reason: "Required NVD and vendor catalogue checks are stale.", targetUrl: `/products/${DEMO_IDS.edgeGateway}/releases/${DEMO_IDS.gatewayRelease}` },
-  { id: "compliance-camera-ready", type: "readiness", title: "Smart Camera release evidence complete", requirement: "CRA Annex VII", productId: DEMO_IDS.smartCamera, releaseId: DEMO_IDS.cameraRelease, priority: "low", status: "complete", ownerId: DEMO_IDS.jane, reason: "All required evidence and approvals are current.", targetUrl: `/products/${DEMO_IDS.smartCamera}/releases/${DEMO_IDS.cameraRelease}?tab=compliance` },
+  { id: "compliance-org-response-review", type: "deadline", title: "Approve organization CRA response roster", requirement: "CRA incident response governance", priority: "high", status: "open", lifecycleStatus: "action_required", readiness: "action_required", version: 1, createdAt: "2026-09-08T08:00:00Z", updatedAt: "2026-09-13T14:20:00Z", dueAt: "2026-09-22T17:00:00Z", ownerId: DEMO_IDS.jane, reason: "Two backup reporting contacts still require authorization before the quarterly exercise.", targetUrl: "/compliance?item=compliance-org-response-review" },
+  { id: "compliance-hub-case", type: "reporting_case", title: "Assess actively exploited vulnerability", requirement: "CRA Article 14(1)", productId: DEMO_IDS.homeHub, releaseId: DEMO_IDS.hubRelease, priority: "urgent", status: "in_progress", lifecycleStatus: "in_progress", readiness: "action_required", reportingStage: "early_warning", version: 2, createdAt: "2026-09-14T08:30:00Z", updatedAt: "2026-09-14T09:20:00Z", dueAt: "2026-09-14T20:00:00Z", ownerId: DEMO_IDS.jane, reason: "CISA KEV match is confirmed present and reachable.", targetUrl: "/compliance?view=cases&case=case-hub-2026-014" },
+  { id: "compliance-lock-deadline", type: "deadline", title: "Submit initial incident notification", requirement: "CRA Article 14(2)", productId: DEMO_IDS.smartLock, releaseId: DEMO_IDS.lockRelease, priority: "urgent", status: "in_progress", lifecycleStatus: "in_progress", readiness: "action_required", reportingStage: "notification", version: 1, createdAt: "2026-09-13T05:00:00Z", updatedAt: "2026-09-14T09:45:00Z", dueAt: "2026-09-14T16:00:00Z", ownerId: DEMO_IDS.jane, reason: "Approval must complete before the 24-hour deadline.", targetUrl: "/documents/document-lock-report" },
+  { id: "compliance-lock-approval", type: "approval", title: "Approve notification revision 3", requirement: "Authorized approval policy", productId: DEMO_IDS.smartLock, releaseId: DEMO_IDS.lockRelease, priority: "urgent", status: "blocked", lifecycleStatus: "pending_approval", readiness: "review_required", version: 3, createdAt: "2026-09-13T05:00:00Z", updatedAt: "2026-09-14T09:45:00Z", dueAt: "2026-09-14T17:00:00Z", ownerId: DEMO_IDS.elena, reason: "Document is complete and waiting for an authorized approver.", targetUrl: "/documents/document-lock-report" },
+  { id: "compliance-therm-evidence", type: "missing_evidence", title: "Complete Thermostat technical evidence", requirement: "CRA Annex VII", productId: DEMO_IDS.thermostat, releaseId: DEMO_IDS.thermostatRelease, priority: "normal", status: "blocked", lifecycleStatus: "action_required", readiness: "action_required", version: 0, createdAt: "2026-09-12T08:00:00Z", updatedAt: "2026-09-12T08:00:00Z", ownerId: DEMO_IDS.jane, reason: "Firmware image and one native advisory source are missing.", targetUrl: "/documents/document-therm-evidence" },
+  { id: "compliance-gateway-readiness", type: "readiness", title: "Restore monitoring evidence freshness", requirement: "CRA Article 13(8)", productId: DEMO_IDS.edgeGateway, releaseId: DEMO_IDS.gatewayRelease, priority: "high", status: "blocked", lifecycleStatus: "action_required", readiness: "action_required", version: 1, createdAt: "2026-09-11T08:00:00Z", updatedAt: "2026-09-14T07:00:00Z", ownerId: DEMO_IDS.marcus, reason: "Required NVD and vendor catalogue checks are stale.", targetUrl: `/products/${DEMO_IDS.edgeGateway}/releases/${DEMO_IDS.gatewayRelease}` },
+  { id: "compliance-camera-ready", type: "readiness", title: "Smart Camera release evidence complete", requirement: "CRA Annex VII", productId: DEMO_IDS.smartCamera, releaseId: DEMO_IDS.cameraRelease, priority: "low", status: "complete", lifecycleStatus: "resolved", readiness: "ready", version: 2, createdAt: "2026-09-01T08:00:00Z", updatedAt: "2026-09-13T08:00:00Z", resolvedAt: "2026-09-13T08:00:00Z", ownerId: DEMO_IDS.jane, reason: "All required evidence and approvals are current.", targetUrl: `/products/${DEMO_IDS.smartCamera}/releases/${DEMO_IDS.cameraRelease}?tab=compliance` },
 ];
 
 const activities: Activity[] = [
@@ -491,16 +492,16 @@ const notifications: Notification[] = [
 ];
 
 const integrations: Integration[] = [
-  { id: "integration-email", name: "Compliance email", type: "email", status: "connected", description: "Urgent alerts and approval requests to compliance@acme-devices.eu", lastSyncAt: "2026-09-14T10:00:00Z" },
-  { id: "integration-collector", name: "Actis Collector", type: "collector", status: "connected", description: "Signed release evidence from CI and controlled build environments", lastSyncAt: "2026-09-13T13:33:00Z" },
-  { id: "integration-webhook", name: "Security operations webhook", type: "webhook", status: "attention", description: "Delivery paused after three HTTP 401 responses", lastSyncAt: "2026-09-13T15:02:00Z" },
-  { id: "integration-jira", name: "Jira Cloud", type: "jira", status: "not_connected", description: "Create remediation work items from approved findings" },
+  { id: "integration-email", name: "Compliance email", type: "email", status: "connected", description: "Urgent alerts and approval requests to compliance@acme-devices.eu", configuration: { provider: "microsoft_graph", from_address: "compliance@acme-devices.eu" }, secretReference: "azure-keyvault://actis/acme/email", lastSyncAt: "2026-09-14T10:00:00Z", version: 1 },
+  { id: "integration-collector", name: "Actis Collector", type: "collector", status: "connected", description: "Signed release evidence from CI and controlled build environments", configuration: { collector_id: "acme-production", environment: "production" }, secretReference: "vault://actis/acme/collector", lastSyncAt: "2026-09-13T13:33:00Z", version: 1 },
+  { id: "integration-webhook", name: "Security operations webhook", type: "webhook", status: "attention", description: "Delivery paused after three HTTP 401 responses", configuration: { endpoint_name: "security-operations", event_types: ["urgent_finding", "monitoring_failure"] }, secretReference: "aws-secrets://actis/acme/security-webhook", lastSyncAt: "2026-09-13T15:02:00Z", version: 1 },
+  { id: "integration-jira", name: "Jira Cloud", type: "jira", status: "not_connected", description: "Create remediation work items from approved findings", configuration: { site: "acme-devices.atlassian.net", project_key: "SEC" }, version: 1 },
 ];
 
 export function createDemoState(): DemoState {
   return structuredClone({
     schemaVersion: 2,
-    organization: { id: DEMO_IDS.organization, name: "Acme Devices", legalName: "Acme Devices GmbH", country: "Germany", registrationNumber: "HRB 184220", defaultTimezone: "Europe/Berlin" },
+    organization: { id: DEMO_IDS.organization, name: "Acme Devices", legalName: "Acme Devices GmbH", country: "DE", registrationNumber: "HRB 184220", defaultTimezone: "Europe/Berlin" },
     currentUserId: DEMO_IDS.jane,
     members,
     integrations,
@@ -508,6 +509,7 @@ export function createDemoState(): DemoState {
       notifications: { urgentFindings: true, deadlineWarnings: true, monitoringFailures: true, approvalRequests: true, emailDigest: "daily" },
       security: { sessionTimeoutMinutes: 60, evidenceRetentionMonths: 120, requireMfa: true, allowRawArtifacts: false },
       appearance: { theme: "light", density: "comfortable" },
+      analytics: { enabled: true, retentionDays: 90 },
     },
     products,
     releases,

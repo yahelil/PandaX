@@ -205,7 +205,22 @@ describe("governance API", () => {
     const item = await api.getCompliance("org/acme", "obligation/1");
 
     expect(item.productId).toBeUndefined();
-    expect(mapCompliance(item)).toBeUndefined();
+    expect(mapCompliance(item)).toMatchObject({
+      id: "obligation/1",
+      productId: undefined,
+      lifecycleStatus: "pending_approval",
+      status: "blocked",
+    });
+  });
+
+  it("does not present acknowledged compliance work as complete", async () => {
+    const api = createGovernanceApi({ baseUrl: "", fetch: fetchSequence(json({ ...complianceDto, status: "acknowledged" })) });
+    const item = await api.getCompliance("org/acme", "obligation/1");
+    expect(mapCompliance(item)).toMatchObject({
+      lifecycleStatus: "acknowledged",
+      status: "in_progress",
+      readiness: "review_required",
+    });
   });
 
   it("serializes immutable document revisions and approval transitions", async () => {

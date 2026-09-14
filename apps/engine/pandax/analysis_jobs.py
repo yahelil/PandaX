@@ -454,6 +454,33 @@ class AnalysisJobRepository:
             ).mappings().all()
         return [_event_record(row) for row in rows]
 
+    def record_follow_up_failure(
+        self,
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        job_id: str,
+        *,
+        kind: str,
+        message: str,
+        details: Mapping[str, Any],
+    ) -> None:
+        """Append a safe audit event when post-analysis automation fails."""
+        job = self.get(organization_id, product_id, release_id, job_id)
+        if job.status != "completed":
+            raise AnalysisJobConflict("follow-up failures require a completed analysis job")
+        with self._transaction() as session:
+            self._append_event(
+                session,
+                job_id,
+                kind=_required(kind, "kind", 160),
+                status=job.status,
+                stage=job.stage,
+                progress=job.progress,
+                message=_required(message, "message", 500),
+                details=dict(details),
+            )
+
     def run(
         self,
         organization_id: str,

@@ -108,7 +108,11 @@ def setup(tmp_path: Path) -> Iterator[dict]:
     engine.dispose()
 
 
-def make_client(setup: dict, identity: PortfolioIdentity | None = None) -> TestClient:
+def make_client(
+    setup: dict,
+    identity: PortfolioIdentity | None = None,
+    completion_callback=None,
+) -> TestClient:
     principal = identity or PortfolioIdentity(
         actor_id="security-reviewer",
         organization_id=setup["organization_id"],
@@ -121,7 +125,7 @@ def make_client(setup: dict, identity: PortfolioIdentity | None = None) -> TestC
             lambda: principal,
             setup["runner"],
             setup["pending"].append,
-            completion_callback=setup["completed"].append,
+            completion_callback=completion_callback or setup["completed"].append,
         )
     )
     return TestClient(app)
@@ -201,6 +205,24 @@ def test_completed_active_release_enrolls_hourly_monitoring(monkeypatch):
         enabled_sources=("osv", "cisa_kev", "epss"), cadence_minutes=60,
         enabled=True, actor_id="operator-1",
     )
+
+
+def test_monitoring_enrollment_failure_keeps_analysis_complete_and_records_follow_up(setup):
+    def unavailable_monitoring(_job):
+        raise RuntimeError("monitoring database unavailable")
+
+    client = make_client(setup, completion_callback=unavailable_monitoring)
+    uploaded = upload(client, setup).json()
+    assert client.post(f"{collection(setup)}/{uploaded['id']}/run").status_code == 200
+
+    setup["pending"].pop()()
+
+    job = client.get(f"{collection(setup)}/{uploaded['id']}").json()
+    events = client.get(f"{collection(setup)}/{uploaded['id']}/events").json()
+    assert job["status"] == "completed"
+    assert events[-1]["kind"] == "analysis.monitoring_enrollment_failed"
+    assert events[-1]["details"] == {"integration": "monitoring", "retry_required": True}
+    assert "database" not in events[-1]["message"]
 
 
 def test_idempotent_http_replay_returns_same_job(setup):

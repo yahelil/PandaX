@@ -816,4 +816,12 @@ def get_file(run_id: str, path: str) -> FileResponse:
 
 # Case routing stays isolated from scan and verification endpoints.
 from .case_api import router as case_router
+
 api.include_router(case_router)
+
+# Portfolio routing crosses a repository dependency so API tests and later
+# service deployments can replace storage without rewriting route handlers.
+from .portfolio_api import create_portfolio_router
+from .portfolio_runtime import get_portfolio_repository
+
+api.include_router(create_portfolio_router(get_portfolio_repository))

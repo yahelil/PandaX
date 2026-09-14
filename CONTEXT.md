@@ -4,6 +4,22 @@ PandaX turns product-security observations and manufacturer attestations into re
 
 ## Language
 
+**Organization**:
+The manufacturer workspace that owns products, members, access policy, and compliance records.
+_Avoid_: Account, tenant, customer
+
+**Product**:
+A regulated product identity whose compliance history spans one or more releases.
+_Avoid_: Device, component, artifact
+
+**Release**:
+A versioned product baseline with its own support period, supplied evidence, findings, decisions, and monitoring state.
+_Avoid_: Scan, build upload, device version
+
+**Release analysis**:
+The evidence-backed process that establishes a release's known contents and creates or updates findings without claiming unobserved coverage.
+_Avoid_: Assessment profile, global scan
+
 **Finding**:
 A vulnerability reported by a named checked source for an identified product component.
 _Avoid_: Proven exploitability, confirmed product impact
@@ -31,3 +47,7 @@ _Avoid_: Clean, vulnerability-free
 **Remediation case**:
 The durable history joining an original finding, later release observations, manufacturer decisions, deadlines, and report revisions.
 _Avoid_: Mutable scan bundle
+
+**Self-filing record**:
+The manufacturer's audit record of a regulatory submission performed outside Actis, including the approved revision and receipt evidence.
+_Avoid_: Managed filing, automatic submission

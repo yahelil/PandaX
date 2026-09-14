@@ -164,8 +164,8 @@ try {
   await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Compliance / }).click();
   await page.waitForURL(`${baseUrl}/compliance`);
   await assertSingleMain(page, "Compliance");
-  await assertAccessibilityBasics(page, "Compliance");
   await assertVisible(page.getByRole("textbox", { name: "Search compliance work" }), "compliance search");
+  await assertAccessibilityBasics(page, "Compliance");
   await page.getByRole("button", { name: "Deadlines" }).click();
   await assertVisible(page.getByText("Submit initial incident notification", { exact: true }).first(), "deadline case");
 
@@ -310,9 +310,10 @@ async function assertPerformanceBudgets(page) {
   await page.waitForTimeout(100);
   const metrics = await page.evaluate(() => {
     const navigation = performance.getEntriesByType("navigation")[0];
-    return { ...globalThis.__actisVitals, domContentLoaded: navigation?.domContentLoadedEventEnd ?? 0, domNodes: document.querySelectorAll("*").length };
+    const firstContentfulPaint = performance.getEntriesByName("first-contentful-paint")[0];
+    return { ...globalThis.__actisVitals, fcp: firstContentfulPaint?.startTime ?? 0, domContentLoaded: navigation?.domContentLoadedEventEnd ?? 0, domNodes: document.querySelectorAll("*").length };
   });
-  if (metrics.lcp > 5_000 || metrics.cls > .1 || metrics.longTaskMs > 1_500 || metrics.domContentLoaded > 5_000 || metrics.domNodes > 3_000) {
+  if (metrics.lcp > 5_000 || metrics.fcp > 5_000 || metrics.cls > .1 || metrics.longTaskMs > 1_500 || metrics.domContentLoaded > 5_000 || metrics.domNodes > 3_000) {
     throw new Error(`Performance budget exceeded: ${JSON.stringify(metrics)}`);
   }
   console.log(`Performance budgets passed: ${JSON.stringify(metrics)}`);

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { analyticsAreaForPath, pageViewed } from '../data/analytics'
 import { useDemo } from '../data/DemoProvider'
@@ -50,7 +50,9 @@ export function AppShell() {
               <button type="button" onClick={() => { void actions.refresh().catch(() => undefined) }}>Retry</button>
             </div>
           ) : null}
-          <Outlet />
+          <Suspense fallback={<div className="adapter-status" role="status" aria-live="polite">Loading workspace…</div>}>
+            <Outlet />
+          </Suspense>
         </div>
       </div>
     </div>

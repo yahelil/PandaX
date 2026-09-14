@@ -140,6 +140,12 @@ def test_home_aggregates_truth_and_prioritizes_action_queue(seeded):
 
     assert snapshot.monitoring.state == "degraded"
     assert snapshot.monitoring.degraded == 1
+    assert snapshot.monitoring.cadence_minutes == (60,)
+    assert snapshot.monitoring.next_check_at == NOW + timedelta(minutes=15)
+    assert snapshot.monitoring.last_check_at == NOW - timedelta(minutes=45)
+    assert [(item.source, item.state, item.release_count) for item in snapshot.monitoring.sources] == [
+        ("cisa_kev", "degraded", 1), ("osv", "degraded", 1),
+    ]
     assert snapshot.counters.findings_needing_action == 1
     assert snapshot.counters.urgent_findings == 1
     assert snapshot.counters.reachable_kev_findings == 1

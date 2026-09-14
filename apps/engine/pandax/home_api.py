@@ -18,6 +18,12 @@ class ApiModel(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
+class MonitoringSourceResponse(ApiModel):
+    source: str
+    state: Literal["healthy", "degraded", "failed", "stale", "inactive"]
+    release_count: int
+
+
 class MonitoringResponse(ApiModel):
     state: Literal["healthy", "degraded", "failed", "stale", "inactive", "not_configured"]
     supported_releases: int
@@ -29,6 +35,10 @@ class MonitoringResponse(ApiModel):
     inactive: int
     not_configured: int
     last_success_at: datetime | None
+    last_check_at: datetime | None
+    next_check_at: datetime | None
+    cadence_minutes: tuple[int, ...]
+    sources: tuple[MonitoringSourceResponse, ...]
 
 
 class CounterResponse(ApiModel):

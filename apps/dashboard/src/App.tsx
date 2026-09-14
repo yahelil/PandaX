@@ -1,20 +1,20 @@
+import { lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/AppShell'
-import {
-  AnalysisPage,
-  AnalysisResultPage,
-  CompliancePage,
-  DocumentDetailPage,
-  FindingDetailPage,
-  FindingsPage,
-  HomePage,
-  NotFoundPage,
-  ProductsPage,
-  ProductWorkspacePage,
-  ReleaseWorkspacePage,
-  SettingsPage,
-  ClientDemoPage,
-} from './pages'
+import { HomePage } from './pages/HomePage'
+
+const AnalysisPage = lazy(() => import('./pages/AnalysisPage').then(({ AnalysisPage }) => ({ default: AnalysisPage })))
+const AnalysisResultPage = lazy(() => import('./pages/AnalysisResultPage').then(({ AnalysisResultPage }) => ({ default: AnalysisResultPage })))
+const ClientDemoPage = lazy(() => import('./pages/ClientDemoPage').then(({ ClientDemoPage }) => ({ default: ClientDemoPage })))
+const CompliancePage = lazy(() => import('./pages/CompliancePage').then(({ CompliancePage }) => ({ default: CompliancePage })))
+const DocumentDetailPage = lazy(() => import('./pages/DocumentDetailPage').then(({ DocumentDetailPage }) => ({ default: DocumentDetailPage })))
+const FindingDetailPage = lazy(() => import('./pages/FindingDetailPage').then(({ FindingDetailPage }) => ({ default: FindingDetailPage })))
+const FindingsPage = lazy(() => import('./pages/FindingsPage').then(({ FindingsPage }) => ({ default: FindingsPage })))
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage').then(({ NotFoundPage }) => ({ default: NotFoundPage })))
+const ProductsPage = lazy(() => import('./pages/ProductsPage').then(({ ProductsPage }) => ({ default: ProductsPage })))
+const ProductWorkspacePage = lazy(() => import('./pages/ProductWorkspacePage').then(({ ProductWorkspacePage }) => ({ default: ProductWorkspacePage })))
+const ReleaseWorkspacePage = lazy(() => import('./pages/ReleaseWorkspacePage').then(({ ReleaseWorkspacePage }) => ({ default: ReleaseWorkspacePage })))
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(({ SettingsPage }) => ({ default: SettingsPage })))
 
 export function App() {
   return (

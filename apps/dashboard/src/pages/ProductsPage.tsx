@@ -48,7 +48,7 @@ export function ProductsPage() {
       }} members={demo.state.members} /> : null}
       <section className="panel">
         <div className="toolbar" aria-label="Product filters">
-          <input className="search-field" type="search" placeholder="Search products, identifiers, manufacturers…" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <input className="search-field" type="search" aria-label="Search products" placeholder="Search products, identifiers, manufacturers…" value={query} onChange={(event) => setQuery(event.target.value)} />
           <select className="select-field" aria-label="Readiness" value={readiness} onChange={(event) => setReadiness(event.target.value)}>
             <option value="all">All readiness</option><option value="ready">Ready</option><option value="needs_attention">Needs attention</option><option value="incomplete_evidence">Incomplete evidence</option>
           </select>

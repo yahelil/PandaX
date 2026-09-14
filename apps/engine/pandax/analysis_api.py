@@ -1,6 +1,5 @@
 """Typed HTTP interface for release SBOM analysis jobs."""
 from collections.abc import Callable, Mapping
-from functools import partial
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
@@ -119,6 +118,7 @@ class AnalysisJobEventResponse(ApiModel):
 RepositoryDependency = Callable[[], AnalysisJobRepository]
 SettingsRepositoryDependency = Callable[[], OrganizationSettingsRepository]
 JobDispatcher = Callable[[Callable[[], Any]], None]
+CompletionCallback = Callable[[AnalysisJobRecord], None]
 
 
 def create_analysis_router(
@@ -127,6 +127,7 @@ def create_analysis_router(
     runner: AnalysisRunner = pipeline_runner,
     dispatcher: JobDispatcher | None = None,
     settings_repository_dependency: SettingsRepositoryDependency | None = None,
+    completion_callback: CompletionCallback | None = None,
 ) -> APIRouter:
     """Build tenant-scoped routes with replaceable repository, identity, and runner adapters."""
     router = APIRouter(prefix="/v1", tags=["analysis"])
@@ -154,6 +155,7 @@ def create_analysis_router(
         identity: Identity,
         sbom: Annotated[UploadFile, File(...)],
         idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=128)],
+        changed_digest_confirmed: Annotated[bool, Form()] = False,
     ):
         _authorize(identity, organization_id, ANALYSIS_EDIT_ROLES)
         content = await sbom.read(MAX_SBOM_BYTES + 1)
@@ -167,6 +169,7 @@ def create_analysis_router(
                 content=content,
                 idempotency_key=idempotency_key,
                 actor_id=identity.actor_id,
+                changed_digest_confirmed=changed_digest_confirmed,
             )
         )
         return _job_response(job)
@@ -187,6 +190,7 @@ def create_analysis_router(
         file: Annotated[UploadFile, File(...)],
         idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=128)],
         raw_artifact_consent: Annotated[bool, Form()] = False,
+        changed_digest_confirmed: Annotated[bool, Form()] = False,
     ):
         _authorize(identity, organization_id, ANALYSIS_EDIT_ROLES)
         settings = settings_repository.get_settings(organization_id)
@@ -199,6 +203,7 @@ def create_analysis_router(
             idempotency_key=idempotency_key, actor_id=identity.actor_id,
             raw_artifact_allowed=bool(settings.security["allow_raw_artifacts"]),
             raw_artifact_consent=raw_artifact_consent,
+            changed_digest_confirmed=changed_digest_confirmed,
             retention_days=int(settings.security["evidence_retention_months"]) * 30,
         ))
         return _job_response(job)
@@ -270,14 +275,12 @@ def create_analysis_router(
         job = _call(
             lambda: repository.start(organization_id, product_id, release_id, job_id)
         )
-        work = partial(
-            repository.execute,
-            organization_id,
-            product_id,
-            release_id,
-            job_id,
-            runner,
-        )
+        def work() -> None:
+            completed = repository.execute(
+                organization_id, product_id, release_id, job_id, runner
+            )
+            if completed.status == "completed" and completion_callback is not None:
+                completion_callback(completed)
         if dispatcher is None:
             background_tasks.add_task(work)
         else:

@@ -848,6 +848,7 @@ from .home_api import create_home_router
 from .portfolio_api import create_portfolio_router
 from .portfolio_runtime import (
     get_analysis_repository,
+    enroll_completed_analysis,
     get_compliance_repository,
     get_document_repository,
     get_authenticated_principal,
@@ -872,6 +873,7 @@ api.include_router(
         get_analysis_repository,
         get_portfolio_identity,
         settings_repository_dependency=get_organization_settings_repository,
+        completion_callback=enroll_completed_analysis,
     )
 )
 api.include_router(

@@ -2,8 +2,7 @@ export type AuthRole =
   | "org_admin"
   | "compliance_operator"
   | "authorized_approver"
-  | "security_reviewer"
-  | "viewer";
+  | "read_only_auditor";
 
 export interface AuthUser {
   subject: string;
@@ -70,13 +69,14 @@ interface TokenResponse {
   token_type?: string;
 }
 
-const ROLES = new Set<AuthRole>([
-  "org_admin",
-  "compliance_operator",
-  "authorized_approver",
-  "security_reviewer",
-  "viewer",
-]);
+const ROLE_ALIASES: Record<string, AuthRole> = {
+  org_admin: "org_admin",
+  compliance_operator: "compliance_operator",
+  authorized_approver: "authorized_approver",
+  security_reviewer: "compliance_operator",
+  viewer: "read_only_auditor",
+  read_only_auditor: "read_only_auditor",
+};
 
 export class BrowserOidcClient implements AuthClient {
   private readonly fetcher: typeof globalThis.fetch;
@@ -247,7 +247,7 @@ export class BrowserOidcClient implements AuthClient {
     if (!subject) throw new Error("Your session is missing a subject identifier.");
     const rolesClaim = claims[this.config.rolesClaim ?? "roles"];
     const rawRoles = Array.isArray(rolesClaim) ? rolesClaim : typeof rolesClaim === "string" ? rolesClaim.split(" ") : [];
-    const roles = rawRoles.filter((role): role is AuthRole => typeof role === "string" && ROLES.has(role as AuthRole));
+    const roles = normalizeRoles(rawRoles);
     const email = stringClaim(claims.email);
     const name = stringClaim(claims.name) || email || subject;
     return {
@@ -279,6 +279,7 @@ export class BrowserOidcClient implements AuthClient {
       this.storage.removeItem(this.sessionKey);
       return null;
     }
+    value.user.roles = normalizeRoles(value.user.roles);
     return value;
   }
 
@@ -329,6 +330,10 @@ function parseJson<T>(value: string | null): T | undefined {
 
 function stringClaim(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeRoles(values: unknown[]): AuthRole[] {
+  return [...new Set(values.flatMap((value) => typeof value === "string" && ROLE_ALIASES[value] ? [ROLE_ALIASES[value]] : []))];
 }
 
 function initials(name: string): string {

@@ -264,6 +264,27 @@ def test_runner_failure_is_persisted_not_raised(repositories, scope):
     assert repository.events(*scope, job.id)[-1].kind == "analysis.failed"
 
 
+def test_changed_release_digest_requires_and_records_confirmation(repositories, scope):
+    _, repository = repositories
+    first = create_job(repository, scope)
+    repository.run(*scope, first.id, lambda _: [ev.run_done("Complete", components=2)])
+
+    with pytest.raises(AnalysisJobConflict, match="explicit digest confirmation"):
+        create_job(
+            repository, scope, content=spdx(), filename="changed.spdx.json",
+            media_type="application/spdx+json", idempotency_key="changed-1",
+        )
+
+    confirmed = create_job(
+        repository, scope, content=spdx(), filename="changed.spdx.json",
+        media_type="application/spdx+json", idempotency_key="changed-2",
+        changed_digest_confirmed=True,
+    )
+    event = repository.events(*scope, confirmed.id)[-1]
+    assert event.kind == "analysis.digest_confirmed"
+    assert event.details["previous_sha256"] == first.sha256
+
+
 def test_event_rows_are_database_immutable(repositories, scope):
     _, repository = repositories
     job = create_job(repository, scope)

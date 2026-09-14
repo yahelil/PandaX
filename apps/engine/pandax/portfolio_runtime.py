@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from .analysis_jobs import AnalysisJobRepository
+from .analysis_jobs import AnalysisJobRecord, AnalysisJobRepository
 from .analysis_storage import LocalAnalysisInputStorage
 from .auth import OIDCAuthenticator, OIDCSettings, Principal
 from .compliance import ComplianceRepository
@@ -72,6 +72,23 @@ def get_release_monitoring_repository() -> ReleaseMonitoringRepository:
     if repository.engine.dialect.name == "sqlite":
         repository.create_schema()
     return repository
+
+
+def enroll_completed_analysis(job: AnalysisJobRecord) -> None:
+    """Enroll eligible releases in the standard hourly monitoring policy."""
+
+    release = get_portfolio_repository().get_release(job.organization_id, job.release_id)
+    if release.status not in {"active", "supported"}:
+        return
+    get_release_monitoring_repository().configure(
+        job.organization_id,
+        job.product_id,
+        job.release_id,
+        enabled_sources=("osv", "cisa_kev", "epss"),
+        cadence_minutes=60,
+        enabled=True,
+        actor_id=job.actor_id,
+    )
 
 
 @lru_cache(maxsize=1)

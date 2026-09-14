@@ -36,10 +36,10 @@ describe("runtime authentication", () => {
 
   it("maps roles to the same permissions enforced by the API", () => {
     expect(hasPermission(["compliance_operator"], "manage_portfolio")).toBe(true);
-    expect(hasPermission(["security_reviewer"], "run_analysis")).toBe(true);
-    expect(hasPermission(["security_reviewer"], "decide_findings")).toBe(true);
+    expect(hasPermission(["compliance_operator"], "run_analysis")).toBe(true);
+    expect(hasPermission(["compliance_operator"], "decide_findings")).toBe(true);
     expect(hasPermission(["authorized_approver"], "approve_documents")).toBe(true);
-    expect(hasPermission(["viewer"], "manage_settings")).toBe(false);
+    expect(hasPermission(["read_only_auditor"], "manage_settings")).toBe(false);
     expect(hasPermission(["org_admin"], "approve_documents")).toBe(false);
   });
 
@@ -89,7 +89,7 @@ describe("runtime authentication", () => {
   it("clears an expired session when no refresh credential exists", async () => {
     const storage = new MemoryStorage();
     storage.setItem("actis.oidc.session.actis-dashboard", JSON.stringify({
-      accessToken: "expired", expiresAt: 1, user: { subject: "user-1", organizationId: "org-acme", name: "Jane", initials: "J", roles: ["viewer"] },
+      accessToken: "expired", expiresAt: 1, user: { subject: "user-1", organizationId: "org-acme", name: "Jane", initials: "J", roles: ["read_only_auditor"] },
     }));
     const client = new BrowserOidcClient({
       issuer: "https://identity.example", clientId: "actis-dashboard", organizationId: "org-acme",

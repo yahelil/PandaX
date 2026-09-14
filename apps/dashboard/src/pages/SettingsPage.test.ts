@@ -18,13 +18,13 @@ describe("Settings mutations", () => {
   it("updates organization, team roles, integrations, and policy in fixture mode", async () => {
     const adapter = new FixtureAdapter(createDemoState(), false);
     await adapter.updateOrganization({ legalName: "Acme Connected Devices GmbH", country: "DE" });
-    await adapter.updateTeamMember(DEMO_IDS.marcus, { title: "Principal Product Security Engineer", roles: ["security_reviewer"] });
+    await adapter.updateTeamMember(DEMO_IDS.marcus, { title: "Principal Product Security Engineer", roles: ["compliance_operator"] });
     await adapter.updateIntegration("integration-jira", { status: "connected", secretReference: "vault://actis/acme/jira" });
     await adapter.updateSettings("security", { evidenceRetentionMonths: 60 });
 
     const state = adapter.getSnapshot();
     expect(state.organization).toMatchObject({ legalName: "Acme Connected Devices GmbH", country: "DE" });
-    expect(state.members.find((item) => item.id === DEMO_IDS.marcus)).toMatchObject({ title: "Principal Product Security Engineer", roles: ["security_reviewer"], version: 2 });
+    expect(state.members.find((item) => item.id === DEMO_IDS.marcus)).toMatchObject({ title: "Principal Product Security Engineer", roles: ["compliance_operator"], version: 2 });
     expect(state.integrations.find((item) => item.id === "integration-jira")).toMatchObject({ status: "connected", secretReference: "vault://actis/acme/jira", version: 2 });
     expect(state.settings.security.evidenceRetentionMonths).toBe(60);
   });
@@ -68,7 +68,7 @@ describe("Settings mutations", () => {
     const member: GovernanceTeamMemberDto = { id: DEMO_IDS.marcus, organizationId: initial.organization.id, subject: "oidc|marcus", name: "Marcus Chen", email: "marcus@example.test", title: "Product Security Engineer", initials: "MC", roles: ["compliance_operator"], status: "active", version: 1, createdAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-14T00:00:00Z" };
     const integration: GovernanceIntegrationDto = { id: "integration-jira", organizationId: initial.organization.id, name: "Jira Cloud", type: "jira", status: "not_connected", description: "Remediation work items", configuration: { site: "acme.atlassian.net", project_key: "SEC" }, version: 1, createdAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-14T00:00:00Z" };
     const updateSettings = vi.fn(async () => ({ ...settings, version: 2, organizationProfile: { ...settings.organizationProfile, legalName: "Acme Connected Devices GmbH" } }));
-    const updateTeamMember = vi.fn(async () => ({ ...member, version: 2, roles: ["security_reviewer"] as const }));
+    const updateTeamMember = vi.fn(async () => ({ ...member, version: 2, roles: ["compliance_operator"] as const }));
     const updateIntegration = vi.fn(async () => ({ ...integration, version: 2, status: "connected" as const, secretReference: "vault://actis/acme/jira" }));
     const governance = {
       listCompliance: vi.fn(async () => []), listDocuments: vi.fn(async () => []), getSettings: vi.fn(async () => settings),
@@ -82,13 +82,13 @@ describe("Settings mutations", () => {
 
     await adapter.initialize();
     await adapter.updateOrganization({ legalName: "Acme Connected Devices GmbH" });
-    await adapter.updateTeamMember(DEMO_IDS.marcus, { roles: ["security_reviewer"] });
+    await adapter.updateTeamMember(DEMO_IDS.marcus, { roles: ["compliance_operator"] });
     await adapter.updateIntegration("integration-jira", { status: "connected", secretReference: "vault://actis/acme/jira" });
 
     expect(updateSettings).toHaveBeenCalledWith(initial.organization.id, { expectedVersion: 1, organizationProfile: { legalName: "Acme Connected Devices GmbH", timezone: undefined } });
-    expect(updateTeamMember).toHaveBeenCalledWith(initial.organization.id, DEMO_IDS.marcus, { expectedVersion: 1, roles: ["security_reviewer"] });
+    expect(updateTeamMember).toHaveBeenCalledWith(initial.organization.id, DEMO_IDS.marcus, { expectedVersion: 1, roles: ["compliance_operator"] });
     expect(updateIntegration).toHaveBeenCalledWith(initial.organization.id, "integration-jira", { expectedVersion: 1, status: "connected", secretReference: "vault://actis/acme/jira" });
-    expect(adapter.getSnapshot()).toMatchObject({ organization: { legalName: "Acme Connected Devices GmbH" }, members: [{ roles: ["security_reviewer"], version: 2 }], integrations: [{ status: "connected", version: 2 }] });
+    expect(adapter.getSnapshot()).toMatchObject({ organization: { legalName: "Acme Connected Devices GmbH" }, members: [{ roles: ["compliance_operator"], version: 2 }], integrations: [{ status: "connected", version: 2 }] });
   });
 
   it("exposes real actions, permission boundaries, disabled provisioning, and feedback", () => {

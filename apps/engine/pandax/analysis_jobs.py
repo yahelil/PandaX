@@ -265,11 +265,13 @@ class AnalysisJobRepository:
         content: bytes,
         idempotency_key: str,
         actor_id: str,
+        changed_digest_confirmed: bool = False,
     ) -> AnalysisJobRecord:
         return self.create_input(
             organization_id, product_id, release_id, input_type="sbom",
             filename=filename, media_type=media_type, content=content,
             idempotency_key=idempotency_key, actor_id=actor_id,
+            changed_digest_confirmed=changed_digest_confirmed,
         )
 
     def create_input(
@@ -286,6 +288,7 @@ class AnalysisJobRepository:
         actor_id: str,
         raw_artifact_allowed: bool = False,
         raw_artifact_consent: bool = False,
+        changed_digest_confirmed: bool = False,
         retention_days: int = 3650,
     ) -> AnalysisJobRecord:
         clean_type = _choice(input_type, INPUT_TYPES, "input_type")
@@ -306,6 +309,10 @@ class AnalysisJobRepository:
                 label = "SBOM content" if clean_type == "sbom" else "analysis input"
                 raise AnalysisJobConflict(f"idempotency key already used for different {label}")
             return existing
+        previous_digest = self._latest_completed_digest(organization_id, product_id, release_id)
+        digest_changed = previous_digest is not None and previous_digest != digest
+        if digest_changed and not changed_digest_confirmed:
+            raise AnalysisJobConflict("release contents changed; explicit digest confirmation is required")
         job_id = str(uuid4())
         try:
             stored = self.storage.put(organization_id, job_id, content)
@@ -359,6 +366,13 @@ class AnalysisJobRepository:
                         message="Explicit raw artifact processing consent recorded",
                         details={"actor_id": clean_actor, "consented_at": now.isoformat()},
                     )
+                if digest_changed:
+                    self._append_event(
+                        session, job_id, kind="analysis.digest_confirmed", status="queued",
+                        stage=values["stage"], progress=0,
+                        message="Changed release contents explicitly confirmed",
+                        details={"previous_sha256": previous_digest, "sha256": digest, "actor_id": clean_actor},
+                    )
                 return _job_record(values)
         except Exception:
             self.storage.delete(stored.object_key)
@@ -379,6 +393,22 @@ class AnalysisJobRepository:
                 & (analysis_jobs.c.idempotency_key == key)
             )).mappings().one_or_none()
         return _job_record(row) if row is not None else None
+
+    def _latest_completed_digest(
+        self, organization_id: str, product_id: str, release_id: str,
+    ) -> str | None:
+        with Session(self.engine) as session:
+            return session.execute(
+                select(analysis_jobs.c.sha256)
+                .where(
+                    (analysis_jobs.c.organization_id == organization_id)
+                    & (analysis_jobs.c.product_id == product_id)
+                    & (analysis_jobs.c.release_id == release_id)
+                    & (analysis_jobs.c.status == "completed")
+                )
+                .order_by(analysis_jobs.c.completed_at.desc(), analysis_jobs.c.id.desc())
+                .limit(1)
+            ).scalar_one_or_none()
 
     def get(
         self, organization_id: str, product_id: str, release_id: str, job_id: str

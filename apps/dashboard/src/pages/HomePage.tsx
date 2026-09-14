@@ -14,9 +14,9 @@ export function HomePage() {
     .filter((item) => item.status !== "completed")
     .sort((a, b) => ({ urgent: 0, high: 1, normal: 2, low: 3 }[a.priority] - { urgent: 0, high: 1, normal: 2, low: 3 }[b.priority]));
   const counters = isScoped ? undefined : demo.state.home?.counters;
-  const actionTotal = counters?.actionTotal ?? activeActions.length;
   const needsReview = counters?.findingsNeedingAction ?? demo.findings.filter((item) => matchesScope(item, scope) && (item.status === "needs_review" || item.status === "action_required")).length;
-  const dueSoon = counters?.dueSoonObligations ?? activeActions.filter((item) => item.dueAt && new Date(item.dueAt).getTime() - Date.now() <= 7 * 86_400_000).length;
+  const deadlinesAtRisk = counters ? counters.overdueObligations + counters.dueSoonObligations : activeActions.filter((item) => item.type === "deadline").length;
+  const incompleteEvidence = counters?.missingEvidence ?? activeActions.filter((item) => item.type === "evidence").length;
   const scopedReleases = demo.releases.filter((item) => matchesScope(item, scope));
   const scopedProducts = demo.products.filter((item) => !scope.productId || item.id === scope.productId);
   const degraded = scope.releaseId
@@ -26,21 +26,31 @@ export function HomePage() {
   const monitoringNeedsAttention = monitoring ? monitoring.state !== "healthy" : degraded.length > 0;
   const monitoringIssueCount = monitoring ? monitoring.degraded + monitoring.failed + monitoring.stale + monitoring.inactive + monitoring.notConfigured : degraded.length;
   const recentChanges = demo.state.activities.filter((item) => matchesScope(item, scope));
+  const hasProduct = demo.products.length > 0;
+  const hasRelease = demo.releases.length > 0;
+  const hasAnalysis = demo.releases.some((item) => item.lastAnalysisAt) || demo.state.analysisJobs.some((item) => item.status === "completed");
+  const hasReview = hasAnalysis && (demo.findings.length === 0 || demo.findings.some((item) => item.decisions.length > 0));
+  const hasApprover = demo.state.members.some((item) => item.status === "active" && item.roles.includes("authorized_approver"));
+  const notificationsConfigured = Object.entries(demo.state.settings.notifications).some(([key, value]) => key === "emailDigest" ? value !== "off" : value === true);
+  const firstRun = !isScoped && !(hasProduct && hasRelease && hasAnalysis && hasReview && hasApprover && notificationsConfigured);
+
+  if (firstRun) {
+    const steps = [
+      { label: "Create product", done: hasProduct, to: "/products" },
+      { label: "Register release", done: hasRelease, to: hasProduct ? `/products/${demo.products[0].id}` : "/products" },
+      { label: "Analyze release", done: hasAnalysis, to: hasRelease ? `/products/${demo.releases[0].productId}/releases/${demo.releases[0].id}/analyze` : "/products" },
+      { label: "Review initial findings", done: hasReview, to: "/findings" },
+      { label: "Assign an authorized approver and configure notifications", done: hasApprover && notificationsConfigured, to: "/settings/team" },
+    ];
+    return <main className="page"><PageHeader title="Set up Actis" description="Complete these steps to establish release evidence and continuous CRA monitoring."/><section className="panel setup-panel"><ol className="setup-list">{steps.map((item, index)=><li className={item.done ? "done" : ""} key={item.label}><span aria-hidden="true">{item.done ? "✓" : index + 1}</span><div><strong>{item.label}</strong><small>{item.done ? "Complete" : "Not started"}</small></div>{!item.done && steps.slice(0,index).every((step)=>step.done) ? <Link className="button button-primary" to={item.to}>Continue setup</Link> : null}</li>)}</ol></section></main>;
+  }
 
   return (
     <main className="page">
       <PageHeader
-        eyebrow="Compliance operations"
-        title={`Good morning, ${demo.currentUser.name.split(" ")[0]}`}
-        description="What needs attention across your products and supported releases."
-        actions={<Link className="button button-primary" to="/products">Review portfolio</Link>}
+        title="Home"
+        description="What needs action now, why, by when, and who owns it."
       />
-
-      <section className="metrics-grid" aria-label="Action summary">
-        <MetricCard label="Action needed" value={actionTotal} detail="Open prioritized work" tone="urgent" />
-        <MetricCard label="Needs review" value={needsReview} detail="Findings awaiting a decision" tone="high" />
-        <MetricCard label="Due soon" value={dueSoon} detail="Obligations within seven days" />
-      </section>
 
       {monitoring || monitoringNeedsAttention ? (
         <section className={`notice${monitoringNeedsAttention ? " notice-warning" : ""}`} aria-label="Monitoring status">
@@ -53,6 +63,12 @@ export function HomePage() {
           {" "}<Link className="text-link" to={scopedPath("/compliance", scope, { view: "monitoring" })}>Review monitoring</Link>
         </section>
       ) : null}
+
+      <section className="metrics-grid" aria-label="Action summary">
+        <MetricCard label="Deadlines at risk" value={deadlinesAtRisk} detail="Overdue or due soon" tone="urgent" to={scopedPath("/compliance", scope, { view: "deadlines" })} />
+        <MetricCard label="Findings awaiting action" value={needsReview} detail="Review or decision required" tone="high" to={scopedPath("/findings", scope)} />
+        <MetricCard label="Incomplete or stale evidence" value={incompleteEvidence} detail="Evidence needs attention" to={scopedPath("/compliance", scope, { view: "evidence" })} />
+      </section>
 
       <div className="split-layout">
         <section className="panel">
@@ -76,13 +92,14 @@ export function HomePage() {
                 </li>
               );
             })}
+            {!activeActions.length ? <li className="empty-state"><strong>No action needed</strong><p>There is no open work in this scope.</p></li> : null}
           </ul>
         </section>
 
         <section className="panel">
           <SectionHeader title="Recent changes" description="Evidence, decisions, monitoring, and documents." />
           <ul className="activity-list">
-            {recentChanges.slice(0, 7).map((activity) => (
+            {recentChanges.slice(0, 5).map((activity) => (
               <li className="activity-item" key={activity.id}>
                 <span className="activity-icon" aria-hidden="true">{activity.type.slice(0, 1).toUpperCase()}</span>
                 <div className="item-main">
@@ -92,6 +109,7 @@ export function HomePage() {
                 <div className="item-meta"><span>{formatDate(activity.at, true)}</span></div>
               </li>
             ))}
+            {!recentChanges.length ? <li className="empty-state"><strong>No recent changes</strong><p>Monitoring and workflow changes will appear here.</p></li> : null}
           </ul>
         </section>
       </div>

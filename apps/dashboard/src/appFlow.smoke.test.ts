@@ -129,4 +129,20 @@ describe("application flow smoke contracts", () => {
     expect(detail).toContain("Record decision");
     expect(detail).toContain("Save remediation plan");
   });
+
+  it("keeps Home operator-first and exposes the agreed first-run checklist", () => {
+    const home = source("./pages/HomePage.tsx");
+    expect(home).not.toContain("Good morning");
+    for (const text of [
+      "Deadlines at risk",
+      "Findings awaiting action",
+      "Incomplete or stale evidence",
+      "Create product",
+      "Register release",
+      "Analyze release",
+      "Review initial findings",
+      "Assign an authorized approver and configure notifications",
+    ]) expect(home).toContain(text);
+    expect(home).toContain("recentChanges.slice(0, 5)");
+  });
 });

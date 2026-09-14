@@ -7,7 +7,7 @@ export type MonitoringHealth = "healthy" | "degraded" | "failed" | "inactive";
 export type Severity = "critical" | "high" | "medium" | "low";
 export type FindingStatus = "needs_review" | "action_required" | "in_remediation" | "accepted" | "resolved";
 export type DecisionKind = "affected" | "not_affected" | "accepted_risk" | "deferred";
-export type Role = "org_admin" | "compliance_operator" | "authorized_approver" | "security_reviewer" | "viewer" | "read_only_auditor";
+export type Role = "org_admin" | "compliance_operator" | "authorized_approver" | "read_only_auditor";
 
 export interface Scope {
   productId?: EntityId;
@@ -432,6 +432,7 @@ export interface AnalysisDraft {
   fileSize: number;
   file?: Blob;
   rawArtifactConsent?: boolean;
+  changedDigestConfirmed?: boolean;
 }
 
 export interface AnalysisPreview {
@@ -538,7 +539,7 @@ export interface CreateReleaseInput {
 
 export type OrganizationProfileUpdate = Partial<Pick<Organization, "name" | "legalName" | "country" | "registrationNumber" | "defaultTimezone">>;
 
-export type ManagedRole = Exclude<Role, "read_only_auditor">;
+export type ManagedRole = Role;
 
 export interface TeamMemberUpdate {
   title?: string;

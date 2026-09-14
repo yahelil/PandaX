@@ -37,7 +37,7 @@ describe("compliance lifecycle", () => {
     [["compliance_operator"], "pending_approval", { canEdit: true, canApprove: false }],
     [["authorized_approver"], "pending_approval", { canEdit: false, canApprove: true }],
     [["org_admin"], "pending_approval", { canEdit: true, canApprove: true }],
-    [["viewer"], "action_required", { canEdit: false, canApprove: false }],
+    [["read_only_auditor"], "action_required", { canEdit: false, canApprove: false }],
   ] as Array<[Role[], ComplianceItem["lifecycleStatus"], ReturnType<typeof compliancePermissions>]>) (
     "applies backend roles for %j",
     (roles, status, expected) => expect(compliancePermissions(roles, item({ lifecycleStatus: status }))).toEqual(expected),

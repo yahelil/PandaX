@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useDemo } from "../data/DemoProvider";
 import type { ReleaseMonitoringView } from "../data/types";
-import { Breadcrumbs, EmptyState, EvidenceMeter, MetricCard, SectionHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
+import { Breadcrumbs, EmptyState, EvidenceMeter, FindingInsights, MetricCard, SectionHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
 import "./pages.css";
 
 const releaseTabs = ["overview", "findings", "compliance", "documents"] as const;
@@ -27,6 +27,7 @@ export function ReleaseWorkspacePage() {
       <section className="metrics-grid wide"><MetricCard label="Open findings" value={findings.filter((item) => item.status !== "resolved").length} detail={`${findings.filter((item) => item.kev).length} listed in KEV`} tone={findings.some((item) => item.priority === "urgent") ? "urgent" : "good"} /><MetricCard label="Identified components" value={`${release.coverage.identifiedComponents}/${release.coverage.components}`} detail="From latest evidence" /><MetricCard label="Next deadline" value={relativeDate(product.nextDeadline)} detail={formatDate(product.nextDeadline)} tone={product.nextDeadline ? "high" : "good"} /></section>
       <section className="panel"><SectionHeader title="Analysis coverage" description="Latest known software composition and source coverage." /><dl className="definition-grid"><div><dt>SBOM status</dt><dd><StatusPill value={release.sbomStatus} /></dd></div><div><dt>Component identity</dt><dd><EvidenceMeter value={release.coverage.identifiedComponents} total={release.coverage.components} /></dd></div><div><dt>Advisory sources</dt><dd><EvidenceMeter value={release.coverage.advisorySourcesChecked} total={release.coverage.advisorySourcesExpected} /></dd></div><div><dt>Last analysis</dt><dd>{formatDate(release.lastAnalysisAt, true)}</dd></div></dl>{release.coverage.limitations.length ? <div className="panel-pad"><div className="coverage-callout"><strong>Coverage limitations</strong><br />{release.coverage.limitations.join(" ")}</div></div> : null}</section>
       <MonitoringPanel productId={product.id} releaseId={release.id} fallbackHealth={release.monitoringHealth} fallbackLastCheck={release.lastMonitoringCheckAt} />
+      <FindingInsights findings={findings} analyses={demo.state.analysisJobs.filter((item) => item.draft.releaseId === release.id)}/>
       <section className="panel wide"><SectionHeader title="Received artifacts" description="Traceable evidence used in the latest analysis." /><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Artifact</th><th>Kind</th><th>Size</th><th>Received</th><th>SHA-256</th></tr></thead><tbody>{release.artifacts.map((artifact) => <tr key={artifact.id}><td className="cell-strong">{artifact.name}</td><td>{artifact.kind.replaceAll("_", " ")}</td><td>{artifact.sizeLabel}</td><td>{formatDate(artifact.receivedAt, true)}</td><td className="mono">{artifact.sha256.slice(0, 16)}…</td></tr>)}</tbody></table></div></section>
     </div> : null}
     {tab === "findings" ? <ReleaseFindings releaseId={release.id} /> : null}

@@ -5,6 +5,8 @@ import type {
   PriorityBand,
   ReadinessStatus,
   TeamMember,
+  Finding,
+  AnalysisJob,
 } from "../data/types";
 
 export const labels = {
@@ -102,14 +104,17 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
   );
 }
 
-export function MetricCard({ label, value, detail, tone = "neutral" }: { label: string; value: ReactNode; detail: string; tone?: string }) {
-  return (
-    <article className={`metric-card tone-${tone}`}>
-      <p>{label}</p>
-      <strong>{value}</strong>
-      <span>{detail}</span>
-    </article>
-  );
+export function MetricCard({ label, value, detail, tone = "neutral", to }: { label: string; value: ReactNode; detail: string; tone?: string; to?: string }) {
+  const content = <><p>{label}</p><strong>{value}</strong><span>{detail}</span></>;
+  return to ? <Link className={`metric-card metric-card-link tone-${tone}`} to={to}>{content}</Link> : <article className={`metric-card tone-${tone}`}>{content}</article>;
+}
+
+export function FindingInsights({ findings, analyses }: { findings: Finding[]; analyses: AnalysisJob[] }) {
+  const distribution = (["critical", "high", "medium", "low"] as const).map((severity) => ({ severity, count: findings.filter((item) => item.severity === severity).length }));
+  const history = analyses.filter((item) => item.status === "completed" && item.result).sort((a, b) => a.createdAt.localeCompare(b.createdAt)).slice(-6);
+  if (findings.length < 3 && history.length < 2) return null;
+  const maximum = Math.max(1, ...distribution.map((item) => item.count), ...history.map((item) => (item.result?.newFindings ?? 0) + (item.result?.changedFindings ?? 0)));
+  return <section className="panel wide"><SectionHeader title="Finding insights" description="Shown only when enough release evidence exists for a useful comparison."/><div className="insights-grid">{findings.length >= 3 ? <div><h3>Current distribution</h3><ul className="bar-list">{distribution.map((item)=><li key={item.severity}><span>{titleCase(item.severity)}</span><i><b style={{width:`${item.count/maximum*100}%`}}/></i><strong>{item.count}</strong></li>)}</ul></div>:null}{history.length >= 2 ? <div><h3>Analysis history</h3><ul className="bar-list">{history.map((item)=>{const count=(item.result?.newFindings??0)+(item.result?.changedFindings??0);return <li key={item.id}><span>{formatDate(item.createdAt)}</span><i><b style={{width:`${count/maximum*100}%`}}/></i><strong>{count}</strong></li>})}</ul><small>New or changed findings per immutable snapshot</small></div>:null}</div></section>;
 }
 
 export function ScopeLink({ productId, releaseId, children }: { productId: string; releaseId?: string; children: ReactNode }) {

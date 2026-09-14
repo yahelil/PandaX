@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
 import shutil
 import subprocess
 import uuid
@@ -384,7 +385,9 @@ def run(ctx: RunContext) -> ev.Stream:
     ]
     yield ev.log(STAGE, "syft scan dir:<extracted> -o cyclonedx-json@1.6")
 
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+    environment = dict(os.environ)
+    environment["SYFT_CHECK_FOR_APP_UPDATE"] = "false"
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900, env=environment)
     if proc.returncode != 0 or not out_path.exists():
         raise SbomError(f"syft failed (exit {proc.returncode}): {proc.stderr.strip()}")
 

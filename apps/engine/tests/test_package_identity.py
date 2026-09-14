@@ -24,6 +24,7 @@ def test_syft_stage_resolves_exact_binary_identity_and_keeps_original(ctx, monke
     monkeypatch.setattr(sbom, 'syft_binary', lambda: jar)
     monkeypatch.setattr(sbom, 'syft_version', lambda _: 'test')
     def scan(*args, **kwargs):
+        assert kwargs['env']['SYFT_CHECK_FOR_APP_UPDATE'] == 'false'
         ctx.path('sbom.cdx.json').write_text(json.dumps(original))
         return SimpleNamespace(returncode=0)
     monkeypatch.setattr(sbom.subprocess, 'run', scan)

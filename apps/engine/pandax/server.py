@@ -45,13 +45,32 @@ def _advisory_service():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from .advisory_watch import AdvisoryRefreshLoop
+    from .portfolio_runtime import get_release_monitoring_repository
+    from .release_monitoring import monitoring_store_runner
+    from .release_monitoring_worker import ReleaseMonitoringLoop
+
     interval = max(1, float(os.environ.get("PANDAX_ADVISORY_REFRESH_SECONDS", "3600")))
     loop = AdvisoryRefreshLoop(_advisory_service, interval)
+    release_interval = max(
+        1,
+        float(os.environ.get("PANDAX_RELEASE_MONITORING_SECONDS", "60")),
+    )
+    release_loop = ReleaseMonitoringLoop(
+        get_release_monitoring_repository,
+        monitoring_store_runner(
+            _monitor_store(),
+            lambda _organization_id, _product_id, release_id: release_id,
+        ),
+        interval_seconds=release_interval,
+    )
     app.state.advisory_refresh = loop
+    app.state.release_monitoring = release_loop
     loop.start()
+    release_loop.start()
     try:
         yield
     finally:
+        release_loop.stop()
         loop.stop()
 
 

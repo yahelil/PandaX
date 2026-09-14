@@ -584,12 +584,21 @@ export class ProductionAdapter implements DataAdapter {
   }
 
   private analysisKey(draft: AnalysisDraft): string {
-    let fileKey = "no-file";
-    if (draft.file) {
-      fileKey = this.analysisFileKeys.get(draft.file) ?? crypto.randomUUID();
-      this.analysisFileKeys.set(draft.file, fileKey);
-    }
-    return `${draft.productId}:${draft.releaseId ?? "new"}:${draft.inputKind}:${fileKey}`;
+    return [
+      draft.productId,
+      draft.releaseId ?? "new",
+      draft.inputKind,
+      this.analysisFileKey(draft.file),
+      this.analysisFileKey(draft.runtimeTelemetry),
+      this.analysisFileKey(draft.exposureContext),
+    ].join(":");
+  }
+
+  private analysisFileKey(file?: Blob): string {
+    if (!file) return "none";
+    const key = this.analysisFileKeys.get(file) ?? crypto.randomUUID();
+    this.analysisFileKeys.set(file, key);
+    return key;
   }
 
   private async uploadAnalysis(draft: AnalysisDraft & { releaseId: string; file: Blob }): Promise<ReleaseAnalysisJob> {
@@ -598,7 +607,16 @@ export class ProductionAdapter implements DataAdapter {
     if (existing) return existing;
     const idempotencyKey = this.analysisIdempotencyKeys.get(key) ?? `actis:${crypto.randomUUID()}`;
     this.analysisIdempotencyKeys.set(key, idempotencyKey);
-    const input = { file: draft.file, filename: draft.fileName, idempotencyKey, changedDigestConfirmed: draft.changedDigestConfirmed };
+    const input = {
+      file: draft.file,
+      filename: draft.fileName,
+      idempotencyKey,
+      changedDigestConfirmed: draft.changedDigestConfirmed,
+      runtimeTelemetry: draft.runtimeTelemetry,
+      runtimeTelemetryFilename: draft.runtimeTelemetryName,
+      exposureContext: draft.exposureContext,
+      exposureContextFilename: draft.exposureContextName,
+    };
     const uploaded = draft.inputKind === "sbom"
       ? await this.config.releaseOperationsApi!.uploadSbom(this.analysisScope(draft), input)
       : await this.config.releaseOperationsApi!.uploadAnalysisInput(this.analysisScope(draft), {

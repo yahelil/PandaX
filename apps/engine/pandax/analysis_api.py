@@ -18,6 +18,7 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from . import exposure, telemetry
 from .analysis_jobs import (
     MAX_SBOM_BYTES,
     MAX_COLLECTOR_BYTES,
@@ -157,10 +158,14 @@ def create_analysis_router(
         identity: Identity,
         sbom: Annotated[UploadFile, File(...)],
         idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=128)],
+        telemetry_file: Annotated[UploadFile | None, File(alias="telemetry")] = None,
+        exposure_context: Annotated[UploadFile | None, File()] = None,
         changed_digest_confirmed: Annotated[bool, Form()] = False,
     ):
         _authorize(identity, organization_id, ANALYSIS_EDIT_ROLES)
         content = await sbom.read(MAX_SBOM_BYTES + 1)
+        runtime_input = await _optional_json_input(telemetry_file, telemetry.MAX_BYTES)
+        exposure_input = await _optional_json_input(exposure_context, exposure.MAX_BYTES)
         job = _call(
             lambda: repository.create(
                 organization_id,
@@ -172,6 +177,8 @@ def create_analysis_router(
                 idempotency_key=idempotency_key,
                 actor_id=identity.actor_id,
                 changed_digest_confirmed=changed_digest_confirmed,
+                runtime_telemetry=runtime_input,
+                exposure_context=exposure_input,
             )
         )
         return _job_response(job)
@@ -191,6 +198,8 @@ def create_analysis_router(
         input_type: Annotated[Literal["collector", "raw_artifact"], Form(...)],
         file: Annotated[UploadFile, File(...)],
         idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=128)],
+        telemetry_file: Annotated[UploadFile | None, File(alias="telemetry")] = None,
+        exposure_context: Annotated[UploadFile | None, File()] = None,
         raw_artifact_consent: Annotated[bool, Form()] = False,
         changed_digest_confirmed: Annotated[bool, Form()] = False,
     ):
@@ -198,6 +207,8 @@ def create_analysis_router(
         settings = settings_repository.get_settings(organization_id)
         maximum = MAX_COLLECTOR_BYTES if input_type == "collector" else MAX_RAW_ARTIFACT_BYTES
         content = await file.read(maximum + 1)
+        runtime_input = await _optional_json_input(telemetry_file, telemetry.MAX_BYTES)
+        exposure_input = await _optional_json_input(exposure_context, exposure.MAX_BYTES)
         job = _call(lambda: repository.create_input(
             organization_id, product_id, release_id,
             input_type=input_type, filename=file.filename or "",
@@ -207,6 +218,8 @@ def create_analysis_router(
             raw_artifact_consent=raw_artifact_consent,
             changed_digest_confirmed=changed_digest_confirmed,
             retention_days=int(settings.security["evidence_retention_months"]) * 30,
+            runtime_telemetry=runtime_input,
+            exposure_context=exposure_input,
         ))
         return _job_response(job)
 
@@ -383,7 +396,7 @@ def _job_response(job: AnalysisJobRecord) -> dict[str, Any]:
         "sha256": job.sha256,
         "preview": dict(job.preview),
         "retained_until": job.retained_until,
-        "input_metadata": dict(job.input_metadata),
+        "input_metadata": _public_input_metadata(job.input_metadata),
         "consented_at": job.consented_at,
         "consent_actor_id": job.consent_actor_id,
         "status": job.status,
@@ -396,6 +409,26 @@ def _job_response(job: AnalysisJobRecord) -> dict[str, Any]:
         "started_at": job.started_at,
         "completed_at": job.completed_at,
     }
+
+
+async def _optional_json_input(
+    upload: UploadFile | None, maximum: int,
+) -> tuple[str, str, bytes] | None:
+    if upload is None:
+        return None
+    content = await upload.read(maximum + 1)
+    return upload.filename or "", upload.content_type or "", content
+
+
+def _public_input_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    def scrub(value: Any) -> Any:
+        if isinstance(value, Mapping):
+            return {str(key): scrub(item) for key, item in value.items() if key != "object_key"}
+        if isinstance(value, list):
+            return [scrub(item) for item in value]
+        return value
+
+    return scrub(metadata)
 
 
 def _public_result(result: Mapping[str, Any], prefix: str) -> dict[str, Any]:

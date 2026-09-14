@@ -38,6 +38,24 @@ def sbom_bytes() -> bytes:
     ).encode()
 
 
+def telemetry_bytes() -> bytes:
+    return json.dumps({
+        "schema": "pandax/runtime-telemetry/v1",
+        "product": {"name": "Smart Camera", "version": "2.1.0", "unique_id": "ACM-CAM-210"},
+        "approval": {"operator": "Company reviewer", "approved_at": "2026-09-14T08:00:00Z", "authority_attestation": True},
+        "observations": [],
+    }).encode()
+
+
+def exposure_bytes() -> bytes:
+    return json.dumps({
+        "schema": "pandax/exposure-context/v1",
+        "product": {"name": "Smart Camera", "version": "2.1.0", "unique_id": "ACM-CAM-210"},
+        "approval": {"reviewer": "Company reviewer", "reviewed_at": "2026-09-14T08:00:00Z", "authority_attestation": True},
+        "components": [],
+    }).encode()
+
+
 @pytest.fixture
 def setup(tmp_path: Path) -> Iterator[dict]:
     engine = create_portfolio_engine(
@@ -79,8 +97,11 @@ def setup(tmp_path: Path) -> Iterator[dict]:
     manifest.write_text('{"signed":true}', encoding="utf-8")
     digest = hashlib.sha256(manifest.read_bytes()).hexdigest()
 
-    def runner(path: Path):
+    supplemental = {}
+
+    def runner(path: Path, **kwargs):
         assert path.read_bytes() == sbom_bytes()
+        supplemental.update({key: value.read_bytes() if value else None for key, value in kwargs.items()})
         yield ev.start("S2 SBOM", "Validating SBOM")
         yield ev.done("S2 SBOM", "SBOM ready")
         yield ev.artifact("SEAL", "manifest.json", digest)
@@ -104,6 +125,7 @@ def setup(tmp_path: Path) -> Iterator[dict]:
         "digest": digest,
         "pending": [],
         "completed": [],
+        "supplemental": supplemental,
     }
     engine.dispose()
 
@@ -187,6 +209,50 @@ def test_upload_preview_run_events_and_evidence(setup):
     evidence = client.get(result["result"]["evidence"][0]["href"])
     assert evidence.status_code == 200
     assert evidence.content == b'{"signed":true}'
+
+
+def test_upload_validates_retains_and_forwards_release_bound_runtime_evidence(setup):
+    client = make_client(setup)
+    response = client.post(
+        collection(setup),
+        headers={"Idempotency-Key": "analysis-with-runtime"},
+        files={
+            "sbom": ("smart-camera.cdx.json", sbom_bytes(), "application/vnd.cyclonedx+json"),
+            "telemetry": ("runtime.json", telemetry_bytes(), "application/json"),
+            "exposure_context": ("exposure.json", exposure_bytes(), "application/json"),
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    metadata = response.json()["input_metadata"]["supplemental_evidence"]
+    assert set(metadata) == {"runtime_telemetry", "exposure_context"}
+    assert metadata["runtime_telemetry"]["validation"]["schema"] == "pandax/runtime-telemetry/v1"
+    assert "object_key" not in json.dumps(metadata)
+
+    job_id = response.json()["id"]
+    assert client.post(f"{collection(setup)}/{job_id}/run").status_code == 200
+    setup["pending"].pop()()
+    assert setup["supplemental"] == {
+        "telemetry_path": telemetry_bytes(),
+        "exposure_context_path": exposure_bytes(),
+    }
+
+
+def test_runtime_evidence_must_match_the_selected_product_release(setup):
+    document = json.loads(telemetry_bytes())
+    document["product"]["version"] = "9.9.9"
+    client = make_client(setup)
+    response = client.post(
+        collection(setup),
+        headers={"Idempotency-Key": "wrong-release-runtime"},
+        files={
+            "sbom": ("smart-camera.cdx.json", sbom_bytes(), "application/vnd.cyclonedx+json"),
+            "telemetry": ("runtime.json", json.dumps(document).encode(), "application/json"),
+        },
+    )
+
+    assert response.status_code == 422
+    assert "selected product release" in response.json()["detail"]
 
 
 def test_completed_active_release_enrolls_hourly_monitoring(monkeypatch):

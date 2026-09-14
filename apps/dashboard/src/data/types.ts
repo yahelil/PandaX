@@ -431,6 +431,10 @@ export interface AnalysisDraft {
   fileName: string;
   fileSize: number;
   file?: Blob;
+  runtimeTelemetry?: Blob;
+  runtimeTelemetryName?: string;
+  exposureContext?: Blob;
+  exposureContextName?: string;
   rawArtifactConsent?: boolean;
   changedDigestConfirmed?: boolean;
 }

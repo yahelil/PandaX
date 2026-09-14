@@ -15,7 +15,7 @@ import tempfile
 import unicodedata
 import zipfile
 from collections.abc import Callable, Iterable, Mapping
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
@@ -45,9 +45,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from . import events as pipeline_events
-from . import pipeline
+from . import exposure, pipeline, telemetry
 from .analysis_storage import AnalysisInputStorage, AnalysisInputStorageError, MemoryAnalysisInputStorage
-from .portfolio import portfolio_metadata, releases
+from .portfolio import portfolio_metadata, products, releases
 from .stages.sbom import SbomError, inspect_sbom
 
 MAX_SBOM_BYTES = 10 * 1024 * 1024
@@ -150,7 +150,7 @@ class AnalysisJobEventRecord:
     occurred_at: datetime
 
 
-AnalysisRunner = Callable[[Path], Iterable[pipeline_events.Event]]
+AnalysisRunner = Callable[..., Iterable[pipeline_events.Event]]
 
 
 analysis_jobs = Table(
@@ -236,9 +236,18 @@ analysis_job_events = Table(
 )
 
 
-def pipeline_runner(path: Path) -> Iterable[pipeline_events.Event]:
+def pipeline_runner(
+    path: Path,
+    *,
+    telemetry_path: Path | None = None,
+    exposure_context_path: Path | None = None,
+) -> Iterable[pipeline_events.Event]:
     """Production adapter for the existing PandaX SBOM pipeline."""
-    return pipeline.run_sbom(path)
+    return pipeline.run_sbom(
+        path,
+        telemetry_path=telemetry_path,
+        exposure_context_path=exposure_context_path,
+    )
 
 
 class AnalysisJobRepository:
@@ -266,12 +275,16 @@ class AnalysisJobRepository:
         idempotency_key: str,
         actor_id: str,
         changed_digest_confirmed: bool = False,
+        runtime_telemetry: tuple[str, str, bytes] | None = None,
+        exposure_context: tuple[str, str, bytes] | None = None,
     ) -> AnalysisJobRecord:
         return self.create_input(
             organization_id, product_id, release_id, input_type="sbom",
             filename=filename, media_type=media_type, content=content,
             idempotency_key=idempotency_key, actor_id=actor_id,
             changed_digest_confirmed=changed_digest_confirmed,
+            runtime_telemetry=runtime_telemetry,
+            exposure_context=exposure_context,
         )
 
     def create_input(
@@ -289,6 +302,8 @@ class AnalysisJobRepository:
         raw_artifact_allowed: bool = False,
         raw_artifact_consent: bool = False,
         changed_digest_confirmed: bool = False,
+        runtime_telemetry: tuple[str, str, bytes] | None = None,
+        exposure_context: tuple[str, str, bytes] | None = None,
         retention_days: int = 3650,
     ) -> AnalysisJobRecord:
         clean_type = _choice(input_type, INPUT_TYPES, "input_type")
@@ -303,20 +318,38 @@ class AnalysisJobRepository:
             raw_artifact_consent=raw_artifact_consent,
         )
         digest = hashlib.sha256(content).hexdigest()
+        supplemental = self._validate_supplemental_inputs(
+            organization_id,
+            product_id,
+            release_id,
+            runtime_telemetry=runtime_telemetry,
+            exposure_context=exposure_context,
+        )
         existing = self._idempotent_job(organization_id, product_id, release_id, clean_key)
         if existing is not None:
             if existing.sha256 != digest or existing.input_type != clean_type:
                 label = "SBOM content" if clean_type == "sbom" else "analysis input"
                 raise AnalysisJobConflict(f"idempotency key already used for different {label}")
+            if _supplemental_digests(existing.input_metadata) != {
+                key: value["sha256"] for key, value in supplemental.items()
+            }:
+                raise AnalysisJobConflict("idempotency key already used with different supplemental evidence")
             return existing
         previous_digest = self._latest_completed_digest(organization_id, product_id, release_id)
         digest_changed = previous_digest is not None and previous_digest != digest
         if digest_changed and not changed_digest_confirmed:
             raise AnalysisJobConflict("release contents changed; explicit digest confirmation is required")
         job_id = str(uuid4())
+        stored_inputs = []
         try:
             stored = self.storage.put(organization_id, job_id, content)
+            stored_inputs.append(stored)
+            for kind, item in supplemental.items():
+                item["stored"] = self.storage.put(organization_id, f"{job_id}-{kind}", item.pop("content"))
+                stored_inputs.append(item["stored"])
         except AnalysisInputStorageError as exc:
+            for stored_input in stored_inputs:
+                self.storage.delete(stored_input.object_key)
             raise AnalysisJobError(str(exc)) from exc
         try:
             with self._transaction() as session:
@@ -329,9 +362,31 @@ class AnalysisJobRepository:
                     if raced["sha256"] != digest or raced.get("input_type", "sbom") != clean_type:
                         label = "SBOM content" if clean_type == "sbom" else "analysis input"
                         raise AnalysisJobConflict(f"idempotency key already used for different {label}")
-                    self.storage.delete(stored.object_key)
+                    if _supplemental_digests(raced.get("input_metadata") or {}) != {
+                        key: value["sha256"] for key, value in supplemental.items()
+                    }:
+                        raise AnalysisJobConflict(
+                            "idempotency key already used with different supplemental evidence"
+                        )
+                    for stored_input in stored_inputs:
+                        self.storage.delete(stored_input.object_key)
                     return _job_record(raced)
                 now = _utc_now()
+                public_supplemental = {
+                    kind: {
+                        "filename": item["filename"],
+                        "media_type": item["media_type"],
+                        "object_key": item["stored"].object_key,
+                        "sha256": item["stored"].sha256,
+                        "size_bytes": item["stored"].size_bytes,
+                        "retained_until": (now + timedelta(days=retention_days)).isoformat(),
+                        "validation": item["validation"],
+                    }
+                    for kind, item in supplemental.items()
+                }
+                metadata = dict(metadata)
+                if public_supplemental:
+                    metadata["supplemental_evidence"] = public_supplemental
                 values = {
                     "id": job_id, "organization_id": organization_id,
                     "product_id": product_id, "release_id": release_id,
@@ -373,10 +428,94 @@ class AnalysisJobRepository:
                         message="Changed release contents explicitly confirmed",
                         details={"previous_sha256": previous_digest, "sha256": digest, "actor_id": clean_actor},
                     )
+                if public_supplemental:
+                    self._append_event(
+                        session, job_id, kind="analysis.supplemental_evidence_received", status="queued",
+                        stage=values["stage"], progress=0,
+                        message="Optional runtime evidence validated and retained",
+                        details={
+                            kind: {"sha256": item["sha256"], "size_bytes": item["size_bytes"]}
+                            for kind, item in public_supplemental.items()
+                        },
+                    )
                 return _job_record(values)
         except Exception:
-            self.storage.delete(stored.object_key)
+            for stored_input in stored_inputs:
+                self.storage.delete(stored_input.object_key)
             raise
+
+    def _validate_supplemental_inputs(
+        self,
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        *,
+        runtime_telemetry: tuple[str, str, bytes] | None,
+        exposure_context: tuple[str, str, bytes] | None,
+    ) -> dict[str, dict[str, Any]]:
+        supplied = {
+            "runtime_telemetry": runtime_telemetry,
+            "exposure_context": exposure_context,
+        }
+        if not any(supplied.values()):
+            return {}
+        identity = self._release_identity(organization_id, product_id, release_id)
+        validated: dict[str, dict[str, Any]] = {}
+        for kind, value in supplied.items():
+            if value is None:
+                continue
+            filename, media_type, content = value
+            safe_name = _safe_upload_filename(filename)
+            clean_media = _clean_media_type(media_type)
+            if clean_media not in ALLOWED_MEDIA_TYPES:
+                raise AnalysisJobValidationError(f"{kind} must be JSON")
+            module = telemetry if kind == "runtime_telemetry" else exposure
+            if not content or len(content) > module.MAX_BYTES:
+                raise AnalysisJobValidationError(f"{kind} exceeds its {module.MAX_BYTES // 1024} KiB limit")
+            try:
+                with _temporary_sbom(content, ".json") as path:
+                    document = module.load(path)
+                    validation = module.summary(path)
+            except (telemetry.TelemetryError, exposure.ExposureError) as exc:
+                raise AnalysisJobValidationError(str(exc)) from exc
+            supplied_product = document["product"]
+            matches = (
+                supplied_product["name"].casefold() == identity["name"].casefold()
+                and supplied_product["version"].casefold() == identity["version"].casefold()
+            )
+            supplied_id = str(supplied_product.get("unique_id", "")).strip()
+            if supplied_id and supplied_id.casefold() != identity["identifier"].casefold():
+                matches = False
+            if not matches:
+                raise AnalysisJobValidationError(f"{kind} does not match the selected product release")
+            validated[kind] = {
+                "filename": safe_name,
+                "media_type": clean_media,
+                "content": bytes(content),
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "validation": validation,
+            }
+        return validated
+
+    def _release_identity(
+        self, organization_id: str, product_id: str, release_id: str,
+    ) -> Mapping[str, str]:
+        with Session(self.engine) as session:
+            row = session.execute(
+                select(products.c.name, products.c.identifier, releases.c.version)
+                .select_from(releases.join(products, (
+                    (releases.c.product_id == products.c.id)
+                    & (releases.c.organization_id == products.c.organization_id)
+                )))
+                .where(
+                    (releases.c.organization_id == organization_id)
+                    & (releases.c.product_id == product_id)
+                    & (releases.c.id == release_id)
+                )
+            ).mappings().one_or_none()
+        if row is None:
+            raise AnalysisJobNotFound("release not found")
+        return row
 
     def _idempotent_job(
         self, organization_id: str, product_id: str, release_id: str, key: str,
@@ -533,8 +672,27 @@ class AnalysisJobRepository:
         )
 
         try:
-            with _temporary_sbom(content, suffix) as input_path:
-                stream = pipeline.run(input_path) if job.input_type == "raw_artifact" else runner(input_path)
+            with ExitStack() as stack:
+                input_path = stack.enter_context(_temporary_sbom(content, suffix))
+                supplemental = job.input_metadata.get("supplemental_evidence", {})
+                runtime_path = self._supplemental_path(stack, supplemental, "runtime_telemetry")
+                exposure_path = self._supplemental_path(stack, supplemental, "exposure_context")
+                if job.input_type == "raw_artifact" and (runtime_path is not None or exposure_path is not None):
+                    stream = pipeline.run(
+                        input_path,
+                        telemetry_path=runtime_path,
+                        exposure_context_path=exposure_path,
+                    )
+                elif job.input_type == "raw_artifact":
+                    stream = pipeline.run(input_path)
+                elif runtime_path is not None or exposure_path is not None:
+                    stream = runner(
+                        input_path,
+                        telemetry_path=runtime_path,
+                        exposure_context_path=exposure_path,
+                    )
+                else:
+                    stream = runner(input_path)
                 for item in stream:
                     progress = _event_progress(item, default=self.get(
                         organization_id, product_id, release_id, job_id
@@ -569,6 +727,21 @@ class AnalysisJobRepository:
         except Exception as exc:
             self._fail(organization_id, product_id, release_id, job_id, str(exc))
         return self.get(organization_id, product_id, release_id, job_id)
+
+    def _supplemental_path(
+        self,
+        stack: ExitStack,
+        supplemental: Any,
+        kind: str,
+    ) -> Path | None:
+        if not isinstance(supplemental, Mapping) or not isinstance(supplemental.get(kind), Mapping):
+            return None
+        item = supplemental[kind]
+        try:
+            content = self.storage.get(str(item["object_key"]), str(item["sha256"]))
+        except (KeyError, AnalysisInputStorageError) as exc:
+            raise AnalysisJobError(f"retained {kind} evidence is unavailable") from exc
+        return stack.enter_context(_temporary_sbom(content, ".json"))
 
     def evidence_path(
         self,
@@ -1086,6 +1259,17 @@ def _preview_dict(value: SbomPreview) -> dict[str, Any]:
 
 def _json_safe(value: Any) -> Any:
     return json.loads(json.dumps(value, default=str))
+
+
+def _supplemental_digests(metadata: Mapping[str, Any]) -> dict[str, str]:
+    supplemental = metadata.get("supplemental_evidence", {})
+    if not isinstance(supplemental, Mapping):
+        return {}
+    return {
+        str(kind): str(item["sha256"])
+        for kind, item in supplemental.items()
+        if isinstance(item, Mapping) and isinstance(item.get("sha256"), str)
+    }
 
 
 def _utc_now() -> datetime:

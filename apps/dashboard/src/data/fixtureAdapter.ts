@@ -376,11 +376,13 @@ export class FixtureAdapter implements DataAdapter {
     actions: DemoState["actions"],
     activities: DemoState["activities"],
     notifications: DemoState["notifications"],
+    home?: DemoState["home"],
   ): void => {
     this.mutate((state) => {
       state.actions = structuredClone(actions);
       state.activities = structuredClone(activities);
       state.notifications = structuredClone(notifications);
+      state.home = home ? structuredClone(home) : undefined;
     });
   };
 

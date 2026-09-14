@@ -323,6 +323,36 @@ export interface AnalysisJob {
   error?: string;
 }
 
+export interface HomeReadModel {
+  generatedAt: ISODate;
+  monitoring: {
+    state: "healthy" | "degraded" | "failed" | "stale" | "inactive" | "not_configured";
+    supportedReleases: number;
+    configured: number;
+    healthy: number;
+    degraded: number;
+    failed: number;
+    stale: number;
+    inactive: number;
+    notConfigured: number;
+    lastSuccessAt?: ISODate;
+  };
+  counters: {
+    actionTotal: number;
+    findingsNeedingAction: number;
+    urgentFindings: number;
+    reachableKevFindings: number;
+    complianceActions: number;
+    overdueObligations: number;
+    dueSoonObligations: number;
+    missingEvidence: number;
+    pendingApprovals: number;
+    documentsNeedingAction: number;
+    monitoringIssues: number;
+  };
+  dataWarnings: string[];
+}
+
 export interface DemoState {
   schemaVersion: 2;
   organization: Organization;
@@ -342,6 +372,7 @@ export interface DemoState {
   activities: Activity[];
   notifications: Notification[];
   analysisJobs: AnalysisJob[];
+  home?: HomeReadModel;
 }
 
 export interface CreateProductInput {

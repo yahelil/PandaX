@@ -16,6 +16,13 @@ const homeDto = {
     inactive: 0,
     not_configured: 1,
     last_success_at: "2026-09-14T11:45:00Z",
+    last_check_at: "2026-09-14T11:45:00Z",
+    next_check_at: "2026-09-14T12:45:00Z",
+    cadence_minutes: [60],
+    sources: [
+      { source: "cisa_kev", state: "healthy", release_count: 3 },
+      { source: "osv", state: "degraded", release_count: 3 },
+    ],
   },
   counters: {
     action_total: 8,
@@ -150,7 +157,14 @@ describe("operations API", () => {
     expect(headers.get("Accept")).toBe("application/json");
     expect(home).toMatchObject({
       organizationId: "org/acme",
-      monitoring: { supportedReleases: 4, notConfigured: 1, lastSuccessAt: "2026-09-14T11:45:00Z" },
+      monitoring: {
+        supportedReleases: 4,
+        notConfigured: 1,
+        lastSuccessAt: "2026-09-14T11:45:00Z",
+        nextCheckAt: "2026-09-14T12:45:00Z",
+        cadenceMinutes: [60],
+        sources: [{ source: "cisa_kev", state: "healthy", releaseCount: 3 }, { source: "osv", state: "degraded", releaseCount: 3 }],
+      },
       counters: { actionTotal: 8, reachableKevFindings: 1, pendingApprovals: 1 },
       actionQueue: [{ sourceType: "finding", productId: "product-camera", dueAt: undefined, score: 1050 }],
       recentChanges: [{ sourceType: "document", actorId: "member-jane", releaseId: undefined }],

@@ -483,6 +483,10 @@ export interface HomeReadModel {
     inactive: number;
     notConfigured: number;
     lastSuccessAt?: ISODate;
+    lastCheckAt?: ISODate;
+    nextCheckAt?: ISODate;
+    cadenceMinutes: number[];
+    sources: Array<{ source: string; state: "healthy" | "degraded" | "failed" | "stale" | "inactive"; releaseCount: number }>;
   };
   counters: {
     actionTotal: number;

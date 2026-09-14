@@ -29,6 +29,13 @@ class HomeValidationError(HomeError):
 
 
 @dataclass(frozen=True, slots=True)
+class MonitoringSourceSummary:
+    source: str
+    state: str
+    release_count: int
+
+
+@dataclass(frozen=True, slots=True)
 class MonitoringSummary:
     state: str
     supported_releases: int
@@ -40,6 +47,10 @@ class MonitoringSummary:
     inactive: int
     not_configured: int
     last_success_at: datetime | None
+    last_check_at: datetime | None
+    next_check_at: datetime | None
+    cadence_minutes: tuple[int, ...]
+    sources: tuple[MonitoringSourceSummary, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,6 +223,8 @@ class HomeReadModel:
                 func.sum(case((inactive, 1), else_=0)).label("inactive"),
                 func.sum(case((missing, 1), else_=0)).label("not_configured"),
                 func.max(release_monitoring.c.last_success_at).label("last_success_at"),
+                func.max(release_monitoring.c.last_check_at).label("last_check_at"),
+                func.min(release_monitoring.c.next_check_at).label("next_check_at"),
             ).select_from(
                 releases.outerjoin(
                     release_monitoring,
@@ -239,6 +252,34 @@ class HomeReadModel:
             state = "stale"
         if counts["failed"]:
             state = "failed"
+        configured_rows = session.execute(
+            select(
+                release_monitoring.c.enabled_sources,
+                release_monitoring.c.cadence_minutes,
+                release_monitoring.c.enabled,
+                release_monitoring.c.health,
+                release_monitoring.c.last_success_at,
+                release_monitoring.c.next_check_at,
+            )
+            .select_from(release_monitoring.join(
+                releases,
+                and_(
+                    release_monitoring.c.organization_id == releases.c.organization_id,
+                    release_monitoring.c.product_id == releases.c.product_id,
+                    release_monitoring.c.release_id == releases.c.id,
+                ),
+            ))
+            .where(scope)
+        ).mappings().all()
+        source_states: dict[str, tuple[str, int]] = {}
+        state_rank = {"healthy": 0, "degraded": 1, "inactive": 2, "stale": 3, "failed": 4}
+        for configured_row in configured_rows:
+            row_state = _monitoring_row_state(configured_row, now)
+            for source in configured_row["enabled_sources"] or ():
+                clean_source = str(source)
+                previous_state, release_count = source_states.get(clean_source, (row_state, 0))
+                worst = row_state if state_rank[row_state] > state_rank[previous_state] else previous_state
+                source_states[clean_source] = (worst, release_count + 1)
         summary = MonitoringSummary(
             state=state,
             supported_releases=counts["supported"],
@@ -250,6 +291,16 @@ class HomeReadModel:
             inactive=counts["inactive"],
             not_configured=counts["not_configured"],
             last_success_at=_optional_utc(row["last_success_at"]),
+            last_check_at=_optional_utc(row["last_check_at"]),
+            next_check_at=_optional_utc(row["next_check_at"]),
+            cadence_minutes=tuple(sorted({
+                int(configured_row["cadence_minutes"])
+                for configured_row in configured_rows if configured_row["enabled"]
+            })),
+            sources=tuple(
+                MonitoringSourceSummary(source, source_state, release_count)
+                for source, (source_state, release_count) in sorted(source_states.items())
+            ),
         )
         return summary, int(row["product_count"] or 0)
 

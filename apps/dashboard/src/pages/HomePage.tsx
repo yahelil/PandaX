@@ -63,6 +63,7 @@ export function HomePage() {
               : `${monitoring.healthy} of ${monitoring.supportedReleases} supported releases have current coverage.`
             : `${degraded.map((item) => "version" in item ? item.version : item.name).join(", ")} ${degraded.length === 1 ? "has" : "have"} incomplete source coverage.`}
           {" "}<Link className="text-link" to={scopedPath("/compliance", scope, { view: "monitoring" })}>Review monitoring</Link>
+          {monitoring ? <div className="monitoring-detail"><dl><div><dt>Cadence</dt><dd>{cadenceLabel(monitoring.cadenceMinutes)}</dd></div><div><dt>Last successful check</dt><dd>{monitoring.lastSuccessAt ? formatDate(monitoring.lastSuccessAt, true) : "No successful check"}</dd></div><div><dt>Next check</dt><dd>{monitoring.nextCheckAt ? formatDate(monitoring.nextCheckAt, true) : "Not scheduled"}</dd></div></dl>{monitoring.sources.length ? <ul aria-label="Monitoring source health">{monitoring.sources.map((source)=><li key={source.source}><span>{sourceName(source.source)} · {source.releaseCount} {source.releaseCount===1?"release":"releases"}</span><StatusPill value={source.state}/></li>)}</ul>:<p>No monitoring sources configured.</p>}</div> : null}
         </section>
       ) : null}
 
@@ -117,6 +118,15 @@ export function HomePage() {
       </div>
     </main>
   );
+}
+
+function cadenceLabel(minutes: number[]): string {
+  if (!minutes.length) return "Not configured";
+  return minutes.map((value) => value === 60 ? "Hourly" : value % 1440 === 0 ? `Every ${value / 1440}d` : value % 60 === 0 ? `Every ${value / 60}h` : `Every ${value}m`).join(", ");
+}
+
+function sourceName(source: string): string {
+  return ({ osv: "OSV", cisa_kev: "CISA KEV", epss: "EPSS", native_advisory: "Native advisories", vendor_advisory: "Vendor advisories" } as Record<string, string>)[source] ?? source.replaceAll("_", " ");
 }
 
 function SetupChecklist({ steps }: { steps: Array<{ label: string; done: boolean; to: string }> }) {

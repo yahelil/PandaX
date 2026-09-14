@@ -103,7 +103,7 @@ describe("analytics event flow", () => {
 const home: OperationsHome = {
   organizationId: organization.id,
   generatedAt: "2026-09-14T10:00:00Z",
-  monitoring: { state: "healthy", supportedReleases: 1, configured: 1, healthy: 1, degraded: 0, failed: 0, stale: 0, inactive: 0, notConfigured: 0 },
+  monitoring: { state: "healthy", supportedReleases: 1, configured: 1, healthy: 1, degraded: 0, failed: 0, stale: 0, inactive: 0, notConfigured: 0, cadenceMinutes: [60], sources: [{ source: "osv", state: "healthy", releaseCount: 1 }] },
   counters: { actionTotal: 1, findingsNeedingAction: 1, urgentFindings: 1, reachableKevFindings: 0, complianceActions: 0, overdueObligations: 0, dueSoonObligations: 0, missingEvidence: 0, pendingApprovals: 0, documentsNeedingAction: 0, monitoringIssues: 0 },
   actionQueue: [],
   recentChanges: [],

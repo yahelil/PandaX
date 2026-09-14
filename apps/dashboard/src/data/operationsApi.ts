@@ -53,6 +53,10 @@ export interface OperationsMonitoringSummary {
   inactive: number;
   notConfigured: number;
   lastSuccessAt?: string;
+  lastCheckAt?: string;
+  nextCheckAt?: string;
+  cadenceMinutes: number[];
+  sources: Array<{ source: string; state: Exclude<HomeMonitoringState, "not_configured">; releaseCount: number }>;
 }
 
 export interface OperationsActionCounters {
@@ -275,6 +279,20 @@ function parseMonitoring(value: unknown): OperationsMonitoringSummary {
     inactive: count(item, "inactive"),
     notConfigured: count(item, "not_configured"),
     lastSuccessAt: nullableDateTime(item, "last_success_at"),
+    lastCheckAt: nullableDateTime(item, "last_check_at"),
+    nextCheckAt: nullableDateTime(item, "next_check_at"),
+    cadenceMinutes: array(item.cadence_minutes, "cadence_minutes", (value) => {
+      if (typeof value !== "number" || !Number.isInteger(value) || value < 5) invalid("cadence_minutes must contain valid intervals", value);
+      return value;
+    }),
+    sources: array(item.sources, "monitoring sources", (value) => {
+      const source = record(value, "monitoring source");
+      return {
+        source: string(source, "source"),
+        state: member(source, "state", monitoringStates.filter((state) => state !== "not_configured")),
+        releaseCount: count(source, "release_count"),
+      };
+    }),
   };
 }
 

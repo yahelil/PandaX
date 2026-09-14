@@ -18,6 +18,7 @@ from .findings import FindingRepository
 from .portfolio import PortfolioRepository, create_portfolio_engine
 from .portfolio_api import PortfolioIdentity
 from .release_monitoring import ReleaseMonitoringRepository
+from .search_notifications import SearchNotificationRepository
 
 
 _bearer = HTTPBearer(auto_error=False)
@@ -85,6 +86,14 @@ def get_document_repository() -> DocumentRepository:
 
 
 @lru_cache(maxsize=1)
+def get_search_notification_repository() -> SearchNotificationRepository:
+    repository = SearchNotificationRepository(get_portfolio_repository().engine)
+    if repository.engine.dialect.name == "sqlite":
+        repository.create_schema()
+    return repository
+
+
+@lru_cache(maxsize=1)
 def get_oidc_authenticator() -> OIDCAuthenticator:
     return OIDCAuthenticator(OIDCSettings.from_env())
 
@@ -124,4 +133,5 @@ def reset_portfolio_repository() -> None:
     get_finding_repository.cache_clear()
     get_compliance_repository.cache_clear()
     get_document_repository.cache_clear()
+    get_search_notification_repository.cache_clear()
     get_oidc_authenticator.cache_clear()

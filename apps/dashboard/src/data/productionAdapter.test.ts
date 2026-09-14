@@ -258,6 +258,32 @@ describe("ProductionAdapter", () => {
     expect(releaseApi.uploadSbom).not.toHaveBeenCalled();
   });
 
+  it("does not reuse an uploaded analysis when selected bytes change without changing name or size", async () => {
+    const initial = createDemoState();
+    const productId = initial.products[0].id;
+    const releaseId = initial.releases.find((item) => item.productId === productId)!.id;
+    const base: ReleaseAnalysisJob = {
+      id: "analysis-a", organizationId: organization.id, productId, releaseId, inputType: "sbom",
+      filename: "release.cdx.json", mediaType: "application/json", sizeBytes: 2, sha256: "a".repeat(64),
+      preview: { format: "CycloneDX", version: "1.6", components: 1, matchableComponents: 1, skippedComponents: 0, product: {} },
+      inputMetadata: {}, status: "queued", stage: "Validation complete", progress: 0,
+      createdAt: "2026-09-14T08:00:00Z", updatedAt: "2026-09-14T08:00:00Z",
+    };
+    const releaseApi = releaseOperations(base);
+    vi.mocked(releaseApi.uploadSbom)
+      .mockResolvedValueOnce(base)
+      .mockResolvedValueOnce({ ...base, id: "analysis-b", sha256: "b".repeat(64) });
+    const adapter = new ProductionAdapter({ organizationId: organization.id, portfolioApi: api(), releaseOperationsApi: releaseApi, fixtureAdapter: new FixtureAdapter(initial) });
+    const first = new Blob(["aa"], { type: "application/json" });
+    const second = new Blob(["bb"], { type: "application/json" });
+    const draft = { productId, releaseId, version: "1.0.0", channel: "stable" as const, inputKind: "sbom" as const, fileName: "release.cdx.json", fileSize: 2 };
+
+    await expect(adapter.previewAnalysis({ ...draft, file: first })).resolves.toMatchObject({ digest: "a".repeat(64) });
+    await expect(adapter.previewAnalysis({ ...draft, file: second })).resolves.toMatchObject({ digest: "b".repeat(64) });
+
+    expect(releaseApi.uploadSbom).toHaveBeenCalledTimes(2);
+  });
+
   it("restores persisted analysis jobs and resumes polling after reload", async () => {
     vi.useFakeTimers();
     try {

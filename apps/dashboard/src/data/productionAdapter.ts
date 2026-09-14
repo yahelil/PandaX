@@ -208,6 +208,7 @@ export class ProductionAdapter implements DataAdapter {
   private readonly documentDetails = new Map<string, DocumentDetailDto>();
   private readonly uploadedAnalysis = new Map<string, ReleaseAnalysisJob>();
   private readonly analysisIdempotencyKeys = new Map<string, string>();
+  private readonly analysisFileKeys = new WeakMap<Blob, string>();
   private readonly analysisTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private settingsVersion?: number;
   private analyticsConsent?: boolean;
@@ -583,7 +584,12 @@ export class ProductionAdapter implements DataAdapter {
   }
 
   private analysisKey(draft: AnalysisDraft): string {
-    return `${draft.productId}:${draft.releaseId ?? "new"}:${draft.inputKind}:${draft.fileName}:${draft.fileSize}`;
+    let fileKey = "no-file";
+    if (draft.file) {
+      fileKey = this.analysisFileKeys.get(draft.file) ?? crypto.randomUUID();
+      this.analysisFileKeys.set(draft.file, fileKey);
+    }
+    return `${draft.productId}:${draft.releaseId ?? "new"}:${draft.inputKind}:${fileKey}`;
   }
 
   private async uploadAnalysis(draft: AnalysisDraft & { releaseId: string; file: Blob }): Promise<ReleaseAnalysisJob> {

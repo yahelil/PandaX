@@ -7,13 +7,14 @@
     "capture": "node scripts/capture.mjs",
     "voiceover": "uv run --with kokoro-onnx --with soundfile python scripts/generate_voiceover.py",
     "studio": "remotion studio src/index.tsx",
-    "render": "remotion render src/index.tsx PandaXShowcase ../../output/video/pandax-poc-showcase.mp4 --codec=h264 --crf=18 --audio-codec=aac"
+    "render": "remotion render src/index.tsx ActisDashboardDemo ../../output/video/actis-dashboard-demo.mp4 --codec=h264 --crf=18 --audio-codec=aac --browser-executable=\"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe\""
   },
   "dependencies": {
-    "@remotion/cli": "4.0.346",
+    "@remotion/cli": "4.0.524",
+    "@remotion/webcodecs": "4.0.524",
     "playwright-core": "1.55.0",
     "react": "19.1.1",
     "react-dom": "19.1.1",
-    "remotion": "4.0.346"
+    "remotion": "4.0.524"
   }
 }

@@ -45,13 +45,32 @@ def _advisory_service():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from .advisory_watch import AdvisoryRefreshLoop
+    from .portfolio_runtime import get_release_monitoring_repository
+    from .release_monitoring import monitoring_store_runner
+    from .release_monitoring_worker import ReleaseMonitoringLoop
+
     interval = max(1, float(os.environ.get("PANDAX_ADVISORY_REFRESH_SECONDS", "3600")))
     loop = AdvisoryRefreshLoop(_advisory_service, interval)
+    release_interval = max(
+        1,
+        float(os.environ.get("PANDAX_RELEASE_MONITORING_SECONDS", "60")),
+    )
+    release_loop = ReleaseMonitoringLoop(
+        get_release_monitoring_repository,
+        monitoring_store_runner(
+            _monitor_store(),
+            lambda _organization_id, _product_id, release_id: release_id,
+        ),
+        interval_seconds=release_interval,
+    )
     app.state.advisory_refresh = loop
+    app.state.release_monitoring = release_loop
     loop.start()
+    release_loop.start()
     try:
         yield
     finally:
+        release_loop.stop()
         loop.stop()
 
 
@@ -816,4 +835,78 @@ def get_file(run_id: str, path: str) -> FileResponse:
 
 # Case routing stays isolated from scan and verification endpoints.
 from .case_api import router as case_router
+
 api.include_router(case_router)
+
+# Portfolio routing crosses a repository dependency so API tests and later
+# service deployments can replace storage without rewriting route handlers.
+from .analysis_api import create_analysis_router
+from .compliance_v1_api import create_compliance_v1_router
+from .documents_api import create_documents_router
+from .findings_api import create_findings_router
+from .home_api import create_home_router
+from .portfolio_api import create_portfolio_router
+from .portfolio_runtime import (
+    get_analysis_repository,
+    enroll_completed_analysis,
+    get_compliance_repository,
+    get_document_repository,
+    get_authenticated_principal,
+    get_finding_repository,
+    get_home_read_model,
+    get_organization_settings_repository,
+    get_portfolio_identity,
+    get_portfolio_repository,
+    get_release_monitoring_repository,
+    get_search_notification_repository,
+)
+from .release_monitoring import monitoring_store_runner
+from .release_monitoring_api import create_release_monitoring_router
+from .search_notifications_api import create_search_notifications_router
+from .settings_api import create_settings_router
+
+api.include_router(
+    create_portfolio_router(get_portfolio_repository, get_portfolio_identity)
+)
+api.include_router(
+    create_analysis_router(
+        get_analysis_repository,
+        get_portfolio_identity,
+        settings_repository_dependency=get_organization_settings_repository,
+        completion_callback=enroll_completed_analysis,
+    )
+)
+api.include_router(
+    create_release_monitoring_router(
+        get_release_monitoring_repository,
+        monitoring_store_runner(
+            _monitor_store(),
+            lambda _organization_id, _product_id, release_id: release_id,
+        ),
+        get_portfolio_identity,
+    )
+)
+api.include_router(
+    create_findings_router(get_finding_repository, get_portfolio_identity)
+)
+api.include_router(
+    create_compliance_v1_router(get_compliance_repository, get_portfolio_identity)
+)
+api.include_router(
+    create_documents_router(get_document_repository, get_authenticated_principal)
+)
+api.include_router(
+    create_search_notifications_router(
+        get_search_notification_repository,
+        get_portfolio_identity,
+    )
+)
+api.include_router(
+    create_home_router(get_home_read_model, get_portfolio_identity)
+)
+api.include_router(
+    create_settings_router(
+        get_organization_settings_repository,
+        get_authenticated_principal,
+    )
+)

@@ -1,362 +1,41 @@
 import React from 'react';
-import {
-  AbsoluteFill,
-  Audio,
-  Easing,
-  Img,
-  Sequence,
-  interpolate,
-  spring,
-  staticFile,
-  useCurrentFrame,
-  useVideoConfig,
-} from 'remotion';
+import {AbsoluteFill,Audio,Easing,Img,Sequence,interpolate,spring,staticFile,useCurrentFrame,useVideoConfig} from 'remotion';
 
-const COLORS = {
-  ink: '#071017',
-  white: '#f5fbff',
-  cyan: '#3cf2d0',
-  blue: '#45a9ff',
-  red: '#ff556a',
-  muted: '#9eb1bf',
-};
+const C={bg:'#06101d',panel:'#0d1a2b',panel2:'#12233a',white:'#f7f9fc',muted:'#9fb0c5',blue:'#4b8dff',cyan:'#53dfd1',green:'#4ade80',amber:'#fbbf24',red:'#fb5c66',line:'#24364f'};
+const clamp={extrapolateLeft:'clamp' as const,extrapolateRight:'clamp' as const};
+const mono='Cascadia Code,Consolas,monospace';
 
-const ease = (frame: number, input: number[], output: number[]) =>
-  interpolate(frame, input, output, {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+const Grid=()=> <AbsoluteFill style={{background:`radial-gradient(circle at 16% 8%,#12366b 0,transparent 31%),radial-gradient(circle at 88% 86%,#073e48 0,transparent 29%),${C.bg}`}}><div style={{position:'absolute',inset:0,backgroundImage:'linear-gradient(rgba(111,153,209,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(111,153,209,.05) 1px,transparent 1px)',backgroundSize:'52px 52px'}}/></AbsoluteFill>;
+const Brand=()=> <div style={{display:'flex',alignItems:'center',gap:13}}><div style={{width:44,height:44,borderRadius:12,display:'grid',placeItems:'center',background:'linear-gradient(145deg,#377ff0,#1749ae)',fontWeight:900,fontSize:24}}>A</div><div><div style={{fontSize:28,fontWeight:850,letterSpacing:-1}}>Actis</div><div style={{fontSize:10,color:C.muted,letterSpacing:1.9,textTransform:'uppercase'}}>by PandaX</div></div></div>;
+const Scene=({duration,step,children}:{duration:number;step:string;children:React.ReactNode})=>{const f=useCurrentFrame();const enter=interpolate(f,[0,12],[0,1],clamp);const exit=interpolate(f,[duration-15,duration],[1,0],clamp);return <AbsoluteFill style={{color:C.white,fontFamily:'Segoe UI,Arial,sans-serif',opacity:Math.min(enter,exit),overflow:'hidden'}}><Grid/><div style={{position:'absolute',left:56,right:56,top:36,display:'flex',alignItems:'center',justifyContent:'space-between',zIndex:5}}><Brand/><div style={{fontSize:13,fontWeight:800,letterSpacing:2.4,textTransform:'uppercase',color:C.cyan}}>LIVE RUN · {step}</div></div>{children}</AbsoluteFill>};
+const Kicker=({children,color=C.cyan}:{children:React.ReactNode;color?:string})=> <div style={{fontSize:16,fontWeight:850,letterSpacing:2.7,textTransform:'uppercase',color}}>{children}</div>;
+const Panel=({children,style={}}:{children:React.ReactNode;style?:React.CSSProperties})=> <div style={{background:'linear-gradient(180deg,rgba(18,35,58,.97),rgba(10,24,41,.97))',border:`1px solid ${C.line}`,borderRadius:20,boxShadow:'0 28px 70px rgba(0,0,0,.35)',...style}}>{children}</div>;
+const Pill=({children,color=C.blue}:{children:React.ReactNode;color?:string})=> <span style={{display:'inline-flex',alignItems:'center',padding:'7px 12px',borderRadius:999,background:`${color}1e`,border:`1px solid ${color}55`,color,fontWeight:800,fontSize:14}}>{children}</span>;
+const Cursor=({x,y,click}:{x:number;y:number;click:number})=> <div style={{position:'absolute',left:x,top:y,zIndex:10,filter:'drop-shadow(0 8px 6px rgba(0,0,0,.55))'}}><div style={{position:'absolute',left:-19,top:-19,width:38+click*45,height:38+click*45,border:`3px solid ${C.cyan}`,borderRadius:'50%',opacity:click,transform:`translate(${-click*22}px,${-click*22}px)`}}/><svg width="48" height="54" viewBox="0 0 48 54"><path d="M4 2L42 24 27 28 39 46 30 51 19 33 8 45Z" fill="white" stroke="#06101d" strokeWidth="3"/></svg></div>;
 
-const GlowGrid: React.FC = () => {
-  const frame = useCurrentFrame();
-  return (
-    <AbsoluteFill
-      style={{
-        backgroundColor: COLORS.ink,
-        backgroundImage:
-          'linear-gradient(rgba(67,242,208,.055) 1px, transparent 1px), linear-gradient(90deg, rgba(67,242,208,.055) 1px, transparent 1px)',
-        backgroundSize: '54px 54px',
-        backgroundPosition: `${frame * -0.16}px ${frame * 0.08}px`,
-      }}
-    >
-      <div
-        style={{
-          position: 'absolute',
-          inset: -300,
-          background:
-            'radial-gradient(circle at 24% 25%, rgba(69,169,255,.18), transparent 34%), radial-gradient(circle at 82% 76%, rgba(60,242,208,.13), transparent 32%)',
-        }}
-      />
-    </AbsoluteFill>
-  );
-};
+const ArtifactScene=()=>{const f=useCurrentFrame();const {fps}=useVideoConfig();const s=spring({fps,frame:f,config:{damping:18,stiffness:82}});const move=interpolate(f,[18,80],[0,1],{...clamp,easing:Easing.inOut(Easing.cubic)});const click=interpolate(f,[82,88,101],[0,1,0],clamp);return <Scene duration={160} step="SmartHub SH-100 · 2.3.1"><div style={{position:'absolute',left:140,top:160,width:1640,display:'grid',gridTemplateColumns:'1.15fr .85fr',gap:28,transform:`translateY(${(1-s)*50}px)`,opacity:s}}><Panel style={{padding:34}}><Kicker>Real product artifact</Kicker><h1 style={{fontSize:49,letterSpacing:-2,margin:'15px 0 8px'}}>smarthub-sh100-v2.3.1.zip</h1><p style={{fontFamily:mono,color:C.muted,fontSize:17}}>SHA-256 31a4ab99d0e67588fc36… · 1,564,299 bytes</p><div style={{marginTop:28,display:'grid',gridTemplateColumns:'1fr 1fr',gap:13,fontFamily:mono,fontSize:17}}>{['app/package-lock.json','services/requirements.txt','firmware/config.json','lib/log4j-core-2.14.1.jar','product.yaml','firmware/README.txt'].map((x,i)=><div key={x} style={{padding:'14px 16px',borderRadius:10,background:i===3?'rgba(251,92,102,.13)':'rgba(255,255,255,.035)',border:`1px solid ${i===3?C.red+'66':C.line}`,color:i===3?C.white:C.muted}}>{x}</div>)}</div></Panel><Panel style={{padding:34,display:'flex',flexDirection:'column',justifyContent:'space-between'}}><div><Kicker>Declared identity</Kicker><h2 style={{fontSize:40,margin:'17px 0 8px'}}>SmartHub SH-100</h2><p style={{fontSize:22,color:C.muted,lineHeight:1.5}}>PDX-SH100-EU · Default CRA tier<br/>PandaX Devices B.V.</p></div><button style={{height:74,border:0,borderRadius:14,background:'linear-gradient(135deg,#2e79ed,#1852c4)',color:'white',fontSize:24,fontWeight:850,boxShadow:'0 18px 45px rgba(24,82,196,.38)'}}>Analyze artifact →</button></Panel></div><Cursor x={interpolate(move,[0,1],[1550,1565])} y={interpolate(move,[0,1],[300,747])} click={click}/></Scene>};
 
-const Logo: React.FC<{small?: boolean}> = ({small}) => (
-  <div style={{display: 'flex', alignItems: 'center', gap: small ? 14 : 24}}>
-    <div
-      style={{
-        width: small ? 50 : 82,
-        height: small ? 50 : 82,
-        border: `2px solid ${COLORS.cyan}`,
-        borderRadius: small ? 14 : 22,
-        display: 'grid',
-        placeItems: 'center',
-        boxShadow: `0 0 38px rgba(60,242,208,.22)`,
-        fontWeight: 900,
-        fontSize: small ? 25 : 42,
-        color: COLORS.cyan,
-      }}
-    >
-      X
-    </div>
-    <div style={{fontWeight: 850, fontSize: small ? 30 : 62, letterSpacing: -2}}>PandaX</div>
-  </div>
-);
+const PipelineScene=()=>{const f=useCurrentFrame();const stages=[{at:8,label:'INGEST',proof:'7 files · safety checks passed',color:C.green},{at:64,label:'SYFT 1.51.1',proof:'CycloneDX 1.6 · 11 components',color:C.cyan},{at:132,label:'OSV.dev',proof:'11 exact package URLs · 102 matches',color:C.blue},{at:205,label:'CISA KEV + EPSS',proof:'4 actively exploited · 95 EPSS scores',color:C.red}];return <Scene duration={315} step="Artifact → evidence"><div style={{position:'absolute',left:110,right:110,top:148}}><Kicker>Actual pipeline · run-20260914-121547-450486-9b45e3</Kicker><h1 style={{fontSize:56,letterSpacing:-2.5,margin:'14px 0 29px'}}>Every stage emits evidence.</h1><Panel style={{padding:'24px 30px'}}>{stages.map((s,i)=>{const p=spring({fps:30,frame:f-s.at,config:{damping:19,stiffness:100}});return <div key={s.label} style={{display:'grid',gridTemplateColumns:'54px 240px 1fr 104px',alignItems:'center',gap:18,padding:'20px 4px',borderBottom:i<3?`1px solid ${C.line}`:'none',opacity:p,transform:`translateX(${(1-p)*45}px)`}}><div style={{width:34,height:34,borderRadius:'50%',display:'grid',placeItems:'center',background:f>s.at+18?s.color:'#23344b',color:C.bg,fontWeight:900}}>✓</div><strong style={{fontFamily:mono,fontSize:19,color:s.color}}>[{i+1}/7] {s.label}</strong><span style={{fontSize:21}}>{s.proof}</span><span style={{fontFamily:mono,color:f>s.at+18?C.green:C.muted,fontWeight:850}}>{f>s.at+18?'OK':'RUNNING'}</span></div>})}</Panel><div style={{display:'flex',gap:14,marginTop:24}}><Pill color={C.cyan}>Maven 1</Pill><Pill color={C.blue}>npm 5</Pill><Pill color="#b99cff">PyPI 5</Pill><span style={{marginLeft:'auto',fontFamily:mono,color:C.muted,fontSize:15}}>SBOM 1cfac96830e1ff05…</span></div></div></Scene>};
 
-const Intro: React.FC = () => {
-  const frame = useCurrentFrame();
-  const {fps} = useVideoConfig();
-  const inSpring = spring({fps, frame, config: {damping: 16, stiffness: 90}});
-  const fade = ease(frame, [0, 12, 115, 140], [0, 1, 1, 0]);
-  return (
-    <AbsoluteFill style={{color: COLORS.white, alignItems: 'center', justifyContent: 'center', opacity: fade}}>
-      <GlowGrid />
-      <div style={{zIndex: 2, transform: `translateY(${(1 - inSpring) * 70}px) scale(${0.9 + inSpring * 0.1})`}}>
-        <Logo />
-        <div style={{marginTop: 42, fontSize: 62, lineHeight: 1.08, fontWeight: 760, letterSpacing: -2.6, maxWidth: 980}}>
-          Software ships fast.
-          <br />
-          <span style={{color: COLORS.cyan}}>Regulation should keep up.</span>
-        </div>
-      </div>
-    </AbsoluteFill>
-  );
-};
+const FindingsScene=()=>{const f=useCurrentFrame();const rows=[['CVE-2021-44228','log4j-core 2.14.1','MAVEN','CRITICAL','0.99999'],['CVE-2023-4863','pillow 8.1.0','PYPI','CRITICAL','0.99979'],['CVE-2021-45046','log4j-core 2.14.1','MAVEN','HIGH','0.99977'],['CVE-2020-11023','jquery 3.4.0','NPM','MEDIUM','0.83830']];return <Scene duration={300} step="OSV + CISA KEV"><div style={{position:'absolute',left:110,right:110,top:140}}><div style={{display:'flex',alignItems:'end',gap:30}}><div><Kicker color={C.red}>Real advisory correlation</Kicker><h1 style={{fontSize:54,letterSpacing:-2.5,margin:'12px 0 0'}}>102 findings. <span style={{color:C.red}}>4 KEV.</span></h1></div><div style={{marginLeft:'auto',textAlign:'right'}}><div style={{fontSize:15,color:C.muted}}>CISA catalogue release</div><strong style={{fontFamily:mono,fontSize:19}}>2026-09-11 · 1,709 entries</strong></div></div><Panel style={{marginTop:27,overflow:'hidden'}}><div style={{display:'grid',gridTemplateColumns:'260px 1fr 130px 150px 130px',padding:'16px 25px',background:'rgba(255,255,255,.04)',color:C.muted,fontSize:13,fontWeight:800,letterSpacing:1.5}}><span>CVE</span><span>COMPONENT</span><span>SOURCE</span><span>SEVERITY</span><span>EPSS</span></div>{rows.map((r,i)=>{const p=spring({fps:30,frame:f-35-i*35,config:{damping:17,stiffness:110}});return <div key={r[0]} style={{display:'grid',gridTemplateColumns:'260px 1fr 130px 150px 130px',padding:'22px 25px',alignItems:'center',borderTop:`1px solid ${C.line}`,opacity:p,transform:`translateX(${(1-p)*60}px)`,background:i===0?'linear-gradient(90deg,rgba(251,92,102,.13),transparent)':'transparent'}}><strong style={{fontFamily:mono,fontSize:20,color:i===0?C.red:C.white}}>{r[0]}</strong><span style={{fontSize:20,fontWeight:700}}>{r[1]}</span><Pill color={r[2]==='MAVEN'?C.amber:r[2]==='NPM'?C.red:'#b99cff'}>{r[2]}</Pill><strong style={{color:r[3]==='CRITICAL'?C.red:r[3]==='HIGH'?C.amber:C.white}}>{r[3]}</strong><span style={{fontFamily:mono}}>{r[4]}</span></div>})}</Panel><p style={{fontSize:19,color:C.muted,marginTop:20}}>Log4Shell was identified inside the bundled JAR—not inferred from the product name.</p></div></Scene>};
 
-type ShotProps = {
-  duration: number;
-  image: string;
-  title: string;
-  kicker: string;
-  cursorFrom: [number, number];
-  cursorTo: [number, number];
-  secondCursorTarget?: [number, number];
-  documentImage?: string;
-  orbitRadius?: number;
-  pipeline?: boolean;
-  circle?: boolean;
-  circleSecond?: boolean;
-  zoom?: number;
-  accent?: string;
-};
+const DecisionScene=()=> <Scene duration={245} step="Evidence-backed decision"><div style={{position:'absolute',left:130,right:130,top:150,display:'grid',gridTemplateColumns:'1.05fr .95fr',gap:27}}><Panel style={{padding:32}}><Kicker color={C.red}>CVE-2021-44228 · Log4Shell</Kicker><h1 style={{fontSize:43,lineHeight:1.08,letterSpacing:-1.7,margin:'15px 0 20px'}}>The exact vulnerable package<br/>exists in the release.</h1><div style={{fontFamily:mono,fontSize:16,lineHeight:1.8,color:C.muted,background:'#071321',padding:20,borderRadius:12,border:`1px solid ${C.line}`}}><div style={{color:C.white}}>\lib\log4j-core-2.14.1.jar</div><div>pkg:maven/org.apache.logging.log4j/</div><div style={{color:C.cyan}}>log4j-core@2.14.1</div><div>SHA-1 9141212b8507ab50…</div></div><div style={{display:'flex',gap:12,marginTop:21}}><Pill color={C.red}>Affected</Pill><Pill color={C.red}>CISA KEV</Pill><Pill color={C.amber}>Fix: 2.15.0+</Pill></div></Panel><Panel style={{padding:32}}><Kicker>What the evidence does—and does not—say</Kicker><div style={{marginTop:24,padding:'21px 22px',borderRadius:13,background:'rgba(74,222,128,.09)',border:'1px solid rgba(74,222,128,.35)'}}><strong style={{fontSize:22,color:C.green}}>PRESENCE PROVEN</strong><p style={{fontSize:18,lineHeight:1.5,color:C.muted}}>OSV returned the advisory for the exact versioned Package URL discovered by Syft.</p></div><div style={{marginTop:16,padding:'21px 22px',borderRadius:13,background:'rgba(251,191,36,.09)',border:'1px solid rgba(251,191,36,.4)'}}><strong style={{fontSize:22,color:C.amber}}>REACHABILITY NOT ASSESSED</strong><p style={{fontSize:18,lineHeight:1.5,color:C.muted}}>No runtime evidence was supplied. Actis preserves the limitation instead of asserting exploitability.</p></div></Panel></div></Scene>;
 
-const Cursor: React.FC<{x: number; y: number; click: number; color: string; scale: number}> = ({x, y, click, color, scale}) => (
-  <div style={{position: 'absolute', left: x, top: y, width: 66, height: 72, zIndex: 8, transform: `scale(${scale})`, transformOrigin: '5px 4px'}}>
-    <div
-      style={{
-        position: 'absolute',
-        width: 30 + click * 54,
-        height: 30 + click * 54,
-        left: -11 - click * 27,
-        top: -11 - click * 27,
-        border: `3px solid ${color}`,
-        borderRadius: '50%',
-        opacity: click * 0.82,
-      }}
-    />
-    <svg width="66" height="72" viewBox="0 0 740 740" style={{overflow: 'visible', filter: 'drop-shadow(0 7px 5px rgba(0,0,0,.48))'}}>
-      <path d="M92 47L645 310L425 386L615 638L500 692L335 457L204 648Z" fill="#fff" stroke="#05080a" strokeWidth="42" strokeLinejoin="miter" />
-    </svg>
-  </div>
-);
+const OutputsScene=()=>{const f=useCurrentFrame();const swap=interpolate(f,[172,205],[0,1],clamp);return <Scene duration={335} step="Generated regulatory evidence"><div style={{position:'absolute',left:82,right:82,top:125}}><Kicker>One run · versioned outputs</Kicker><h1 style={{fontSize:49,letterSpacing:-2,margin:'12px 0 21px'}}>From findings to filing-ready evidence.</h1><div style={{display:'grid',gridTemplateColumns:'1.08fr .92fr',gap:25}}><Panel style={{padding:25}}><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>{[['sbom.cdx.json','CycloneDX 1.6','1cfac968…'],['findings.cdx-vex.json','CycloneDX VEX','c19509b9…'],['filings/','12 Article 14 drafts','4 CVEs × 3'],['ledger.jsonl','6 chained stages','f58b9248…'],['manifest.json + .sig','Ed25519 seal','50 files'],['pdf-validation/','veraPDF 1.30.2','PDF/A-2b']].map(([a,b,c],i)=><div key={a} style={{padding:'15px 17px',border:`1px solid ${C.line}`,borderRadius:11,background:'rgba(255,255,255,.025)',opacity:spring({fps:30,frame:f-15-i*16,config:{damping:18,stiffness:110}})}}><div style={{fontFamily:mono,fontSize:16,color:C.cyan}}>{a}</div><div style={{fontSize:15,marginTop:8}}>{b}</div><div style={{fontFamily:mono,fontSize:12,color:C.muted,marginTop:5}}>{c}</div></div>)}</div><div style={{marginTop:16,padding:'13px 15px',borderRadius:10,background:'rgba(251,92,102,.11)',border:'1px solid rgba(251,92,102,.38)',color:C.red,fontWeight:750}}>Conformity remains blocked: 4 known actively exploited vulnerabilities.</div></Panel><Panel style={{height:650,overflow:'hidden',position:'relative',background:'#e9eef5'}}><Img src={staticFile('proof/annex-vii.png')} style={{position:'absolute',height:'100%',left:'50%',transform:'translateX(-50%)',opacity:1-swap}}/><Img src={staticFile('proof/eu-declaration.png')} style={{position:'absolute',height:'100%',left:'50%',transform:'translateX(-50%)',opacity:swap}}/></Panel></div></div></Scene>};
 
-const orbit = (frame: number, start: number, duration: number, radius: number): [number, number] => {
-  const progress = Math.max(0, Math.min(1, (frame - start) / duration));
-  const angle = -Math.PI / 2 + progress * Math.PI * 2;
-  return [Math.cos(angle) * radius, Math.sin(angle) * radius * 0.64];
-};
+const SealScene=()=>{const f=useCurrentFrame();const checks=['50 file digests — all match','6 ledger links — unbroken','Stage outputs — re-hashed','Ed25519 signature — valid','External signer trust — verified'];return <Scene duration={230} step="Independent verification"><div style={{position:'absolute',left:145,right:145,top:145,display:'grid',gridTemplateColumns:'1fr 1fr',gap:30}}><div><Kicker>Cryptographic evidence seal</Kicker><h1 style={{fontSize:52,letterSpacing:-2.4,lineHeight:1.05,margin:'16px 0 25px'}}>Trust is checked,<br/>not assumed.</h1><p style={{fontSize:20,color:C.muted,lineHeight:1.55}}>Public key supplied separately from the bundle.</p><div style={{fontFamily:mono,color:C.muted,fontSize:14,lineHeight:1.7,marginTop:22}}>fingerprint<br/><span style={{color:C.cyan}}>4a06e24cf3ab32b20bff6affdef11128…</span><br/><br/>ledger root<br/><span style={{color:C.cyan}}>29e21005143a4aea16d5b84d0e18388e…</span></div></div><Panel style={{padding:31}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:17}}><strong style={{fontSize:24}}>Verification</strong><Pill color={C.green}>TRUSTED</Pill></div>{checks.map((x,i)=>{const p=spring({fps:30,frame:f-24-i*24,config:{damping:16,stiffness:120}});return <div key={x} style={{display:'flex',gap:16,alignItems:'center',padding:'17px 3px',borderTop:`1px solid ${C.line}`,opacity:p}}><span style={{width:30,height:30,borderRadius:'50%',display:'grid',placeItems:'center',background:C.green,color:C.bg,fontWeight:900}}>✓</span><span style={{fontFamily:mono,fontSize:17}}>{x}</span></div>})}</Panel></div></Scene>};
 
-const BrowserShot: React.FC<ShotProps> = ({
-  duration,
-  image,
-  title,
-  kicker,
-  cursorFrom,
-  cursorTo,
-  secondCursorTarget,
-  documentImage,
-  orbitRadius = 92,
-  pipeline = false,
-  circle = true,
-  circleSecond = true,
-  zoom = 1.85,
-  accent = COLORS.cyan,
-}) => {
-  const frame = useCurrentFrame();
-  const {fps} = useVideoConfig();
-  const isDocumentShot = image === 'documents.png';
-  const activeCursorTo: [number, number] = isDocumentShot ? [1240, 550] : cursorTo;
-  const activeSecondTarget = secondCursorTarget ?? (isDocumentShot ? [910, 300] as [number, number] : undefined);
-  const activeDocumentImage = documentImage ?? (isDocumentShot ? 'eu-declaration.png' : undefined);
-  const activeOrbitRadius = isDocumentShot ? 108 : orbitRadius;
-  const activeKicker = isDocumentShot ? 'EU market readiness' : kicker;
-  const activeTitle = isDocumentShot ? 'Open the declaration. See the blocker instantly.' : title;
-  const activeAccent = isDocumentShot ? COLORS.red : accent;
-  const activeZoom = isDocumentShot ? 1.92 : zoom;
-  const activeDuration = isDocumentShot ? 390 : duration;
-  const enter = spring({fps, frame, config: {damping: 18, stiffness: 90}});
-  const exit = ease(frame, [activeDuration - 20, activeDuration], [1, 0]);
-  const cameraIn = spring({fps, frame: frame - 12, config: {damping: 20, stiffness: 64, mass: 1.1}});
-  const firstMove = interpolate(frame, [12, 36], [0, 1], {
-    easing: Easing.out(Easing.cubic),
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const [firstOrbitX, firstOrbitY] = orbit(frame, 42, 54, activeSecondTarget || !circle ? 0 : activeOrbitRadius);
-  const secondMove = interpolate(frame, [108, 132], [0, 1], {
-    easing: Easing.inOut(Easing.cubic),
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  const [secondOrbitX, secondOrbitY] = activeSecondTarget ? orbit(frame, 138, 62, circleSecond ? activeOrbitRadius * 0.8 : 0) : [0, 0];
-  const firstX = ease(firstMove, [0, 1], [cursorFrom[0], activeCursorTo[0] + firstOrbitX]);
-  const firstY = ease(firstMove, [0, 1], [cursorFrom[1], activeCursorTo[1] + firstOrbitY]);
-  const targetX = activeSecondTarget ? ease(secondMove, [0, 1], [activeCursorTo[0], activeSecondTarget[0] + secondOrbitX]) : activeCursorTo[0];
-  const targetY = activeSecondTarget ? ease(secondMove, [0, 1], [activeCursorTo[1], activeSecondTarget[1] + secondOrbitY]) : activeCursorTo[1];
-  const cursorX = activeSecondTarget && frame >= 108 ? targetX : firstX;
-  const cursorY = activeSecondTarget && frame >= 108 ? targetY : firstY;
-  const cameraZoom = 1 + (activeZoom - 1) * cameraIn;
-  const focusX = 1130;
-  const focusY = 450;
-  const cameraX = (focusX - cursorX * cameraZoom) * cameraIn;
-  const cameraY = (focusY - cursorY * cameraZoom) * cameraIn;
-  const firstClick = ease(frame, [34, 39, 56], [0, 1, 0]);
-  const secondClick = activeSecondTarget && circleSecond ? ease(frame, [130, 135, 152], [0, 1, 0]) : 0;
-  const click = Math.max(firstClick, secondClick);
-  const titleIn = spring({fps, frame: frame - 9, config: {damping: 18, stiffness: 110}});
-  const documentIn = spring({fps, frame: frame - 104, config: {damping: 18, stiffness: 105}});
-  const pipelineOut = ease(frame, [166, 190], [1, 0]);
+const TamperScene=()=>{const f=useCurrentFrame();const restored=f>178;const fail=interpolate(f,[35,65],[0,1],clamp);const restore=interpolate(f,[178,205],[0,1],clamp);return <Scene duration={260} step="Tamper proof"><div style={{position:'absolute',left:125,right:125,top:145}}><Kicker color={restored?C.green:C.red}>One byte test</Kicker><h1 style={{fontSize:50,letterSpacing:-2.2,margin:'14px 0 24px'}}>{restored?'Clean file restored. Trust returns.':'The JSON still opens. The seal does not.'}</h1><Panel style={{padding:30}}><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:25}}><div><div style={{fontFamily:mono,fontSize:16,color:C.muted}}>sbom.cdx.json · byte offset 5286</div><div style={{display:'flex',alignItems:'center',gap:18,marginTop:22,fontFamily:mono}}><span style={{fontSize:50,padding:'13px 22px',borderRadius:12,background:'rgba(255,255,255,.04)'}}>2</span><span style={{fontSize:32,color:C.muted}}>→</span><span style={{fontSize:50,padding:'13px 22px',borderRadius:12,background:`${C.red}20`,border:`2px solid ${C.red}`,color:C.red,transform:`scale(${.92+fail*.08})`}}>9</span></div><p style={{fontSize:18,color:C.muted,lineHeight:1.5,marginTop:25}}>A valid JSON digit changed. Everything else remained untouched.</p></div><div style={{padding:'21px 24px',borderRadius:14,background:restored?'rgba(74,222,128,.09)':'rgba(251,92,102,.1)',border:`1px solid ${restored?C.green:C.red}66`}}><div style={{fontSize:24,fontWeight:900,color:restored?C.green:C.red}}>{restored?'✓ ALL CHECKS PASSED':'✕ INVALID OR TAMPERED'}</div><div style={{fontFamily:mono,fontSize:16,lineHeight:1.9,marginTop:17,opacity:Math.max(fail,restore)}}>{restored?<><div>✓ file digests (50 files)</div><div>✓ S2_SBOM re-hash</div><div>✓ signature + signer trust</div></>:<><div>✕ sbom.cdx.json — digest mismatch</div><div>✕ S2_SBOM → sbom.cdx.json</div><div style={{color:C.muted}}>✓ signature remains valid</div></>}</div></div></div></Panel></div></Scene>};
 
-  return (
-    <AbsoluteFill style={{color: COLORS.white, opacity: exit, overflow: 'hidden'}}>
-      <GlowGrid />
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          transform: `translate(${cameraX}px, ${cameraY + (1 - enter) * 110}px) scale(${cameraZoom})`,
-          transformOrigin: '0 0',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            width: 1580,
-            height: 988,
-            left: 170,
-            top: 56,
-            borderRadius: 24,
-            background: '#0c1720',
-            border: '1px solid rgba(255,255,255,.14)',
-            boxShadow: '0 45px 120px rgba(0,0,0,.55)',
-            overflow: 'hidden',
-          }}
-        >
-          <div style={{height: 54, display: 'flex', alignItems: 'center', gap: 10, padding: '0 22px', background: '#111e28', borderBottom: '1px solid rgba(255,255,255,.1)'}}>
-            <i style={{width: 13, height: 13, borderRadius: '50%', background: '#ff5f57'}} />
-            <i style={{width: 13, height: 13, borderRadius: '50%', background: '#febc2e'}} />
-            <i style={{width: 13, height: 13, borderRadius: '50%', background: '#28c840'}} />
-            <div style={{marginLeft: 22, width: 720, height: 28, borderRadius: 10, background: '#09131b', color: '#758795', fontSize: 14, display: 'grid', placeItems: 'center'}}>PandaX · CRA Compliance Vault</div>
-          </div>
-          <Img src={staticFile(`captures/${image}`)} style={{width: '100%', height: 934, objectFit: 'cover', objectPosition: 'top'}} />
-        </div>
-        {pipeline ? (
-          <div
-            style={{
-              position: 'absolute',
-              left: 438,
-              top: 282,
-              width: 1280,
-              height: 530,
-              zIndex: 4,
-              borderRadius: 18,
-              background: '#f7f9fc',
-              border: '1px solid #d9e1ec',
-              boxShadow: '0 18px 50px rgba(7,16,23,.16)',
-              opacity: pipelineOut,
-              padding: '42px 48px',
-              color: '#071017',
-            }}
-          >
-            <div style={{fontSize: 19, fontWeight: 800, color: COLORS.blue, letterSpacing: 2.4, textTransform: 'uppercase'}}>Analysis running</div>
-            <div style={{fontSize: 38, fontWeight: 820, marginTop: 8}}>Building the CRA evidence chain</div>
-            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18, marginTop: 34}}>
-              {['Inventory product', 'Match vulnerabilities', 'Check active exploitation', 'Generate and seal documents'].map((label, index) => {
-                const active = frame >= 48 + index * 27;
-                return (
-                  <div key={label} style={{display: 'flex', alignItems: 'center', gap: 15, padding: '19px 22px', borderRadius: 13, background: '#fff', border: `1px solid ${active ? '#8ad8ca' : '#e4e9ef'}`, color: active ? '#08715f' : '#7d8994', fontSize: 21, fontWeight: 720}}>
-                    <span style={{width: 28, height: 28, borderRadius: '50%', display: 'grid', placeItems: 'center', color: '#fff', background: active ? '#0aa386' : '#c9d1da'}}>{active ? '✓' : index + 1}</span>
-                    {label}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-        {activeDocumentImage ? (
-          <>
-            <div style={{position: 'absolute', inset: 0, zIndex: 5, background: 'rgba(3,8,12,.82)', opacity: documentIn}} />
-            <div
-              style={{
-                position: 'absolute',
-                left: 500,
-                top: 28,
-                width: 820,
-                zIndex: 6,
-                borderRadius: 8,
-                overflow: 'hidden',
-                background: '#fff',
-                boxShadow: '0 38px 100px rgba(0,0,0,.68)',
-                opacity: documentIn,
-                transform: `translate(${(1 - documentIn) * 315}px, ${(1 - documentIn) * 250}px) scale(${0.42 + documentIn * 0.58})`,
-                transformOrigin: '72% 45%',
-              }}
-            >
-              <Img src={staticFile(`captures/${activeDocumentImage}`)} style={{display: 'block', width: '100%'}} />
-            </div>
-          </>
-        ) : null}
-        <Cursor x={cursorX} y={cursorY} click={click} color={activeAccent} scale={1 / cameraZoom} />
-      </div>
-      <div
-        style={{
-          position: 'absolute',
-          left: 72,
-          bottom: 65,
-          width: 770,
-          padding: '27px 34px 30px',
-          background: 'rgba(5,13,19,.9)',
-          border: `1px solid ${activeAccent}55`,
-          borderLeft: `7px solid ${activeAccent}`,
-          borderRadius: 18,
-          backdropFilter: 'blur(18px)',
-          transform: `translateX(${(1 - titleIn) * -90}px)`,
-          opacity: titleIn,
-          zIndex: 12,
-        }}
-      >
-        <div style={{color: activeAccent, fontWeight: 800, fontSize: 18, textTransform: 'uppercase', letterSpacing: 3}}>{activeKicker}</div>
-        <div style={{fontSize: 44, fontWeight: 780, lineHeight: 1.08, letterSpacing: -1.4, marginTop: 9}}>{activeTitle}</div>
-      </div>
-      <div style={{position: 'absolute', inset: 0, boxShadow: `inset 0 0 180px ${activeAccent}12`, pointerEvents: 'none'}} />
-    </AbsoluteFill>
-  );
-};
+const Outro=()=>{const f=useCurrentFrame();const {fps}=useVideoConfig();const s=spring({fps,frame:f,config:{damping:17,stiffness:76}});return <Scene duration={160} step="Actis by PandaX"><div style={{position:'absolute',inset:0,display:'grid',placeItems:'center',textAlign:'center',transform:`scale(${.9+s*.1})`,opacity:s}}><div><h1 style={{fontSize:68,letterSpacing:-3.2,lineHeight:1.03,margin:0}}>Artifact → finding → filing → <span style={{color:C.cyan}}>proof.</span></h1><p style={{fontSize:24,color:C.muted,marginTop:26}}>Real inputs. Explicit limits. Verifiable evidence.</p></div></div></Scene>};
 
-const Outro: React.FC = () => {
-  const frame = useCurrentFrame();
-  const {fps} = useVideoConfig();
-  const reveal = spring({fps, frame, config: {damping: 15, stiffness: 80}});
-  return (
-    <AbsoluteFill style={{color: COLORS.white, alignItems: 'center', justifyContent: 'center'}}>
-      <GlowGrid />
-      <div style={{zIndex: 2, textAlign: 'center', transform: `scale(${0.88 + reveal * 0.12})`, opacity: reveal}}>
-        <div style={{display: 'flex', justifyContent: 'center'}}><Logo small /></div>
-        <div style={{fontSize: 67, lineHeight: 1.07, fontWeight: 820, letterSpacing: -3, marginTop: 50}}>
-          From artifact to
-          <br />
-          <span style={{color: COLORS.cyan}}>tamper-evident CRA evidence.</span>
-        </div>
-        <div style={{fontSize: 25, color: COLORS.muted, marginTop: 34, letterSpacing: 0.2}}>Inventory · Triage · Deadlines · Documents · Proof</div>
-      </div>
-    </AbsoluteFill>
-  );
-};
-
-export const PandaXShowcase: React.FC = () => (
-  <AbsoluteFill style={{fontFamily: 'Segoe UI, Arial, sans-serif', background: COLORS.ink}}>
-    <Sequence durationInFrames={110}><Intro /></Sequence>
-    <Sequence from={100} durationInFrames={300}>
-      <BrowserShot duration={300} image="overview.png" kicker="Run the product" title="One click starts the full evidence pipeline." cursorFrom={[1220, 235]} cursorTo={[1650, 235]} secondCursorTarget={[1050, 570]} zoom={1.72} pipeline circle={false} circleSecond={false} />
-    </Sequence>
-    <Sequence from={380} durationInFrames={225}>
-      <BrowserShot duration={225} image="overview.png" kicker="Immediate alert" title="One exploited threat becomes the release blocker." cursorFrom={[930, 535]} cursorTo={[1250, 535]} accent={COLORS.red} zoom={2.02} orbitRadius={96} />
-    </Sequence>
-    <Sequence from={585} durationInFrames={240}>
-      <BrowserShot duration={240} image="overview.png" kicker="Clear next action" title="Upgrade once. Clear twenty-two findings." cursorFrom={[680, 765]} cursorTo={[930, 765]} accent={COLORS.blue} zoom={2.05} orbitRadius={118} />
-    </Sequence>
-    <Sequence from={2000} durationInFrames={270}>
-      <BrowserShot duration={270} image="deadlines.png" kicker="Article 14" title="24h, 72h, 14d—deadlines stay visible." cursorFrom={[120, 300]} cursorTo={[920, 500]} accent="#ffc55f" zoom={2.02} />
-    </Sequence>
-    <Sequence from={805} durationInFrames={390}>
-      <BrowserShot duration={245} image="documents.png" kicker="Review-ready output" title="Dossier, declaration, SBOM and VEX—together." cursorFrom={[120, 410]} cursorTo={[900, 500]} zoom={1.82} />
-    </Sequence>
-    <Sequence from={2000} durationInFrames={300}>
-      <BrowserShot duration={300} image="evidence.png" kicker="Cryptographic proof" title="Every stage chained. Every output sealed." cursorFrom={[120, 470]} cursorTo={[980, 565]} accent={COLORS.cyan} zoom={1.9} />
-    </Sequence>
-    <Sequence from={1175} durationInFrames={235}><Outro /></Sequence>
-    <Sequence><Audio src={staticFile('audio/intro.wav')} volume={0.98} /></Sequence>
-    <Sequence from={105}><Audio src={staticFile('audio/pipeline.wav')} volume={0.98} /></Sequence>
-    <Sequence from={383}><Audio src={staticFile('audio/alert.wav')} volume={0.98} /></Sequence>
-    <Sequence from={588}><Audio src={staticFile('audio/upgrade.wav')} volume={0.98} /></Sequence>
-    <Sequence from={808}><Audio src={staticFile('audio/document.wav')} volume={0.98} /></Sequence>
-    <Sequence from={1185}><Audio src={staticFile('audio/outro.wav')} volume={0.98} /></Sequence>
-  </AbsoluteFill>
-);
+export const ActisRealAnalysisDemo:React.FC=()=> <AbsoluteFill style={{background:C.bg}}>
+ <Sequence durationInFrames={160}><ArtifactScene/></Sequence><Sequence><Audio src={staticFile('audio/proof-intro.wav')} volume={1}/></Sequence>
+ <Sequence from={145} durationInFrames={315}><PipelineScene/></Sequence><Sequence from={150}><Audio src={staticFile('audio/proof-pipeline.wav')} volume={1}/></Sequence>
+ <Sequence from={445} durationInFrames={300}><FindingsScene/></Sequence><Sequence from={450}><Audio src={staticFile('audio/proof-findings.wav')} volume={1}/></Sequence>
+ <Sequence from={730} durationInFrames={245}><DecisionScene/></Sequence><Sequence from={735}><Audio src={staticFile('audio/proof-decision.wav')} volume={1}/></Sequence>
+ <Sequence from={960} durationInFrames={335}><OutputsScene/></Sequence><Sequence from={965}><Audio src={staticFile('audio/proof-outputs.wav')} volume={1}/></Sequence>
+ <Sequence from={1280} durationInFrames={230}><SealScene/></Sequence><Sequence from={1285}><Audio src={staticFile('audio/proof-seal.wav')} volume={1}/></Sequence>
+ <Sequence from={1495} durationInFrames={260}><TamperScene/></Sequence><Sequence from={1500}><Audio src={staticFile('audio/proof-tamper.wav')} volume={1}/></Sequence>
+ <Sequence from={1740} durationInFrames={160}><Outro/></Sequence><Sequence from={1745}><Audio src={staticFile('audio/proof-outro.wav')} volume={1}/></Sequence>
+</AbsoluteFill>;

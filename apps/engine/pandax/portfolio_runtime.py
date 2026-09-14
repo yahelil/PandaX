@@ -11,8 +11,9 @@ from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .analysis_jobs import AnalysisJobRepository
-from .auth import OIDCAuthenticator, OIDCSettings
+from .auth import OIDCAuthenticator, OIDCSettings, Principal
 from .compliance import ComplianceRepository
+from .documents import DocumentRepository
 from .findings import FindingRepository
 from .portfolio import PortfolioRepository, create_portfolio_engine
 from .portfolio_api import PortfolioIdentity
@@ -76,13 +77,21 @@ def get_compliance_repository() -> ComplianceRepository:
 
 
 @lru_cache(maxsize=1)
+def get_document_repository() -> DocumentRepository:
+    repository = DocumentRepository(get_portfolio_repository().engine)
+    if repository.engine.dialect.name == "sqlite":
+        repository.create_schema()
+    return repository
+
+
+@lru_cache(maxsize=1)
 def get_oidc_authenticator() -> OIDCAuthenticator:
     return OIDCAuthenticator(OIDCSettings.from_env())
 
 
-async def get_portfolio_identity(
+async def get_authenticated_principal(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Security(_bearer)],
-) -> PortfolioIdentity:
+) -> Principal:
     """Fail closed when OIDC is unconfigured or the bearer token is invalid."""
 
     try:
@@ -92,7 +101,13 @@ async def get_portfolio_identity(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="OIDC authentication is not configured",
         ) from exc
-    principal = await authenticator(credentials)
+    return await authenticator(credentials)
+
+
+async def get_portfolio_identity(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Security(_bearer)],
+) -> PortfolioIdentity:
+    principal = await get_authenticated_principal(credentials)
     return PortfolioIdentity(
         actor_id=principal.subject,
         organization_id=principal.organization_id,
@@ -108,4 +123,5 @@ def reset_portfolio_repository() -> None:
     get_release_monitoring_repository.cache_clear()
     get_finding_repository.cache_clear()
     get_compliance_repository.cache_clear()
+    get_document_repository.cache_clear()
     get_oidc_authenticator.cache_clear()

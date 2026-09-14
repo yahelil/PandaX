@@ -844,6 +844,7 @@ from .analysis_api import create_analysis_router
 from .compliance_v1_api import create_compliance_v1_router
 from .documents_api import create_documents_router
 from .findings_api import create_findings_router
+from .home_api import create_home_router
 from .portfolio_api import create_portfolio_router
 from .portfolio_runtime import (
     get_analysis_repository,
@@ -851,6 +852,7 @@ from .portfolio_runtime import (
     get_document_repository,
     get_authenticated_principal,
     get_finding_repository,
+    get_home_read_model,
     get_portfolio_identity,
     get_portfolio_repository,
     get_release_monitoring_repository,
@@ -890,4 +892,7 @@ api.include_router(
         get_search_notification_repository,
         get_portfolio_identity,
     )
+)
+api.include_router(
+    create_home_router(get_home_read_model, get_portfolio_identity)
 )

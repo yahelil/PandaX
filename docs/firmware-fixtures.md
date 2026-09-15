@@ -28,12 +28,12 @@ PowerShell:
 
 ```powershell
 $env:PANDAX_FIRMWARE_INTEGRATION = '1'
-$env:PANDAX_FIRMWARE_CACHE = "$PWD/.cache/firmware-fresh"
-python -m pytest apps/engine/tests/test_firmware_integration.py apps/engine/tests/test_firmware_fixtures.py apps/engine/tests/test_firmware.py apps/engine/tests/test_ingest.py -q --basetemp .cache/firmware-check --junitxml=.cache/firmware-check.xml
+$env:PANDAX_FIRMWARE_CACHE = "$PWD/workspace/cache/firmware-fresh"
+python -m pytest apps/engine/tests/test_firmware_integration.py apps/engine/tests/test_firmware_fixtures.py apps/engine/tests/test_firmware.py apps/engine/tests/test_ingest.py -q --basetemp workspace/cache/firmware-check --junitxml=workspace/cache/firmware-check.xml
 ```
 
 Linux/macOS use the same pytest arguments prefixed with
-`PANDAX_FIRMWARE_INTEGRATION=1 PANDAX_FIRMWARE_CACHE="$PWD/.cache/firmware-fresh"`.
+`PANDAX_FIRMWARE_INTEGRATION=1 PANDAX_FIRMWARE_CACHE="$PWD/workspace/cache/firmware-fresh"`.
 Use a previously unused cache directory to exercise fresh downloads. Successful
 downloads are SHA256-checked before caching; cached bytes are rechecked on every
 use. The 64 MiB download ceiling covers these fixtures. No firmware binaries or
@@ -76,7 +76,7 @@ Windows 11, Python 3.12.10, Docker Linux Engine 29.7.2, unblob 26.6.4 (pinned
 image), Syft 1.51.1 (installed with the digest-verifying bootstrap helper).
 
 A new dependency-only virtual environment was created in
-`.cache/card07-clean-env`. The engine was loaded via `PYTHONPATH=apps/engine`;
+`workspace/cache/card07-clean-env`. The engine was loaded via `PYTHONPATH=apps/engine`;
 this permits the standalone verifier test to replace PYTHONPATH and prove that
 it works without the engine. An editable engine installation in the original
 virtual environment had violated that existing test's isolation assumption;
@@ -87,7 +87,7 @@ bootstrap prerequisites installed, the complete repository command
 `python -m pytest -q --tb=short` passed **304 tests, no skips or deselections**.
 This includes all ten real network end-to-end tests and nine firmware
 integration cases. Two existing FastAPI/Starlette deprecation warnings remain.
-Local machine-readable results: `.cache/card07-full.xml`.
+Local machine-readable results: `workspace/cache/card07-full.xml`.
 
 The OpenWrt run extracted **1,069 files / 13,483,094 bytes**, matched all
 **150 native packages** exactly, and produced a CycloneDX 1.6 SBOM with 218
@@ -103,5 +103,5 @@ only after independent upstream profile/dependency validation.
 
 A final warm-cache firmware/download/archive safety pass, including two added
 download-failure checks, passed **87 tests** in 57.52 seconds, with no skips.
-Results are recorded in `.cache/card07-warm.xml`.
+Results are recorded in `workspace/cache/card07-warm.xml`.
 Public regression success does not replace final unseen-image acceptance.

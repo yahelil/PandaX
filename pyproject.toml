@@ -43,6 +43,7 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["apps/engine/tests", "apps/verifier/tests"]
+cache_dir = "workspace/cache/pytest"
 markers = [
     "slow: end-to-end tests needing the bootstrapped syft binary and network",
 ]

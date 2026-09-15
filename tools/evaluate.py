@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TOOLS = ROOT / ".tools"
+TOOLS = ROOT / "workspace" / "tools"
 CORPUS = ROOT / "evaluation" / "corpus"
 RESULTS = ROOT / "evaluation" / "results"
 

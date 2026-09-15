@@ -16,7 +16,7 @@ from pandax.context import ROOT
 from pandax.evidence import verify_run
 
 ARTIFACT = ROOT / "fixtures" / "smarthub-sh100-v2.3.1.zip"
-SYFT = [ROOT / ".tools" / "syft.exe", ROOT / ".tools" / "syft"]
+SYFT = [ROOT / "workspace" / "tools" / "syft.exe", ROOT / "workspace" / "tools" / "syft"]
 
 pytestmark = [
     pytest.mark.slow,

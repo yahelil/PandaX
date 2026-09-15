@@ -4,7 +4,7 @@ Run from the repository root with PandaX installed in the active Python
 environment. [Set up the pinned validator first](pdfa-validation.md).
 
 ```powershell
-python tools/validate_pdfs.py "out/final-exports" --reports ".cache/final-export-pdf-check"
+python tools/validate_pdfs.py "workspace/runs/final-exports" --reports "workspace/cache/final-export-pdf-check"
 ```
 
 The command recursively checks every `.pdf` (case-insensitive) using the existing
@@ -37,7 +37,7 @@ dependency beyond the engine. Versions used for this check:
 ```powershell
 python -m pip install pypdfium2==5.13.0 Pillow==12.3.0
 $env:PANDAX_PDFA_INTEGRATION = '1'
-python -m pytest apps/engine/tests/test_pdf_corpus.py -q --basetemp .cache/pdf-corpus-qa
+python -m pytest apps/engine/tests/test_pdf_corpus.py -q --basetemp workspace/cache/pdf-corpus-qa
 ```
 
 Use a disposable `--basetemp`: pytest clears it before running. Fixture definitions
@@ -84,7 +84,7 @@ these layout fixes. Passing PDF/A and visual checks does not resolve that conten
 question or authorize issuing either declaration.
 
 
-## Verification record — 2026-09-13
+## Verification record ï¿½ 2026-09-13
 
 - Latest main incorporated: `4e55b2d` (PR 20). Work remains on `simon-pdfa`.
 - Corpus/command tests after review fixes: **17 passed**, including a real
@@ -100,9 +100,9 @@ question or authorize issuing either declaration.
   All nine were firmware integration tests requiring Docker. Docker Desktop
   failed during startup because its secrets-engine socket was inaccessible;
   those tests remain unverified in this run. No factory reset was attempted.
-- Local evidence: `.cache/card13-reviewed`, `.cache/card13-full.xml`,
-  `.cache/card13-visual-final`, `.cache/card13-corpus-validation` and
-  `.cache/card13-claude`. Generated PDFs and review output are kept outside Git.
+- Local evidence: `workspace/cache/card13-reviewed`, `workspace/cache/card13-full.xml`,
+  `workspace/cache/card13-visual-final`, `workspace/cache/card13-corpus-validation` and
+  `workspace/cache/card13-claude`. Generated PDFs and review output are kept outside Git.
 
 - Claude Opus independently reviewed the changes twice. Addressed failure-record
   consistency, short report paths, provenance, real junction coverage and input

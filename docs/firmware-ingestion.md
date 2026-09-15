@@ -128,7 +128,7 @@ python -m pytest apps/engine/tests/test_firmware_integration.py -q
 On Linux use `PANDAX_FIRMWARE_INTEGRATION=1 python -m pytest
 apps/engine/tests/test_firmware_integration.py -q` on one line.
 
-The pinned public fixtures are downloaded into ignored `.cache/firmware/`:
+The pinned public fixtures are downloaded into ignored `workspace/cache/firmware/`:
 
 - OpenWrt 23.05.5 x86/64 SquashFS rootfs firmware image, SHA-256
   `478601ab0f5176372e6e0079614240dd25049c74167572ca9bc1b91e9261fe17`.
@@ -171,7 +171,7 @@ A transport read failure still fails the job and preserves stderr; a partially
 written TAR cannot safely be repaired by appending a new status member. The
 host records failure and never publishes that root. No canary-file heuristic
 was added: a surviving canary cannot prove all extracted files are complete.
-The existing `.cache/` ignore entry was verified. CLI/server and assignments
+The `workspace/` ignore entry covers the cache. CLI/server and assignments
 01/02/04 remain untouched by these corrections.
 
 Correction validation: **232 passed, 10 pre-existing slow tests excluded**, with

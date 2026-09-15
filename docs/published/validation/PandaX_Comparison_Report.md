@@ -64,7 +64,7 @@ The ten named SmartHub positive checks were detected in both directory and ZIP s
 - [Independent answer key](../pdf/PandaX_Independent_Expected_Results.pdf)
 - [Every expected/observed CVE row (CSV)](pandax-reference-comparison.csv)
 - [Machine-readable results, VEX states and run IDs](pandax-reference-comparison.json)
-- [Public-source baseline](../../docs/expected-results-baseline.json)
+- [Public-source baseline](../../expected-results-baseline.json)
 
 Start the dashboard from the desired GitHub revision, configure its trusted public key, then run `python tools/evaluate_reference.py`. The evaluator exits 1 when a named check, execution, inventory check, or trusted seal verification fails. A KEV warning by itself is not treated as an execution failure.
 

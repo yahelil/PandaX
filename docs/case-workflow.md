@@ -1,6 +1,6 @@
 # Local regulatory cases
 
-Storage: `PANDAX_DATA_DIR/cases.sqlite3`, default `out/.pandax/cases.sqlite3`.
+Storage: `PANDAX_DATA_DIR/cases.sqlite3`, default `workspace/runs/.pandax/cases.sqlite3`.
 SQLite migrations preserve the original remediation database. Back up this file
 with the application stopped. Scan directories remain read-only inputs.
 

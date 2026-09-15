@@ -2,7 +2,8 @@
 
 Does not import PandaX or change matching rules. The default server must be
 started from the intended checkout before use. Raw events and API responses
-are retained under out/reference-validation; summaries are under output/validation.
+are retained under workspace/runs/reference-validation; summaries are under
+workspace/generated/validation.
 """
 from __future__ import annotations
 
@@ -19,6 +20,9 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "docs/expected-results-baseline.json"
+GENERATED = ROOT / "workspace" / "generated"
+RUNS = ROOT / "workspace" / "runs"
+PUBLISHED = ROOT / "docs" / "published"
 
 
 def digest(path):
@@ -76,7 +80,7 @@ def artifact_for(case):
         return case['selector']
     if case.get('path'):
         return str(ROOT / case['path'])
-    cache = ROOT / '.cache/independent-inputs'
+    cache = ROOT / 'workspace/cache/independent-inputs'
     cache.mkdir(parents=True, exist_ok=True)
     dest = cache / case['url'].rsplit('/', 1)[-1]
     if not dest.exists() or digest(dest) != case['sha256']:
@@ -122,7 +126,7 @@ def collect_run(base, folder):
 
 
 def write_reports(report):
-    dest = ROOT / 'output/validation'; dest.mkdir(parents=True, exist_ok=True)
+    dest = GENERATED / 'validation'; dest.mkdir(parents=True, exist_ok=True)
     (dest/'pandax-reference-comparison.json').write_text(json.dumps(report, indent=2) + '\n')
     with (dest/'pandax-reference-comparison.csv').open('w', newline='') as f:
         writer = csv.writer(f, lineterminator='\n')
@@ -187,12 +191,12 @@ def render_markdown(report):
         '- [Independent answer key](../pdf/PandaX_Independent_Expected_Results.pdf)',
         '- [Every expected/observed CVE row (CSV)](pandax-reference-comparison.csv)',
         '- [Machine-readable results, VEX states and run IDs](pandax-reference-comparison.json)',
-        '- [Public-source baseline](../../docs/expected-results-baseline.json)', '',
+        '- [Public-source baseline](../../../docs/expected-results-baseline.json)', '',
         'Start the dashboard from the desired GitHub revision, configure its trusted public key, then run `python tools/evaluate_reference.py`. The evaluator exits 1 when a named check, execution, inventory check, or trusted seal verification fails. A KEV warning by itself is not treated as an execution failure.', '',
-        f"Raw API summaries, event streams and verification responses remain locally under `{report['evidence_directory']}`; signed pipeline bundles remain in `out/run-*`. The JSON/CSV report is committed, while bulky raw scan artifacts remain local.", '',
+        f"Raw API summaries, event streams and verification responses remain locally under `{report['evidence_directory']}`; signed pipeline bundles remain in `workspace/runs/run-*`. Publish selected reports separately under `docs/published/`.", '',
         'Frozen baseline SHA-256: `'+report['reference_sha256']+'`.',
         'Tested PDF SHA-256: `'+report['reference_pdf_sha256']+'`.', '']
-    (ROOT/'output/validation/PandaX_Comparison_Report.md').write_text('\n'.join(lines))
+    (GENERATED/'validation/PandaX_Comparison_Report.md').write_text('\n'.join(lines))
 
 
 def main():
@@ -202,10 +206,13 @@ def main():
     args = parser.parse_args()
     baseline = json.loads(BASELINE.read_text())
     stamp = dt.datetime.now(dt.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
-    root = ROOT / 'out/reference-validation' / stamp; root.mkdir(parents=True)
+    root = RUNS / 'reference-validation' / stamp; root.mkdir(parents=True)
+    reference_pdf = GENERATED/'pdf/PandaX_Independent_Expected_Results.pdf'
+    if not reference_pdf.exists():
+        reference_pdf = PUBLISHED/'pdf/PandaX_Independent_Expected_Results.pdf'
     report = {'started_utc': stamp, 'base_url': args.base_url, 'engine_commit': subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
               'engine_worktree_dirty': bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True).strip()),
-              'reference_sha256': digest(BASELINE), 'reference_pdf_sha256': digest(ROOT/'output/pdf/PandaX_Independent_Expected_Results.pdf'),
+              'reference_sha256': digest(BASELINE), 'reference_pdf_sha256': digest(reference_pdf),
               'reference_version': baseline['reference_version'], 'evidence_directory': str(root.relative_to(ROOT)), 'cases': [], 'comparisons': []}
     (root/'frozen-reference.json').write_bytes(BASELINE.read_bytes())
     request_json(args.base_url, '/api/artifacts')
@@ -251,7 +258,7 @@ def main():
             report['comparisons'].append(result);write_reports(report)
             print('COMPARISON '+name+' '+str(result.get('comparison',{}).get('passed')),flush=True)
     report['finished_utc']=dt.datetime.now(dt.timezone.utc).isoformat();write_reports(report);render_markdown(report)
-    print('Saved output/validation/pandax-reference-comparison.json',flush=True)
+    print('Saved workspace/generated/validation/pandax-reference-comparison.json',flush=True)
     return 1 if any(c['errors'] or not c.get('seal_ok') or
                     not all(x['present'] for x in c['inventory']) or
                     any(x['verdict']!='MATCH' for x in c['checks']) for c in report['cases']) else 0

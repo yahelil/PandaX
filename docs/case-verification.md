@@ -14,14 +14,14 @@ Branch: `yaheli-case-workflow`. Cards 05 → 11 → 14 → 15 → 16 → 17.
 Final regression command (from repository root):
 
 ```powershell
-.venv/Scripts/python.exe -m pytest -m "not slow" -q -p no:cacheprovider --basetemp tmp/case-delivery-check
+.venv/Scripts/python.exe -m pytest -m "not slow" -q -p no:cacheprovider --basetemp workspace/tmp/case-delivery-check
 ```
 
 Slow tests requiring external bootstrap/network are excluded explicitly. Existing
 FastAPI/Starlette dependency deprecation warnings are unchanged.
 Final result: **164 passed, 10 deselected, 2 warnings** in 18.68 seconds.
 
-Browser smoke test used an isolated database under `tmp/case-ui-smoke/data`
+Browser smoke test used an isolated database under `workspace/tmp/case-ui-smoke/data`
 and a local server at 127.0.0.1:8769. All test activity was simulated:
 
 - Opened the Cases page and verified incident-specific display and rehearsal labels.

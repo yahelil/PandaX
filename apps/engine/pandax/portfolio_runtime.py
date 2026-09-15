@@ -15,6 +15,7 @@ from sqlalchemy.engine import Engine, make_url
 
 from .analysis_jobs import AnalysisJobRecord, AnalysisJobRepository
 from .analysis_storage import LocalAnalysisInputStorage
+from .context import WORKSPACE_DIR
 from .auth import OIDCAuthenticator, OIDCSettings, Principal, Role
 from .compliance import ComplianceRepository
 from .documents import DocumentRepository
@@ -96,7 +97,7 @@ def database_settings() -> DatabaseSettings:
             hard_stop_bytes=hard_stop,
         )
 
-    data_dir = Path(os.environ.get("PANDAX_DATA_DIR", Path.cwd() / "output" / ".pandax"))
+    data_dir = Path(os.environ.get("PANDAX_DATA_DIR", WORKSPACE_DIR / "data"))
     data_dir.mkdir(parents=True, exist_ok=True)
     return DatabaseSettings(
         environment=environment,
@@ -184,7 +185,7 @@ def database_allows_background_growth() -> bool:
 @lru_cache(maxsize=1)
 def get_analysis_repository() -> AnalysisJobRepository:
     configured = os.environ.get("PANDAX_ANALYSIS_INPUT_DIR", "").strip()
-    root = Path(configured) if configured else Path(os.environ.get("PANDAX_DATA_DIR", Path.cwd() / "output" / ".pandax")) / "analysis-objects"
+    root = Path(configured) if configured else Path(os.environ.get("PANDAX_DATA_DIR", WORKSPACE_DIR / "data")) / "analysis-objects"
     repository = AnalysisJobRepository(
         get_portfolio_repository().engine,
         LocalAnalysisInputStorage(root),

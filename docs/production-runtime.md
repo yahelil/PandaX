@@ -115,7 +115,7 @@ subject for every mutation in an append-only, per-organization SHA-256 chain.
 
 Apply `alembic upgrade head` before deploying this version. Rollback requires
 draining writes, deploying the prior application, then running
-`alembic downgrade 20260915_0011`.
+`alembic downgrade 20260915_0013`.
 
 The identity adapter is provider-neutral. A later Entra or Okta OIDC/SAML bridge
 must return the same verified subject, session, and MFA timestamps; it must not
@@ -125,6 +125,39 @@ When the dashboard and API use different origins, set `PANDAX_CORS_ORIGINS` to
 a comma-separated allowlist such as `https://dashboard.actis.example.com`.
 Wildcards, credentials in origins, paths, and non-local HTTP origins are rejected.
 Leave it empty when a same-origin reverse proxy serves both applications.
+
+## Notification delivery
+
+The in-app inbox is always the fallback. Connected Resend, signed-webhook, and
+Jira integrations add idempotent PostgreSQL outbox jobs; they never replace the
+inbox record. Set `PANDAX_NOTIFICATION_DAILY_LIMIT` (default 500 per organization)
+and `PANDAX_NOTIFICATION_DELIVERY_SECONDS` (default 30). Capacity hard stops pause
+the worker without discarding queued work. Attempts use bounded exponential retry;
+permanent failures and exhausted retries remain visible as dead letters through
+`GET /v1/organizations/{organization_id}/notifications/deliveries`.
+
+Admins configure integrations through the organization settings API. Credentials
+remain in the deployment secret manager. For each stored secret reference, inject
+a JSON string map under `PANDAX_NOTIFICATION_SECRET_<HASH>`, where `<HASH>` is the
+uppercase first 16 characters of its SHA-256 digest. Resend needs `api_key`; a
+webhook needs `endpoint_url` and a random `signing_secret` of at least 32
+characters; Jira needs `email` and `api_token`. For example, calculate the variable
+name for `vault://actis/acme/email` without printing its value:
+
+```bash
+python -c "import hashlib; print('PANDAX_NOTIFICATION_SECRET_' + hashlib.sha256(b'vault://actis/acme/email').hexdigest()[:16].upper())"
+```
+
+Webhook messages carry an idempotency key plus `X-Actis-Timestamp` and an HMAC
+SHA-256 `X-Actis-Signature`; receivers must check all three. HTTPS, public literal
+addresses, and a 10-second timeout are enforced. Keep network egress allowlisted
+because DNS names can change after validation.
+
+Resend and webhook failures retry on timeouts, rate limits, and server errors.
+Jira requests are not automatically retried after an indeterminate network/server
+failure because Jira cannot guarantee idempotent issue creation; reconcile the
+project, then use the admin retry endpoint. No live recipient is contacted until
+an integration is explicitly marked connected and its external secret is present.
 
 ## Local commands
 

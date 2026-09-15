@@ -7,6 +7,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from pandax.findings import FindingObservation, FindingRepository
+from pandax.notification_delivery import NotificationDeliveryRepository
+from pandax.organization_settings import OrganizationSettingsRepository
 from pandax.portfolio import PortfolioRepository, create_portfolio_engine
 from pandax.portfolio_api import PortfolioIdentity
 from pandax.search_notifications import NotificationInput, SearchNotificationRepository
@@ -109,3 +111,31 @@ def test_missing_notification_is_hidden(repository):
     api = make_client(repository, roles={"security_reviewer"})
     assert api.post(INBOX + "/missing/read").status_code == 404
     assert api.post(INBOX + "/missing/acknowledge").status_code == 404
+
+
+def test_delivery_visibility_retry_and_admin_authorization(repository):
+    settings = OrganizationSettingsRepository(repository.engine)
+    settings.create_integration(
+        "org-acme", name="Webhook", type="webhook", description="Automation",
+        configuration={"endpoint_name": "automation", "event_types": ["urgent_finding"]},
+        status="connected", secret_reference="vault://actis/acme/webhook",
+        actor_id="admin", integration_id="integration-webhook",
+    )
+    repository.upsert_notification("org-acme", NotificationInput(
+        source_fingerprint="finding:CVE-2026-4200", kind="finding", priority="critical",
+        title="Another critical finding", detail="Review CVE-2026-4200.",
+        target_url="/findings/finding-2", requires_action=True,
+    ), now=NOW)
+    outbox = NotificationDeliveryRepository(repository.engine)
+    claimed = outbox.claim(now=NOW)
+    assert claimed
+    dead = outbox.failed(claimed, "http_400", retryable=False, now=NOW)
+
+    admin = make_client(repository, roles={"org_admin"})
+    response = admin.get(INBOX + "/deliveries")
+    assert response.status_code == 200
+    assert "payload" not in response.json()[0] and "idempotency_key" not in response.json()[0]
+    assert admin.post(INBOX + f"/deliveries/{dead.id}/retry").json()["status"] == "queued"
+    assert make_client(repository).post(
+        INBOX + f"/deliveries/{dead.id}/retry"
+    ).status_code == 403

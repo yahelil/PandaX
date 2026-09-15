@@ -81,6 +81,14 @@ def test_team_and_integration_get_patch_tenant_and_secret_validation(api):
     })
     assert plaintext.status_code == 422
 
+    created = client.post("/v1/organizations/org-acme/integrations", json={
+        "name": "Resend alerts", "type": "email", "description": "Urgent alerts",
+        "configuration": {"provider": "resend", "from_address": "alerts@pandax.test"},
+        "status": "connected", "secret_reference": "vault://actis/acme/resend",
+    })
+    assert created.status_code == 201 and created.json()["type"] == "email"
+    assert "secret" not in str(created.json()["configuration"])
+
     identity["value"] = Principal("admin", "org-other", frozenset({Role.ORG_ADMIN}))
     assert client.get("/v1/organizations/org-acme/team").status_code == 404
 

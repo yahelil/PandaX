@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -29,6 +30,8 @@ from pandax.analysis_storage import (
 from pandax.evidence import Ledger, sha256_file, write_manifest, write_public_key
 from pandax.portfolio import PortfolioRepository, create_portfolio_engine
 from pandax.portfolio_api import PortfolioIdentity
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "verifier" / "src"))
 from pandax_verifier.verification import verify_bundle
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 

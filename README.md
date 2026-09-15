@@ -9,6 +9,8 @@ This POC exists to answer one question: **is the automated compliance engine
 actually buildable?** The answer is yes, and everything below is runnable.
 
 Private-beta behavior is bounded by the [scope and acceptance gates](docs/private-beta-scope.md).
+Provider ownership, access, and billing are governed by the
+[zero-cost delivery policy](docs/private-beta-delivery.md).
 
 ```
 artifact.zip                         existing-sbom.json

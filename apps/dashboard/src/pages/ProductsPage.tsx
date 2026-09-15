@@ -65,6 +65,7 @@ export function ProductsPage() {
             fileName: evidence.file.name,
             fileSize: evidence.file.size,
             file: evidence.file,
+            rawArtifactConsent: evidence.rawArtifactConsent,
           });
           navigate(`/analyses/${job.id}`);
         } catch (error) {
@@ -72,7 +73,7 @@ export function ProductsPage() {
         } finally {
           setCreatePending(false);
         }
-      }} members={demo.state.members} /> : null}
+      }} members={demo.state.members} rawArtifactsAllowed={demo.state.settings.security.allowRawArtifacts} /> : null}
       <section className="panel">
         <div className="toolbar" aria-label="Product filters">
           <input className="search-field" type="search" aria-label="Search products" placeholder="Search products, identifiers, manufacturers…" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -116,15 +117,17 @@ export function ProductsPage() {
 
 interface InitialEvidence {
   file: File;
-  kind: Extract<ReleaseArtifact["kind"], "sbom" | "collector_package">;
+  kind: ReleaseArtifact["kind"];
   version: string;
+  rawArtifactConsent?: boolean;
 }
 
-function CreateProductPanel({ onCancel, onCreate, members, pending, error }: { onCancel: () => void; onCreate: (input: CreateProductInput, evidence?: InitialEvidence) => Promise<void>; members: ReturnType<typeof useDemo>["state"]["members"]; pending: boolean; error?: string }) {
+function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawArtifactsAllowed }: { onCancel: () => void; onCreate: (input: CreateProductInput, evidence?: InitialEvidence) => Promise<void>; members: ReturnType<typeof useDemo>["state"]["members"]; pending: boolean; error?: string; rawArtifactsAllowed: boolean }) {
   const [assessmentOpen, setAssessmentOpen] = useState(false);
   const [assessment, setAssessment] = useState<CraClassificationAssessment>();
   const [evidenceKind, setEvidenceKind] = useState<InitialEvidence["kind"]>("sbom");
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [rawArtifactConsent, setRawArtifactConsent] = useState(false);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!assessment || assessment.scopeResult === "out_of_scope") return;
@@ -135,7 +138,7 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error }: { o
       classificationAssessment: assessment, supportUntil: String(data.get("supportUntil")), ownerId: String(data.get("ownerId")) || undefined,
     } satisfies CreateProductInput;
     const version = String(data.get("version")).trim();
-    void onCreate(input, evidenceFile ? { file: evidenceFile, kind: evidenceKind, version } : undefined);
+    void onCreate(input, evidenceFile ? { file: evidenceFile, kind: evidenceKind, version, rawArtifactConsent } : undefined);
   };
   return <section className="panel analysis-card create-product-panel">
     {assessmentOpen ? <CraAssessmentWizard onCancel={() => setAssessmentOpen(false)} onComplete={(value) => { setAssessment(value); setAssessmentOpen(false); }} /> : null}
@@ -152,10 +155,11 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error }: { o
           <legend>Initial release evidence <span className="muted">(optional)</span></legend>
           <p>Upload now to create the first release and start analysis immediately.</p>
           <div className="supplemental-grid">
-            <label><span>Evidence type</span><select className="select-field" value={evidenceKind} onChange={(event) => { setEvidenceKind(event.target.value as InitialEvidence["kind"]); setEvidenceFile(null); }}><option value="sbom">SBOM</option><option value="collector_package">Collector ZIP</option></select></label>
+            <label><span>Evidence type</span><select className="select-field" value={evidenceKind} onChange={(event) => { setEvidenceKind(event.target.value as InitialEvidence["kind"]); setEvidenceFile(null); setRawArtifactConsent(false); }}><option value="sbom">SBOM</option><option value="collector_package">Collector ZIP</option><option value="raw_artifact" disabled={!rawArtifactsAllowed}>Firmware / build archive</option></select></label>
             <label><span>Release version</span><input className="input-field" name="version" required={Boolean(evidenceFile)} placeholder="1.0.0" /></label>
           </div>
-          <label className="upload-zone"><strong>{evidenceFile?.name ?? `Choose ${evidenceKind === "sbom" ? "SBOM" : "Collector ZIP"}`}</strong><input type="file" accept={analysisInputAccept(evidenceKind)} onChange={(event) => setEvidenceFile(event.target.files?.[0] ?? null)} /><p>{analysisInputHint(evidenceKind)}</p></label>
+          <label className="upload-zone"><strong>{evidenceFile?.name ?? `Choose ${evidenceKind === "sbom" ? "SBOM" : evidenceKind === "collector_package" ? "Collector ZIP" : "firmware or build archive"}`}</strong><input type="file" accept={analysisInputAccept(evidenceKind)} onChange={(event) => setEvidenceFile(event.target.files?.[0] ?? null)} /><p>{analysisInputHint(evidenceKind)}</p></label>
+          {evidenceKind === "raw_artifact" ? <label className="notice notice-warning"><input type="checkbox" checked={rawArtifactConsent} onChange={(event) => setRawArtifactConsent(event.target.checked)} /> I confirm this artifact may be processed to identify components and security evidence.</label> : null}
         </fieldset>
         <div className="cra-assessment-launch span-2">
           <div className="cra-assessment-launch__icon" aria-hidden="true">{assessment ? <ShieldCheck size={22} /> : <ClipboardCheck size={22} />}</div>
@@ -163,7 +167,7 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error }: { o
           <button type="button" onClick={() => setAssessmentOpen(true)}>{assessment ? "Reassess" : "Start CRA assessment"}</button>
         </div>
         {error ? <p className="danger-text span-2" role="alert">{error}</p> : null}
-        <div className="inline-actions span-2"><button className="button-primary" type="submit" disabled={pending || !assessment || assessment.scopeResult === "out_of_scope"}>{pending ? "Creating product…" : evidenceFile ? "Create and analyze" : "Create product"}</button><button type="button" onClick={onCancel} disabled={pending}>Cancel</button>{!assessment ? <span className="field-hint">Complete the CRA assessment before creating this product.</span> : null}</div>
+        <div className="inline-actions span-2"><button className="button-primary" type="submit" disabled={pending || !assessment || assessment.scopeResult === "out_of_scope" || evidenceKind === "raw_artifact" && Boolean(evidenceFile) && !rawArtifactConsent}>{pending ? "Creating product…" : evidenceFile ? "Create and analyze" : "Create product"}</button><button type="button" onClick={onCancel} disabled={pending}>Cancel</button>{!assessment ? <span className="field-hint">Complete the CRA assessment before creating this product.</span> : null}</div>
       </form>
     </div>
   </section>;

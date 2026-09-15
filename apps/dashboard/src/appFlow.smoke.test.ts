@@ -97,6 +97,8 @@ describe("application flow smoke contracts", () => {
     expect(products).toContain("Initial release evidence");
     expect(products).toContain('value="sbom"');
     expect(products).toContain('value="collector_package"');
+    expect(products).toContain('value="raw_artifact"');
+    expect(products).toContain("rawArtifactConsent");
     expect(products).toContain("demo.actions.runAnalysis");
   });
 

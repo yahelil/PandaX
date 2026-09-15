@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import os
+from dataclasses import asdict, dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy import text
+from sqlalchemy.engine import Engine, make_url
 
 from .analysis_jobs import AnalysisJobRecord, AnalysisJobRepository
 from .analysis_storage import LocalAnalysisInputStorage
@@ -31,26 +34,151 @@ from .search_notifications import SearchNotificationRepository
 
 _bearer = HTTPBearer(auto_error=False)
 
+MANAGED_ENVIRONMENTS = frozenset({"staging", "beta", "production"})
+DATABASE_HARD_STOP_MB = {"staging": 100, "beta": 250, "production": 350}
+EXPECTED_DATABASE_REVISION = "20260915_0011"
 
-def _database_url() -> tuple[str, bool]:
+
+@dataclass(frozen=True, slots=True)
+class DatabaseSettings:
+    environment: str
+    url: str
+    create_schema: bool
+    hard_stop_bytes: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class DatabaseStatus:
+    ready: bool
+    backend: str
+    revision: str | None
+    capacity: str
+    used_bytes: int | None
+    hard_stop_bytes: int | None
+
+    def as_dict(self) -> dict[str, object]:
+        return asdict(self)
+
+
+def runtime_environment() -> str:
+    value = os.environ.get("PANDAX_ENVIRONMENT", "development").strip().lower()
+    if value not in {"development", "test", *MANAGED_ENVIRONMENTS}:
+        raise ValueError("PANDAX_ENVIRONMENT must be development, test, staging, beta, or production")
+    return value
+
+
+def database_settings() -> DatabaseSettings:
+    environment = runtime_environment()
     configured = os.environ.get("PANDAX_DATABASE_URL", "").strip()
+    if environment in MANAGED_ENVIRONMENTS and not configured:
+        raise ValueError(f"PANDAX_DATABASE_URL is required for {environment}")
+
     if configured:
-        return configured, False
+        parsed = make_url(configured)
+        if parsed.drivername == "postgresql":
+            parsed = parsed.set(drivername="postgresql+psycopg")
+        if environment in MANAGED_ENVIRONMENTS and parsed.get_backend_name() != "postgresql":
+            raise ValueError(f"{environment} requires PostgreSQL; SQLite is development-only")
+        hard_stop = None
+        if environment in MANAGED_ENVIRONMENTS:
+            default_mb = DATABASE_HARD_STOP_MB[environment]
+            try:
+                limit_mb = int(os.environ.get("PANDAX_DATABASE_HARD_STOP_MB", default_mb))
+            except ValueError as exc:
+                raise ValueError("PANDAX_DATABASE_HARD_STOP_MB must be an integer") from exc
+            if not 1 <= limit_mb <= 350:
+                raise ValueError("PANDAX_DATABASE_HARD_STOP_MB must be between 1 and 350")
+            hard_stop = limit_mb * 1_000_000
+        return DatabaseSettings(
+            environment=environment,
+            url=parsed.render_as_string(hide_password=False),
+            create_schema=False,
+            hard_stop_bytes=hard_stop,
+        )
 
     data_dir = Path(os.environ.get("PANDAX_DATA_DIR", Path.cwd() / "output" / ".pandax"))
     data_dir.mkdir(parents=True, exist_ok=True)
-    return f"sqlite:///{(data_dir / 'portfolio.sqlite3').as_posix()}", True
+    return DatabaseSettings(
+        environment=environment,
+        url=f"sqlite:///{(data_dir / 'portfolio.sqlite3').as_posix()}",
+        create_schema=True,
+        hard_stop_bytes=None,
+    )
+
+
+def _engine_options(database_url: str) -> dict[str, object]:
+    if make_url(database_url).get_backend_name() != "postgresql":
+        return {}
+    return {
+        "pool_size": 3,
+        "max_overflow": 2,
+        "pool_timeout": 5,
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+        "pool_use_lifo": True,
+        "connect_args": {
+            "connect_timeout": 5,
+            "prepare_threshold": None,
+            "options": (
+                "-c statement_timeout=15000 "
+                "-c lock_timeout=5000 "
+                "-c idle_in_transaction_session_timeout=30000"
+            ),
+        },
+    }
+
+
+def _database_url() -> tuple[str, bool]:
+    settings = database_settings()
+    return settings.url, settings.create_schema
 
 
 @lru_cache(maxsize=1)
 def get_portfolio_repository() -> PortfolioRepository:
     """Return the process repository; configured databases require migrations."""
 
-    database_url, create_schema = _database_url()
-    repository = PortfolioRepository(create_portfolio_engine(database_url))
-    if create_schema:
+    settings = database_settings()
+    repository = PortfolioRepository(
+        create_portfolio_engine(settings.url, **_engine_options(settings.url))
+    )
+    if settings.create_schema:
         repository.create_schema()
     return repository
+
+
+def inspect_database(engine: Engine, settings: DatabaseSettings) -> DatabaseStatus:
+    if engine.dialect.name != "postgresql":
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+        return DatabaseStatus(True, engine.dialect.name, None, "development", None, None)
+
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+        revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
+        used_bytes = int(connection.scalar(text("SELECT pg_database_size(current_database())")))
+    hard_stop = settings.hard_stop_bytes
+    ratio = used_bytes / hard_stop if hard_stop else 0
+    capacity = "full" if ratio >= 1 else "restricted" if ratio >= 0.8 else "warning" if ratio >= 0.7 else "ok"
+    return DatabaseStatus(
+        ready=revision == EXPECTED_DATABASE_REVISION and capacity != "full",
+        backend="postgresql",
+        revision=str(revision) if revision is not None else None,
+        capacity=capacity,
+        used_bytes=used_bytes,
+        hard_stop_bytes=hard_stop,
+    )
+
+
+def get_database_status() -> DatabaseStatus:
+    settings = database_settings()
+    return inspect_database(get_portfolio_repository().engine, settings)
+
+
+def database_allows_background_growth() -> bool:
+    try:
+        return get_database_status().capacity not in {"restricted", "full"}
+    except Exception:
+        return False
 
 
 @lru_cache(maxsize=1)

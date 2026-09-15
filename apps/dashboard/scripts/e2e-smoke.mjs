@@ -84,6 +84,7 @@ try {
   await assertCoreShell(page);
   await assertSingleMain(page, "Home");
   await assertAccessibilityBasics(page, "Home");
+  await assertPerformanceBudgets(page);
   await assertKeyboardAccess(page);
   await assertThemeContrast(page, "light");
   for (const width of [640, 768, 1024, 1440, 1920]) {
@@ -184,8 +185,6 @@ try {
   await assertSingleMain(page, "Settings");
   await assertAccessibilityBasics(page, "Settings");
   await assertVisible(page.getByRole("heading", { name: "Appearance" }), "appearance settings");
-  await assertPerformanceBudgets(page);
-
   if (browserErrors.length) {
     throw new Error(`Browser emitted errors:\n${browserErrors.join("\n")}`);
   }

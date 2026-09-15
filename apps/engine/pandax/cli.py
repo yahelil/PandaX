@@ -6,6 +6,8 @@ import datetime as dt
 import json
 import os
 import random
+import shutil
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -596,29 +598,40 @@ def clock(
 # -------------------------------------------------------------------- serve
 
 
+def _dashboard_repository_root() -> Path:
+    candidates = (Path.cwd(), *Path.cwd().parents, *Path(__file__).resolve().parents)
+    for candidate in candidates:
+        if (candidate / "apps" / "dashboard" / "package.json").is_file():
+            return candidate
+    raise RuntimeError(
+        "Actis dashboard sources were not found. Run this command from the Actis repository checkout."
+    )
+
+
 @app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", help="Bind address"),
-    port: int = typer.Option(8000, help="Port"),
+    port: int = typer.Option(4175, min=1, max=65535, help="Port"),
 ) -> None:
-    """Run the live dashboard: the same event stream, rendered in a browser."""
-    import uvicorn
+    """Run the Actis React dashboard with Vite hot reload."""
+    npm = shutil.which("npm")
+    if npm is None:
+        typer.echo("npm was not found. Install Node.js and try again.", err=True)
+        raise typer.Exit(1)
+    try:
+        root = _dashboard_repository_root()
+    except RuntimeError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
 
-    console.print()
-    console.print(
-        Panel(
-            Text.assemble(
-                ("Actis by PandaX dashboard on ", "dim"),
-                (f"http://{host}:{port}", "bold cyan"),
-                ("\n\nThe browser view and this CLI consume the identical event "
-                 "stream - neither one is a reimplementation of the other.", "dim"),
-            ),
-            title="Dashboard",
-            border_style="cyan",
-            padding=(1, 2),
-        )
+    typer.echo(f"Actis dashboard: http://{host}:{port}")
+    result = subprocess.run(
+        [npm, "run", "dev", "--workspace", "@pandax/dashboard", "--", "--host", host, "--port", str(port)],
+        cwd=root,
+        check=False,
     )
-    uvicorn.run("pandax.server:api", host=host, port=port, log_level="warning")
+    if result.returncode:
+        raise typer.Exit(result.returncode)
 
 
 @app.command()

@@ -30,7 +30,8 @@ decisions, exports a report, and verifies the copied package offline.
 ## Supported Collector matrix
 
 All inputs are processed locally. “Core” is required on native Windows, macOS,
-and Linux packages; “Linux/Docker” is an explicitly supported specialist path.
+and Linux packages. The specialist path is supported only on a Linux host with
+Docker; Docker Desktop on Windows or macOS is outside the beta contract.
 
 | Input | Windows | macOS | Linux | Contract |
 |---|---|---|---|---|
@@ -38,8 +39,8 @@ and Linux packages; “Linux/Docker” is an explicitly supported specialist pat
 | ZIP/TAR archive | Core | Core | Core | Reject traversal, links, duplicates, bombs, and limit violations. |
 | CycloneDX JSON 1.2/1.6 | Core | Core | Core | Normalize to the internal CycloneDX 1.6 component model. |
 | SPDX JSON 2.2/2.3 | Core | Core | Core | Normalize without inventing missing package identity. |
-| Container image | Linux/Docker | Linux/Docker | Linux/Docker | Local extraction/analysis; raw layers remain customer-side. |
-| SquashFS/UBIFS firmware | Linux/Docker | Linux/Docker | Linux/Docker | Sandboxed local extraction; unsupported formats fail closed. |
+| Container image | Not supported | Not supported | Linux/Docker | Local extraction/analysis; raw layers remain customer-side. |
+| SquashFS/UBIFS firmware | Not supported | Not supported | Linux/Docker | Sandboxed local extraction; unsupported formats fail closed. |
 
 Release packages require detached checksums/signatures and installation tests.
 Native OS code signing is not a beta promise. Public executable names are
@@ -80,14 +81,18 @@ releases. Failed attempts remain in the denominator and in the defect record.
 
 Capacity controls warn administrators at 70%, block optional/background growth
 at 80%, and fail closed at the hard stop: 25 MB per Collector package, 50 MB per
-other object, 200 MB active storage per organization, 800 MB storage per
-Supabase project, 350 MB PostgreSQL, and 80 Resend messages/day or 2,000/month.
-Staging is suspended first if combined Render Free allowance is threatened.
+other object, 200 MB active storage per application organization, 800 MB
+aggregate Supabase Storage and 350 MB aggregate PostgreSQL per Supabase
+organization across all projects, and 80 Resend messages/day or 2,000/month. If
+staging and private beta share one Supabase organization, staging/private-beta
+hard-stop allocations are 200/600 MB for Storage and 100/250 MB for PostgreSQL.
+Unused staging allocation is not borrowed by private beta. Staging is suspended
+first if combined Render Free allowance is threatened.
 
 ## Card-to-gate traceability
 
-The identifiers below are the decision-pack card runbooks; each card must also
-satisfy its own Done statement and prerequisites.
+The identifiers below are the decision-pack card runbooks; each required beta
+card must also satisfy its own Done statement and prerequisites.
 
 | Card | Acceptance gate(s) |
 |---|---|
@@ -117,7 +122,7 @@ satisfy its own Done statement and prerequisites.
 | d07 — Staging integration validation | G8 |
 | d08 — Hardening, monitoring, backup, and recovery | G8 |
 | d09 — Deployment readiness and recovery drills | G9 |
-| Deferred — Distributed queues and workers | G1, G8 (start only after measured beta load and paid-infrastructure approval) |
+| Deferred — Distributed queues and workers | Not a beta gate; reconsider only after measured beta load and paid-infrastructure approval. |
 
 ## Explicit deferrals
 
@@ -136,5 +141,6 @@ approval without that binding is not the required signature.
 
 Required record fields: founder name, decision (`APPROVED` or `REJECTED`), UTC
 timestamp, repository/commit, document path, document SHA-256, and any conditions.
-The immutable record may be a signed repository document or an authenticated
-Trello comment by the founder containing every field.
+The immutable record must be a signed repository document, signed commit, or
+signed tag containing every field. An authenticated Trello comment may link to
+that record, but is not itself immutable and does not satisfy this gate.

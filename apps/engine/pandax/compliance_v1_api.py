@@ -5,6 +5,7 @@ from typing import Annotated, Callable, Literal, TypeVar
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .auth import authorize_request
 from .compliance import (
     APPROVE_ROLES,
     EDIT_ROLES,
@@ -122,12 +123,10 @@ def _authorize(
     identity: PortfolioIdentity,
     organization_id: str,
     roles: frozenset[str],
+    *,
+    sensitive: bool = False,
 ) -> None:
-    if identity.organization_id and identity.organization_id != organization_id:
-        # Tenant mismatches are hidden to prevent resource enumeration.
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
-    if identity.roles.isdisjoint(roles):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
+    authorize_request(identity, organization_id, roles, sensitive=sensitive)
 
 
 def create_compliance_v1_router(
@@ -194,7 +193,7 @@ def create_compliance_v1_router(
         repository: Repository,
         identity: Identity,
     ) -> ComplianceItemRecord:
-        _authorize(identity, organization_id, EDIT_ROLES)
+        _authorize(identity, organization_id, EDIT_ROLES, sensitive=True)
         values = body.model_dump(exclude_unset=True, exclude={"expected_version"})
         return _call(lambda: repository.update_item(
             organization_id,
@@ -215,7 +214,7 @@ def create_compliance_v1_router(
         repository: Repository,
         identity: Identity,
     ) -> ComplianceItemRecord:
-        _authorize(identity, organization_id, APPROVE_ROLES)
+        _authorize(identity, organization_id, APPROVE_ROLES, sensitive=True)
         return _call(lambda: repository.approve_item(
             organization_id,
             item_id,

@@ -5,7 +5,7 @@ from typing import Annotated, Any, Callable, Literal, Mapping, TypeVar
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .auth import Principal, Role
+from .auth import Principal, Role, authorize_request
 from .documents import (
     DocumentConflict, DocumentError, DocumentNotFound, DocumentRepository,
     DocumentValidationError,
@@ -156,11 +156,14 @@ def _unauthenticated() -> Principal:
     raise HTTPException(status.HTTP_401_UNAUTHORIZED, "authentication required")
 
 
-def _authorize(principal: Principal, organization_id: str, roles: frozenset[Role]) -> None:
-    if principal.organization_id != organization_id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "organization access denied")
-    if principal.roles.isdisjoint(roles):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
+def _authorize(
+    principal: Principal,
+    organization_id: str,
+    roles: frozenset[Role],
+    *,
+    sensitive: bool = False,
+) -> None:
+    authorize_request(principal, organization_id, roles, sensitive=sensitive)
 
 
 def _call(operation: Callable[[], Result]) -> Result:
@@ -199,7 +202,7 @@ def create_documents_router(
 
     @router.post("", response_model=DocumentDetailResponse, status_code=status.HTTP_201_CREATED)
     def create_document(body: DocumentCreate, organization_id: str, repository: Repository, principal: Identity):
-        _authorize(principal, organization_id, WRITE_ROLES)
+        _authorize(principal, organization_id, WRITE_ROLES, sensitive=True)
         return _call(lambda: repository.create_document(
             organization_id, body.product_id, name=body.name, kind=body.kind,
             format=body.format, content_hash=body.content_hash,
@@ -215,7 +218,7 @@ def create_documents_router(
 
     @router.post("/{document_id}/revisions", response_model=RevisionResponse, status_code=status.HTTP_201_CREATED)
     def add_revision(body: RevisionCreate, document_id: str, organization_id: str, repository: Repository, principal: Identity):
-        _authorize(principal, organization_id, WRITE_ROLES)
+        _authorize(principal, organization_id, WRITE_ROLES, sensitive=True)
         return _call(lambda: repository.add_revision(
             organization_id, document_id,
             expected_current_revision=body.expected_current_revision,
@@ -236,7 +239,7 @@ def create_documents_router(
 
     @router.post("/{document_id}/revisions/{revision}/approval-request", response_model=RevisionResponse)
     def request_approval(body: ApprovalRequest, document_id: str, revision: int, organization_id: str, repository: Repository, principal: Identity):
-        _authorize(principal, organization_id, WRITE_ROLES)
+        _authorize(principal, organization_id, WRITE_ROLES, sensitive=True)
         return _call(lambda: repository.request_approval(
             organization_id, document_id, revision,
             expected_status=body.expected_status, actor_id=principal.subject,
@@ -245,7 +248,7 @@ def create_documents_router(
 
     @router.post("/{document_id}/revisions/{revision}/approve", response_model=RevisionResponse)
     def approve(body: ApprovalRequest, document_id: str, revision: int, organization_id: str, repository: Repository, principal: Identity):
-        _authorize(principal, organization_id, APPROVER_ROLES)
+        _authorize(principal, organization_id, APPROVER_ROLES, sensitive=True)
         return _call(lambda: repository.approve(
             organization_id, document_id, revision,
             expected_status=body.expected_status, actor_id=principal.subject,
@@ -254,7 +257,7 @@ def create_documents_router(
 
     @router.post("/{document_id}/revisions/{revision}/reject", response_model=RevisionResponse)
     def reject(body: RejectionRequest, document_id: str, revision: int, organization_id: str, repository: Repository, principal: Identity):
-        _authorize(principal, organization_id, APPROVER_ROLES)
+        _authorize(principal, organization_id, APPROVER_ROLES, sensitive=True)
         return _call(lambda: repository.reject(
             organization_id, document_id, revision,
             expected_status=body.expected_status, actor_id=principal.subject,
@@ -263,7 +266,7 @@ def create_documents_router(
 
     @router.post("/{document_id}/revisions/{revision}/self-filings", response_model=SelfFilingResponse, status_code=status.HTTP_201_CREATED)
     def record_self_filing(body: SelfFilingCreate, document_id: str, revision: int, organization_id: str, repository: Repository, principal: Identity):
-        _authorize(principal, organization_id, WRITE_ROLES)
+        _authorize(principal, organization_id, WRITE_ROLES, sensitive=True)
         filing = _call(lambda: repository.record_self_filing(
             organization_id, document_id, revision,
             external_submission_reference=body.external_submission_reference,

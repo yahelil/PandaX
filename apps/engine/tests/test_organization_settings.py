@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import select
@@ -71,6 +71,70 @@ def test_team_roles_are_typed_tenant_scoped_and_optimistic(settings_repo):
         settings_repo.update_member("org-acme", member.id, expected_version=2, changes={"roles": ["root"]}, actor_id="admin")
     with pytest.raises(SettingsNotFound):
         settings_repo.get_member("org-other", member.id)
+
+
+def test_membership_authority_is_exact_active_and_unexpired(settings_repo):
+    portfolio = PortfolioRepository(settings_repo.engine)
+    portfolio.create_organization(
+        name="Other", legal_name="Other Ltd", country="GB",
+        registration_number="OTHER-1", actor_id="admin",
+        organization_id="org-other",
+    )
+    future = datetime.now(timezone.utc) + timedelta(days=1)
+    past = datetime.now(timezone.utc) - timedelta(seconds=1)
+    settings_repo.create_member(
+        "org-acme", subject="shared-user", name="Shared Acme",
+        email="shared@acme.test", title="Reviewer", initials="SA",
+        roles=["security_reviewer"], status="active", expires_at=future,
+        actor_id="admin", member_id="member-acme",
+    )
+    settings_repo.create_member(
+        "org-other", subject="shared-user", name="Shared Other",
+        email="shared@other.test", title="Viewer", initials="SO",
+        roles=["viewer"], status="revoked", actor_id="admin",
+        member_id="member-other",
+    )
+    assert settings_repo.resolve_membership(
+        "shared-user", "org-acme"
+    ).roles == ("security_reviewer",)
+    with pytest.raises(SettingsNotFound):
+        settings_repo.resolve_membership("shared-user", "org-other")
+
+    for status in ("invited", "disabled", "revoked", "removed"):
+        settings_repo.create_member(
+            "org-acme", subject=f"{status}-user", name=status.title(),
+            email=f"{status}@acme.test", title="Viewer", initials="X",
+            roles=["viewer"], status=status, actor_id="admin",
+        )
+        with pytest.raises(SettingsNotFound):
+            settings_repo.resolve_membership(f"{status}-user", "org-acme")
+    settings_repo.create_member(
+        "org-acme", subject="expired-user", name="Expired",
+        email="expired@acme.test", title="Viewer", initials="EX",
+        roles=["viewer"], status="active", expires_at=past,
+        actor_id="admin",
+    )
+    with pytest.raises(SettingsNotFound):
+        settings_repo.resolve_membership("expired-user", "org-acme")
+
+
+def test_admin_audit_events_form_an_immutable_digest_chain(settings_repo):
+    settings_repo.update_settings(
+        "org-acme", expected_version=0, actor_id="admin",
+        patch={"appearance": {"theme": "dark"}},
+    )
+    settings_repo.create_member(
+        "org-acme", subject="audit-user", name="Audit User",
+        email="audit@acme.test", title="Viewer", initials="AU",
+        roles=["viewer"], actor_id="admin",
+    )
+    chronological = list(reversed(settings_repo.list_audit("org-acme")))
+    assert chronological[0].previous_digest is None
+    assert all(len(event.digest) == 64 for event in chronological)
+    assert all(
+        current.previous_digest == previous.digest
+        for previous, current in zip(chronological, chronological[1:])
+    )
 
 
 def test_integrations_store_external_secret_references_never_secret_values(settings_repo):

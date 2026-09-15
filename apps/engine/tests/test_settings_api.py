@@ -82,7 +82,7 @@ def test_team_and_integration_get_patch_tenant_and_secret_validation(api):
     assert plaintext.status_code == 422
 
     identity["value"] = Principal("admin", "org-other", frozenset({Role.ORG_ADMIN}))
-    assert client.get("/v1/organizations/org-acme/team").status_code == 403
+    assert client.get("/v1/organizations/org-acme/team").status_code == 404
 
 
 def test_analytics_ingest_privacy_aggregate_permissions_and_opt_out(api):

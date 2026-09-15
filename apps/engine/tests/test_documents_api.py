@@ -118,7 +118,7 @@ def test_api_tenant_scope_validation_and_optimistic_conflicts(api):
     client, identity = api
     document_id = client.post("/v1/organizations/org-acme/documents", json=payload()).json()["document"]["id"]
     identity["value"] = Principal("operator", "org-other", frozenset({Role.COMPLIANCE_OPERATOR}))
-    assert client.get("/v1/organizations/org-acme/documents").status_code == 403
+    assert client.get("/v1/organizations/org-acme/documents").status_code == 404
 
     identity["value"] = Principal("operator", "org-acme", frozenset({Role.COMPLIANCE_OPERATOR}))
     stale = client.post(

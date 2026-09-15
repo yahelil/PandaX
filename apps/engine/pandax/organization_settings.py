@@ -1,6 +1,8 @@
 """Organization policy, access, integrations, and privacy-safe analytics."""
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -77,13 +79,19 @@ team_members = Table(
     _col("initials", 8, nullable=False),
     _col("roles", JSON, nullable=False),
     _col("status", 16, nullable=False),
+    _col("expires_at", DateTime(timezone=True), nullable=True),
+    _col("revoked_at", DateTime(timezone=True), nullable=True),
+    _col("removed_at", DateTime(timezone=True), nullable=True),
     _col("last_active_at", DateTime(timezone=True), nullable=True),
     _col("version", Integer, nullable=False),
     _col("created_at", DateTime(timezone=True), nullable=False),
     _col("updated_at", DateTime(timezone=True), nullable=False),
     UniqueConstraint("organization_id", "subject", name="uq_organization_team_members_subject"),
     UniqueConstraint("organization_id", "email", name="uq_organization_team_members_email"),
-    CheckConstraint("status IN ('active','invited','disabled')", name="status"),
+    CheckConstraint(
+        "status IN ('active','invited','disabled','revoked','removed')",
+        name="status",
+    ),
     CheckConstraint("version >= 1", name="version_positive"),
 )
 
@@ -119,6 +127,9 @@ settings_audit_events = Table(
     _col("actor_id", 128, nullable=False),
     _col("occurred_at", DateTime(timezone=True), nullable=False),
     _col("changes", JSON, nullable=False),
+    _col("previous_digest", 64, nullable=True),
+    _col("digest", 64, nullable=False),
+    UniqueConstraint("organization_id", "digest", name="uq_settings_audit_org_digest"),
     CheckConstraint("version >= 1", name="version_positive"),
 )
 
@@ -188,6 +199,9 @@ class TeamMemberRecord:
     initials: str
     roles: tuple[str, ...]
     status: str
+    expires_at: datetime | None
+    revoked_at: datetime | None
+    removed_at: datetime | None
     last_active_at: datetime | None
     version: int
     created_at: datetime
@@ -221,6 +235,8 @@ class AuditRecord:
     actor_id: str
     occurred_at: datetime
     changes: Mapping[str, Any]
+    previous_digest: str | None
+    digest: str
 
 
 class OrganizationSettingsRepository:
@@ -274,14 +290,18 @@ class OrganizationSettingsRepository:
             self._audit(session, organization_id, "settings", organization_id, "settings.updated", next_version, actor_id, _safe_changes(patch))
         return self.get_settings(organization_id)
 
-    def create_member(self, organization_id: str, *, subject: str, name: str, email: str, title: str, initials: str, roles: Sequence[str], actor_id: str, status: str = "invited", member_id: str | None = None) -> TeamMemberRecord:
+    def create_member(self, organization_id: str, *, subject: str, name: str, email: str, title: str, initials: str, roles: Sequence[str], actor_id: str, status: str = "invited", expires_at: datetime | None = None, member_id: str | None = None) -> TeamMemberRecord:
         now = _now()
+        member_status = _member_status(status)
         values = {
             "id": member_id or _id(), "organization_id": organization_id,
             "subject": _required(subject, "subject", 160), "name": _required(name, "name", 200),
             "email": _email(email), "title": _required(title, "title", 160),
             "initials": _required(initials, "initials", 8), "roles": list(_roles(roles)),
-            "status": _choice(status, {"active", "invited", "disabled"}, "status"),
+            "status": member_status,
+            "expires_at": _timestamp(expires_at, "expires_at") if expires_at else None,
+            "revoked_at": now if member_status in {"disabled", "revoked"} else None,
+            "removed_at": now if member_status == "removed" else None,
             "last_active_at": None, "version": 1, "created_at": now, "updated_at": now,
         }
         with Session(self.engine) as session, session.begin():
@@ -305,15 +325,50 @@ class OrganizationSettingsRepository:
             rows = session.execute(select(team_members).where(team_members.c.organization_id == organization_id).order_by(team_members.c.name, team_members.c.id)).all()
         return [_member_record(row) for row in rows]
 
+    def resolve_membership(
+        self,
+        subject: str,
+        organization_id: str,
+        *,
+        now: datetime | None = None,
+    ) -> TeamMemberRecord:
+        """Resolve application authority from PostgreSQL, never identity claims."""
+
+        checked_at = now or _now()
+        with Session(self.engine) as session:
+            row = session.execute(
+                select(team_members).where(
+                    team_members.c.subject == _required(subject, "subject", 160),
+                    team_members.c.organization_id
+                    == _required(organization_id, "organization_id", 36),
+                    team_members.c.status == "active",
+                    team_members.c.revoked_at.is_(None),
+                    team_members.c.removed_at.is_(None),
+                    (team_members.c.expires_at.is_(None))
+                    | (team_members.c.expires_at > checked_at),
+                )
+            ).one_or_none()
+        if row is None:
+            raise SettingsNotFound("active membership not found")
+        return _member_record(row)
+
     def update_member(self, organization_id: str, member_id: str, *, expected_version: int, changes: Mapping[str, Any], actor_id: str) -> TeamMemberRecord:
-        allowed = {"title", "roles", "status"}
+        current = self.get_member(organization_id, member_id)
+        allowed = {"title", "roles", "status", "expires_at"}
         values = _strict_changes(changes, allowed, "team member")
         if "title" in values:
             values["title"] = _required(values["title"], "title", 160)
         if "roles" in values:
             values["roles"] = list(_roles(values["roles"]))
         if "status" in values:
-            values["status"] = _choice(values["status"], {"active", "invited", "disabled"}, "status")
+            next_status = _member_status(values["status"])
+            if current.status == "removed" and next_status != "removed":
+                raise SettingsValidationError("removed membership cannot be restored")
+            values["status"] = next_status
+            values["revoked_at"] = _now() if next_status in {"disabled", "revoked"} else None
+            values["removed_at"] = _now() if next_status == "removed" else None
+        if "expires_at" in values and values["expires_at"] is not None:
+            values["expires_at"] = _timestamp(values["expires_at"], "expires_at")
         return self._versioned_update(team_members, organization_id, member_id, expected_version, values, actor_id, "team_member")
 
     def create_integration(self, organization_id: str, *, name: str, type: str, description: str, configuration: Mapping[str, Any], actor_id: str, status: str = "not_connected", secret_reference: str | None = None, integration_id: str | None = None) -> IntegrationRecord:
@@ -404,7 +459,7 @@ class OrganizationSettingsRepository:
 
     def list_audit(self, organization_id: str) -> list[AuditRecord]:
         with Session(self.engine) as session:
-            rows = session.execute(select(settings_audit_events).where(settings_audit_events.c.organization_id == organization_id).order_by(settings_audit_events.c.occurred_at.desc(), settings_audit_events.c.id)).all()
+            rows = session.execute(select(settings_audit_events).where(settings_audit_events.c.organization_id == organization_id).order_by(settings_audit_events.c.occurred_at.desc(), settings_audit_events.c.id.desc())).all()
         return [_audit_record(row) for row in rows]
 
     def _versioned_update(self, table: Table, organization_id: str, entity_id: str, expected_version: int, values: Mapping[str, Any], actor_id: str, entity_type: str, safe_changes: Mapping[str, Any] | None = None):
@@ -436,12 +491,49 @@ class OrganizationSettingsRepository:
         return row
 
     def _audit(self, session: Session, organization_id: str, entity_type: str, entity_id: str, action: str, version: int, actor_id: str, changes: Mapping[str, Any]) -> None:
-        session.execute(insert(settings_audit_events).values(
-            id=_id(), organization_id=organization_id, entity_type=entity_type,
-            entity_id=entity_id, action=action, version=version,
-            actor_id=_required(actor_id, "actor_id", 128), occurred_at=_now(),
-            changes=_json_safe(changes),
-        ))
+        session.execute(
+            select(organizations.c.id)
+            .where(organizations.c.id == organization_id)
+            .with_for_update()
+        ).one()
+        previous = session.execute(
+            select(
+                settings_audit_events.c.digest,
+                settings_audit_events.c.occurred_at,
+            )
+            .where(settings_audit_events.c.organization_id == organization_id)
+            .order_by(
+                settings_audit_events.c.occurred_at.desc(),
+                settings_audit_events.c.id.desc(),
+            )
+            .limit(1)
+        ).one_or_none()
+        previous_digest = previous.digest if previous else None
+        event_id = _id()
+        occurred_at = _now()
+        if previous and occurred_at <= _aware(previous.occurred_at):
+            occurred_at = _aware(previous.occurred_at) + timedelta(microseconds=1)
+        safe_changes = _json_safe(changes)
+        payload = {
+            "id": event_id,
+            "organization_id": organization_id,
+            "entity_type": entity_type,
+            "entity_id": entity_id,
+            "action": action,
+            "version": version,
+            "actor_id": _required(actor_id, "actor_id", 128),
+            "occurred_at": occurred_at.isoformat(),
+            "changes": safe_changes,
+            "previous_digest": previous_digest,
+        }
+        digest = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        session.execute(
+            insert(settings_audit_events).values(
+                **{**payload, "occurred_at": occurred_at, "digest": digest}
+            )
+        )
 
 
 def _settings_record(profile: Any, row: Any | None) -> SettingsRecord:
@@ -548,7 +640,15 @@ def _secret_reference(value: str | None) -> str | None:
 
 
 def _member_record(row: Any) -> TeamMemberRecord:
-    return TeamMemberRecord(row.id, row.organization_id, row.subject, row.name, row.email, row.title, row.initials, tuple(sorted(row.roles)), row.status, _aware(row.last_active_at) if row.last_active_at else None, row.version, _aware(row.created_at), _aware(row.updated_at))
+    return TeamMemberRecord(
+        row.id, row.organization_id, row.subject, row.name, row.email, row.title,
+        row.initials, tuple(sorted(row.roles)), row.status,
+        _aware(row.expires_at) if row.expires_at else None,
+        _aware(row.revoked_at) if row.revoked_at else None,
+        _aware(row.removed_at) if row.removed_at else None,
+        _aware(row.last_active_at) if row.last_active_at else None,
+        row.version, _aware(row.created_at), _aware(row.updated_at),
+    )
 
 
 def _integration_record(row: Any) -> IntegrationRecord:
@@ -556,7 +656,11 @@ def _integration_record(row: Any) -> IntegrationRecord:
 
 
 def _audit_record(row: Any) -> AuditRecord:
-    return AuditRecord(row.id, row.organization_id, row.entity_type, row.entity_id, row.action, row.version, row.actor_id, _aware(row.occurred_at), dict(row.changes))
+    return AuditRecord(
+        row.id, row.organization_id, row.entity_type, row.entity_id, row.action,
+        row.version, row.actor_id, _aware(row.occurred_at), dict(row.changes),
+        row.previous_digest, row.digest,
+    )
 
 
 def _strict_changes(value: Mapping[str, Any], allowed: set[str] | frozenset[str], label: str) -> dict[str, Any]:
@@ -592,6 +696,12 @@ def _roles(values: Sequence[str]) -> tuple[str, ...]:
     if any(value not in ROLE_VALUES for value in result):
         raise SettingsValidationError("unsupported role")
     return result
+
+
+def _member_status(value: str) -> str:
+    return _choice(
+        value, {"active", "invited", "disabled", "revoked", "removed"}, "status"
+    )
 
 
 def _email(value: str) -> str:

@@ -1703,14 +1703,9 @@ a { color: inherit; }
 .mk-todo li:nth-child(4) .mk-add { transition-delay: .3s; }
 
 /* The break between them, which is the whole argument. */
-.mk-edge { display: grid; grid-template-rows: 1fr auto 1fr; justify-items: center; gap: 12px; }
+.mk-edge { display: grid; grid-template-rows: 1fr 1fr; justify-items: center; gap: 12px; }
 .mk-rail { width: 1px; background: var(--line); }
 .mk-rail-dash { background: var(--brand); opacity: 0.45; }
-.mk-stop {
-  font-family: var(--mono); font-size: 11px; letter-spacing: 0.04em;
-  color: var(--brand); white-space: nowrap;
-  writing-mode: vertical-rl; text-orientation: mixed;
-}
 
 /* Who we are: one claim, then the three things we will not trade away. */
 .claim {

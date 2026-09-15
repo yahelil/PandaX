@@ -3,9 +3,10 @@ import { ClipboardCheck, ShieldCheck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { usePermission } from "../auth";
 import { useDemo } from "../data/DemoProvider";
-import type { CraClassificationAssessment, Product } from "../data/types";
+import type { CraClassificationAssessment, CreateProductInput, Product, ReleaseArtifact } from "../data/types";
 import { CraAssessmentWizard } from "./CraAssessmentWizard";
 import { craClassLabel } from "./craAssessment";
+import { analysisInputAccept, analysisInputHint } from "./analysisInput";
 import { PageHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
 import "./pages.css";
 
@@ -39,12 +40,33 @@ export function ProductsPage() {
         description="Cybersecurity readiness, monitoring, and regulatory obligations across your portfolio."
         actions={<button className="button button-primary" disabled={!canManagePortfolio} title={!canManagePortfolio ? "Org Admin or Compliance Operator permission required" : undefined} onClick={() => setAdding((value) => !value)}>Add product</button>}
       />
-      {adding && canManagePortfolio ? <CreateProductPanel pending={createPending} error={createError} onCancel={() => setAdding(false)} onCreate={async (input) => {
+      {adding && canManagePortfolio ? <CreateProductPanel pending={createPending} error={createError} onCancel={() => setAdding(false)} onCreate={async (input, evidence) => {
         setCreatePending(true);
         setCreateError(undefined);
         try {
           const created = await demo.actions.createProduct(input);
-          navigate(`/products/${created.id}`);
+          if (!evidence) {
+            navigate(`/products/${created.id}`);
+            return;
+          }
+          const release = await demo.actions.createRelease({
+            productId: created.id,
+            version: evidence.version,
+            channel: "stable",
+            releaseDate: new Date().toISOString().slice(0, 10),
+            supportedUntil: input.supportUntil,
+          });
+          const job = await demo.actions.runAnalysis({
+            productId: created.id,
+            releaseId: release.id,
+            version: release.version,
+            channel: release.channel,
+            inputKind: evidence.kind,
+            fileName: evidence.file.name,
+            fileSize: evidence.file.size,
+            file: evidence.file,
+          });
+          navigate(`/analyses/${job.id}`);
         } catch (error) {
           setCreateError(error instanceof Error ? error.message : "Product could not be created.");
         } finally {
@@ -92,18 +114,28 @@ export function ProductsPage() {
   );
 }
 
-function CreateProductPanel({ onCancel, onCreate, members, pending, error }: { onCancel: () => void; onCreate: (input: Parameters<ReturnType<typeof useDemo>["actions"]["createProduct"]>[0]) => Promise<void>; members: ReturnType<typeof useDemo>["state"]["members"]; pending: boolean; error?: string }) {
+interface InitialEvidence {
+  file: File;
+  kind: Extract<ReleaseArtifact["kind"], "sbom" | "collector_package">;
+  version: string;
+}
+
+function CreateProductPanel({ onCancel, onCreate, members, pending, error }: { onCancel: () => void; onCreate: (input: CreateProductInput, evidence?: InitialEvidence) => Promise<void>; members: ReturnType<typeof useDemo>["state"]["members"]; pending: boolean; error?: string }) {
   const [assessmentOpen, setAssessmentOpen] = useState(false);
   const [assessment, setAssessment] = useState<CraClassificationAssessment>();
+  const [evidenceKind, setEvidenceKind] = useState<InitialEvidence["kind"]>("sbom");
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!assessment || assessment.scopeResult === "out_of_scope") return;
     const data = new FormData(event.currentTarget);
-    void onCreate({
+    const input = {
       name: String(data.get("name")), identifier: String(data.get("identifier")), manufacturer: String(data.get("manufacturer")),
       description: String(data.get("description")), craClass: assessment.recommendedClass, classificationStatus: assessment.classificationStatus,
       classificationAssessment: assessment, supportUntil: String(data.get("supportUntil")), ownerId: String(data.get("ownerId")) || undefined,
-    });
+    } satisfies CreateProductInput;
+    const version = String(data.get("version")).trim();
+    void onCreate(input, evidenceFile ? { file: evidenceFile, kind: evidenceKind, version } : undefined);
   };
   return <section className="panel analysis-card create-product-panel">
     {assessmentOpen ? <CraAssessmentWizard onCancel={() => setAssessmentOpen(false)} onComplete={(value) => { setAssessment(value); setAssessmentOpen(false); }} /> : null}
@@ -116,13 +148,22 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error }: { o
         <div className="field"><label htmlFor="support-until">Support until</label><input id="support-until" name="supportUntil" className="input-field" type="date" required defaultValue="2031-12-31" /></div>
         <div className="field"><label htmlFor="owner">Default owner</label><select id="owner" name="ownerId" className="select-field"><option value="">Unassigned</option>{members.filter((member) => member.status === "active").map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select></div>
         <div className="field span-2"><label htmlFor="description">Description</label><textarea id="description" name="description" className="textarea-field" placeholder="Describe the product, intended purpose, connected functionality, and users." /><span className="field-hint">The description provides context; classification comes from structured assessment answers.</span></div>
+        <fieldset className="supplemental-evidence span-2">
+          <legend>Initial release evidence <span className="muted">(optional)</span></legend>
+          <p>Upload now to create the first release and start analysis immediately.</p>
+          <div className="supplemental-grid">
+            <label><span>Evidence type</span><select className="select-field" value={evidenceKind} onChange={(event) => { setEvidenceKind(event.target.value as InitialEvidence["kind"]); setEvidenceFile(null); }}><option value="sbom">SBOM</option><option value="collector_package">Collector ZIP</option></select></label>
+            <label><span>Release version</span><input className="input-field" name="version" required={Boolean(evidenceFile)} placeholder="1.0.0" /></label>
+          </div>
+          <label className="upload-zone"><strong>{evidenceFile?.name ?? `Choose ${evidenceKind === "sbom" ? "SBOM" : "Collector ZIP"}`}</strong><input type="file" accept={analysisInputAccept(evidenceKind)} onChange={(event) => setEvidenceFile(event.target.files?.[0] ?? null)} /><p>{analysisInputHint(evidenceKind)}</p></label>
+        </fieldset>
         <div className="cra-assessment-launch span-2">
           <div className="cra-assessment-launch__icon" aria-hidden="true">{assessment ? <ShieldCheck size={22} /> : <ClipboardCheck size={22} />}</div>
           <div><span className="field-label">CRA classification</span>{assessment ? <><strong>{assessment.scopeResult === "out_of_scope" ? "Likely outside scope" : craClassLabel(assessment.recommendedClass)}</strong><p>{assessment.rationale}</p><small>Readiness {assessment.readinessScore}% · {assessment.actions.length} actions · {assessment.classificationStatus.replaceAll("_", " ")}</small></> : <><strong>Not assessed</strong><p>Answer scope, Annex category, and readiness questions. Answers and sources will be retained.</p></>}</div>
           <button type="button" onClick={() => setAssessmentOpen(true)}>{assessment ? "Reassess" : "Start CRA assessment"}</button>
         </div>
         {error ? <p className="danger-text span-2" role="alert">{error}</p> : null}
-        <div className="inline-actions span-2"><button className="button-primary" type="submit" disabled={pending || !assessment || assessment.scopeResult === "out_of_scope"}>{pending ? "Creating product…" : "Create product"}</button><button type="button" onClick={onCancel} disabled={pending}>Cancel</button>{!assessment ? <span className="field-hint">Complete the CRA assessment before creating this product.</span> : null}</div>
+        <div className="inline-actions span-2"><button className="button-primary" type="submit" disabled={pending || !assessment || assessment.scopeResult === "out_of_scope"}>{pending ? "Creating product…" : evidenceFile ? "Create and analyze" : "Create product"}</button><button type="button" onClick={onCancel} disabled={pending}>Cancel</button>{!assessment ? <span className="field-hint">Complete the CRA assessment before creating this product.</span> : null}</div>
       </form>
     </div>
   </section>;

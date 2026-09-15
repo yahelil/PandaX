@@ -93,6 +93,11 @@ describe("application flow smoke contracts", () => {
     const workspace = source("./pages/ProductWorkspacePage.tsx");
     expect(workspace).toContain("`/products/${product.id}/releases/${release.id}`");
     expect(workspace).toContain("navigate(`/products/${productId}/releases/${created.id}/analyze`)");
+    const products = source("./pages/ProductsPage.tsx");
+    expect(products).toContain("Initial release evidence");
+    expect(products).toContain('value="sbom"');
+    expect(products).toContain('value="collector_package"');
+    expect(products).toContain("demo.actions.runAnalysis");
   });
 
   it("persists a representative finding decision and remediation workflow", async () => {

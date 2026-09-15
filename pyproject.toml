@@ -21,6 +21,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+kms = ["google-cloud-kms>=3.5,<4"]
 
 [project.scripts]
 actis = "pandax.cli:app"

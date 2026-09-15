@@ -59,6 +59,81 @@ pg_restore --no-owner --no-privileges \
 Do not print either URL, enable shell tracing, or restore over a live database.
 Card d08 owns scheduled backups, encryption/media handling, and recurring drills.
 
+## Evidence signing custody
+
+Every sealing path uses the same provider-neutral Ed25519 signer. Development
+and tests default to a generated file under `~/.pandax`. Staging and private beta
+reject file signing and require `PANDAX_SIGNER_PROVIDER=secret`, an explicit key
+ID/version, and a base64 PKCS#8 Ed25519 key supplied by the deployment secret
+manager. The key is decoded in memory and is never written to the Render
+filesystem. Keep the source key outside Git and delete any temporary provisioning
+copy only after its public key and recovery copy have been verified.
+
+Production rejects both file and secret signers. Install the optional client and
+configure an exact enabled Ed25519 key version:
+
+```bash
+uv sync --extra kms
+PANDAX_ENVIRONMENT=production
+PANDAX_SIGNER_PROVIDER=google-cloud-kms
+PANDAX_GCP_KMS_KEY_VERSION=projects/PROJECT/locations/LOCATION/keyRings/RING/cryptoKeys/KEY/cryptoKeyVersions/VERSION
+```
+
+Application Default Credentials belong in the deployment secret manager. Bind
+the runtime identity on that one CryptoKey only, with
+`cloudkms.cryptoKeyVersions.get`, `cloudkms.cryptoKeyVersions.viewPublicKey`, and
+`cloudkms.cryptoKeyVersions.useToSign`. Do not grant key creation, update,
+disable, destroy, IAM administration, or project-wide KMS roles. Use an
+`ASYMMETRIC_SIGN` / `EC_SIGN_ED25519` key; choose `HSM` protection at production
+provisioning if approved. PandaX submits canonical manifest bytes as raw Ed25519
+data and verifies the returned signature locally before publishing it.
+
+`PANDAX_SIGNING_KEY_REGISTRY_B64` is base64 JSON conforming to
+`actis/signing-key-registry/v1`. It contains public PEM keys only, exactly one
+`active` entry, and any `historical` or `revoked` versions. Production readiness
+requires its active fingerprint to match the exact KMS version. The public copy
+is available at `GET /.well-known/actis-signing-keys.json`; distribute or archive
+that response through an authenticated channel before relying on it as trust.
+
+### Planned rotation drill
+
+1. Preserve current registry and a pre-rotation evidence bundle on the encrypted
+   company backup machine. Never destroy the old KMS version.
+2. Create an approved new `EC_SIGN_ED25519` version without changing runtime IAM.
+3. Retrieve its public key while enabled, verify its fingerprint independently,
+   add it as `active`, and change the old entry to `historical`.
+4. Update registry secret and exact KMS version in one deployment. Readiness must
+   pass before traffic is restored; it never falls back to another or local key.
+5. Seal and verify a new bundle, then verify the preserved old bundle with the
+   same registry and `actis-verify --trusted-key-registry REGISTRY`.
+6. Roll back by restoring both prior configuration values together. Record the
+   registry digest, deployment revision, bundle IDs, and verification results.
+
+### Compromise, revocation, and recovery drill
+
+1. Stop sealing work. Preserve the affected public key and change its registry
+   status to `revoked` before disabling it; Google exposes asymmetric public keys
+   only while their versions are enabled.
+2. Rotate to a clean version. Disable the compromised version; never destroy it
+   because historical signatures still need its public identity.
+3. Confirm affected bundles remain internally valid but return `untrusted` with
+   the revoked registry. Confirm new bundles are trusted.
+4. For accidental disable, re-enable the preserved version during its recovery
+   window, cross-check its fingerprint, restore matching configuration, and
+   repeat both verification checks.
+
+KMS failures abort before any manifest, signature, or bundled public key is
+published. Readiness returns `503` when production custody is unavailable.
+Enable Cloud KMS Data Access audit logs for signing and retain Admin Activity
+logs for key/IAM changes. Correlate them with PandaX `evidence.sign` logs by run
+ID, key ID/version, payload SHA-256, outcome, and latency. Logs must never contain
+credentials, private keys, raw manifests, or signatures.
+
+At each production release, test provider outage, registry mismatch, rotation,
+revoked-key verification, rollback, and accidental-disable recovery. Private
+beta performs the equivalent two-secret rotation locally and creates no Google
+Cloud resource or cost.
+
 ## Evidence storage
 
 Create a private `actis-evidence` bucket in each separate staging and private-beta

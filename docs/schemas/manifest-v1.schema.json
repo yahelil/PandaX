@@ -31,7 +31,19 @@
       "minItems": 1,
       "items": { "$ref": "#/$defs/fileReference" }
     },
-    "signature_note": { "type": "string" }
+    "signature_note": { "type": "string" },
+    "signing": {
+      "type": "object",
+      "required": ["provider", "algorithm", "key_id", "key_version", "public_key_fingerprint"],
+      "properties": {
+        "provider": { "enum": ["file", "secret", "google-cloud-kms"] },
+        "algorithm": { "const": "Ed25519" },
+        "key_id": { "type": "string", "minLength": 1 },
+        "key_version": { "type": "string", "minLength": 1 },
+        "public_key_fingerprint": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": true,
   "$defs": {

@@ -101,6 +101,18 @@ declared sizes could make them unsafe. See
 [`apps/verifier/README.md`](../apps/verifier/README.md) for distribution,
 plain-language results, and exit codes.
 
+For rotation-aware verification, save the independently obtained public registry
+and use it instead of a single key:
+
+```powershell
+actis-verify C:\evidence\case-snapshot.zip --trusted-key-registry C:\secure-config\actis-signing-keys.json
+```
+
+The verifier selects the exact provider, key ID, and version committed inside
+the signed manifest. Active and historical entries may establish trust. Revoked,
+unknown, fingerprint-mismatched, or legacy bundles without signed key identity
+remain untrusted when registry mode is selected.
+
 The organization registry supports independently versioned key names, rotation,
 and revocation. Managed KMS/HSM custody and identity-backed/eIDAS seals remain
 separate production work; customer private keys are never sent to PandaX.

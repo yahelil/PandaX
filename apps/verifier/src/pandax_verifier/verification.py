@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from .bundle import BundleError, normalize_bundle_path, open_bundle
 from .models import Check, VerificationResult
+from .registry import RegistryKey, load_registry
 
 GENESIS = "0" * 64
 LEDGER_NAME = "ledger.jsonl"
@@ -125,6 +126,19 @@ def _validate_manifest(manifest: Any) -> tuple[dict[str, Any], list[dict[str, st
         raise ValueError(f"unsupported manifest schema: {manifest['schema']}")
     if manifest["ledger_records"] < 0:
         raise ValueError("manifest ledger_records cannot be negative")
+    signing = manifest.get("signing")
+    if signing is not None:
+        required_signing = {
+            "provider", "algorithm", "key_id", "key_version", "public_key_fingerprint"
+        }
+        if not isinstance(signing, dict) or set(signing) != required_signing:
+            raise ValueError("manifest signing metadata is malformed")
+        if not all(isinstance(signing[field], str) and signing[field] for field in required_signing):
+            raise ValueError("manifest signing metadata values must be non-empty strings")
+        if signing["algorithm"] != "Ed25519" or not _HEX_DIGEST.fullmatch(
+            signing["public_key_fingerprint"]
+        ):
+            raise ValueError("manifest signing metadata is invalid")
     for field in ("ledger_root", "ledger_sha256"):
         if not _HEX_DIGEST.fullmatch(manifest[field]):
             raise ValueError(f"manifest field {field} must be a lowercase SHA-256 digest")
@@ -236,14 +250,31 @@ def _verification_failure(reason: str) -> VerificationResult:
 def verify_bundle(
     source: str | Path,
     trusted_key: str | Path | Ed25519PublicKey | None = None,
+    trusted_registry: str | Path | None = None,
 ) -> VerificationResult:
     """Verify a PandaX bundle without importing or contacting PandaX."""
+    if trusted_key is not None and trusted_registry is not None:
+        raise TrustedKeyConfigurationError(
+            "trusted key and trusted key registry are mutually exclusive"
+        )
     if isinstance(trusted_key, (str, Path)):
         trusted_public_key = load_trusted_key(trusted_key, source)
     elif trusted_key is None or isinstance(trusted_key, Ed25519PublicKey):
         trusted_public_key = trusted_key
     else:
         raise TrustedKeyConfigurationError("trusted key is not Ed25519")
+    registry: dict[tuple[str, str, str], RegistryKey] | None = None
+    if trusted_registry is not None:
+        try:
+            source_path = Path(source)
+            registry_path = Path(trusted_registry)
+            if source_path.is_dir() and registry_path.resolve().is_relative_to(source_path.resolve()):
+                raise ValueError(
+                    "the trusted key registry must be stored separately from the evidence bundle"
+                )
+            registry = load_registry(trusted_registry)
+        except ValueError as exc:
+            raise TrustedKeyConfigurationError(str(exc)) from exc
 
     try:
         reader = open_bundle(source)
@@ -307,6 +338,9 @@ def verify_bundle(
             else:
                 try:
                     bundled_public_key.verify(signature, canonical(manifest))
+                    signing = manifest.get("signing")
+                    if signing and bundle_fingerprint != signing["public_key_fingerprint"]:
+                        raise ValueError("bundled public key does not match signing metadata")
                     add(
                         "bundle signature",
                         True,
@@ -321,6 +355,8 @@ def verify_bundle(
                         "signature does not match the manifest",
                         "mismatch",
                     )
+                except ValueError as exc:
+                    add("bundle signature", False, "bundle_signature", str(exc), "mismatch")
 
         if manifest is not None:
             bad_files: list[str] = []
@@ -466,13 +502,38 @@ def verify_bundle(
                 output_problem,
             )
 
+        trust_blocker = ""
+        if registry is not None:
+            signing = manifest.get("signing") if manifest else None
+            if not isinstance(signing, dict):
+                trust_blocker = "bundle has no signed key identity"
+            else:
+                entry = registry.get(
+                    (
+                        str(signing.get("provider")),
+                        str(signing.get("key_id")),
+                        str(signing.get("key_version")),
+                    )
+                )
+                if entry is None:
+                    trust_blocker = "signed key identity is absent from trusted registry"
+                elif entry.fingerprint != signing.get("public_key_fingerprint"):
+                    trust_blocker = "trusted registry fingerprint does not match signed identity"
+                else:
+                    trusted_public_key = entry.public_key
+                    if entry.status == "revoked":
+                        trust_blocker = "trusted key version is revoked"
+
         trusted_fingerprint = (
             _fingerprint(trusted_public_key) if trusted_public_key is not None else None
         )
         trust_ok = False
         if trusted_public_key is None:
             signer_trust = "not_configured"
-            trust_detail = "no separately supplied trusted key was configured"
+            trust_detail = trust_blocker or "no separately supplied trusted key was configured"
+        elif trust_blocker:
+            signer_trust = "untrusted"
+            trust_detail = trust_blocker
         elif manifest is None or signature is None:
             signer_trust = "untrusted"
             trust_detail = "the bundle signature could not be checked with the trusted key"

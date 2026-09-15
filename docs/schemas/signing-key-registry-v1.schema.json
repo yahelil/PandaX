@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pandax.online/schemas/evidence/signing-key-registry-v1.schema.json",
+  "title": "Actis signing-key registry v1",
+  "type": "object",
+  "required": ["schema", "keys"],
+  "properties": {
+    "schema": { "const": "actis/signing-key-registry/v1" },
+    "keys": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "provider",
+          "algorithm",
+          "key_id",
+          "key_version",
+          "public_key_fingerprint",
+          "public_key_pem",
+          "status"
+        ],
+        "properties": {
+          "provider": { "enum": ["file", "secret", "google-cloud-kms"] },
+          "algorithm": { "const": "Ed25519" },
+          "key_id": { "type": "string", "minLength": 1 },
+          "key_version": { "type": "string", "minLength": 1 },
+          "public_key_fingerprint": { "$ref": "#/$defs/sha256" },
+          "public_key_pem": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["active", "historical", "revoked"] },
+          "activated_at": { "type": ["string", "null"], "format": "date-time" },
+          "retired_at": { "type": ["string", "null"], "format": "date-time" },
+          "revoked_at": { "type": ["string", "null"], "format": "date-time" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

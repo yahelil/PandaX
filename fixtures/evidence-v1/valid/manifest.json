@@ -1,0 +1,26 @@
+{
+  "schema": "actis/manifest/v1",
+  "run_id": "public-safe-v1",
+  "created": "2026-09-15T00:00:00.000Z",
+  "product": {
+    "name": "Synthetic Device",
+    "version": "1.0"
+  },
+  "tool_versions": {
+    "actis-fixture": "1"
+  },
+  "ledger_root": "1ecfd0d36cd2e0fe050cdb9a66b2adbb101af803c90b880dd46a0ca5a151c3a4",
+  "ledger_sha256": "d02dc6e3ef8f128c4920bd6419bb7969a0d46d448a76c22c0d3fc49e2eb3e969",
+  "ledger_records": 1,
+  "files": [
+    {
+      "path": "evidence.json",
+      "sha256": "9a33a668eecfa8f646557682bb88770db6b895a23ca157d4aa74c8455250906b"
+    },
+    {
+      "path": "ledger.jsonl",
+      "sha256": "d02dc6e3ef8f128c4920bd6419bb7969a0d46d448a76c22c0d3fc49e2eb3e969"
+    }
+  ],
+  "signature_note": "Synthetic public-safe fixture; no customer data or private signing key is included."
+}

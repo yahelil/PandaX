@@ -1,6 +1,6 @@
-# PandaX GitHub Action
+# Actis by PandaX GitHub Action
 
-PandaX can analyze an existing CycloneDX or SPDX JSON SBOM during CI. It emits:
+Actis can analyze an existing CycloneDX or SPDX JSON SBOM during CI. It emits:
 
 - a sealed evidence bundle;
 - a compact JSON summary for automation;
@@ -10,11 +10,11 @@ The JSON and SARIF files are derived after sealing and intentionally written out
 
 ## Pilot usage
 
-Until PandaX has a published, licensed release, check out the private action at
+Until Actis has a published, licensed release, check out the private action at
 an exact audited commit:
 
 ```yaml
-name: PandaX
+name: Actis
 
 on:
   workflow_dispatch:
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Checkout PandaX
+      - name: Checkout Actis
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: yahelil/PandaX
@@ -64,8 +64,8 @@ release signing are established.
 
 ```bash
 pip install .
-pandax --version
-pandax scan-sbom path/to/bom.cdx.json \
+actis --version
+actis scan-sbom path/to/bom.cdx.json \
   --out pandax-results \
   --json-output pandax-summary.json \
   --sarif-output pandax.sarif

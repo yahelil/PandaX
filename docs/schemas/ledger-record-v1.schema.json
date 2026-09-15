@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pandax.online/schemas/evidence/ledger-record-v1.schema.json",
+  "title": "Actis evidence ledger record v1",
+  "type": "object",
+  "required": [
+    "seq",
+    "ts",
+    "stage",
+    "tool",
+    "tool_version",
+    "inputs",
+    "outputs",
+    "params_sha256",
+    "prev_hash",
+    "record_hash"
+  ],
+  "properties": {
+    "seq": { "type": "integer", "minimum": 0 },
+    "ts": { "type": "string", "format": "date-time" },
+    "stage": { "type": "string" },
+    "tool": { "type": "string" },
+    "tool_version": { "type": "string" },
+    "inputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fileReference" }
+    },
+    "outputs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/fileReference" }
+    },
+    "params_sha256": { "$ref": "#/$defs/sha256" },
+    "prev_hash": { "$ref": "#/$defs/sha256" },
+    "record_hash": { "$ref": "#/$defs/sha256" }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "fileReference": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

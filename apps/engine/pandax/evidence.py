@@ -17,6 +17,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -33,8 +34,13 @@ LEDGER_NAME = "ledger.jsonl"
 MANIFEST_NAME = "manifest.json"
 SIG_NAME = "manifest.sig"
 PUBKEY_NAME = "pubkey.pem"
-MANIFEST_SCHEMA = "pandax/manifest/v1"
+MANIFEST_SCHEMA = "actis/manifest/v1"
+VERIFICATION_RESULT_SCHEMA = "actis/verification-result/v1"
+LEGACY_MANIFEST_SCHEMAS = {"pandax/manifest/v1"}
 CONTROL_FILES = {MANIFEST_NAME, SIG_NAME, PUBKEY_NAME}
+_PRIVATE_KEY_PEM_HEADER = re.compile(
+    br"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----"
+)
 
 SIGNING_NOTE = (
     "Ed25519 over the canonical JSON of manifest.json (UTF-8, sorted keys, no "
@@ -51,7 +57,7 @@ SIGNING_NOTE = (
 def canonical(obj: Any) -> bytes:
     """Deterministic JSON encoding. The single source of truth for hashing."""
     return json.dumps(
-        obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
     ).encode("utf-8")
 
 
@@ -65,6 +71,17 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: fh.read(1024 * 1024), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _contains_private_key_pem(path: Path) -> bool:
+    tail = b""
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+            candidate = tail + chunk
+            if _PRIVATE_KEY_PEM_HEADER.search(candidate):
+                return True
+            tail = candidate[-64:]
+    return False
 
 
 def record_digest(record: dict[str, Any]) -> str:
@@ -82,8 +99,16 @@ def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON number: {value}")
+
+
 def _load_json_object(blob: str, label: str) -> dict[str, Any]:
-    value = json.loads(blob, object_pairs_hook=_unique_json_object)
+    value = json.loads(
+        blob,
+        object_pairs_hook=_unique_json_object,
+        parse_constant=_reject_json_constant,
+    )
     if not isinstance(value, dict):
         raise ValueError(f"{label} must be a JSON object")
     return value
@@ -108,7 +133,7 @@ def _validate_manifest_structure(manifest: dict[str, Any]) -> None:
             expected is int and isinstance(manifest[field], bool)
         ):
             raise ValueError(f"manifest field {field} must be {expected.__name__}")
-    if manifest["schema"] != MANIFEST_SCHEMA:
+    if manifest["schema"] not in {MANIFEST_SCHEMA, *LEGACY_MANIFEST_SCHEMAS}:
         raise ValueError(f"unsupported manifest schema: {manifest['schema']}")
     if manifest["ledger_records"] < 0:
         raise ValueError("manifest ledger_records cannot be negative")
@@ -233,10 +258,12 @@ def write_manifest(
         rel = path.relative_to(run_dir).as_posix()
         if rel in skip:
             continue  # cannot commit to files that do not exist yet
+        if _contains_private_key_pem(path):
+            raise ValueError(f"refusing to seal bundle containing private key PEM: {rel}")
         files.append({"path": rel, "sha256": sha256_file(path)})
 
     manifest = {
-        "schema": "pandax/manifest/v1",
+        "schema": MANIFEST_SCHEMA,
         "run_id": run_id,
         "created": _utc_now(),
         "product": product,
@@ -289,8 +316,8 @@ class VerificationResult:
     signer_trust: str
     reason: str
     checks: list[Check]
-    bundle_key_fingerprint: str = ""
-    trusted_key_fingerprint: str = ""
+    bundle_key_fingerprint: str | None = None
+    trusted_key_fingerprint: str | None = None
 
     @property
     def ok(self) -> bool:
@@ -298,6 +325,7 @@ class VerificationResult:
 
     def as_dict(self) -> dict[str, Any]:
         return {
+            "schema": VERIFICATION_RESULT_SCHEMA,
             "status": self.status,
             "ok": self.ok,
             "integrity_ok": self.integrity_ok,
@@ -410,7 +438,7 @@ def verify_run(run_dir: Path) -> list[Check]:
                 ),
             ),
         ]
-    checks.append(Check("manifest structure", True, f"schema {MANIFEST_SCHEMA}"))
+    checks.append(Check("manifest structure", True, f"schema {manifest['schema']}"))
 
     # 1. Ed25519 signature against the key advertised by the bundle. This is
     # useful inspection evidence, but it is deliberately not a trust decision.
@@ -423,7 +451,7 @@ def verify_run(run_dir: Path) -> list[Check]:
                 "ed25519 signature",
                 True,
                 "manifest signature valid against bundled public key",
-                category="signature",
+                category="bundle_signature",
             )
         )
     except InvalidSignature:
@@ -432,7 +460,7 @@ def verify_run(run_dir: Path) -> list[Check]:
                 "ed25519 signature",
                 False,
                 "signature does not match manifest content",
-                category="signature",
+                category="bundle_signature",
                 problem="mismatch",
             )
         )
@@ -442,7 +470,7 @@ def verify_run(run_dir: Path) -> list[Check]:
                 "ed25519 signature",
                 False,
                 f"required signature file is missing: {exc.filename}",
-                category="signature",
+                category="bundle_signature",
                 problem="missing",
             )
         )
@@ -452,7 +480,7 @@ def verify_run(run_dir: Path) -> list[Check]:
                 "ed25519 signature",
                 False,
                 f"signature or bundled public key is malformed: {exc}",
-                category="signature",
+                category="bundle_signature",
                 problem="malformed",
             )
         )
@@ -639,14 +667,16 @@ def verify_bundle(
     run_dir = Path(run_dir)
     checks = verify_run(run_dir)
     integrity_checks = [check for check in checks if check.category == "integrity"]
-    signature_checks = [check for check in checks if check.category == "signature"]
+    signature_checks = [
+        check for check in checks if check.category == "bundle_signature"
+    ]
     integrity_ok = bool(integrity_checks) and all(check.ok for check in integrity_checks)
     signature_valid = bool(signature_checks) and all(check.ok for check in signature_checks)
     incomplete = any(
         check.problem in {"missing", "malformed", "unsupported"} for check in checks
     )
 
-    bundle_fingerprint = ""
+    bundle_fingerprint = None
     try:
         bundle_fingerprint = public_key_fingerprint(
             _parse_public_key((run_dir / PUBKEY_NAME).read_bytes())
@@ -656,7 +686,7 @@ def verify_bundle(
 
     if trusted_key is None:
         signer_trust = "not_configured"
-        trusted_fingerprint = ""
+        trusted_fingerprint = None
         trust_ok = False
         trust_detail = "no independently supplied trusted key was configured"
     else:
@@ -684,7 +714,7 @@ def verify_bundle(
                 "signature does not verify with the independently supplied trusted key"
             )
         except (OSError, ValueError, TypeError) as exc:
-            signer_trust = "not_evaluated"
+            signer_trust = "untrusted"
             trust_ok = False
             trust_detail = f"signer trust could not be evaluated: {exc}"
 
@@ -693,7 +723,7 @@ def verify_bundle(
             "external signer trust",
             trust_ok,
             trust_detail,
-            category="trust",
+            category="signer_trust",
             problem="" if trust_ok else "untrusted",
         )
     )

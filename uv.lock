@@ -4,8 +4,8 @@ requires-python = ">=3.10"
 
 [manifest]
 members = [
-    "pandax",
-    "pandax-evidence-verifier",
+    "actis",
+    "actis-evidence-verifier",
 ]
 
 [[package]]
@@ -530,7 +530,7 @@ wheels = [
 ]
 
 [[package]]
-name = "pandax"
+name = "actis"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -572,7 +572,7 @@ requires-dist = [
 provides-extras = ["dev"]
 
 [[package]]
-name = "pandax-evidence-verifier"
+name = "actis-evidence-verifier"
 version = "0.1.0"
 source = { editable = "apps/verifier" }
 dependencies = [

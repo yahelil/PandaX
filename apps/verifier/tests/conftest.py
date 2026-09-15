@@ -62,7 +62,7 @@ def seal(
     key: Ed25519PrivateKey,
     records: list[dict[str, object]],
     *,
-    schema: str = "pandax/manifest/v1",
+    schema: str = "actis/manifest/v1",
 ) -> dict[str, object]:
     ledger = "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in records)
     (run / "ledger.jsonl").write_text(ledger, encoding="utf-8")

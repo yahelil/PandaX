@@ -7,16 +7,56 @@ same screen contract with deterministic fixture data.
 
 ## Database
 
-Set `PANDAX_DATABASE_URL` to a PostgreSQL SQLAlchemy URL, then apply migrations:
+Use separate EU-primary Supabase Free projects for `staging` and `beta`; never
+reuse their database URL, password, or service role. Set `PANDAX_ENVIRONMENT`
+and provide `PANDAX_DATABASE_URL` through the deployment secret manager, then
+apply migrations:
 
 ```bash
 uv run alembic upgrade head
 ```
 
-The API never creates tables for a configured production database. Without
-`PANDAX_DATABASE_URL`, local development uses
+The API never creates tables for a configured managed database. `staging`,
+`beta`, and `production` fail before serving if the URL is missing or is not
+PostgreSQL. Without `PANDAX_DATABASE_URL`, local development uses
 `$PANDAX_DATA_DIR/portfolio.sqlite3` and creates the portfolio schema on first
 use. SQLite is a local convenience, not the production datastore.
+
+Application connections use a three-connection pool with two bounded overflow
+connections, a five-second acquisition/connect timeout, pre-ping, five-minute
+recycling, and server-side statement, lock, and idle-transaction timeouts.
+Prepared statements are disabled for transaction-pooler compatibility. Each
+Render service therefore consumes at most five database connections.
+
+Set `PANDAX_DATABASE_HARD_STOP_MB=100` in staging and `250` in private beta.
+These reservations enforce the 350 MB aggregate policy without borrowing.
+At 70% the readiness response reports `warning`; at 80% background monitoring
+growth stops and responses report `restricted`; at 100% new `/v1` mutations
+return `507` while reads remain available. Never raise a stop above 350 MB.
+
+`GET /health/live` reports process liveness without touching the database.
+`GET /health/ready` checks connectivity, the Alembic revision, and capacity;
+database failure, an unapplied migration, or the hard stop returns `503`.
+
+Alembic takes a PostgreSQL advisory lock, so a second migration fails before
+changing schema. Promote with expand/migrate/contract ordering: migrate staging,
+run smoke tests, drain beta writes, back up, migrate beta, then deploy. A failed
+migration leaves the prior revision available; deploy the prior application and
+rehearse `alembic downgrade` before relying on that rollback.
+
+The operations owner stores encrypted logical backups on the company backup
+machine, never in Render or the repository. A restore rehearsal uses a fresh
+database and verifies both the Alembic revision and representative tenant data:
+
+```bash
+pg_dump --format=custom --no-owner --no-privileges \
+  --file actis-$(date +%Y%m%dT%H%M%S).dump "$PANDAX_DATABASE_URL"
+pg_restore --no-owner --no-privileges \
+  --dbname "$PANDAX_RESTORE_DATABASE_URL" actis-YYYYMMDDTHHMMSS.dump
+```
+
+Do not print either URL, enable shell tracing, or restore over a live database.
+Card d08 owns scheduled backups, encryption/media handling, and recurring drills.
 
 ## Authentication
 

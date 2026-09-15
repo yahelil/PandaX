@@ -22,7 +22,7 @@ from urllib.parse import urlsplit
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
 from . import events as ev
 from .cases import CaseStore
@@ -46,10 +46,15 @@ def _advisory_service():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from .advisory_watch import AdvisoryRefreshLoop
-    from .portfolio_runtime import get_release_monitoring_repository
+    from .portfolio_runtime import (
+        database_allows_background_growth,
+        database_settings,
+        get_release_monitoring_repository,
+    )
     from .release_monitoring import monitoring_store_runner
     from .release_monitoring_worker import ReleaseMonitoringLoop
 
+    database_settings()  # Managed environments fail before serving if PostgreSQL is absent.
     interval = max(1, float(os.environ.get("PANDAX_ADVISORY_REFRESH_SECONDS", "3600")))
     loop = AdvisoryRefreshLoop(_advisory_service, interval)
     release_interval = max(
@@ -63,6 +68,7 @@ async def lifespan(app: FastAPI):
             lambda _organization_id, _product_id, release_id: release_id,
         ),
         interval_seconds=release_interval,
+        growth_allowed=database_allows_background_growth,
     )
     app.state.advisory_refresh = loop
     app.state.release_monitoring = release_loop
@@ -133,6 +139,50 @@ async def apply_browser_security_headers(request: Request, call_next):
     if request.url.scheme == "https":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
+
+
+@api.middleware("http")
+async def enforce_database_capacity(request: Request, call_next):
+    from .portfolio_runtime import (
+        MANAGED_ENVIRONMENTS,
+        get_database_status,
+        runtime_environment,
+    )
+
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"} and request.url.path.startswith("/v1/"):
+        try:
+            managed = runtime_environment() in MANAGED_ENVIRONMENTS
+            database = get_database_status() if managed else None
+        except Exception:
+            return JSONResponse(status_code=503, content={"detail": "database unavailable"})
+        if database is not None and not database.ready:
+            code = 507 if database.capacity == "full" else 503
+            detail = "database capacity hard stop reached" if code == 507 else "database migration required"
+            return JSONResponse(status_code=code, content={"detail": detail})
+        response = await call_next(request)
+        if database is not None and database.capacity in {"warning", "restricted"}:
+            response.headers["X-Actis-Database-Capacity"] = database.capacity
+        return response
+    return await call_next(request)
+
+
+@api.get("/health/live", include_in_schema=False)
+def application_liveness() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@api.get("/health/ready", include_in_schema=False)
+def database_readiness() -> dict[str, object]:
+    from .portfolio_runtime import get_database_status
+
+    try:
+        database = get_database_status()
+    except Exception as exc:
+        raise HTTPException(503, "database unavailable") from exc
+    if not database.ready:
+        detail = "database capacity hard stop reached" if database.capacity == "full" else "database migration required"
+        raise HTTPException(503, detail)
+    return database.as_dict()
 
 
 def _case_store() -> CaseStore:

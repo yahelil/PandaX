@@ -32,6 +32,20 @@ jobs:
   engine:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: actis
+          POSTGRES_PASSWORD: actis
+          POSTGRES_DB: actis_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U actis -d actis_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -44,3 +58,4 @@ jobs:
       - run: uv run pytest apps/engine/tests -m "not slow" -q
         env:
           PYTHONPATH: apps/engine
+          PANDAX_TEST_POSTGRES_URL: postgresql+psycopg://actis:actis@localhost:5432/actis_test

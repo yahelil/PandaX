@@ -38,3 +38,16 @@ def test_run_once_contains_repository_failure_for_next_tick():
 
     assert loop.run_once() == 0
     assert loop.last_error == "database unavailable"
+
+
+def test_run_once_stops_background_growth_at_database_capacity_limit():
+    repository = FakeRepository(["due"])
+    loop = ReleaseMonitoringLoop(
+        lambda: repository,
+        lambda claim: claim,
+        growth_allowed=lambda: False,
+    )
+
+    assert loop.run_once() == 0
+    assert repository.runs == []
+    assert loop.last_error == "database capacity restricts background growth"

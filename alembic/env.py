@@ -4,7 +4,7 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 from pandax.portfolio import portfolio_metadata
 
@@ -39,9 +39,24 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
-        with context.begin_transaction():
-            context.run_migrations()
+        locked = False
+        if connection.dialect.name == "postgresql":
+            locked = bool(connection.scalar(text(
+                "SELECT pg_try_advisory_lock(hashtext('actis'), hashtext('schema-migrations'))"
+            )))
+            if not locked:
+                raise RuntimeError("another Actis database migration is in progress")
+            connection.execute(text("SET lock_timeout = '5s'"))
+            connection.execute(text("SET statement_timeout = '60s'"))
+        try:
+            context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
+            with context.begin_transaction():
+                context.run_migrations()
+        finally:
+            if locked:
+                connection.execute(text(
+                    "SELECT pg_advisory_unlock(hashtext('actis'), hashtext('schema-migrations'))"
+                ))
 
 
 run_migrations_offline() if context.is_offline_mode() else run_migrations_online()

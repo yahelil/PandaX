@@ -21,11 +21,13 @@ class ReleaseMonitoringLoop:
         *,
         interval_seconds: float = 60.0,
         batch_size: int = 25,
+        growth_allowed: Callable[[], bool] | None = None,
     ) -> None:
         self.repository_factory = repository_factory
         self.runner = runner
         self.interval_seconds = max(1.0, interval_seconds)
         self.batch_size = max(1, batch_size)
+        self.growth_allowed = growth_allowed or (lambda: True)
         self.last_error: str | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -48,6 +50,9 @@ class ReleaseMonitoringLoop:
 
     def run_once(self) -> int:
         try:
+            if not self.growth_allowed():
+                self.last_error = "database capacity restricts background growth"
+                return 0
             repository = self.repository_factory()
             claims = repository.claim_due(limit=self.batch_size)
             for claim in claims:

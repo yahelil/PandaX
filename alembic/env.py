@@ -48,6 +48,7 @@ def run_migrations_online() -> None:
                 raise RuntimeError("another Actis database migration is in progress")
             connection.execute(text("SET lock_timeout = '5s'"))
             connection.execute(text("SET statement_timeout = '60s'"))
+            connection.commit()
         try:
             context.configure(connection=connection, target_metadata=target_metadata, compare_type=True)
             with context.begin_transaction():
@@ -57,6 +58,7 @@ def run_migrations_online() -> None:
                 connection.execute(text(
                     "SELECT pg_advisory_unlock(hashtext('actis'), hashtext('schema-migrations'))"
                 ))
+                connection.commit()
 
 
 run_migrations_offline() if context.is_offline_mode() else run_migrations_online()

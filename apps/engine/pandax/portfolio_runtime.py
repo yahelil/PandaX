@@ -38,7 +38,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 MANAGED_ENVIRONMENTS = frozenset({"staging", "beta", "production"})
 DATABASE_HARD_STOP_MB = {"staging": 100, "beta": 250, "production": 350}
-EXPECTED_DATABASE_REVISION = "20260915_0012"
+EXPECTED_DATABASE_REVISION = "20260915_0013"
 
 
 @dataclass(frozen=True, slots=True)

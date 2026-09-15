@@ -37,6 +37,28 @@ key merely because it arrived in the same email, ZIP, or download as the evidenc
 PandaX does not fetch trust keys from arbitrary URLs or accept one inside an
 evidence bundle as authoritative.
 
+## Customer-controlled organization keys
+
+Hosted Actis keeps the private Ed25519 key in the customer's environment. Create
+an organization-scoped proof of possession locally:
+
+```powershell
+actis key enrollment-proof org-acme release-signing --signing-key C:\secure\customer.pem
+```
+
+An organization administrator submits the resulting JSON to
+`POST /v1/organizations/{organization_id}/trust-keys`. The server stores only
+the public key, fingerprint, proof result, version, and audit history. Registering
+a new key with the same name rotates the active key; old bundles remain
+verifiable only when their signed manifest time precedes that rotation. Revoking
+a key immediately makes every bundle signed by it untrusted.
+
+`POST /v1/organizations/{organization_id}/trust-verifications` accepts an
+evidence ZIP and reports its policy, registry source, Ed25519 algorithm,
+verification time, key name/version/status, integrity result, and trust decision.
+ZIP paths and expansion limits are checked before verification. Enrollment,
+rotation, revocation, and verification are tenant-scoped audit events.
+
 ## Results
 
 - `trusted`: the evidence is intact and the external trusted key verifies its
@@ -79,6 +101,6 @@ declared sizes could make them unsafe. See
 [`apps/verifier/README.md`](../apps/verifier/README.md) for distribution,
 plain-language results, and exit codes.
 
-This first version supports one active key per installation. Rotation, revoked
-keys, multiple simultaneous keys, and identity-backed/eIDAS seals are separate
-future work.
+The organization registry supports independently versioned key names, rotation,
+and revocation. Managed KMS/HSM custody and identity-backed/eIDAS seals remain
+separate production work; customer private keys are never sent to PandaX.

@@ -1,14 +1,21 @@
 """Typed tenant and role-scoped settings and privacy-safe analytics routes."""
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Annotated, Any, Callable, Literal, Mapping, TypeVar
+import io
+from pathlib import Path, PurePosixPath
+import re
+import stat
+import tempfile
+from typing import Annotated, Any, Callable, Iterator, Literal, Mapping, TypeVar
+import zipfile
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .auth import Principal, Role, authorize_request
 from .organization_settings import (
     OrganizationSettingsRepository, SettingsConflict, SettingsError,
-    SettingsNotFound, SettingsValidationError,
+    SettingsNotFound, SettingsValidationError, TrustKeyRecord,
 )
 
 RepositoryDependency = Callable[[], OrganizationSettingsRepository]
@@ -17,6 +24,10 @@ Result = TypeVar("Result")
 READ_ROLES = frozenset(Role)
 ADMIN_ROLES = frozenset({Role.ORG_ADMIN})
 ANALYTICS_READ_ROLES = frozenset({Role.ORG_ADMIN, Role.COMPLIANCE_OPERATOR})
+MAX_TRUST_BUNDLE_BYTES = 50_000_000
+MAX_TRUST_BUNDLE_UNCOMPRESSED_BYTES = 200_000_000
+MAX_TRUST_BUNDLE_ENTRIES = 2_000
+_DRIVE_PATH = re.compile(r"^[A-Za-z]:")
 
 
 class ApiModel(BaseModel):
@@ -223,6 +234,54 @@ class AuditResponse(ApiModel):
     digest: str
 
 
+class TrustKeyEnrollmentRequest(ApiModel):
+    key_name: str = Field(min_length=1, max_length=80)
+    public_key_pem: str = Field(min_length=1, max_length=1000)
+    proof_signature: str = Field(pattern=r"^[0-9a-fA-F]{128}$")
+
+
+class TrustKeyResponse(ApiModel):
+    id: str
+    organization_id: str
+    key_name: str
+    key_version: int
+    algorithm: Literal["Ed25519"]
+    public_key_pem: str
+    fingerprint: str
+    status: Literal["active", "rotated", "revoked"]
+    proof_verified_at: datetime
+    activated_at: datetime
+    valid_until: datetime | None
+    revoked_at: datetime | None
+    revocation_reason: str | None
+    created_by: str
+
+
+class TrustKeyRevocationRequest(ApiModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class TrustVerificationResponse(ApiModel):
+    schema_version: str = Field(alias="schema")
+    status: Literal["trusted", "untrusted", "invalid", "incomplete"]
+    ok: bool
+    integrity_ok: bool
+    signature_valid: bool
+    signer_trust: str
+    reason: str
+    bundle_key_fingerprint: str | None
+    trusted_key_fingerprint: str | None
+    checks: list[dict[str, Any]]
+    trust_policy: Literal["organization_enrolled_ed25519_v1"]
+    trust_source: Literal["organization_registry"]
+    trust_decision: Literal["trusted", "not_enrolled", "revoked", "expired"]
+    algorithm: Literal["Ed25519"]
+    key_id: str | None
+    key_version: int | None
+    key_status: Literal["active", "rotated", "revoked"] | None
+    verified_at: datetime
+
+
 def _unauthenticated() -> Principal:
     raise HTTPException(status.HTTP_401_UNAUTHORIZED, "authentication required")
 
@@ -275,6 +334,69 @@ def create_settings_router(repository_dependency: RepositoryDependency, identity
     def settings_audit(organization_id: str, repository: Repository, principal: Identity):
         _authorize(principal, organization_id, ADMIN_ROLES | frozenset({Role.VIEWER}))
         return _call(lambda: repository.list_audit(organization_id))
+
+    @router.post("/trust-keys", response_model=TrustKeyResponse, status_code=status.HTTP_201_CREATED)
+    def enroll_trust_key(
+        body: TrustKeyEnrollmentRequest,
+        organization_id: str,
+        repository: Repository,
+        principal: Identity,
+    ):
+        _authorize(principal, organization_id, ADMIN_ROLES, sensitive=True)
+        return _call(lambda: repository.enroll_trust_key(
+            organization_id,
+            key_name=body.key_name,
+            public_key_pem=body.public_key_pem,
+            proof_signature=body.proof_signature,
+            actor_id=principal.subject,
+        ))
+
+    @router.get("/trust-keys", response_model=list[TrustKeyResponse])
+    def list_trust_keys(
+        organization_id: str, repository: Repository, principal: Identity
+    ):
+        _authorize(principal, organization_id, READ_ROLES)
+        return _call(lambda: repository.list_trust_keys(organization_id))
+
+    @router.post("/trust-keys/{key_id}/revoke", response_model=TrustKeyResponse)
+    def revoke_trust_key(
+        body: TrustKeyRevocationRequest,
+        key_id: str,
+        organization_id: str,
+        repository: Repository,
+        principal: Identity,
+    ):
+        _authorize(principal, organization_id, ADMIN_ROLES, sensitive=True)
+        return _call(lambda: repository.revoke_trust_key(
+            organization_id,
+            key_id,
+            reason=body.reason,
+            actor_id=principal.subject,
+        ))
+
+    @router.post("/trust-verifications", response_model=TrustVerificationResponse)
+    async def verify_trust(
+        organization_id: str,
+        repository: Repository,
+        principal: Identity,
+        bundle: Annotated[UploadFile, File()],
+    ):
+        _authorize(principal, organization_id, READ_ROLES, sensitive=True)
+        content = await bundle.read(MAX_TRUST_BUNDLE_BYTES + 1)
+        if not content or len(content) > MAX_TRUST_BUNDLE_BYTES:
+            raise HTTPException(
+                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                "evidence bundle must be between 1 byte and 50 MB",
+            )
+        try:
+            with _bundle_directory(content) as directory:
+                return _call(lambda: repository.verify_registered_bundle(
+                    organization_id,
+                    directory,
+                    actor_id=principal.subject,
+                ))
+        except SettingsValidationError as exc:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
     @router.get("/team", response_model=list[TeamMemberResponse])
     def list_team(organization_id: str, repository: Repository, principal: Identity):
@@ -330,3 +452,54 @@ def create_settings_router(repository_dependency: RepositoryDependency, identity
         return _call(lambda: repository.analytics_aggregates(organization_id, since=since, until=until))
 
     return router
+
+
+@contextmanager
+def _bundle_directory(content: bytes) -> Iterator[Path]:
+    try:
+        archive = zipfile.ZipFile(io.BytesIO(content))
+    except zipfile.BadZipFile as exc:
+        raise SettingsValidationError("evidence bundle must be a valid ZIP archive") from exc
+    with archive, tempfile.TemporaryDirectory(prefix="actis-trust-") as temporary:
+        root = Path(temporary)
+        seen: set[str] = set()
+        total = 0
+        try:
+            for info in archive.infolist():
+                name = info.filename.rstrip("/")
+                if not name:
+                    continue
+                path = PurePosixPath(name)
+                if (
+                    "\\" in name
+                    or "\x00" in name
+                    or name.startswith("/")
+                    or _DRIVE_PATH.match(name)
+                    or any(part in {"", ".", ".."} for part in path.parts)
+                ):
+                    raise SettingsValidationError("evidence bundle contains an unsafe path")
+                folded = path.as_posix().casefold()
+                if folded in seen:
+                    raise SettingsValidationError("evidence bundle contains duplicate paths")
+                seen.add(folded)
+                if len(seen) > MAX_TRUST_BUNDLE_ENTRIES:
+                    raise SettingsValidationError("evidence bundle contains too many entries")
+                if info.flag_bits & 0x1 or ((info.external_attr >> 16) & 0o170000) == stat.S_IFLNK:
+                    raise SettingsValidationError("evidence bundle contains an unsupported entry")
+                if info.is_dir():
+                    continue
+                total += info.file_size
+                if total > MAX_TRUST_BUNDLE_UNCOMPRESSED_BYTES:
+                    raise SettingsValidationError("evidence bundle expands beyond 200 MB")
+                target = root.joinpath(*path.parts)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                written = 0
+                with archive.open(info) as source, target.open("xb") as destination:
+                    while chunk := source.read(1024 * 1024):
+                        written += len(chunk)
+                        if written > info.file_size:
+                            raise SettingsValidationError("evidence bundle entry size is invalid")
+                        destination.write(chunk)
+        except (zipfile.BadZipFile, RuntimeError, EOFError) as exc:
+            raise SettingsValidationError("evidence bundle is corrupt or unsupported") from exc
+        yield root

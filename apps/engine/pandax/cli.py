@@ -25,6 +25,7 @@ from .evidence import (
     verify_bundle,
     write_public_key,
 )
+from .organization_settings import create_trust_key_enrollment
 from .render_cli import CliRenderer, banner, render_checks
 
 def _force_utf8() -> None:
@@ -109,6 +110,26 @@ def export_public_key(
         "[yellow]Distribute this key separately from evidence bundles and confirm "
         "the fingerprint through a trusted administrator channel.[/]"
     )
+
+
+@key_app.command("enrollment-proof")
+def enrollment_proof(
+    organization_id: str = typer.Argument(..., help="Actis organization ID"),
+    key_name: str = typer.Argument(..., help="Stable key name, such as release-signing"),
+    signing_key: Optional[Path] = typer.Option(
+        None, "--signing-key", help="Private signing key (default: PANDAX_SIGNING_KEY)"
+    ),
+) -> None:
+    """Create public enrollment material while keeping the private key local."""
+    try:
+        enrollment = create_trust_key_enrollment(
+            load_or_create_key(signing_key or signing_key_path()),
+            organization_id,
+            key_name,
+        )
+    except (OSError, TypeError, ValueError) as exc:
+        raise typer.BadParameter(f"signing key cannot be used: {exc}") from exc
+    typer.echo(json.dumps(enrollment, sort_keys=True))
 
 
 def _latest_run() -> Path:

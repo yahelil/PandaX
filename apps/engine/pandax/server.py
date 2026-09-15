@@ -49,9 +49,11 @@ async def lifespan(app: FastAPI):
     from .portfolio_runtime import (
         database_allows_background_growth,
         database_settings,
+        get_notification_delivery_worker,
         get_release_monitoring_repository,
         get_storage_status,
     )
+    from .notification_delivery import NotificationDeliveryLoop
     from .release_monitoring import monitoring_store_runner
     from .release_monitoring_worker import ReleaseMonitoringLoop
 
@@ -72,13 +74,23 @@ async def lifespan(app: FastAPI):
         interval_seconds=release_interval,
         growth_allowed=database_allows_background_growth,
     )
+    delivery_loop = NotificationDeliveryLoop(
+        get_notification_delivery_worker,
+        interval_seconds=max(
+            1, float(os.environ.get("PANDAX_NOTIFICATION_DELIVERY_SECONDS", "30"))
+        ),
+        growth_allowed=database_allows_background_growth,
+    )
     app.state.advisory_refresh = loop
     app.state.release_monitoring = release_loop
+    app.state.notification_delivery = delivery_loop
     loop.start()
     release_loop.start()
+    delivery_loop.start()
     try:
         yield
     finally:
+        delivery_loop.stop()
         release_loop.stop()
         loop.stop()
 

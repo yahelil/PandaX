@@ -440,6 +440,10 @@ class OrganizationSettingsRepository:
             "secret_reference": _secret_reference(secret_reference), "last_sync_at": None,
             "version": 1, "created_at": now, "updated_at": now,
         }
+        _validate_connected_integration(
+            integration_type, values["status"], values["configuration"],
+            values["secret_reference"],
+        )
         with Session(self.engine) as session, session.begin():
             self._profile(session, organization_id)
             try:
@@ -474,6 +478,12 @@ class OrganizationSettingsRepository:
             values["secret_reference"] = _secret_reference(values["secret_reference"])
         if "last_sync_at" in values and values["last_sync_at"] is not None:
             values["last_sync_at"] = _timestamp(values["last_sync_at"], "last_sync_at")
+        _validate_connected_integration(
+            current.type,
+            values.get("status", current.status),
+            values.get("configuration", current.configuration),
+            values.get("secret_reference", current.secret_reference),
+        )
         safe = {**values}
         if "secret_reference" in safe:
             safe["secret_reference"] = "configured" if safe["secret_reference"] else None
@@ -904,7 +914,7 @@ def _integration_configuration(integration_type: str, value: Mapping[str, Any]) 
             raise SettingsValidationError(f"invalid integration configuration field: {key}")
     if "from_address" in result:
         result["from_address"] = _email(result["from_address"])
-    if "provider" in result and result["provider"] not in {"smtp", "sendgrid", "ses", "microsoft_graph"}:
+    if "provider" in result and result["provider"] not in {"resend", "smtp", "sendgrid", "ses", "microsoft_graph"}:
         raise SettingsValidationError("unsupported email provider")
     for key in ("endpoint_name", "collector_id"):
         if key in result and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", result[key]):
@@ -925,6 +935,28 @@ def _secret_reference(value: str | None) -> str | None:
     if not SECRET_REFERENCE_RE.fullmatch(result):
         raise SettingsValidationError("secret_reference must identify an external secret manager")
     return result
+
+
+def _validate_connected_integration(
+    integration_type: str,
+    status: str,
+    configuration: Mapping[str, Any],
+    secret_reference: str | None,
+) -> None:
+    if status != "connected":
+        return
+    required = {
+        "email": {"provider", "from_address"},
+        "webhook": {"endpoint_name", "event_types"},
+        "collector": {"collector_id", "environment"},
+        "jira": {"site", "project_key"},
+    }[integration_type]
+    if not secret_reference or not required.issubset(configuration):
+        raise SettingsValidationError(
+            "connected integration requires complete configuration and an external secret reference"
+        )
+    if integration_type == "email" and configuration["provider"] != "resend":
+        raise SettingsValidationError("connected notification email must use Resend")
 
 
 def _member_record(row: Any) -> TeamMemberRecord:

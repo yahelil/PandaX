@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 from .compliance import compliance_items
 from .documents import documents
 from .findings import findings
+from .notification_delivery import DeliveryJob, NotificationDeliveryRepository
 from .portfolio import portfolio_metadata, products, releases
 
 
@@ -161,8 +162,9 @@ Index("ix_regulatory_documents_search", documents.c.organization_id, documents.c
 
 
 class SearchNotificationRepository:
-    def __init__(self, engine: Engine):
+    def __init__(self, engine: Engine, *, delivery_daily_limit: int = 500):
         self.engine = engine
+        self.delivery_daily_limit = delivery_daily_limit
 
     def create_schema(self) -> None:
         portfolio_metadata.create_all(self.engine)
@@ -322,6 +324,11 @@ class SearchNotificationRepository:
                 if current["content_fingerprint"] != digest:
                     values.update(read_at=None, acknowledged_at=None, acknowledged_by=None)
                 session.execute(update(notifications).where(notifications.c.id == notification_id).values(**values))
+            NotificationDeliveryRepository(
+                self.engine, daily_limit=self.delivery_daily_limit
+            ).enqueue(
+                session, organization_id, notification_id, digest, material, timestamp
+            )
         return self.get_notification(organization_id, notification_id)
 
     def get_notification(self, organization_id: str, notification_id: str) -> NotificationRecord:
@@ -382,6 +389,20 @@ class SearchNotificationRepository:
         return self._mark(
             organization_id, notification_id, read=True,
             actor_id=_required(actor_id, "actor_id", 128), now=now,
+        )
+
+    def list_deliveries(
+        self, organization_id: str, *, status: str | None = None, limit: int = 100
+    ) -> list[DeliveryJob]:
+        return NotificationDeliveryRepository(self.engine).list(
+            organization_id, status=status, limit=limit
+        )
+
+    def retry_delivery(
+        self, organization_id: str, delivery_id: str, *, now: datetime | None = None
+    ) -> DeliveryJob:
+        return NotificationDeliveryRepository(self.engine).retry(
+            organization_id, delivery_id, now=now
         )
 
     def _mark(

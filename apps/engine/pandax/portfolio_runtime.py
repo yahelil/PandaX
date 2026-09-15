@@ -27,6 +27,10 @@ from .domain_projections import (
 )
 from .findings import FindingRepository
 from .home import HomeReadModel
+from .notification_delivery import (
+    NotificationDeliveryRepository, NotificationDeliveryWorker,
+    environment_secret_resolver,
+)
 from .organization_settings import OrganizationSettingsRepository, SettingsNotFound
 from .portfolio import PortfolioRepository, create_portfolio_engine
 from .portfolio_api import PortfolioIdentity
@@ -38,7 +42,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 MANAGED_ENVIRONMENTS = frozenset({"staging", "beta", "production"})
 DATABASE_HARD_STOP_MB = {"staging": 100, "beta": 250, "production": 350}
-EXPECTED_DATABASE_REVISION = "20260915_0013"
+EXPECTED_DATABASE_REVISION = "20260915_0014"
 
 
 @dataclass(frozen=True, slots=True)
@@ -278,15 +282,42 @@ def get_document_repository() -> DocumentRepository:
 
 @lru_cache(maxsize=1)
 def get_search_notification_repository() -> SearchNotificationRepository:
-    repository = ProjectedSearchNotificationRepository(get_portfolio_repository().engine)
+    repository = ProjectedSearchNotificationRepository(
+        get_portfolio_repository().engine,
+        delivery_daily_limit=_notification_daily_limit(),
+    )
     if repository.engine.dialect.name == "sqlite":
         repository.create_schema()
     return repository
 
 
 @lru_cache(maxsize=1)
+def get_notification_delivery_repository() -> NotificationDeliveryRepository:
+    return NotificationDeliveryRepository(
+        get_portfolio_repository().engine, daily_limit=_notification_daily_limit()
+    )
+
+
+def _notification_daily_limit() -> int:
+    try:
+        daily_limit = int(os.environ.get("PANDAX_NOTIFICATION_DAILY_LIMIT", "500"))
+    except ValueError as exc:
+        raise ValueError("PANDAX_NOTIFICATION_DAILY_LIMIT must be an integer") from exc
+    return daily_limit
+
+
+def get_notification_delivery_worker() -> NotificationDeliveryWorker:
+    return NotificationDeliveryWorker(
+        get_notification_delivery_repository(), environment_secret_resolver
+    )
+
+
+@lru_cache(maxsize=1)
 def get_home_read_model() -> HomeReadModel:
-    return ProjectedHomeReadModel(get_portfolio_repository().engine)
+    return ProjectedHomeReadModel(
+        get_portfolio_repository().engine,
+        delivery_daily_limit=_notification_daily_limit(),
+    )
 
 
 @lru_cache(maxsize=1)
@@ -372,6 +403,7 @@ def reset_portfolio_repository() -> None:
     get_compliance_repository.cache_clear()
     get_document_repository.cache_clear()
     get_search_notification_repository.cache_clear()
+    get_notification_delivery_repository.cache_clear()
     get_home_read_model.cache_clear()
     get_organization_settings_repository.cache_clear()
     get_oidc_authenticator.cache_clear()

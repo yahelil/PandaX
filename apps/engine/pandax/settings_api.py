@@ -179,6 +179,15 @@ class IntegrationResponse(ApiModel):
     updated_at: datetime
 
 
+class IntegrationCreate(ApiModel):
+    name: str = Field(min_length=1, max_length=200)
+    type: Literal["email", "webhook", "collector", "jira"]
+    description: str = Field(min_length=1, max_length=1000)
+    configuration: dict[str, Any]
+    status: Literal["connected", "attention", "not_connected"] = "not_connected"
+    secret_reference: str | None = Field(default=None, max_length=500)
+
+
 class IntegrationPatch(ApiModel):
     expected_version: int = Field(ge=1)
     status: Literal["connected", "attention", "not_connected"] | None = None
@@ -421,6 +430,20 @@ def create_settings_router(repository_dependency: RepositoryDependency, identity
     def list_integrations(organization_id: str, repository: Repository, principal: Identity):
         _authorize(principal, organization_id, READ_ROLES)
         return _call(lambda: repository.list_integrations(organization_id))
+
+    @router.post("/integrations", response_model=IntegrationResponse, status_code=status.HTTP_201_CREATED)
+    def create_integration(
+        body: IntegrationCreate,
+        organization_id: str,
+        repository: Repository,
+        principal: Identity,
+    ):
+        _authorize(principal, organization_id, ADMIN_ROLES, sensitive=True)
+        return _call(lambda: repository.create_integration(
+            organization_id,
+            **body.model_dump(),
+            actor_id=principal.subject,
+        ))
 
     @router.get("/integrations/{integration_id}", response_model=IntegrationResponse)
     def get_integration(integration_id: str, organization_id: str, repository: Repository, principal: Identity):

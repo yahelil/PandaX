@@ -18,8 +18,8 @@ HTTP 404 means a missing case/run/finding. Legacy mutation clients must add thes
 fields. The original CaseStore methods remain internal compatibility helpers;
 all application writes go through CaseService.
 
-CLI: `pandax case list`, `pandax case show CASE_ID`, and
-`pandax case apply ACTION --case-id CASE_ID --input command.json`.
+CLI: `actis case list`, `actis case show CASE_ID`, and
+`actis case apply ACTION --case-id CASE_ID --input command.json`.
 Omit `--case-id` for create/import-draft. JSON command files retain request IDs
 for retries. Actions initially include create, import-draft, observe-release,
 and confirm-measure. Incomplete or historical drafts are never approvals.
@@ -68,7 +68,7 @@ or attests it unavailable. Drafts may remain incomplete, but only a complete,
 approved latest revision is ready. Placeholders never satisfy a required field.
 
 Export: `GET /api/cases/{id}/export?format=html|json|checklist&revision=N` or
-`pandax case export CASE_ID --format html --destination pack.html`.
+`actis case export CASE_ID --format html --destination pack.html`.
 CLI export refuses to overwrite an existing file. HTML escapes supplied values;
 JSON is PandaX internal interchange, not an SRP API schema. Packs are prepared
 artifacts, never proof of submission. Older approved revisions remain readable
@@ -104,7 +104,7 @@ containing case history, the selected report pack, receipts, ledger and signed
 manifest. The immutable ZIP and digest commit together in SQLite; request replay
 does not generate another snapshot. Download through
 `/api/cases/{id}/snapshots/{snapshot_id}` or
-`pandax case download-snapshot CASE_ID SNAPSHOT_ID output.zip`.
+`actis case download-snapshot CASE_ID SNAPSHOT_ID output.zip`.
 Scans and snapshots use the installation key selected by `PANDAX_SIGNING_KEY`
 (default `~/.pandax/dev_signing_key.pem`). External signer trust is established
 only when verification receives the corresponding public key separately through

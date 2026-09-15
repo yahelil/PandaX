@@ -1,4 +1,4 @@
-"""pandax - CRA compliance engine command line."""
+"""Actis by PandaX command line."""
 
 from __future__ import annotations
 
@@ -45,13 +45,13 @@ _force_utf8()
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="CRA Compliance-in-a-Box: artifact in, verifiable Annex VII dossier out.",
+    help="Actis by PandaX: artifact or SBOM to verifiable CRA evidence.",
 )
 
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(__version__)
+        typer.echo(f"Actis by PandaX {__version__}")
         raise typer.Exit()
 
 
@@ -62,10 +62,10 @@ def main(
         "--version",
         callback=_version_callback,
         is_eager=True,
-        help="Show PandaX version and exit.",
+        help="Show the Actis version and exit.",
     ),
 ) -> None:
-    """Run PandaX locally or in CI."""
+    """Run Actis locally or in CI."""
 from .case_cli import app as case_app
 app.add_typer(case_app, name="case")
 from .monitor_cli import app as monitor_app
@@ -116,7 +116,7 @@ def _latest_run() -> Path:
     )
     if not runs:
         raise typer.BadParameter(
-            "no runs found in out/. Run `pandax scan <artifact>` first."
+            "no runs found in out/. Run `actis scan <artifact>` first."
         )
     return runs[-1]
 
@@ -312,7 +312,7 @@ def verdict(
         Text("  evidence: ", style="dim")
         + Text(str(target), style="cyan")
         + Text("   verify with ", style="dim")
-        + Text(f"pandax verify {target.name}", style="bold cyan")
+        + Text(f"actis verify {target.name}", style="bold cyan")
     )
     console.print()
     raise typer.Exit(code=0 if result.can_ship else 2)
@@ -480,7 +480,7 @@ def tamper(
                 (f"'{chr(blob[index])}'", "bold red"),
                 ("\n\nThe file is still valid JSON and still looks entirely "
                  "plausible to a human reader. Run ", "dim"),
-                (f"pandax verify {bundle}", "bold cyan"),
+                (f"actis verify {bundle}", "bold cyan"),
                 (" to see the seal catch it.", "dim"),
             ),
             title="ONE BYTE CHANGED",
@@ -608,7 +608,7 @@ def serve(
     console.print(
         Panel(
             Text.assemble(
-                ("PandaX dashboard on ", "dim"),
+                ("Actis by PandaX dashboard on ", "dim"),
                 (f"http://{host}:{port}", "bold cyan"),
                 ("\n\nThe browser view and this CLI consume the identical event "
                  "stream - neither one is a reimplementation of the other.", "dim"),
@@ -631,7 +631,7 @@ def compare(scenario: str = typer.Argument(..., help="Scenario id, or 'list'"),
             console.print(f"{item['id']}: {item['before']} → {item['after']}")
         return
     if scenario not in SCENARIOS:
-        raise typer.BadParameter('Unknown scenario. Run pandax compare list')
+        raise typer.BadParameter('Unknown scenario. Run actis compare list')
     renderer = CliRenderer(console)
     summary = {}
     for event in run_scenario(scenario, out_base=out):

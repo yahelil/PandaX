@@ -24,7 +24,7 @@ class VerificationResult:
     bundle_key_fingerprint: str | None = None
     trusted_key_fingerprint: str | None = None
     checks: list[Check] = field(default_factory=list)
-    schema: str = "pandax/verification-result/v1"
+    schema: str = "actis/verification-result/v1"
 
     @property
     def ok(self) -> bool:

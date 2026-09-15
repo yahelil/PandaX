@@ -40,7 +40,7 @@ STAGE_TITLE = {
     "SEAL": "Evidence Seal",
 }
 
-BANNER = "PandaX — CRA Compliance Engine"
+BANNER = "Actis by PandaX — CRA Evidence Workspace"
 RESULT_COLUMN = 62  # where the trailing OK [time] is aligned
 
 
@@ -258,11 +258,11 @@ class CliRenderer:
         console.print()
         console.print(
             Text("  next: ", style="dim")
-            + Text(f"pandax verify {run_dir} --trusted-key KEY.pem", style="bold cyan")
+            + Text(f"actis verify {run_dir} --trusted-key KEY.pem", style="bold cyan")
             + Text("   or inspect with   ", style="dim")
-            + Text(f"pandax verify {run_dir} --inspect-only", style="bold cyan")
+            + Text(f"actis verify {run_dir} --inspect-only", style="bold cyan")
             + Text("   then   ", style="dim")
-            + Text(f"pandax tamper {run_dir}", style="bold yellow")
+            + Text(f"actis tamper {run_dir}", style="bold yellow")
             + Text(" to watch it fail", style="dim")
         )
         console.print()
@@ -273,7 +273,7 @@ def render_checks(console: Console, result, title: str, inspect_only: bool = Fal
     checks = result.checks
     inspection_ok = result.integrity_ok and result.signature_valid
     all_ok = inspection_ok if inspect_only else result.ok
-    if any(c.category != "trust" and not c.ok for c in checks):
+    if any(c.category != "signer_trust" and not c.ok for c in checks):
         all_ok = False
     untrusted = result.status == "untrusted"
     table = Table(
@@ -287,7 +287,9 @@ def render_checks(console: Console, result, title: str, inspect_only: bool = Fal
     table.add_column("Check")
     table.add_column("Detail", style="dim", overflow="fold", max_width=70)
     for check in checks:
-        warning = check.category == "trust" and not check.ok and inspection_ok
+        warning = (
+            check.category == "signer_trust" and not check.ok and inspection_ok
+        )
         table.add_row(
             "[green]✔[/]" if check.ok else "[bold yellow]![/]" if warning else "[bold red]✘[/]",
             Text(check.name, style="" if check.ok else "bold yellow" if warning else "bold red"),

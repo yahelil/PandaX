@@ -1,4 +1,4 @@
-# PandaX — CRA Compliance-in-a-Box (proof of concept)
+# Actis by PandaX — CRA evidence workspace
 
 Turns a product artifact **or an existing JSON SBOM** into a signed,
 independently verifiable EU Cyber Resilience Act evidence bundle: SBOM → CVE
@@ -27,7 +27,7 @@ artifact.zip                         existing-sbom.json
 ## Tomcat, OpenWrt, curl and OpenSSL release comparisons
 
 The dashboard selector includes five downloadable release comparisons and all
-ten individual releases. Run `uv run pandax compare list` for CLI ids.
+ten individual releases. Run `uv run actis compare list` for CLI ids.
 Comparisons show passes, failures, package-variant exclusions and vendor evidence;
 failed downloads/scans remain visible and do not stop the other release being tested.
 See [the scenario guide](docs/release-scenarios.md) for instructions and limitations.
@@ -38,22 +38,22 @@ releases. These are inventory/advisory tests, not runtime exploit tests.
 
 ## Quickstart
 
-For CI/CD integration, JSON output, and SARIF, see the [PandaX GitHub Action guide](docs/github-action.md).
+For CI/CD integration, JSON output, and SARIF, see the [Actis GitHub Action guide](docs/github-action.md).
 
 ```bash
 uv sync --extra dev
 uv run python tools/bootstrap.py           # pinned, digest-verified downloads
-uv run pandax scan fixtures/smarthub-sh100-v2.3.1.zip
+uv run actis scan fixtures/smarthub-sh100-v2.3.1.zip
 ```
 
 To start from an SBOM, Syft and the bootstrap step are not required:
 
 ```bash
 uv sync --extra dev
-uv run pandax scan-sbom fixtures/example-sbom.cdx.json
+uv run actis scan-sbom fixtures/example-sbom.cdx.json
 ```
 
-PandaX detects the document from its contents; the user does not need to choose
+Actis detects the document from its contents; the user does not need to choose
 a format. The accepted inputs are **CycloneDX 1.2/1.6 JSON** and **SPDX 2.2/2.3
 JSON**. CycloneDX 1.2 and SPDX are upgraded to the pipeline's CycloneDX 1.6
 component model. The
@@ -62,7 +62,7 @@ written as `sbom.cdx.json`; both are covered by the evidence seal.
 
 Vulnerability matching requires a versioned Package URL (`purl`), such as
 `pkg:npm/jquery@3.4.0`. Components without one are preserved in the SBOM,
-dashboard and dossier, but are clearly counted as **not scanned**. PandaX does
+dashboard and dossier, but are clearly counted as **not scanned**. Actis does
 not guess an identifier from a name because that can attach vulnerabilities to
 the wrong package. A run is refused only when none of the components can be
 matched safely.
@@ -92,12 +92,12 @@ Expect: 11 components, ~102 vulnerabilities, **4 actively exploited**, 4 Article
 ## Proving it actually worked
 
 Every claim this POC makes has a command that checks it. None of these require
-trusting PandaX.
+trusting Actis.
 
 **0 · The one-screen answer**
 
 ```bash
-uv run pandax verdict
+uv run actis verdict
 ```
 Answers the three questions behind a scan — can this product go on the EU market
 (blockers, each with the article that blocks it), what is due and when (Article 14
@@ -107,8 +107,8 @@ into ~10 package upgrades, which is the whole backlog.
 **1 · The seal holds**
 
 ```bash
-uv run pandax key export-public trusted-pandax-key.pem
-uv run pandax verify --trusted-key trusted-pandax-key.pem
+uv run actis key export-public trusted-pandax-key.pem
+uv run actis verify --trusted-key trusted-pandax-key.pem
 ```
 Recomputes every file digest, re-derives every chain link, and checks the
 Ed25519 signature against the public key supplied outside the bundle. Integrity,
@@ -117,22 +117,22 @@ signature validity and signer trust are reported separately.
 **2 · The seal actually catches tampering** — the important one
 
 ```bash
-uv run pandax tamper --target sbom.cdx.json   # flips ONE byte; file stays valid JSON
-uv run pandax verify --trusted-key trusted-pandax-key.pem
+uv run actis tamper --target sbom.cdx.json   # flips ONE byte; file stays valid JSON
+uv run actis verify --trusted-key trusted-pandax-key.pem
 # now fails, naming S2_SBOM as the source
 ```
 
 **3 · The findings reproduce against the live feed**
 
 ```bash
-uv run pandax verify --trusted-key trusted-pandax-key.pem --online
+uv run actis verify --trusted-key trusted-pandax-key.pem --online
 # re-queries OSV.dev and compares the advisory set
 ```
 
 **4 · The statutory clocks**
 
 ```bash
-uv run pandax clock --speed 1800  # 24h/72h/14d countdowns, time compressed for demo
+uv run actis clock --speed 1800  # 24h/72h/14d countdowns, time compressed for demo
 ```
 
 **5 · Check the outputs yourself, without this tool**
@@ -174,7 +174,7 @@ Article 14 field mapping, and a full end-to-end run asserting the three KEV CVEs
 **7 · The dashboard**
 
 ```bash
-uv run pandax serve      # http://127.0.0.1:8000
+uv run actis serve      # http://127.0.0.1:8000
 ```
 
 Same event stream as the CLI, over SSE — the browser view is not a
@@ -183,7 +183,7 @@ reimplementation. Six views, each backed by the sealed bundle's own files:
 The runner offers **Product artifact** and **SBOM file** modes. In SBOM mode,
 choose a JSON file and press **Run pipeline**; the dashboard uploads it, reports
 the detected format and matchable/skipped component counts, then streams the
-same S3-through-SEAL execution shown by `pandax scan-sbom`.
+same S3-through-SEAL execution shown by `actis scan-sbom`.
 
 | View | Shows |
 |---|---|
@@ -261,29 +261,29 @@ longer matches the signed manifest. Trusted verification additionally checks
 the signature against a public key supplied separately from the bundle:
 
 ```powershell
-pandax key export-public trusted-pandax-key.pem
+actis key export-public trusted-pandax-key.pem
 $env:PANDAX_TRUSTED_KEY = "C:\secure-config\trusted-pandax-key.pem"
-pandax verify out\run-example
+actis verify out\run-example
 ```
 
-Use `pandax verify RUN --trusted-key KEY.pem` for a one-off trusted check, or
-`pandax verify RUN --inspect-only` to inspect an old bundle without claiming
+Use `actis verify RUN --trusted-key KEY.pem` for a one-off trusted check, or
+`actis verify RUN --inspect-only` to inspect an old bundle without claiming
 that its signer is trusted. See [trusted verification](docs/trusted-verification.md)
 for provisioning and status meanings.
 
 ### Continuous monitoring
 
-Register an artifact or SBOM once, then let PandaX recheck it on a saved schedule:
+Register an artifact or SBOM once, then let Actis recheck it on a saved schedule:
 
 ```powershell
-uv run pandax monitor add "Product release" .\product.zip --every-minutes 360
-uv run pandax monitor watch
+uv run actis monitor add "Product release" .\product.zip --every-minutes 360
+uv run actis monitor watch
 ```
 
-`pandax monitor list` shows source freshness and the next check. `pandax monitor
+`actis monitor list` shows source freshness and the next check. `actis monitor
 alerts` reports new, changed, reappearing, and no-longer-detected findings plus
 source failures and recoveries. Repeated identical results do not create new
-alerts. If a required source cannot be checked, PandaX records monitoring as
+alerts. If a required source cannot be checked, Actis records monitoring as
 incomplete and does not treat missing results as resolved vulnerabilities.
 
 ### Approved runtime evidence
@@ -293,9 +293,9 @@ whether a component is actually loaded, used, enabled, or exposed on a real
 device. PandaX can now attach a small approved telemetry summary to a scan:
 
 ```powershell
-uv run pandax telemetry validate .\runtime-telemetry.json
-uv run pandax scan .\product.zip --telemetry .\runtime-telemetry.json
-uv run pandax monitor add "Product release" .\product.zip --telemetry .\runtime-telemetry.json
+uv run actis telemetry validate .\runtime-telemetry.json
+uv run actis scan .\product.zip --telemetry .\runtime-telemetry.json
+uv run actis monitor add "Product release" .\product.zip --telemetry .\runtime-telemetry.json
 ```
 
 Start with [the example telemetry file](docs/runtime-telemetry-example.json).
@@ -320,12 +320,12 @@ backported a security fix without changing the upstream version. An authorized
 security curator can install reviewed, exact-package vendor decisions:
 
 ```powershell
-uv run pandax advisory validate .\vendor-intelligence.json
-uv run pandax advisory install .\vendor-intelligence.json
-uv run pandax advisory status
+uv run actis advisory validate .\vendor-intelligence.json
+uv run actis advisory install .\vendor-intelligence.json
+uv run actis advisory status
 ```
 
-PandaX matches these decisions only to an exact, versioned Package URL. It keeps
+Actis matches these decisions only to an exact, versioned Package URL. It keeps
 the official source, complete vendor revision, patch reference, review record,
 and any conflicting generic-feed result in the signed bundle. See
 [vendor advisories and backports](docs/vendor-intelligence.md) and the
@@ -333,12 +333,12 @@ and any conflicting generic-feed result in the signed bundle. See
 
 ### Product exposure analysis
 
-PandaX can combine reviewed build flags, feature configuration, network
+Actis can combine reviewed build flags, feature configuration, network
 exposure, SBOM dependency paths, and approved runtime observations:
 
 ```powershell
-uv run pandax exposure validate .\exposure-context.json
-uv run pandax scan .\product.zip --exposure-context .\exposure-context.json
+uv run actis exposure validate .\exposure-context.json
+uv run actis scan .\product.zip --exposure-context .\exposure-context.json
 ```
 
 The result explains whether the supplied evidence supports reachability,
@@ -355,10 +355,10 @@ reviewed, explains source priority, and identifies what remains unknown.
 
 Evidence recipients can instead install the independent offline verifier from
 [`apps/verifier`](apps/verifier/README.md). It accepts a folder or ZIP and does
-not import the PandaX product:
+not import the Actis product:
 
 ```powershell
-pandax-verify evidence.zip --trusted-key trusted-pandax-key.pem
+actis-verify evidence.zip --trusted-key trusted-actis-key.pem
 ```
 
 > External-key verification establishes that the bundle came from the

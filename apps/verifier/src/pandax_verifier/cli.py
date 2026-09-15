@@ -12,8 +12,8 @@ from .verification import TrustedKeyConfigurationError, verify_bundle
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="pandax-verify",
-        description="Check a PandaX evidence folder or ZIP without connecting to PandaX.",
+        prog="actis-verify",
+        description="Check an Actis evidence folder or ZIP without connecting to Actis.",
     )
     parser.add_argument("bundle", type=Path, help="Evidence folder or ZIP file")
     trust = parser.add_mutually_exclusive_group()
@@ -63,7 +63,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(
                 json.dumps(
                     {
-                        "schema": "pandax/verification-result/v1",
+                        "schema": "actis/verifier-error/v1",
                         "error": "trusted_key_configuration",
                         "reason": str(exc),
                     },

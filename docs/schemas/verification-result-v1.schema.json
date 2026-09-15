@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pandax.online/schemas/evidence/verification-result-v1.schema.json",
+  "title": "Actis evidence verification result v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "status",
+    "ok",
+    "integrity_ok",
+    "signature_valid",
+    "signer_trust",
+    "reason",
+    "bundle_key_fingerprint",
+    "trusted_key_fingerprint",
+    "checks"
+  ],
+  "properties": {
+    "schema": { "const": "actis/verification-result/v1" },
+    "status": {
+      "enum": ["trusted", "untrusted", "invalid", "incomplete"]
+    },
+    "ok": { "type": "boolean" },
+    "integrity_ok": { "type": "boolean" },
+    "signature_valid": { "type": "boolean" },
+    "signer_trust": {
+      "enum": ["trusted", "untrusted", "not_configured"]
+    },
+    "reason": { "type": "string" },
+    "bundle_key_fingerprint": {
+      "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+    },
+    "trusted_key_fingerprint": {
+      "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }]
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "ok", "category", "detail"],
+        "properties": {
+          "name": { "type": "string" },
+          "ok": { "type": "boolean" },
+          "category": {
+            "enum": ["integrity", "bundle_signature", "signer_trust"]
+          },
+          "detail": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

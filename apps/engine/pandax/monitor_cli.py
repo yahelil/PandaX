@@ -79,7 +79,7 @@ def alerts(policy_id: Optional[str] = typer.Option(None, "--policy")) -> None:
 def watch(poll_seconds: int = typer.Option(60, "--poll-seconds", min=5)) -> None:
     """Keep running and launch checks when their saved schedule becomes due."""
     store = _store()
-    typer.echo("PandaX monitoring started. Press Ctrl+C to stop.")
+    typer.echo("Actis monitoring started. Press Ctrl+C to stop.")
     try:
         while True:
             results = store.run_due()
@@ -87,4 +87,4 @@ def watch(poll_seconds: int = typer.Option(60, "--poll-seconds", min=5)) -> None
                 typer.echo(json.dumps(result, ensure_ascii=False))
             time.sleep(poll_seconds)
     except KeyboardInterrupt:
-        typer.echo("PandaX monitoring stopped.")
+        typer.echo("Actis monitoring stopped.")

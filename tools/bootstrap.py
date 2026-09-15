@@ -138,13 +138,13 @@ def build_artifact() -> Path:
 
 
 def main() -> int:
-    print("\nPandaX bootstrap - pinned, digest-verified external dependencies")
+    print("\nActis by PandaX bootstrap - pinned, digest-verified dependencies")
     print("=" * 72)
     install_syft()
     install_log4j()
     build_artifact()
     print("=" * 72)
-    print("\nReady.  Next:  uv run pandax scan fixtures/smarthub-sh100-v2.3.1.zip\n")
+    print("\nReady.  Next:  uv run actis scan fixtures/smarthub-sh100-v2.3.1.zip\n")
     return 0
 
 

@@ -59,6 +59,7 @@ output/
 # Trust anchors are public, but remain installation-specific and must be
 # distributed through the authenticated onboarding/configuration channel.
 *.pem
+!fixtures/evidence-v1/**/*.pem
 *.key
 *.p12
 *.pfx

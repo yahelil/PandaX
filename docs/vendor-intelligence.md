@@ -11,9 +11,9 @@ deployment's authorized security curator prepares the catalogue from official
 vendor notices, validates it, and installs it:
 
 ```powershell
-pandax advisory validate .\vendor-intelligence.json
-pandax advisory install .\vendor-intelligence.json
-pandax advisory status
+actis advisory validate .\vendor-intelligence.json
+actis advisory install .\vendor-intelligence.json
+actis advisory status
 ```
 
 Start with [the example catalogue](vendor-intelligence-example.json), but do not

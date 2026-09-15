@@ -17,11 +17,11 @@ The company reviewer prepares the small exposure-context JSON file and validates
 it before scanning:
 
 ```powershell
-pandax exposure validate .\exposure-context.json
-pandax scan .\product.zip --exposure-context .\exposure-context.json
+actis exposure validate .\exposure-context.json
+actis scan .\product.zip --exposure-context .\exposure-context.json
 ```
 
-For scheduled monitoring, add `--exposure-context` to `pandax monitor add`.
+For scheduled monitoring, add `--exposure-context` to `actis monitor add`.
 SBOM uploads can include the context as the `exposure_context` form field.
 
 Start with [the example context](exposure-context-example.json).

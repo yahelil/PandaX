@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from click import unstyle
 from typer.testing import CliRunner
 
 from pandax import cli, pipeline
@@ -72,7 +73,17 @@ def test_scan_sbom_command_forwards_options(monkeypatch, tmp_path: Path):
 def test_version_is_available_without_running_pipeline():
     result = runner.invoke(cli.app, ["--version"])
     assert result.exit_code == 0
-    assert result.stdout.strip() == "0.1.0"
+    assert result.stdout.strip() == "Actis by PandaX 0.1.0"
+
+
+def test_help_uses_public_brand_and_command_name():
+    result = runner.invoke(cli.app, ["--help"], prog_name="actis")
+    help_text = unstyle(result.stdout)
+    assert result.exit_code == 0
+    assert "Actis by PandaX" in help_text
+    assert "Usage: actis" in help_text
+    assert "Usage: pandax" not in help_text
+    assert "Run PandaX" not in help_text
 
 
 def test_scan_sbom_missing_file_exits_with_pipeline_error(tmp_path: Path):

@@ -6,17 +6,25 @@ import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
 from sqlalchemy import (
-    JSON, Boolean, CheckConstraint, Column, DateTime, Engine, ForeignKey, Integer,
-    String, Table, UniqueConstraint, func, insert, select, update,
+    JSON, Boolean, CheckConstraint, Column, DateTime, Engine, ForeignKey, Index, Integer,
+    String, Table, Text, UniqueConstraint, func, insert, select, update,
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .auth import Role
+from .evidence import canonical, public_key_fingerprint, verify_bundle
 from .portfolio import organizations, portfolio_metadata
 
 
@@ -133,6 +141,35 @@ settings_audit_events = Table(
     CheckConstraint("version >= 1", name="version_positive"),
 )
 
+trust_keys = Table(
+    "organization_trust_keys", portfolio_metadata,
+    _col("id", 36, primary_key=True),
+    _col("organization_id", 36, ForeignKey(organizations.c.id, ondelete="CASCADE"), nullable=False),
+    _col("key_name", 80, nullable=False),
+    _col("key_version", Integer, nullable=False),
+    _col("algorithm", 24, nullable=False),
+    _col("public_key_pem", Text, nullable=False),
+    _col("fingerprint", 64, nullable=False),
+    _col("status", 16, nullable=False),
+    _col("proof_verified_at", DateTime(timezone=True), nullable=False),
+    _col("activated_at", DateTime(timezone=True), nullable=False),
+    _col("valid_until", DateTime(timezone=True), nullable=True),
+    _col("revoked_at", DateTime(timezone=True), nullable=True),
+    _col("revocation_reason", 500, nullable=True),
+    _col("created_by", 128, nullable=False),
+    UniqueConstraint("organization_id", "key_name", "key_version", name="uq_trust_keys_name_version"),
+    UniqueConstraint("organization_id", "fingerprint", name="uq_trust_keys_fingerprint"),
+    CheckConstraint("key_version >= 1", name="key_version_positive"),
+    CheckConstraint("algorithm = 'Ed25519'", name="algorithm"),
+    CheckConstraint("status IN ('active','rotated','revoked')", name="status"),
+)
+Index(
+    "ix_trust_keys_org_name_status",
+    trust_keys.c.organization_id,
+    trust_keys.c.key_name,
+    trust_keys.c.status,
+)
+
 analytics_events = Table(
     "privacy_safe_analytics_events", portfolio_metadata,
     _col("id", 36, primary_key=True),
@@ -159,6 +196,8 @@ PROFILE_FIELDS = frozenset({"name", "legal_name", "country", "registration_numbe
 ROLE_VALUES = frozenset(role.value for role in Role)
 INTEGRATION_TYPES = frozenset({"email", "webhook", "collector", "jira"})
 INTEGRATION_STATUSES = frozenset({"connected", "attention", "not_connected"})
+TRUST_KEY_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
+TRUST_POLICY = "organization_enrolled_ed25519_v1"
 INTEGRATION_CONFIG = {
     "email": frozenset({"provider", "from_address"}),
     "webhook": frozenset({"endpoint_name", "event_types"}),
@@ -237,6 +276,24 @@ class AuditRecord:
     changes: Mapping[str, Any]
     previous_digest: str | None
     digest: str
+
+
+@dataclass(frozen=True, slots=True)
+class TrustKeyRecord:
+    id: str
+    organization_id: str
+    key_name: str
+    key_version: int
+    algorithm: str
+    public_key_pem: str
+    fingerprint: str
+    status: str
+    proof_verified_at: datetime
+    activated_at: datetime
+    valid_until: datetime | None
+    revoked_at: datetime | None
+    revocation_reason: str | None
+    created_by: str
 
 
 class OrganizationSettingsRepository:
@@ -421,6 +478,237 @@ class OrganizationSettingsRepository:
         if "secret_reference" in safe:
             safe["secret_reference"] = "configured" if safe["secret_reference"] else None
         return self._versioned_update(integrations, organization_id, integration_id, expected_version, values, actor_id, "integration", safe)
+
+    def enroll_trust_key(
+        self,
+        organization_id: str,
+        *,
+        key_name: str,
+        public_key_pem: str,
+        proof_signature: str,
+        actor_id: str,
+        now: datetime | None = None,
+    ) -> TrustKeyRecord:
+        name = _trust_key_name(key_name)
+        key, canonical_pem = _public_key(public_key_pem)
+        fingerprint = public_key_fingerprint(key)
+        try:
+            signature = bytes.fromhex(proof_signature)
+            if len(signature) != 64:
+                raise ValueError
+            key.verify(
+                signature,
+                trust_key_enrollment_payload(organization_id, name, fingerprint),
+            )
+        except (InvalidSignature, TypeError, ValueError) as exc:
+            raise SettingsValidationError("trust key proof of possession is invalid") from exc
+
+        activated_at = _timestamp(now, "now") if now else _now()
+        actor = _required(actor_id, "actor_id", 128)
+        key_id = _id()
+        with Session(self.engine) as session, session.begin():
+            self._profile(session, organization_id)
+            existing = session.execute(
+                select(trust_keys).where(
+                    trust_keys.c.organization_id == organization_id,
+                    trust_keys.c.key_name == name,
+                    trust_keys.c.status == "active",
+                ).with_for_update()
+            ).one_or_none()
+            duplicate = session.execute(
+                select(trust_keys.c.id).where(
+                    trust_keys.c.organization_id == organization_id,
+                    trust_keys.c.fingerprint == fingerprint,
+                )
+            ).scalar_one_or_none()
+            if duplicate is not None:
+                raise SettingsConflict("trust key is already enrolled")
+            key_version = existing.key_version + 1 if existing else 1
+            if existing:
+                session.execute(
+                    update(trust_keys)
+                    .where(trust_keys.c.id == existing.id)
+                    .values(status="rotated", valid_until=activated_at)
+                )
+            values = {
+                "id": key_id,
+                "organization_id": organization_id,
+                "key_name": name,
+                "key_version": key_version,
+                "algorithm": "Ed25519",
+                "public_key_pem": canonical_pem,
+                "fingerprint": fingerprint,
+                "status": "active",
+                "proof_verified_at": activated_at,
+                "activated_at": activated_at,
+                "valid_until": None,
+                "revoked_at": None,
+                "revocation_reason": None,
+                "created_by": actor,
+            }
+            try:
+                session.execute(insert(trust_keys).values(**values))
+            except IntegrityError as exc:
+                raise SettingsConflict("trust key enrollment conflict") from exc
+            self._audit(
+                session,
+                organization_id,
+                "trust_key",
+                key_id,
+                "trust_key.rotated" if existing else "trust_key.enrolled",
+                key_version,
+                actor,
+                {
+                    "key_name": name,
+                    "key_version": key_version,
+                    "algorithm": "Ed25519",
+                    "fingerprint": fingerprint,
+                    "replaces_fingerprint": existing.fingerprint if existing else None,
+                },
+            )
+        return self.get_trust_key(organization_id, key_id)
+
+    def get_trust_key(self, organization_id: str, key_id: str) -> TrustKeyRecord:
+        with Session(self.engine) as session:
+            row = session.execute(
+                select(trust_keys).where(
+                    trust_keys.c.organization_id == organization_id,
+                    trust_keys.c.id == key_id,
+                )
+            ).one_or_none()
+        if row is None:
+            raise SettingsNotFound("trust key not found")
+        return _trust_key_record(row)
+
+    def list_trust_keys(self, organization_id: str) -> list[TrustKeyRecord]:
+        with Session(self.engine) as session:
+            self._profile(session, organization_id)
+            rows = session.execute(
+                select(trust_keys)
+                .where(trust_keys.c.organization_id == organization_id)
+                .order_by(trust_keys.c.key_name, trust_keys.c.key_version.desc())
+            ).all()
+        return [_trust_key_record(row) for row in rows]
+
+    def revoke_trust_key(
+        self,
+        organization_id: str,
+        key_id: str,
+        *,
+        reason: str,
+        actor_id: str,
+        now: datetime | None = None,
+    ) -> TrustKeyRecord:
+        revoked_at = _timestamp(now, "now") if now else _now()
+        clean_reason = _required(reason, "reason", 500)
+        with Session(self.engine) as session, session.begin():
+            row = session.execute(
+                select(trust_keys).where(
+                    trust_keys.c.organization_id == organization_id,
+                    trust_keys.c.id == key_id,
+                ).with_for_update()
+            ).one_or_none()
+            if row is None:
+                raise SettingsNotFound("trust key not found")
+            if row.status == "revoked":
+                return _trust_key_record(row)
+            session.execute(
+                update(trust_keys)
+                .where(trust_keys.c.id == key_id)
+                .values(
+                    status="revoked",
+                    valid_until=row.valid_until or revoked_at,
+                    revoked_at=revoked_at,
+                    revocation_reason=clean_reason,
+                )
+            )
+            self._audit(
+                session,
+                organization_id,
+                "trust_key",
+                key_id,
+                "trust_key.revoked",
+                row.key_version,
+                actor_id,
+                {
+                    "fingerprint": row.fingerprint,
+                    "reason": clean_reason,
+                    "revoked_at": revoked_at,
+                },
+            )
+        return self.get_trust_key(organization_id, key_id)
+
+    def verify_registered_bundle(
+        self,
+        organization_id: str,
+        bundle_dir: Path,
+        *,
+        actor_id: str,
+        now: datetime | None = None,
+    ) -> Mapping[str, Any]:
+        verified_at = _timestamp(now, "now") if now else _now()
+        inspection = verify_bundle(bundle_dir)
+        key = None
+        fingerprint = inspection.bundle_key_fingerprint
+        signed_at = _manifest_created(bundle_dir)
+        with Session(self.engine) as session:
+            self._profile(session, organization_id)
+            row = session.execute(
+                select(trust_keys).where(
+                    trust_keys.c.organization_id == organization_id,
+                    trust_keys.c.fingerprint == fingerprint,
+                )
+            ).one_or_none() if fingerprint else None
+
+        decision = "not_enrolled"
+        if row is not None:
+            if row.status == "revoked":
+                decision = "revoked"
+            elif row.status == "rotated" and (
+                signed_at is None or row.valid_until is None or signed_at > _aware(row.valid_until)
+            ):
+                decision = "expired"
+            else:
+                decision = "trusted"
+                key, _ = _public_key(row.public_key_pem)
+        result = verify_bundle(bundle_dir, key) if key else inspection
+        payload = result.as_dict()
+        if decision != "trusted" and result.integrity_ok and result.signature_valid:
+            payload.update(
+                status="untrusted",
+                ok=False,
+                signer_trust=decision,
+                reason=f"bundle signer is {decision.replace('_', ' ')} under organization policy",
+            )
+        payload.update({
+            "trust_policy": TRUST_POLICY,
+            "trust_source": "organization_registry",
+            "trust_decision": decision,
+            "algorithm": "Ed25519",
+            "key_id": row.key_name if row else None,
+            "key_version": row.key_version if row else None,
+            "key_status": row.status if row else None,
+            "verified_at": verified_at.isoformat(),
+        })
+        with Session(self.engine) as session, session.begin():
+            self._audit(
+                session,
+                organization_id,
+                "trust_verification",
+                str(_manifest_run_id(bundle_dir) or fingerprint or "unknown"),
+                "trust_key.verified",
+                row.key_version if row else 1,
+                actor_id,
+                {
+                    "status": payload["status"],
+                    "trust_decision": decision,
+                    "fingerprint": fingerprint,
+                    "key_id": row.key_name if row else None,
+                    "key_version": row.key_version if row else None,
+                    "verified_at": verified_at,
+                },
+            )
+        return payload
 
     def ingest_analytics(self, organization_id: str, events: Sequence[Mapping[str, Any]]) -> Mapping[str, int]:
         if not isinstance(events, Sequence) or isinstance(events, (str, bytes)) or not 1 <= len(events) <= 100:
@@ -655,6 +943,25 @@ def _integration_record(row: Any) -> IntegrationRecord:
     return IntegrationRecord(row.id, row.organization_id, row.name, row.type, row.status, row.description, dict(row.configuration), row.secret_reference, _aware(row.last_sync_at) if row.last_sync_at else None, row.version, _aware(row.created_at), _aware(row.updated_at))
 
 
+def _trust_key_record(row: Any) -> TrustKeyRecord:
+    return TrustKeyRecord(
+        row.id,
+        row.organization_id,
+        row.key_name,
+        row.key_version,
+        row.algorithm,
+        row.public_key_pem,
+        row.fingerprint,
+        row.status,
+        _aware(row.proof_verified_at),
+        _aware(row.activated_at),
+        _aware(row.valid_until) if row.valid_until else None,
+        _aware(row.revoked_at) if row.revoked_at else None,
+        row.revocation_reason,
+        row.created_by,
+    )
+
+
 def _audit_record(row: Any) -> AuditRecord:
     return AuditRecord(
         row.id, row.organization_id, row.entity_type, row.entity_id, row.action,
@@ -718,6 +1025,85 @@ def _required(value: str, field: str, maximum: int) -> str:
     if len(result) > maximum:
         raise SettingsValidationError(f"{field} is too long")
     return result
+
+
+def _trust_key_name(value: str) -> str:
+    result = _required(value, "key_name", 80)
+    if not TRUST_KEY_NAME_RE.fullmatch(result):
+        raise SettingsValidationError("key_name must use letters, numbers, dot, underscore, or hyphen")
+    return result
+
+
+def _public_key(value: str) -> tuple[Ed25519PublicKey, str]:
+    if not isinstance(value, str) or "PRIVATE KEY" in value:
+        raise SettingsValidationError("public_key_pem must contain only an Ed25519 public key")
+    try:
+        key = serialization.load_pem_public_key(value.encode("ascii"))
+    except (UnicodeEncodeError, TypeError, ValueError) as exc:
+        raise SettingsValidationError("public_key_pem is not a valid PEM public key") from exc
+    if not isinstance(key, Ed25519PublicKey):
+        raise SettingsValidationError("public_key_pem must be an Ed25519 public key")
+    pem = key.public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("ascii")
+    return key, pem
+
+
+def trust_key_enrollment_payload(
+    organization_id: str, key_name: str, fingerprint: str
+) -> bytes:
+    return canonical({
+        "schema": "actis/trust-key-enrollment/v1",
+        "organization_id": _required(organization_id, "organization_id", 36),
+        "key_name": _trust_key_name(key_name),
+        "algorithm": "Ed25519",
+        "fingerprint": fingerprint,
+    })
+
+
+def create_trust_key_enrollment(
+    key: Ed25519PrivateKey, organization_id: str, key_name: str
+) -> Mapping[str, str]:
+    public = key.public_key()
+    pem = public.public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("ascii")
+    fingerprint = public_key_fingerprint(public)
+    return {
+        "key_name": _trust_key_name(key_name),
+        "public_key_pem": pem,
+        "proof_signature": key.sign(
+            trust_key_enrollment_payload(organization_id, key_name, fingerprint)
+        ).hex(),
+    }
+
+
+def _manifest(bundle_dir: Path) -> Mapping[str, Any] | None:
+    try:
+        value = json.loads((bundle_dir / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, Mapping) else None
+
+
+def _manifest_created(bundle_dir: Path) -> datetime | None:
+    manifest = _manifest(bundle_dir)
+    value = manifest.get("created") if manifest else None
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.astimezone(timezone.utc) if parsed.tzinfo else None
+
+
+def _manifest_run_id(bundle_dir: Path) -> str | None:
+    manifest = _manifest(bundle_dir)
+    value = manifest.get("run_id") if manifest else None
+    return value if isinstance(value, str) and value else None
 
 
 def _choice(value: str, choices: set[str] | frozenset[str], field: str) -> str:

@@ -22,20 +22,20 @@ Before every validation, the engine also checks the installed CLI jar against
 SHA-256 `889075253fb9df4db5482efb8f8208fb3b4f2e00f5f7e1b1e31edf6fb4b69bb6`;
 the verified digest is recorded in the validation JSON.
 Installation follows veraPDF's [automated installation procedure](https://docs.verapdf.org/install/)
-and writes to `.tools/verapdf`. An existing directory is never overwritten;
+and writes to `workspace/tools/verapdf`. An existing directory is never overwritten;
 move it aside explicitly if a reinstall is needed.
 
 The runner accepts `PANDAX_VERAPDF` pointing to a standard `verapdf`/
 `verapdf.bat` launcher or the installed `bin/cli-1.30.2.jar`. Otherwise it looks
-on PATH, then in `.tools/verapdf`. An explicit selection or PATH installation
+on PATH, then in `workspace/tools/verapdf`. An explicit selection or PATH installation
 with the wrong version fails; it does not silently fall back. Example:
 
 ```powershell
-$env:PANDAX_VERAPDF = "$PWD/.tools/verapdf/verapdf.bat"
+$env:PANDAX_VERAPDF = "$PWD/workspace/tools/verapdf/verapdf.bat"
 ```
 
 For the separately owned preflight command, use its `--verapdf` option with the
-launcher, or add `.tools/verapdf` to PATH. No preflight files are changed here.
+launcher, or add `workspace/tools/verapdf` to PATH. No preflight files are changed here.
 The engine executes the launcher's adjacent pinned CLI jar directly through Java,
 using argument arrays and no shell. Paths containing spaces or shell characters
 stay literal, and a timeout terminates Java itself. Custom wrapper scripts are

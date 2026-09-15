@@ -118,7 +118,7 @@ def _latest_run() -> Path:
     )
     if not runs:
         raise typer.BadParameter(
-            "no runs found in out/. Run `actis scan <artifact>` first."
+            "no runs found in workspace/runs/. Run `actis scan <artifact>` first."
         )
     return runs[-1]
 

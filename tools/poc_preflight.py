@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TOOLS_DIR = ROOT / ".tools"
+TOOLS_DIR = ROOT / "workspace" / "tools"
 
 # A probe that has not answered in ten seconds is a failed check, not a wait.
 PROBE_TIMEOUT = 10
@@ -125,7 +125,7 @@ def find_syft() -> Path | None:
 def check_syft() -> Check:
     binary = find_syft()
     if binary is None:
-        return Check("Syft", False, "not found in .tools/ or on PATH",
+        return Check("Syft", False, "not found in workspace/tools/ or on PATH",
                      BOOTSTRAP_FIX)
     result = probe([str(binary), "--version"])
     if not result.ok:

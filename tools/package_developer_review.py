@@ -1,7 +1,7 @@
 """Export portable QA evidence, excluding vendor input/extracted trees and secrets.
 
 Uses saved results only; does not run PandaX or alter its independent baseline.
-Run after the two PDF builders. Requires the original local out/ run directories.
+Run after the two PDF builders. Requires the original local run directories.
 """
 import csv
 import hashlib
@@ -11,17 +11,36 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import zipfile
 
 ROOT=Path(__file__).resolve().parents[1]
-R=json.loads((ROOT/'output/validation/pandax-reference-comparison.json').read_text())
+GENERATED=ROOT/'workspace/generated'
+PUBLISHED=ROOT/'docs/published'
+RUNS=ROOT/'workspace/runs'
+REPORT=GENERATED/'validation/pandax-reference-comparison.json'
+if not REPORT.exists(): REPORT=PUBLISHED/'validation/pandax-reference-comparison.json'
+R=json.loads(REPORT.read_text())
+USE_PUBLISHED=REPORT.is_relative_to(PUBLISHED)
 B=json.loads((ROOT/'docs/expected-results-baseline.json').read_text())
 S={s['id']:s for s in B['sources']}
 NAME='PandaX_Developer_Review_2026-09-07'
-DEST=ROOT/'output/share';DEST.mkdir(exist_ok=True)
+DEST=GENERATED/'share';DEST.mkdir(parents=True,exist_ok=True)
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
+
+def source_file(relative):
+ local=GENERATED/relative
+ return local if local.exists() and not USE_PUBLISHED else PUBLISHED/relative
+
+def saved_evidence_dir():
+ path=Path(R['evidence_directory'].replace('\\','/'))
+ if path.parts and path.parts[0]=='out':
+  path=Path('workspace/runs',*path.parts[1:])
+ target=(ROOT/path).resolve()
+ if not target.is_relative_to(ROOT.resolve()):raise ValueError('Evidence path is outside repository')
+ return target
 
 VERIFY='''"""Verify exported file hashes. Optional --signatures requires cryptography.
 This is a partial output export; omitted input/extracted trees are not verified.
@@ -63,25 +82,30 @@ def page(title,content):
 def main():
  with tempfile.TemporaryDirectory(prefix='pandax-developer-package-') as tmp:
   base=Path(tmp)/NAME;base.mkdir()
-  for fn in ['PandaX_Independent_Expected_Results.pdf','PandaX_Developer_Validation_Report.pdf']:copy(ROOT/'output/pdf'/fn,base/'pdf'/fn)
+  for fn in ['PandaX_Independent_Expected_Results.pdf','PandaX_Developer_Validation_Report.pdf']:
+   src=source_file(Path('pdf')/fn)
+   if fn=='PandaX_Independent_Expected_Results.pdf' and sha(src)!=R['reference_pdf_sha256']:
+    src=PUBLISHED/'pdf'/fn
+   copy(src,base/'pdf'/fn)
   copy(ROOT/'docs/expected-results-baseline.json',base/'reference/expected-results-baseline.json')
-  copy(ROOT/R['evidence_directory']/'frozen-reference.json',base/'reference/frozen-reference.json')
+  copy(saved_evidence_dir()/'frozen-reference.json',base/'reference/frozen-reference.json')
   assert sha(base/'reference/expected-results-baseline.json')==R['reference_sha256']
   assert sha(base/'pdf/PandaX_Independent_Expected_Results.pdf')==R['reference_pdf_sha256']
-  for fn in ['pandax-reference-comparison.csv','pandax-reference-comparison.json','PandaX_Root_Cause_Report.md']:copy(ROOT/'output/validation'/fn,base/'reports'/fn)
-  report=(ROOT/'output/validation/PandaX_Comparison_Report.md').read_text()
-  report=report.replace('../../docs/expected-results-baseline.json','../reference/expected-results-baseline.json')
+  for fn in ['pandax-reference-comparison.csv','pandax-reference-comparison.json','PandaX_Root_Cause_Report.md']:
+   copy(source_file(Path('validation')/fn),base/'reports'/fn)
+  report=source_file(Path('validation/PandaX_Comparison_Report.md')).read_text()
+  report=report.replace('../../docs/expected-results-baseline.json','../reference/expected-results-baseline.json').replace('../../../docs/expected-results-baseline.json','../reference/expected-results-baseline.json')
   for c in R['comparisons']:
    report=report.replace('http://127.0.0.1:8000/api/run/'+c['run_id']+'/summary','../evidence/api/comparison-'+c['id']+'/summary.json')
   report += '\n\n## Portable developer export\n\nThis ZIP now includes saved API responses and original output artifacts under `evidence/`; see START_HERE.md for export limits and verification. The earlier local-storage paragraph describes the original repository report.\n'
   write(base/'reports/PandaX_Comparison_Report.md',report)
-  shutil.copytree(ROOT/'output/validation/root-cause-evidence',base/'reports/root-cause-evidence')
-  shutil.copytree(ROOT/R['evidence_directory'],base/'evidence/api')
+  shutil.copytree(source_file(Path('validation/root-cause-evidence')),base/'reports/root-cause-evidence')
+  shutil.copytree(saved_evidence_dir(),base/'evidence/api')
   run_ids={c['run_id'] for c in R['cases']+R['comparisons']}
   for c in R['comparisons']:run_ids.update(x['run_id'] for x in c['comparison']['runs'])
   exports=[]
   for rid in sorted(run_ids):
-   src=ROOT/'out'/rid;manifest=json.loads((src/'manifest.json').read_text())
+   src=RUNS/rid;manifest=json.loads((src/'manifest.json').read_text())
    included=[]
    for f in sorted(src.rglob('*')):
     rel=f.relative_to(src)
@@ -98,7 +122,7 @@ def main():
     result='HIT' if x['verdict']=='MATCH' and x['expected']=='find' else 'CORRECT ABSENCE' if x['verdict']=='MATCH' else 'MISS' if x['verdict']=='MISSING_FINDING' else x['verdict']
     checks.append(dict(input=cid,component=x['component'],cve=x['cve'],name=x['name'],expected=x['expected'],observed=x['observed'],result=result,fix=x['fix'],applicability=x['reason'],source_url=S[x['source']]['url'],run_id=c['run_id']))
    all_checks+=checks
-   findings=json.loads((ROOT/'out'/c['run_id']/'findings.json').read_text())
+   findings=json.loads((RUNS/c['run_id']/'findings.json').read_text())
    assert len(findings)==c['stats']['findings']
    matched={(r['cve'],r['purl']) for x in c['checks'] for r in x['matched_rows']}
    fr=[dict(input=cid,baseline_grade='NAMED HIT' if (f['cve'],f['purl']) in matched else 'UNGRADED EXTRA',**f) for f in findings]
@@ -176,7 +200,7 @@ Automatic Annex VII / Declaration PDFs inside bundles are unreviewed PoC outputs
   write(base/'PACKAGE_METADATA.json',json.dumps({'tested_engine_commit':R['engine_commit'],'started_utc':R['started_utc'],'finished_utc':R['finished_utc'],'reference_sha256':R['reference_sha256'],'independent_pdf_sha256':R['reference_pdf_sha256'],'inputs':14,'checks':76,'hits':35,'misses':7,'correct_absences':34,'reported_finding_rows':407,'output_bundles':len(run_ids),'vendor_input_trees_included':False},indent=2)+'\n')
   hashes={str(f.relative_to(base)):sha(f) for f in sorted(base.rglob('*')) if f.is_file()}
   write(base/'SHA256SUMS.json',json.dumps(hashes,indent=2)+'\n')
-  subprocess.run([str(ROOT/'.venv/bin/python'),str(base/'verify_package.py'),'--signatures'],check=True)
+  subprocess.run([sys.executable,str(base/'verify_package.py'),'--signatures'],check=True)
   dest=DEST/(NAME+'.zip')
   with zipfile.ZipFile(dest,'w',zipfile.ZIP_DEFLATED,compresslevel=9) as z:
    for f in sorted(base.rglob('*')):

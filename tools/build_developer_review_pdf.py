@@ -9,7 +9,9 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.pagesizes import A4
 
 ROOT=Path(__file__).resolve().parents[1]
-R=json.loads((ROOT/'output/validation/pandax-reference-comparison.json').read_text())
+REPORT=ROOT/'workspace/generated/validation/pandax-reference-comparison.json'
+if not REPORT.exists(): REPORT=ROOT/'docs/published/validation/pandax-reference-comparison.json'
+R=json.loads(REPORT.read_text())
 B=json.loads((ROOT/'docs/expected-results-baseline.json').read_text())
 S={s['id']:s for s in B['sources']}
 NAVY=colors.HexColor('#17324D'); TEAL=colors.HexColor('#087F72'); RED=colors.HexColor('#B52B3C')
@@ -51,6 +53,7 @@ for case in R['cases']:
  for sid in dict.fromkeys(ch['source'] for ch in case['checks']):
   src=S[sid];links.append('<link href="'+escape(src['url'],{'"':'&quot;'})+'" color="#087F72">'+escape(sid)+'</link>')
  story.append(Paragraph('Public sources (click IDs; full titles in the independent PDF): '+', '.join(links),styles['Small2']))
-output=ROOT/'output/pdf/PandaX_Developer_Validation_Report.pdf'
+output=ROOT/'workspace/generated/pdf/PandaX_Developer_Validation_Report.pdf'
+output.parent.mkdir(parents=True,exist_ok=True)
 SimpleDocTemplate(str(output),pagesize=A4,leftMargin=42,rightMargin=42,topMargin=42,bottomMargin=52,title='PandaX Developer Validation Report',author='PandaX validation review').build(story,onFirstPage=footer,onLaterPages=footer)
 print(output)

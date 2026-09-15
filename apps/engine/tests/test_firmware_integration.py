@@ -24,7 +24,7 @@ OPENWRT, UBIFS = MANIFEST["openwrt"], MANIFEST["ubifs"]
 
 def download_fixture(fixture: dict) -> Path:
     url, digest = fixture["url"], fixture["sha256"]
-    cache = Path(os.environ.get("PANDAX_FIRMWARE_CACHE", ROOT / ".cache/firmware"))
+    cache = Path(os.environ.get("PANDAX_FIRMWARE_CACHE", ROOT / "workspace/cache/firmware"))
     cache.mkdir(parents=True, exist_ok=True)
     target = cache / url.rsplit("/", 1)[-1]
     if target.exists() and firmware.sha256_file(target) == digest:

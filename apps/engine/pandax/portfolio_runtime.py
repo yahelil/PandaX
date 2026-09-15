@@ -16,6 +16,7 @@ from sqlalchemy.engine import Engine, make_url
 
 from .analysis_jobs import AnalysisJobRecord, AnalysisJobRepository
 from .analysis_storage import LocalAnalysisInputStorage, SupabaseAnalysisInputStorage
+from .context import WORKSPACE_DIR
 from .auth import OIDCAuthenticator, OIDCSettings, Principal, Role
 from .compliance import ComplianceRepository
 from .documents import DocumentRepository
@@ -97,7 +98,7 @@ def database_settings() -> DatabaseSettings:
             hard_stop_bytes=hard_stop,
         )
 
-    data_dir = Path(os.environ.get("PANDAX_DATA_DIR", Path.cwd() / "output" / ".pandax"))
+    data_dir = Path(os.environ.get("PANDAX_DATA_DIR", WORKSPACE_DIR / "data"))
     data_dir.mkdir(parents=True, exist_ok=True)
     return DatabaseSettings(
         environment=environment,

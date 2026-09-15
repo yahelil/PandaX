@@ -13,9 +13,10 @@ from .evidence import Ledger
 
 # Repo root, derived from this file: apps/engine/pandax/context.py -> ../../..
 ROOT = Path(__file__).resolve().parents[3]
-TOOLS_DIR = ROOT / ".tools"
-OUT_DIR = ROOT / "out"
-CACHE_DIR = ROOT / ".cache"
+WORKSPACE_DIR = ROOT / "workspace"
+TOOLS_DIR = WORKSPACE_DIR / "tools"
+OUT_DIR = WORKSPACE_DIR / "runs"
+CACHE_DIR = WORKSPACE_DIR / "cache"
 KEY_PATH = Path.home() / ".pandax" / "dev_signing_key.pem"
 
 
@@ -131,5 +132,5 @@ def syft_binary() -> Path:
         if candidate.exists():
             return candidate
     raise FileNotFoundError(
-        "syft not found in .tools/. Run:  uv run python tools/bootstrap.py"
+        "syft not found in workspace/tools/. Run:  uv run python tools/bootstrap.py"
     )

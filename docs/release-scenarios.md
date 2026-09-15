@@ -12,12 +12,12 @@ Expand **Evidence / applicability** to see the vendor source and triage conditio
 
 ## Independent answer key and actual comparison
 
-- [Release-by-release PDF answer key](../output/pdf/PandaX_Independent_Expected_Results.pdf):
+- [Release-by-release PDF answer key](published/pdf/PandaX_Independent_Expected_Results.pdf):
   plain-language CVE names, expected findings and exclusions, and an observation column.
-- [Latest independent comparison report](../output/validation/PandaX_Comparison_Report.md):
+- [Latest independent comparison report](published/validation/PandaX_Comparison_Report.md):
   actual results, missed findings, triage limitations and links to individual run evidence.
-- [CSV comparison](../output/validation/pandax-reference-comparison.csv) and
-  [JSON evidence summary](../output/validation/pandax-reference-comparison.json).
+- [CSV comparison](published/validation/pandax-reference-comparison.csv) and
+  [JSON evidence summary](published/validation/pandax-reference-comparison.json).
 
 The public-source expectations live in `docs/expected-results-baseline.json`,
 separate from the scanner's matching rules and built-in scenario checks. The
@@ -29,6 +29,8 @@ the dashboard HTTP API for all 14 reference inputs and four comparison actions.
 Exit 1 means at least one independent check failed; raw errors remain in the
 report. The engine itself is not modified by the evaluator. The reference is
 a selected CVE test set, not a complete vulnerability census.
+Fresh reports are saved under `workspace/generated/validation/`; the links above
+point to the committed snapshot until selected files are published again.
 
 | Comparison / CLI id | Before → after | Input and expected result |
 | --- | --- | --- |
@@ -170,6 +172,6 @@ files before their SHA-256 pins were committed.
 
 ## Developer handoff package
 
-[Developer review ZIP](../output/share/PandaX_Developer_Review_2026-09-07.zip) contains an offline per-input index, the independent answer-key PDF, an observed-results PDF, all 76 reference checks, all 407 reported finding rows, the seven misses, raw API evidence, and output artifacts from 26 scan/comparison bundles. Vendor input/extracted trees are omitted; included output hashes and original manifest signatures were verified. See the ZIP's START_HERE.md for scope and reproduction instructions.
+[Developer review ZIP](published/share/PandaX_Developer_Review_2026-09-07.zip) contains an offline per-input index, the independent answer-key PDF, an observed-results PDF, all 76 reference checks, all 407 reported finding rows, the seven misses, raw API evidence, and output artifacts from 26 scan/comparison bundles. Vendor input/extracted trees are omitted; included output hashes and original manifest signatures were verified. See the ZIP's START_HERE.md for scope and reproduction instructions.
 
-[Root-cause investigation](../output/validation/PandaX_Root_Cause_Report.md) traces the misses to exact-identity OSV query coverage and missing native rules. Fresh diagnostic probes also expose conflicting OSV data for the vendor-fixed curl 8.4.0 control. This handoff does not modify scanner rules or the independent baseline.
+[Root-cause investigation](published/validation/PandaX_Root_Cause_Report.md) traces the misses to exact-identity OSV query coverage and missing native rules. Fresh diagnostic probes also expose conflicting OSV data for the vendor-fixed curl 8.4.0 control. This handoff does not modify scanner rules or the independent baseline.

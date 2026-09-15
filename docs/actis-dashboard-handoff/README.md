@@ -12,8 +12,8 @@ The original questions and answers were stored only in the Codex task conversati
 - Implementation branch: `actis-dashboard`.
 - Do not create a branch whose name contains `codex`.
 - Full product/UI plan: [`PLAN.md`](PLAN.md).
-- Authoritative backend contract: [`CRA-Compliance-API-Spec-Final.docx`](../../CRA-Compliance-API-Spec-Final.docx).
-- Historical draft only: [`CRA-Compliance-API-Spec.docx`](../../CRA-Compliance-API-Spec.docx).
+- Authoritative backend contract: [`CRA-Compliance-API-Spec-Final.docx`](../reference/CRA-Compliance-API-Spec-Final.docx).
+- Historical draft only: [`CRA-Compliance-API-Spec.docx`](../reference/CRA-Compliance-API-Spec.docx).
 - PNGs in [`assets/`](assets/) are visual references for density, spacing, tone, and existing branding. They are not the final information architecture.
 
 ## Source-of-truth order

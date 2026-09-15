@@ -35,7 +35,7 @@ python tools/poc_preflight.py --pdf       # also veraPDF
 
 | Flag | Adds | Needed for |
 |---|---|---|
-| *(none)* | Python >= 3.10, Actis installed, Syft in `.tools/` or on PATH | every run |
+| *(none)* | Python >= 3.10, Actis installed, Syft in `workspace/tools/` or on PATH | every run |
 | `--firmware` | Docker CLI on PATH, daemon reachable via `docker info` | firmware ingest (cards 03, 07, 19) |
 | `--pdf` | veraPDF on PATH, or `--verapdf PATH` | PDF/A validation (cards 10, 13) |
 
@@ -61,7 +61,7 @@ PandaX PoC preflight
 PASS  Python          3.14.3
 FAIL  pandax package  not installed
                       -> install the engine:  uv sync
-FAIL  Syft            not found in .tools/ or on PATH
+FAIL  Syft            not found in workspace/tools/ or on PATH
                       -> run:  uv run python tools/bootstrap.py
 
 2 of 3 checks failed.
@@ -94,14 +94,14 @@ nor veraPDF installed.
 
 ## Step 2 · Setup — **pending**
 
-From `README.md`:
+From the [repository README](../../README.md):
 
 ```bash
 uv sync --extra dev
 uv run python tools/bootstrap.py     # pinned, digest-verified downloads
 ```
 
-`bootstrap.py` installs the pinned Syft into `.tools/`. Re-run the preflight
+`bootstrap.py` installs the pinned Syft into `workspace/tools/`. Re-run the preflight
 afterwards; all three default checks should pass.
 
 Starting from an existing SBOM instead of an artifact skips Syft and the
@@ -121,9 +121,9 @@ Or from an SBOM:
 uv run actis scan-sbom fixtures/example-sbom.cdx.json
 ```
 
-`README.md` states the demo artifact should yield 11 components, ~102
+The [technical guide](../technical-guide.md) states the demo artifact should yield 11 components, ~102
 vulnerabilities, 4 actively exploited, 4 Article 14 clocks and a sealed bundle
-under `out/run-<timestamp>/`, and that the first run takes ~45s while the OSV
+under `workspace/runs/run-<timestamp>/`, and that the first run takes ~45s while the OSV
 cache fills.
 
 Treat those numbers as the repository's claim until a filed log shows them.

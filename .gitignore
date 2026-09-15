@@ -23,6 +23,7 @@ build/
 .next/
 out/
 output/
+workspace/
 
 # Generated media and local plans
 *.[pP][nN][gG]
@@ -105,6 +106,9 @@ evaluation/results/
 presentation-assets/
 presentation-output/
 *.pptx
+!docs/reference/PandaX.pptx
+!docs/published/video/*.mp4
+!docs/published/presentations/*.pptx
 
 # Local neural voice model cache
 apps/showcase-video/.models/

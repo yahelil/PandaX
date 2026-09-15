@@ -16,7 +16,7 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, KeepTogether
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "output/pdf/PandaX_Independent_Expected_Results.pdf"
+OUT = ROOT / "workspace/generated/pdf/PandaX_Independent_Expected_Results.pdf"
 OUT.parent.mkdir(parents=True, exist_ok=True)
 font_dir = Path('/System/Library/Fonts/Supplemental')
 if (font_dir / 'Arial.ttf').exists():

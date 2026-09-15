@@ -21,7 +21,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-TOOLS = ROOT / ".tools"
+TOOLS = ROOT / "workspace" / "tools"
 FIXTURE = ROOT / "fixtures" / "smarthub-sh100"
 ARTIFACT = ROOT / "fixtures" / "smarthub-sh100-v2.3.1.zip"
 

@@ -12,11 +12,23 @@ import urllib.error
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
-DEST = ROOT / 'output/validation/root-cause-evidence'
+DEST = ROOT / 'workspace/generated/validation/root-cause-evidence'
 DEST.mkdir(parents=True, exist_ok=True)
-report = json.loads((ROOT/'output/validation/pandax-reference-comparison.json').read_text())
+REPORT = ROOT/'workspace/generated/validation/pandax-reference-comparison.json'
+if not REPORT.exists(): REPORT = ROOT/'docs/published/validation/pandax-reference-comparison.json'
+report = json.loads(REPORT.read_text())
 cases = [c for c in report['cases'] if c['id'].startswith(('curl-', 'openssl-'))]
 targets = ['CVE-2023-38546','CVE-2023-46218','CVE-2014-0224','CVE-2014-0195']
+
+
+def saved_evidence_dir():
+    path = Path(report['evidence_directory'].replace('\\', '/'))
+    if path.parts and path.parts[0] == 'out':
+        path = Path('workspace/runs', *path.parts[1:])
+    target = (ROOT / path).resolve()
+    if not target.is_relative_to(ROOT.resolve()):
+        raise ValueError('Evidence path is outside repository')
+    return target
 
 
 def call(name, path, body=None):
@@ -59,7 +71,7 @@ def git_probe(case):
 def main():
     purls=[]
     for c in cases:
-        s=json.loads((ROOT/report['evidence_directory']/c['id']/'summary.json').read_text())
+        s=json.loads((saved_evidence_dir()/c['id']/'summary.json').read_text())
         purls.extend(x['purl'] for x in s['components'] if x['purl'])
     exact=call('exact-purl-replay','querybatch',{'queries':[{'package':{'purl':p}} for p in purls]})
     result={'purls':purls,'exact_query_file':'exact-purl-replay.json','exact_http_status':exact.get('http_status'),

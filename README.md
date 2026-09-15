@@ -8,6 +8,8 @@ documentation, sealed so a regulator can prove nothing was edited afterwards.
 This POC exists to answer one question: **is the automated compliance engine
 actually buildable?** The answer is yes, and everything below is runnable.
 
+Private-beta behavior is bounded by the [scope and acceptance gates](docs/private-beta-scope.md).
+
 ```
 artifact.zip                         existing-sbom.json
    │                                      │

@@ -50,11 +50,13 @@ async def lifespan(app: FastAPI):
         database_allows_background_growth,
         database_settings,
         get_release_monitoring_repository,
+        get_storage_status,
     )
     from .release_monitoring import monitoring_store_runner
     from .release_monitoring_worker import ReleaseMonitoringLoop
 
     database_settings()  # Managed environments fail before serving if PostgreSQL is absent.
+    get_storage_status()  # Managed environments require a reachable private object bucket.
     interval = max(1, float(os.environ.get("PANDAX_ADVISORY_REFRESH_SECONDS", "3600")))
     loop = AdvisoryRefreshLoop(_advisory_service, interval)
     release_interval = max(
@@ -173,7 +175,7 @@ def application_liveness() -> dict[str, str]:
 
 @api.get("/health/ready", include_in_schema=False)
 def database_readiness() -> dict[str, object]:
-    from .portfolio_runtime import get_database_status
+    from .portfolio_runtime import get_database_status, get_storage_status
 
     try:
         database = get_database_status()
@@ -182,7 +184,11 @@ def database_readiness() -> dict[str, object]:
     if not database.ready:
         detail = "database capacity hard stop reached" if database.capacity == "full" else "database migration required"
         raise HTTPException(503, detail)
-    return database.as_dict()
+    try:
+        storage = get_storage_status()
+    except Exception as exc:
+        raise HTTPException(503, "evidence storage unavailable") from exc
+    return {**database.as_dict(), "storage": storage}
 
 
 def _case_store() -> CaseStore:

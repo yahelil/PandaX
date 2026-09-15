@@ -35,8 +35,9 @@ growth stops and responses report `restricted`; at 100% new `/v1` mutations
 return `507` while reads remain available. Never raise a stop above 350 MB.
 
 `GET /health/live` reports process liveness without touching the database.
-`GET /health/ready` checks connectivity, the Alembic revision, and capacity;
-database failure, an unapplied migration, or the hard stop returns `503`.
+`GET /health/ready` checks database connectivity, the Alembic revision, capacity,
+and evidence-storage readiness; a database or storage failure, unapplied migration,
+or the hard stop returns `503`.
 
 Alembic takes a PostgreSQL advisory lock, so a second migration fails before
 changing schema. Promote with expand/migrate/contract ordering: migrate staging,
@@ -57,6 +58,27 @@ pg_restore --no-owner --no-privileges \
 
 Do not print either URL, enable shell tracing, or restore over a live database.
 Card d08 owns scheduled backups, encryption/media handling, and recurring drills.
+
+## Evidence storage
+
+Create a private `actis-evidence` bucket in each separate staging and private-beta
+Supabase project. Configure `PANDAX_STORAGE_URL`, `PANDAX_STORAGE_SECRET_KEY`, and
+`PANDAX_STORAGE_BUCKET` with that environment's secret manager. The API checks that
+the bucket is reachable and private before serving. Managed environments reject the
+local adapter; no evidence depends on the Render filesystem.
+
+The server uploads analysis inputs and deterministic ZIP exports directly to private
+Storage and proxies authorized downloads. It never returns object keys, service
+credentials, or unrestricted bucket URLs. Every read verifies the PostgreSQL digest.
+Application limits are 25 MB for Collector packages, 50 MB for other objects,
+200 MB active storage per organization, and 800 MB per Supabase project.
+
+Sealed evidence is retained until the latest of its configured organization policy,
+120 months, or release support end. A legal hold blocks every deletion path. After
+retention, an authorized deletion records a digest-bound receipt and a 30-day backup
+expiry. Restore database metadata and bucket objects together, verify every stored
+SHA-256, then run the independent verifier against an exported ZIP before reopening
+traffic. Card d08 owns recurring company-machine backups and full restore drills.
 
 ## Authentication
 
@@ -93,7 +115,7 @@ subject for every mutation in an append-only, per-organization SHA-256 chain.
 
 Apply `alembic upgrade head` before deploying this version. Rollback requires
 draining writes, deploying the prior application, then running
-`alembic downgrade 20260915_0010`.
+`alembic downgrade 20260915_0011`.
 
 The identity adapter is provider-neutral. A later Entra or Okta OIDC/SAML bridge
 must return the same verified subject, session, and MFA timestamps; it must not

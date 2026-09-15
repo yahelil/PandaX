@@ -32,7 +32,7 @@ manifest schema is versioned and bound to the route scope:
 
 Every non-manifest ZIP entry must be declared exactly once. Validation rejects
 absolute, traversal, backslash, non-normalized, duplicate, encrypted, and symlink
-entries. It verifies every declared digest before creating a job. Limits are 25 MiB
+entries. It verifies every declared digest before creating a job. Limits are 25 MB
 compressed, 256 entries, 100 MiB uncompressed, and a 100:1 per-entry compression
 ratio. The embedded SBOM is previewed deterministically and dispatched through the
 existing analysis worker.
@@ -44,7 +44,7 @@ Raw ingestion is fail-closed. An organization administrator must first enable
 authorized operator. Allowed filename/media-type pairs are `.zip`/
 `application/zip`, `.tar`/`application/x-tar`, `.tar.gz` or `.tgz`/
 `application/gzip`, and `.bin` or `.img`/`application/octet-stream`; maximum size
-is 50 MiB.
+is 50 MB.
 
 Accepted raw inputs retain consent actor/time, digest, media type, size, and expiry
 as immutable analysis audit events and job metadata. Until a production artifact
@@ -54,15 +54,17 @@ explicit explanation. It is never given fabricated findings and cannot be starte
 ## Storage and retention
 
 Input bytes are not stored in relational rows. The database keeps a content digest,
-opaque object reference, metadata, and retention deadline. Production runtime uses
-the rooted local storage adapter at `PANDAX_ANALYSIS_INPUT_DIR`; otherwise it uses
-`$PANDAX_DATA_DIR/analysis-objects` (or the local runtime data directory). Writes are
-atomic and reads re-verify SHA-256 before dispatch. The storage protocol is the seam
-for a future managed object-store adapter.
+opaque object reference, metadata, and retention deadline. Development and tests use
+the rooted local adapter at `PANDAX_ANALYSIS_INPUT_DIR` or
+`$PANDAX_DATA_DIR/analysis-objects`. Managed environments require the private
+Supabase Storage adapter and cannot fall back to local disk. Writes are atomic or
+idempotent and reads re-verify SHA-256 before dispatch.
 
-The retention deadline comes from organization
-`security.evidence_retention_months`. Expiry records policy intent; a deployment
-retention worker must remove expired objects and their references.
+The input retention deadline comes from organization
+`security.evidence_retention_months`. Completed sealed bundles are retained until
+the latest of that deadline, ten years, or release support end. See the
+[production runtime](production-runtime.md#evidence-storage) for bundle quotas,
+export, hold, deletion, and recovery.
 
 ## Security invariants
 

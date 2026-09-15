@@ -8,6 +8,9 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
+from urllib.parse import quote
+
+import httpx
 
 
 class AnalysisInputStorageError(RuntimeError):
@@ -23,8 +26,10 @@ class StoredAnalysisInput:
 
 class AnalysisInputStorage(Protocol):
     def put(self, organization_id: str, job_id: str, content: bytes) -> StoredAnalysisInput: ...
+    def put_bundle(self, organization_id: str, bundle_id: str, content: bytes) -> StoredAnalysisInput: ...
     def get(self, object_key: str, expected_sha256: str) -> bytes: ...
     def delete(self, object_key: str) -> None: ...
+    def check_ready(self) -> None: ...
 
 
 class MemoryAnalysisInputStorage:
@@ -34,8 +39,12 @@ class MemoryAnalysisInputStorage:
         self.objects: dict[str, bytes] = {}
 
     def put(self, organization_id: str, job_id: str, content: bytes) -> StoredAnalysisInput:
-        digest = hashlib.sha256(content).hexdigest()
-        key = f"analysis-inputs/{_segment(organization_id)}/{_segment(job_id)}/{digest}"
+        key, digest = _key("analysis-inputs", organization_id, job_id, content)
+        self.objects[key] = bytes(content)
+        return StoredAnalysisInput(key, digest, len(content))
+
+    def put_bundle(self, organization_id: str, bundle_id: str, content: bytes) -> StoredAnalysisInput:
+        key, digest = _key("evidence-bundles", organization_id, bundle_id, content, ".zip")
         self.objects[key] = bytes(content)
         return StoredAnalysisInput(key, digest, len(content))
 
@@ -51,6 +60,9 @@ class MemoryAnalysisInputStorage:
     def delete(self, object_key: str) -> None:
         self.objects.pop(object_key, None)
 
+    def check_ready(self) -> None:
+        return None
+
 
 class LocalAnalysisInputStorage:
     """Local durable adapter with rooted keys and atomic writes."""
@@ -60,8 +72,14 @@ class LocalAnalysisInputStorage:
         self.root.mkdir(parents=True, exist_ok=True)
 
     def put(self, organization_id: str, job_id: str, content: bytes) -> StoredAnalysisInput:
-        digest = hashlib.sha256(content).hexdigest()
-        key = f"analysis-inputs/{_segment(organization_id)}/{_segment(job_id)}/{digest}"
+        key, digest = _key("analysis-inputs", organization_id, job_id, content)
+        return self._put(key, digest, content)
+
+    def put_bundle(self, organization_id: str, bundle_id: str, content: bytes) -> StoredAnalysisInput:
+        key, digest = _key("evidence-bundles", organization_id, bundle_id, content, ".zip")
+        return self._put(key, digest, content)
+
+    def _put(self, key: str, digest: str, content: bytes) -> StoredAnalysisInput:
         target = self._path(key)
         target.parent.mkdir(parents=True, exist_ok=True)
         handle, temporary = tempfile.mkstemp(prefix=".upload-", dir=target.parent)
@@ -88,6 +106,10 @@ class LocalAnalysisInputStorage:
     def delete(self, object_key: str) -> None:
         self._path(object_key).unlink(missing_ok=True)
 
+    def check_ready(self) -> None:
+        if not self.root.is_dir():
+            raise AnalysisInputStorageError("local analysis storage is unavailable")
+
     def _path(self, object_key: str) -> Path:
         candidate = (self.root / object_key).resolve()
         if self.root not in candidate.parents:
@@ -95,8 +117,111 @@ class LocalAnalysisInputStorage:
         return candidate
 
 
+class SupabaseAnalysisInputStorage:
+    """Private Supabase Storage adapter used only through the server boundary."""
+
+    def __init__(
+        self,
+        endpoint: str,
+        api_key: str,
+        bucket: str,
+        *,
+        client: httpx.Client | None = None,
+    ) -> None:
+        self.endpoint = endpoint.rstrip("/")
+        self.api_key = api_key.strip()
+        self.bucket = _segment(bucket)
+        self.client = client or httpx.Client(timeout=10)
+
+    def put(self, organization_id: str, job_id: str, content: bytes) -> StoredAnalysisInput:
+        key, digest = _key("analysis-inputs", organization_id, job_id, content)
+        return self._upload(key, digest, content, "application/octet-stream")
+
+    def put_bundle(self, organization_id: str, bundle_id: str, content: bytes) -> StoredAnalysisInput:
+        key, digest = _key("evidence-bundles", organization_id, bundle_id, content, ".zip")
+        return self._upload(key, digest, content, "application/zip")
+
+    def get(self, object_key: str, expected_sha256: str) -> bytes:
+        response = self._request(
+            "GET",
+            f"/storage/v1/object/authenticated/{quote(self.bucket)}/{quote(object_key, safe='/')}",
+        )
+        if response.status_code == 404:
+            raise AnalysisInputStorageError("analysis object not found")
+        self._success(response, "download")
+        content = response.content
+        if hashlib.sha256(content).hexdigest() != expected_sha256:
+            raise AnalysisInputStorageError("analysis object digest mismatch")
+        return content
+
+    def delete(self, object_key: str) -> None:
+        response = self._request(
+            "DELETE",
+            f"/storage/v1/object/{quote(self.bucket)}",
+            json={"prefixes": [object_key]},
+        )
+        self._success(response, "delete")
+
+    def check_ready(self) -> None:
+        response = self._request("GET", f"/storage/v1/bucket/{quote(self.bucket)}")
+        self._success(response, "readiness check")
+        try:
+            public = response.json()["public"]
+        except (KeyError, TypeError, ValueError) as exc:
+            raise AnalysisInputStorageError("storage readiness response is invalid") from exc
+        if public is not False:
+            raise AnalysisInputStorageError("managed evidence bucket must be private")
+
+    def _upload(
+        self, key: str, digest: str, content: bytes, media_type: str
+    ) -> StoredAnalysisInput:
+        response = self._request(
+            "POST",
+            f"/storage/v1/object/{quote(self.bucket)}/{quote(key, safe='/')}",
+            content=content,
+            headers={"content-type": media_type, "x-upsert": "false"},
+        )
+        if response.status_code == 409:
+            existing = self.get(key, digest)
+            return StoredAnalysisInput(key, digest, len(existing))
+        self._success(response, "upload")
+        return StoredAnalysisInput(key, digest, len(content))
+
+    def _request(self, method: str, path: str, **kwargs: object) -> httpx.Response:
+        headers = {
+            "apikey": self.api_key,
+            "authorization": f"Bearer {self.api_key}",
+            **dict(kwargs.pop("headers", {})),
+        }
+        try:
+            return self.client.request(method, f"{self.endpoint}{path}", headers=headers, **kwargs)
+        except httpx.HTTPError as exc:
+            raise AnalysisInputStorageError("managed evidence storage is unavailable") from exc
+
+    @staticmethod
+    def _success(response: httpx.Response, action: str) -> None:
+        if not response.is_success:
+            raise AnalysisInputStorageError(
+                f"managed evidence storage {action} failed ({response.status_code})"
+            )
+
+
 def _segment(value: str) -> str:
     clean = value.strip()
     if not clean or not re.fullmatch(r"[A-Za-z0-9._-]{1,160}", clean):
         raise AnalysisInputStorageError("invalid analysis storage scope")
     return clean
+
+
+def _key(
+    namespace: str,
+    organization_id: str,
+    object_id: str,
+    content: bytes,
+    suffix: str = "",
+) -> tuple[str, str]:
+    digest = hashlib.sha256(content).hexdigest()
+    return (
+        f"{namespace}/{_segment(organization_id)}/{_segment(object_id)}/{digest}{suffix}",
+        digest,
+    )

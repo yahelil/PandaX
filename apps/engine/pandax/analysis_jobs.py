@@ -23,6 +23,7 @@ from typing import Any, Iterator
 from uuid import uuid4
 
 from sqlalchemy import (
+    Boolean,
     JSON,
     CheckConstraint,
     Column,
@@ -34,9 +35,11 @@ from sqlalchemy import (
     String,
     Table,
     UniqueConstraint,
+    delete,
     func,
     insert,
     select,
+    text,
     update,
 )
 from sqlalchemy.engine import Engine, RowMapping
@@ -50,11 +53,11 @@ from .portfolio import portfolio_metadata, products, releases
 from .stages.sbom import SbomError, inspect_sbom
 
 MAX_SBOM_BYTES = 10 * 1024 * 1024
-MAX_COLLECTOR_BYTES = 25 * 1024 * 1024
+MAX_COLLECTOR_BYTES = 25_000_000
 MAX_COLLECTOR_ENTRIES = 256
 MAX_COLLECTOR_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 MAX_COLLECTOR_COMPRESSION_RATIO = 100
-MAX_RAW_ARTIFACT_BYTES = 50 * 1024 * 1024
+MAX_RAW_ARTIFACT_BYTES = 50_000_000
 COLLECTOR_MANIFEST = "actis-collector-manifest.json"
 ALLOWED_MEDIA_TYPES = frozenset(
     {
@@ -75,6 +78,10 @@ RAW_MEDIA_BY_EXTENSION = {
 INPUT_TYPES = frozenset({"sbom", "collector", "raw_artifact"})
 JOB_STATUSES = frozenset({"queued", "running", "completed", "failed", "unsupported"})
 TERMINAL_STATUSES = frozenset({"completed", "failed", "unsupported"})
+EVIDENCE_OBJECT_LIMIT_BYTES = 50_000_000
+EVIDENCE_ORGANIZATION_LIMIT_BYTES = 200_000_000
+EVIDENCE_PROJECT_LIMIT_BYTES = 800_000_000
+BACKUP_RETENTION_DAYS = 30
 
 
 class AnalysisJobError(RuntimeError):
@@ -149,6 +156,27 @@ class AnalysisJobEventRecord:
     occurred_at: datetime
 
 
+@dataclass(frozen=True, slots=True)
+class EvidenceBundleRecord:
+    id: str
+    job_id: str
+    organization_id: str
+    object_key: str
+    filename: str
+    sha256: str
+    size_bytes: int
+    created_at: datetime
+    retained_until: datetime
+    state: str
+    legal_hold: bool
+    hold_reason: str | None
+    held_at: datetime | None
+    held_by: str | None
+    deleted_at: datetime | None
+    backup_expires_at: datetime | None
+    deletion_receipt: Mapping[str, Any] | None
+
+
 AnalysisRunner = Callable[..., Iterable[pipeline_events.Event]]
 
 
@@ -164,6 +192,7 @@ analysis_jobs = Table(
     Column("filename", String(255), nullable=False),
     Column("media_type", String(100), nullable=False),
     Column("size_bytes", Integer, nullable=False),
+    Column("storage_size_bytes", Integer, nullable=False),
     Column("sha256", String(64), nullable=False),
     Column("input_format", String(24), nullable=False),
     Column("input_version", String(24), nullable=False),
@@ -233,6 +262,43 @@ analysis_job_events = Table(
     ),
     UniqueConstraint("job_id", "sequence", name="uq_analysis_job_events_sequence"),
 )
+
+evidence_bundles = Table(
+    "evidence_bundles",
+    portfolio_metadata,
+    Column("id", String(36), primary_key=True),
+    Column("job_id", String(36), nullable=False, unique=True),
+    Column("organization_id", String(36), nullable=False),
+    Column("object_key", String(500), nullable=False, unique=True),
+    Column("filename", String(255), nullable=False),
+    Column("sha256", String(64), nullable=False),
+    Column("size_bytes", Integer, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("retained_until", DateTime(timezone=True), nullable=False),
+    Column("state", String(24), nullable=False),
+    Column("legal_hold", Boolean, nullable=False, default=False),
+    Column("hold_reason", String(500), nullable=True),
+    Column("held_at", DateTime(timezone=True), nullable=True),
+    Column("held_by", String(128), nullable=True),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
+    Column("backup_expires_at", DateTime(timezone=True), nullable=True),
+    Column("deletion_receipt", JSON, nullable=True),
+    ForeignKeyConstraint(
+        ["job_id"], ["analysis_jobs.id"], name="fk_evidence_bundles_job", ondelete="CASCADE"
+    ),
+    CheckConstraint(
+        "state IN ('active','deletion_pending','deleted')",
+        name="state",
+    ),
+    CheckConstraint("size_bytes > 0", name="size"),
+    CheckConstraint(
+        "(legal_hold = false AND hold_reason IS NULL AND held_at IS NULL AND held_by IS NULL) "
+        "OR (legal_hold = true AND hold_reason IS NOT NULL AND held_at IS NOT NULL AND held_by IS NOT NULL)",
+        name="hold",
+    ),
+)
+Index("ix_evidence_bundles_org_state", evidence_bundles.c.organization_id, evidence_bundles.c.state)
+Index("ix_evidence_bundles_retention", evidence_bundles.c.retained_until)
 
 
 def pipeline_runner(
@@ -338,6 +404,8 @@ class AnalysisJobRepository:
         digest_changed = previous_digest is not None and previous_digest != digest
         if digest_changed and not changed_digest_confirmed:
             raise AnalysisJobConflict("release contents changed; explicit digest confirmation is required")
+        incoming_bytes = len(content) + sum(len(item["content"]) for item in supplemental.values())
+        self._ensure_storage_capacity(organization_id, incoming_bytes)
         job_id = str(uuid4())
         stored_inputs = []
         try:
@@ -392,6 +460,7 @@ class AnalysisJobRepository:
                     "idempotency_key": clean_key, "input_type": clean_type,
                     "filename": safe_name, "media_type": clean_media,
                     "size_bytes": stored.size_bytes, "sha256": stored.sha256,
+                    "storage_size_bytes": sum(item.size_bytes for item in stored_inputs),
                     "input_format": input_format, "input_version": input_version,
                     "preview": preview, "input_content": None,
                     "object_key": stored.object_key,
@@ -720,8 +789,15 @@ class AnalysisJobRepository:
                 "input_format": job.input_format,
                 "input_version": job.input_version,
                 "evidence": artifacts,
-                "_run_dir": run_dir,
             }
+            if run_dir:
+                bundle = self._store_evidence_bundle(job, Path(run_dir))
+                result["bundle"] = {
+                    "id": bundle.id,
+                    "sha256": bundle.sha256,
+                    "size_bytes": bundle.size_bytes,
+                    "retained_until": bundle.retained_until.isoformat(),
+                }
             self._finish(organization_id, product_id, release_id, job_id, result)
         except Exception as exc:
             self._fail(organization_id, product_id, release_id, job_id, str(exc))
@@ -742,31 +818,312 @@ class AnalysisJobRepository:
             raise AnalysisJobError(f"retained {kind} evidence is unavailable") from exc
         return stack.enter_context(_temporary_sbom(content, ".json"))
 
-    def evidence_path(
+    def evidence_content(
         self,
         organization_id: str,
         product_id: str,
         release_id: str,
         job_id: str,
         digest: str,
-    ) -> tuple[Path, str]:
+    ) -> tuple[bytes, str]:
         job = self.get(organization_id, product_id, release_id, job_id)
         if job.status != "completed" or not job.result:
-            raise AnalysisJobNotFound("evidence not found")
-        run_dir = job.result.get("_run_dir")
-        if not isinstance(run_dir, str) or not run_dir:
             raise AnalysisJobNotFound("evidence not found")
         for evidence in job.result.get("evidence", []):
             if evidence.get("sha256") != digest:
                 continue
-            root = Path(run_dir).resolve()
-            candidate = (root / str(evidence.get("path", ""))).resolve()
-            if root not in candidate.parents or not candidate.is_file():
-                raise AnalysisJobNotFound("evidence not found")
-            if hashlib.sha256(candidate.read_bytes()).hexdigest() != digest:
+            content, _ = self.export_evidence(
+                organization_id, product_id, release_id, job_id
+            )
+            try:
+                with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                    item = archive.read(str(evidence.get("path", "")))
+            except (KeyError, OSError, zipfile.BadZipFile) as exc:
+                raise AnalysisJobNotFound("evidence not found") from exc
+            if hashlib.sha256(item).hexdigest() != digest:
                 raise AnalysisJobConflict("evidence digest mismatch")
-            return candidate, Path(str(evidence.get("name", "evidence"))).name
+            return item, Path(str(evidence.get("name", "evidence"))).name
         raise AnalysisJobNotFound("evidence not found")
+
+    def export_evidence(
+        self,
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        job_id: str,
+    ) -> tuple[bytes, str]:
+        self.get(organization_id, product_id, release_id, job_id)
+        bundle = self._bundle(organization_id, job_id)
+        if bundle is None or bundle.state != "active":
+            raise AnalysisJobNotFound("evidence bundle not found")
+        try:
+            content = self.storage.get(bundle.object_key, bundle.sha256)
+        except AnalysisInputStorageError as exc:
+            raise AnalysisJobError(str(exc)) from exc
+        return content, bundle.filename
+
+    def evidence_bundle(
+        self,
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        job_id: str,
+    ) -> EvidenceBundleRecord:
+        self.get(organization_id, product_id, release_id, job_id)
+        bundle = self._bundle(organization_id, job_id)
+        if bundle is None:
+            raise AnalysisJobNotFound("evidence bundle not found")
+        return bundle
+
+    def set_evidence_hold(
+        self,
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        job_id: str,
+        *,
+        held: bool,
+        reason: str,
+        actor_id: str,
+    ) -> EvidenceBundleRecord:
+        self.get(organization_id, product_id, release_id, job_id)
+        clean_actor = _required(actor_id, "actor_id", 128)
+        clean_reason = _required(reason, "reason", 500)
+        with self._transaction() as session:
+            row = session.execute(
+                select(evidence_bundles).where(
+                    (evidence_bundles.c.organization_id == organization_id)
+                    & (evidence_bundles.c.job_id == job_id)
+                ).with_for_update()
+            ).mappings().one_or_none()
+            if row is None or row["state"] != "active":
+                raise AnalysisJobNotFound("active evidence bundle not found")
+            now = _utc_now()
+            values = {
+                "legal_hold": held,
+                "hold_reason": clean_reason if held else None,
+                "held_at": now if held else None,
+                "held_by": clean_actor if held else None,
+            }
+            session.execute(update(evidence_bundles).where(evidence_bundles.c.id == row["id"]).values(**values))
+            self._append_event(
+                session,
+                job_id,
+                kind="evidence.hold_enabled" if held else "evidence.hold_released",
+                status="completed",
+                stage="Completed",
+                progress=100,
+                message="Evidence legal hold enabled" if held else "Evidence legal hold released",
+                details={"reason": clean_reason, "actor_id": clean_actor},
+            )
+            return _bundle_record({**row, **values})
+
+    def delete_evidence(
+        self,
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        job_id: str,
+        *,
+        reason: str,
+        actor_id: str,
+        now: datetime | None = None,
+    ) -> Mapping[str, Any]:
+        self.get(organization_id, product_id, release_id, job_id)
+        clean_actor = _required(actor_id, "actor_id", 128)
+        clean_reason = _required(reason, "reason", 500)
+        deleted_at = _as_utc(now or _utc_now())
+        with self._transaction() as session:
+            row = session.execute(
+                select(evidence_bundles).where(
+                    (evidence_bundles.c.organization_id == organization_id)
+                    & (evidence_bundles.c.job_id == job_id)
+                ).with_for_update()
+            ).mappings().one_or_none()
+            if row is None:
+                raise AnalysisJobNotFound("evidence bundle not found")
+            if row["state"] == "deleted":
+                return dict(row["deletion_receipt"] or {})
+            if row["state"] != "active":
+                raise AnalysisJobConflict("evidence deletion is already in progress")
+            if row["legal_hold"]:
+                raise AnalysisJobConflict("evidence is protected by legal hold")
+            if deleted_at < _as_utc(row["retained_until"]):
+                raise AnalysisJobConflict("evidence retention period has not ended")
+            session.execute(
+                update(evidence_bundles)
+                .where(evidence_bundles.c.id == row["id"])
+                .values(state="deletion_pending")
+            )
+        try:
+            self.storage.delete(str(row["object_key"]))
+        except AnalysisInputStorageError as exc:
+            with self._transaction() as session:
+                session.execute(
+                    update(evidence_bundles)
+                    .where(evidence_bundles.c.id == row["id"])
+                    .values(state="active")
+                )
+            raise AnalysisJobError(str(exc)) from exc
+
+        backup_expires_at = deleted_at + timedelta(days=BACKUP_RETENTION_DAYS)
+        receipt = {
+            "id": str(uuid4()),
+            "bundle_id": row["id"],
+            "organization_id": organization_id,
+            "sha256": row["sha256"],
+            "deleted_at": deleted_at.isoformat(),
+            "actor_id": clean_actor,
+            "reason": clean_reason,
+            "backup_expires_at": backup_expires_at.isoformat(),
+        }
+        receipt["receipt_sha256"] = hashlib.sha256(
+            json.dumps(receipt, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        with self._transaction() as session:
+            session.execute(
+                update(evidence_bundles)
+                .where(evidence_bundles.c.id == row["id"])
+                .values(
+                    state="deleted",
+                    deleted_at=deleted_at,
+                    backup_expires_at=backup_expires_at,
+                    deletion_receipt=receipt,
+                )
+            )
+            self._append_event(
+                session,
+                job_id,
+                kind="evidence.deleted",
+                status="completed",
+                stage="Completed",
+                progress=100,
+                message="Evidence deleted after retention",
+                details={key: receipt[key] for key in ("id", "sha256", "deleted_at", "backup_expires_at", "receipt_sha256")},
+            )
+        return receipt
+
+    def _store_evidence_bundle(
+        self, job: AnalysisJobRecord, run_dir: Path
+    ) -> EvidenceBundleRecord:
+        existing = self._bundle(job.organization_id, job.id)
+        if existing is not None:
+            if existing.state == "active":
+                return existing
+            raise AnalysisJobConflict("evidence bundle already exists")
+
+        content = _archive_bundle(run_dir)
+        if not content or len(content) > EVIDENCE_OBJECT_LIMIT_BYTES:
+            raise AnalysisJobValidationError("sealed evidence bundle exceeds the 50 MB storage limit")
+        bundle_id = str(uuid4())
+        filename = f"actis-evidence-{job.id}.zip"
+        retained_until = self._bundle_retained_until(job)
+        try:
+            stored = self.storage.put_bundle(job.organization_id, bundle_id, content)
+        except AnalysisInputStorageError as exc:
+            raise AnalysisJobError(str(exc)) from exc
+
+        values = {
+            "id": bundle_id,
+            "job_id": job.id,
+            "organization_id": job.organization_id,
+            "object_key": stored.object_key,
+            "filename": filename,
+            "sha256": stored.sha256,
+            "size_bytes": stored.size_bytes,
+            "created_at": _utc_now(),
+            "retained_until": retained_until,
+            "state": "active",
+            "legal_hold": False,
+            "hold_reason": None,
+            "held_at": None,
+            "held_by": None,
+            "deleted_at": None,
+            "backup_expires_at": None,
+            "deletion_receipt": None,
+        }
+        try:
+            with self._transaction() as session:
+                if self.engine.dialect.name == "postgresql":
+                    session.execute(text(
+                        "SELECT pg_advisory_xact_lock(hashtext('actis'), "
+                        "hashtext('evidence-storage-quota'))"
+                    ))
+                organization_used = self._stored_bytes(session, job.organization_id)
+                project_used = self._stored_bytes(session)
+                if organization_used + stored.size_bytes > EVIDENCE_ORGANIZATION_LIMIT_BYTES:
+                    raise AnalysisJobConflict("organization evidence storage quota reached")
+                if project_used + stored.size_bytes > EVIDENCE_PROJECT_LIMIT_BYTES:
+                    raise AnalysisJobConflict("project evidence storage quota reached")
+                session.execute(insert(evidence_bundles).values(**values))
+                self._append_event(
+                    session,
+                    job.id,
+                    kind="evidence.stored",
+                    status="running",
+                    stage="Storing evidence",
+                    progress=99,
+                    message="Sealed evidence bundle retained",
+                    details={
+                        "bundle_id": bundle_id,
+                        "sha256": stored.sha256,
+                        "size_bytes": stored.size_bytes,
+                        "retained_until": retained_until.isoformat(),
+                    },
+                )
+        except Exception:
+            try:
+                self.storage.delete(stored.object_key)
+            except AnalysisInputStorageError:
+                pass
+            raise
+        return _bundle_record(values)
+
+    def _bundle_retained_until(self, job: AnalysisJobRecord) -> datetime:
+        minimum = _as_utc(job.created_at) + timedelta(days=3650)
+        configured = _as_utc(job.retained_until) if job.retained_until else minimum
+        with Session(self.engine) as session:
+            support_end = session.execute(
+                select(releases.c.support_end).where(
+                    (releases.c.id == job.release_id)
+                    & (releases.c.product_id == job.product_id)
+                    & (releases.c.organization_id == job.organization_id)
+                )
+            ).scalar_one()
+        support_until = datetime.combine(
+            support_end + timedelta(days=1), datetime.min.time(), timezone.utc
+        )
+        return max(minimum, configured, support_until)
+
+    def _stored_bytes(self, session: Session, organization_id: str | None = None) -> int:
+        input_query = select(func.coalesce(func.sum(analysis_jobs.c.storage_size_bytes), 0)).where(
+            analysis_jobs.c.object_key.is_not(None)
+        )
+        bundle_query = select(func.coalesce(func.sum(evidence_bundles.c.size_bytes), 0)).where(
+            evidence_bundles.c.state.in_(("active", "deletion_pending"))
+        )
+        if organization_id is not None:
+            input_query = input_query.where(analysis_jobs.c.organization_id == organization_id)
+            bundle_query = bundle_query.where(evidence_bundles.c.organization_id == organization_id)
+        return int(session.scalar(input_query) or 0) + int(session.scalar(bundle_query) or 0)
+
+    def _ensure_storage_capacity(self, organization_id: str, incoming_bytes: int) -> None:
+        # ponytail: preflight reservation; add upload-reservation rows if beta upload concurrency grows.
+        with Session(self.engine) as session:
+            if self._stored_bytes(session, organization_id) + incoming_bytes > EVIDENCE_ORGANIZATION_LIMIT_BYTES:
+                raise AnalysisJobConflict("organization evidence storage quota reached")
+            if self._stored_bytes(session) + incoming_bytes > EVIDENCE_PROJECT_LIMIT_BYTES:
+                raise AnalysisJobConflict("project evidence storage quota reached")
+
+    def _bundle(self, organization_id: str, job_id: str) -> EvidenceBundleRecord | None:
+        with Session(self.engine) as session:
+            row = session.execute(
+                select(evidence_bundles).where(
+                    (evidence_bundles.c.organization_id == organization_id)
+                    & (evidence_bundles.c.job_id == job_id)
+                )
+            ).mappings().one_or_none()
+        return _bundle_record(row) if row is not None else None
 
     def _start(
         self, organization_id: str, product_id: str, release_id: str, job_id: str
@@ -1024,7 +1381,7 @@ def _validate_collector(
     if clean_media not in COLLECTOR_MEDIA_TYPES:
         raise AnalysisJobValidationError("unsupported Collector media type")
     if not content or len(content) > MAX_COLLECTOR_BYTES:
-        raise AnalysisJobValidationError("Collector package must be between 1 byte and 25 MiB")
+        raise AnalysisJobValidationError("Collector package must be between 1 byte and 25 MB")
     try:
         archive = zipfile.ZipFile(io.BytesIO(content))
     except zipfile.BadZipFile as exc:
@@ -1130,7 +1487,7 @@ def _validate_raw(
     if clean_media not in RAW_MEDIA_BY_EXTENSION[extension]:
         raise AnalysisJobValidationError("raw artifact media type does not match its extension")
     if not content or len(content) > MAX_RAW_ARTIFACT_BYTES:
-        raise AnalysisJobValidationError("raw artifact must be between 1 byte and 50 MiB")
+        raise AnalysisJobValidationError("raw artifact must be between 1 byte and 50 MB")
     if extension == ".zip" and not zipfile.is_zipfile(io.BytesIO(content)):
         raise AnalysisJobValidationError("raw artifact content is not a valid ZIP archive")
     if extension in {".tar", ".tar.gz", ".tgz"}:
@@ -1185,6 +1542,25 @@ def _manifest_timestamp(value: Any) -> str:
     if parsed.tzinfo is None:
         raise AnalysisJobValidationError("Collector generated_at must include a timezone")
     return parsed.astimezone(timezone.utc).isoformat()
+
+
+def _archive_bundle(run_dir: Path) -> bytes:
+    root = run_dir.resolve()
+    if not root.is_dir():
+        raise AnalysisJobError("sealed evidence bundle is unavailable")
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(root.rglob("*")):
+            if path.is_symlink():
+                raise AnalysisJobError("sealed evidence bundle contains a symbolic link")
+            if not path.is_file():
+                continue
+            relative = path.relative_to(root).as_posix()
+            info = zipfile.ZipInfo(relative, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o100644 << 16
+            archive.writestr(info, path.read_bytes())
+    return output.getvalue()
 
 
 @contextmanager
@@ -1275,6 +1651,10 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+
+
 def _job_record(row: Mapping[str, Any]) -> AnalysisJobRecord:
     return AnalysisJobRecord(
         id=row["id"], organization_id=row["organization_id"], product_id=row["product_id"],
@@ -1289,6 +1669,28 @@ def _job_record(row: Mapping[str, Any]) -> AnalysisJobRecord:
         result=row.get("result"), error=row.get("error"), actor_id=row["actor_id"],
         created_at=row["created_at"], updated_at=row["updated_at"],
         started_at=row.get("started_at"), completed_at=row.get("completed_at"),
+    )
+
+
+def _bundle_record(row: Mapping[str, Any]) -> EvidenceBundleRecord:
+    return EvidenceBundleRecord(
+        id=row["id"],
+        job_id=row["job_id"],
+        organization_id=row["organization_id"],
+        object_key=row["object_key"],
+        filename=row["filename"],
+        sha256=row["sha256"],
+        size_bytes=row["size_bytes"],
+        created_at=row["created_at"],
+        retained_until=row["retained_until"],
+        state=row["state"],
+        legal_hold=bool(row["legal_hold"]),
+        hold_reason=row.get("hold_reason"),
+        held_at=row.get("held_at"),
+        held_by=row.get("held_by"),
+        deleted_at=row.get("deleted_at"),
+        backup_expires_at=row.get("backup_expires_at"),
+        deletion_receipt=row.get("deletion_receipt"),
     )
 
 

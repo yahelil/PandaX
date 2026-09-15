@@ -99,7 +99,11 @@ describe("application flow smoke contracts", () => {
     expect(products).toContain('value="collector_package"');
     expect(products).toContain('value="raw_artifact"');
     expect(products).toContain("rawArtifactConsent");
+    expect(products).toContain('answer.questionId === "sbom"');
+    expect(products).toContain("No SBOM was declared");
     expect(products).toContain("demo.actions.runAnalysis");
+    expect(source("./pages/CraAssessmentWizard.tsx")).toContain('assessment.recommendedClass === "critical"');
+    expect(source("./pages/pages.css")).toContain(".cra-result__hero.critical");
   });
 
   it("persists a representative finding decision and remediation workflow", async () => {

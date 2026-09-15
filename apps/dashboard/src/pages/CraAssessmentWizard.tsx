@@ -208,9 +208,10 @@ const ClassificationQuestion = forwardRef<HTMLHeadingElement, { index: number; s
 const AssessmentResult = forwardRef<HTMLHeadingElement, { assessment: CraClassificationAssessment; confirmed: boolean; onConfirmed: (value: boolean) => void }>(function AssessmentResult({ assessment, confirmed, onConfirmed }, ref) {
   const outOfScope = assessment.scopeResult === "out_of_scope";
   const needsReview = assessment.scopeResult === "needs_review" || assessment.answers.some((answer) => answer.answer === "not_sure");
+  const critical = !outOfScope && !needsReview && assessment.recommendedClass === "critical";
   return <div className="cra-result" aria-live="polite">
-    <div className={`cra-result__hero ${outOfScope || needsReview ? "warning" : "success"}`}>
-      {outOfScope || needsReview ? <AlertTriangle size={28} /> : <ShieldCheck size={28} />}
+    <div className={`cra-result__hero ${critical ? "critical" : outOfScope || needsReview ? "warning" : "success"}`}>
+      {critical || outOfScope || needsReview ? <AlertTriangle size={28} /> : <ShieldCheck size={28} />}
       <div><span className="eyebrow">Assessment result</span><h3 ref={ref} tabIndex={-1}>{outOfScope ? "Likely outside CRA product scope" : needsReview ? "Specialist review required" : craClassLabel(assessment.recommendedClass)}</h3><p>{assessment.rationale}</p></div>
     </div>
     {!outOfScope ? <div className="cra-result__metrics"><div><span>Recommended class</span><strong>{craClassLabel(assessment.recommendedClass)}</strong></div><div><span>Readiness</span><strong>{assessment.readinessScore}%</strong></div><div><span>Open actions</span><strong>{assessment.actions.length}</strong></div></div> : null}

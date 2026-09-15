@@ -5,7 +5,7 @@ from typing import Annotated, Any, Callable, Literal, Mapping, TypeVar
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .auth import Principal, Role
+from .auth import Principal, Role, authorize_request
 from .organization_settings import (
     OrganizationSettingsRepository, SettingsConflict, SettingsError,
     SettingsNotFound, SettingsValidationError,
@@ -129,7 +129,10 @@ class TeamMemberResponse(ApiModel):
     title: str
     initials: str
     roles: tuple[str, ...]
-    status: Literal["active", "invited", "disabled"]
+    status: Literal["active", "invited", "disabled", "revoked", "removed"]
+    expires_at: datetime | None
+    revoked_at: datetime | None
+    removed_at: datetime | None
     last_active_at: datetime | None
     version: int
     created_at: datetime
@@ -140,7 +143,8 @@ class TeamMemberPatch(ApiModel):
     expected_version: int = Field(ge=1)
     title: str | None = Field(default=None, min_length=1, max_length=160)
     roles: list[Role] | None = Field(default=None, min_length=1)
-    status: Literal["active", "invited", "disabled"] | None = None
+    status: Literal["active", "invited", "disabled", "revoked", "removed"] | None = None
+    expires_at: datetime | None = None
 
     @model_validator(mode="after")
     def require_changes(self) -> "TeamMemberPatch":
@@ -215,17 +219,24 @@ class AuditResponse(ApiModel):
     actor_id: str
     occurred_at: datetime
     changes: Mapping[str, Any]
+    previous_digest: str | None
+    digest: str
 
 
 def _unauthenticated() -> Principal:
     raise HTTPException(status.HTTP_401_UNAUTHORIZED, "authentication required")
 
 
-def _authorize(principal: Principal, organization_id: str, roles: frozenset[Role]) -> None:
-    if principal.organization_id != organization_id:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "organization access denied")
-    if principal.roles.isdisjoint(roles):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
+def _authorize(
+    principal: Principal,
+    organization_id: str,
+    roles: frozenset[Role],
+    *,
+    sensitive: bool = False,
+) -> None:
+    authorize_request(
+        principal, organization_id, roles, sensitive=sensitive
+    )
 
 
 def _call(operation: Callable[[], Result]) -> Result:
@@ -253,7 +264,7 @@ def create_settings_router(repository_dependency: RepositoryDependency, identity
 
     @router.patch("/settings", response_model=SettingsResponse)
     def update_settings(body: SettingsPatch, organization_id: str, repository: Repository, principal: Identity):
-        _authorize(principal, organization_id, ADMIN_ROLES)
+        _authorize(principal, organization_id, ADMIN_ROLES, sensitive=True)
         patch = body.model_dump(exclude={"expected_version"}, exclude_unset=True, exclude_none=True, mode="json")
         return _call(lambda: repository.update_settings(
             organization_id, expected_version=body.expected_version,
@@ -277,7 +288,7 @@ def create_settings_router(repository_dependency: RepositoryDependency, identity
 
     @router.patch("/team/{member_id}", response_model=TeamMemberResponse)
     def update_member(body: TeamMemberPatch, member_id: str, organization_id: str, repository: Repository, principal: Identity):
-        _authorize(principal, organization_id, ADMIN_ROLES)
+        _authorize(principal, organization_id, ADMIN_ROLES, sensitive=True)
         changes = body.model_dump(exclude={"expected_version"}, exclude_unset=True, mode="json")
         return _call(lambda: repository.update_member(
             organization_id, member_id, expected_version=body.expected_version,
@@ -296,7 +307,7 @@ def create_settings_router(repository_dependency: RepositoryDependency, identity
 
     @router.patch("/integrations/{integration_id}", response_model=IntegrationResponse)
     def update_integration(body: IntegrationPatch, integration_id: str, organization_id: str, repository: Repository, principal: Identity):
-        _authorize(principal, organization_id, ADMIN_ROLES)
+        _authorize(principal, organization_id, ADMIN_ROLES, sensitive=True)
         changes = body.model_dump(exclude={"expected_version"}, exclude_unset=True)
         return _call(lambda: repository.update_integration(
             organization_id, integration_id, expected_version=body.expected_version,

@@ -19,6 +19,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import exposure, telemetry
+from .auth import authorize_request
 from .analysis_jobs import (
     MAX_SBOM_BYTES,
     MAX_COLLECTOR_BYTES,
@@ -162,7 +163,7 @@ def create_analysis_router(
         exposure_context: Annotated[UploadFile | None, File()] = None,
         changed_digest_confirmed: Annotated[bool, Form()] = False,
     ):
-        _authorize(identity, organization_id, ANALYSIS_EDIT_ROLES)
+        _authorize(identity, organization_id, ANALYSIS_EDIT_ROLES, sensitive=True)
         content = await sbom.read(MAX_SBOM_BYTES + 1)
         runtime_input = await _optional_json_input(telemetry_file, telemetry.MAX_BYTES)
         exposure_input = await _optional_json_input(exposure_context, exposure.MAX_BYTES)
@@ -203,7 +204,7 @@ def create_analysis_router(
         raw_artifact_consent: Annotated[bool, Form()] = False,
         changed_digest_confirmed: Annotated[bool, Form()] = False,
     ):
-        _authorize(identity, organization_id, ANALYSIS_EDIT_ROLES)
+        _authorize(identity, organization_id, ANALYSIS_EDIT_ROLES, sensitive=True)
         settings = settings_repository.get_settings(organization_id)
         maximum = MAX_COLLECTOR_BYTES if input_type == "collector" else MAX_RAW_ARTIFACT_BYTES
         content = await file.read(maximum + 1)
@@ -285,7 +286,7 @@ def create_analysis_router(
         repository: Repository,
         identity: Identity,
     ):
-        _authorize(identity, organization_id, ANALYSIS_EDIT_ROLES)
+        _authorize(identity, organization_id, ANALYSIS_EDIT_ROLES, sensitive=True)
         _scoped_job(repository, organization_id, product_id, release_id, job_id)
         job = _call(
             lambda: repository.start(organization_id, product_id, release_id, job_id)
@@ -346,11 +347,10 @@ def _authorize(
     identity: PortfolioIdentity,
     organization_id: str,
     roles: frozenset[str],
+    *,
+    sensitive: bool = False,
 ) -> None:
-    if identity.organization_id and identity.organization_id != organization_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
-    if identity.roles.isdisjoint(roles):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
+    authorize_request(identity, organization_id, roles, sensitive=sensitive)
 
 
 def _scoped_job(

@@ -5,6 +5,7 @@ from typing import Annotated, Callable, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
 
+from .auth import authorize_request
 from .home import (
     HomeNotFound,
     HomeReadModel,
@@ -115,10 +116,7 @@ def create_home_router(
         queue_limit: Annotated[int, Query(ge=1, le=50)] = 8,
         recent_limit: Annotated[int, Query(ge=1, le=50)] = 8,
     ) -> HomeSnapshot:
-        if identity.organization_id and identity.organization_id != organization_id:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
-        if identity.roles.isdisjoint(PORTFOLIO_ROLES):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
+        authorize_request(identity, organization_id, PORTFOLIO_ROLES)
         try:
             return read_model.get(
                 organization_id,

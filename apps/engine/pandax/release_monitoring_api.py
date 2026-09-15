@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from .auth import authorize_request
 from .portfolio_api import (
     PORTFOLIO_ROLES,
     IdentityDependency,
@@ -113,7 +114,7 @@ def create_release_monitoring_router(
         repository: Annotated[ReleaseMonitoringRepository, Depends(repository_dependency)],
         identity: Annotated[PortfolioIdentity, Depends(identity_dependency)],
     ):
-        _authorize(identity, organization_id, MONITORING_EDIT_ROLES)
+        _authorize(identity, organization_id, MONITORING_EDIT_ROLES, sensitive=True)
         record = _call(
             lambda: repository.configure(
                 organization_id,
@@ -139,7 +140,7 @@ def create_release_monitoring_router(
         repository: Annotated[ReleaseMonitoringRepository, Depends(repository_dependency)],
         identity: Annotated[PortfolioIdentity, Depends(identity_dependency)],
     ):
-        _authorize(identity, organization_id, MONITORING_EDIT_ROLES)
+        _authorize(identity, organization_id, MONITORING_EDIT_ROLES, sensitive=True)
         return _response(
             _call(
                 lambda: repository.run_now(
@@ -170,11 +171,10 @@ def _authorize(
     identity: PortfolioIdentity,
     organization_id: str,
     roles: frozenset[str],
+    *,
+    sensitive: bool = False,
 ) -> None:
-    if identity.organization_id and identity.organization_id != organization_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
-    if identity.roles.isdisjoint(roles):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
+    authorize_request(identity, organization_id, roles, sensitive=sensitive)
 
 
 def _call(operation: Callable[[], Any]):

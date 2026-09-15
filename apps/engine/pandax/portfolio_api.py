@@ -3,13 +3,14 @@
 Route handlers cross one repository seam and one identity seam. Slice 2 replaces
 ``local_identity`` with authenticated organization membership enforcement.
 """
-from dataclasses import dataclass
-from datetime import date, datetime
+from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
 from typing import Annotated, Callable, Literal, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .auth import authorize_request, require_recent_reauthentication
 from .portfolio import (
     OrganizationChanges,
     OrganizationRecord,
@@ -40,6 +41,9 @@ class PortfolioIdentity:
     actor_id: str
     organization_id: str | None = None
     roles: frozenset[str] = frozenset()
+    reauthenticated_at: datetime | None = field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
 
 PORTFOLIO_ROLES = frozenset({
@@ -53,7 +57,11 @@ PORTFOLIO_EDIT_ROLES = frozenset({"org_admin", "compliance_operator"})
 
 
 def local_identity() -> PortfolioIdentity:
-    return PortfolioIdentity(actor_id="local-demo", roles=PORTFOLIO_ROLES)
+    return PortfolioIdentity(
+        actor_id="local-demo",
+        roles=PORTFOLIO_ROLES,
+        reauthenticated_at=datetime.now(timezone.utc),
+    )
 
 
 def _authorize(
@@ -61,11 +69,15 @@ def _authorize(
     *,
     organization_id: str | None = None,
     roles: frozenset[str] = PORTFOLIO_ROLES,
+    sensitive: bool = False,
 ) -> None:
-    if organization_id and identity.organization_id and identity.organization_id != organization_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
-    if identity.roles.isdisjoint(roles):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
+    if organization_id is None:
+        if identity.roles.isdisjoint(roles):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
+        if sensitive:
+            require_recent_reauthentication(identity)
+        return
+    authorize_request(identity, organization_id, roles, sensitive=sensitive)
 
 
 class ApiModel(BaseModel):
@@ -325,7 +337,7 @@ def create_portfolio_router(
 
     @router.post("/organizations", response_model=OrganizationResponse, status_code=status.HTTP_201_CREATED)
     def create_organization(body: OrganizationCreate, repository: Repository, identity: Identity):
-        _authorize(identity, roles=frozenset({"org_admin"}))
+        _authorize(identity, roles=frozenset({"org_admin"}), sensitive=True)
         return _call(lambda: repository.create_organization(
             name=body.name,
             legal_name=body.legal_name,
@@ -342,7 +354,12 @@ def create_portfolio_router(
 
     @router.patch("/organizations/{organization_id}", response_model=OrganizationResponse)
     def update_organization(body: OrganizationUpdate, organization_id: str, repository: Repository, identity: Identity):
-        _authorize(identity, organization_id=organization_id, roles=frozenset({"org_admin"}))
+        _authorize(
+            identity,
+            organization_id=organization_id,
+            roles=frozenset({"org_admin"}),
+            sensitive=True,
+        )
         changes = OrganizationChanges(**body.model_dump(exclude_unset=True))
         return _call(lambda: repository.update_organization(organization_id, changes, identity.actor_id))
 
@@ -358,7 +375,12 @@ def create_portfolio_router(
         status_code=status.HTTP_201_CREATED,
     )
     def create_product(body: ProductCreate, organization_id: str, repository: Repository, identity: Identity):
-        _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES)
+        _authorize(
+            identity,
+            organization_id=organization_id,
+            roles=PORTFOLIO_EDIT_ROLES,
+            sensitive=True,
+        )
         values = body.model_dump()
         if body.classification_assessment is not None:
             values["classification_assessment"] = body.classification_assessment.model_dump(mode="json")
@@ -381,7 +403,12 @@ def create_portfolio_router(
         repository: Repository,
         identity: Identity,
     ):
-        _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES)
+        _authorize(
+            identity,
+            organization_id=organization_id,
+            roles=PORTFOLIO_EDIT_ROLES,
+            sensitive=True,
+        )
         values = body.model_dump(exclude_unset=True, exclude={"active_release_id"})
         if body.classification_assessment is not None:
             values["classification_assessment"] = body.classification_assessment.model_dump(mode="json")
@@ -421,7 +448,12 @@ def create_portfolio_router(
         repository: Repository,
         identity: Identity,
     ):
-        _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES)
+        _authorize(
+            identity,
+            organization_id=organization_id,
+            roles=PORTFOLIO_EDIT_ROLES,
+            sensitive=True,
+        )
         return _call(lambda: repository.create_release(
             organization_id,
             product_id,
@@ -458,7 +490,12 @@ def create_portfolio_router(
         repository: Repository,
         identity: Identity,
     ):
-        _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES)
+        _authorize(
+            identity,
+            organization_id=organization_id,
+            roles=PORTFOLIO_EDIT_ROLES,
+            sensitive=True,
+        )
         release = _call(lambda: repository.get_release(organization_id, release_id))
         if release.product_id != product_id:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "release not found")

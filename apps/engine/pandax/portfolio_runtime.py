@@ -7,12 +7,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import HTTPException, Security, status
+from fastapi import HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from .analysis_jobs import AnalysisJobRecord, AnalysisJobRepository
 from .analysis_storage import LocalAnalysisInputStorage
-from .auth import OIDCAuthenticator, OIDCSettings, Principal
+from .auth import OIDCAuthenticator, OIDCSettings, Principal, Role
 from .compliance import ComplianceRepository
 from .documents import DocumentRepository
 from .domain_projections import (
@@ -22,7 +22,7 @@ from .domain_projections import (
 )
 from .findings import FindingRepository
 from .home import HomeReadModel
-from .organization_settings import OrganizationSettingsRepository
+from .organization_settings import OrganizationSettingsRepository, SettingsNotFound
 from .portfolio import PortfolioRepository, create_portfolio_engine
 from .portfolio_api import PortfolioIdentity
 from .release_monitoring import ReleaseMonitoringRepository
@@ -142,9 +142,10 @@ def get_oidc_authenticator() -> OIDCAuthenticator:
 
 
 async def get_authenticated_principal(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Security(_bearer)],
 ) -> Principal:
-    """Fail closed when OIDC is unconfigured or the bearer token is invalid."""
+    """Verify identity, then resolve tenant roles only from PostgreSQL."""
 
     try:
         authenticator = get_oidc_authenticator()
@@ -153,17 +154,50 @@ async def get_authenticated_principal(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="OIDC authentication is not configured",
         ) from exc
-    return await authenticator(credentials)
+    identity = await authenticator(credentials)
+    path_organization = request.path_params.get("organization_id")
+    header_organization = request.headers.get("x-organization-id")
+    if (
+        path_organization
+        and header_organization
+        and path_organization != header_organization
+    ):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
+    organization_id = (
+        path_organization or header_organization or identity.organization_hint
+    )
+    if not organization_id:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN,
+            "an organization context is required",
+        )
+    try:
+        membership = get_organization_settings_repository().resolve_membership(
+            identity.subject,
+            organization_id,
+        )
+    except SettingsNotFound as exc:
+        code = status.HTTP_404_NOT_FOUND if path_organization else status.HTTP_403_FORBIDDEN
+        raise HTTPException(code, "organization access denied") from exc
+    return Principal(
+        subject=identity.subject,
+        organization_id=organization_id,
+        roles=frozenset(Role(role) for role in membership.roles),
+        reauthenticated_at=identity.reauthenticated_at,
+        session_id=identity.session_id,
+    )
 
 
 async def get_portfolio_identity(
+    request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Security(_bearer)],
 ) -> PortfolioIdentity:
-    principal = await get_authenticated_principal(credentials)
+    principal = await get_authenticated_principal(request, credentials)
     return PortfolioIdentity(
         actor_id=principal.subject,
         organization_id=principal.organization_id,
         roles=frozenset(role.value for role in principal.roles),
+        reauthenticated_at=principal.reauthenticated_at,
     )
 
 

@@ -1,6 +1,7 @@
 from datetime import date
 
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 
 from pandax import server
@@ -42,9 +43,14 @@ def test_server_exposes_portfolio_router_with_replaceable_repository(tmp_path):
     )
     repository.create_schema()
     server.api.dependency_overrides[get_portfolio_repository] = lambda: repository
-    server.api.dependency_overrides[get_portfolio_identity] = lambda: PortfolioIdentity(
-        actor_id="test-admin", roles=PORTFOLIO_ROLES
-    )
+    def identity(request: Request) -> PortfolioIdentity:
+        return PortfolioIdentity(
+            actor_id="test-admin",
+            organization_id=request.path_params.get("organization_id"),
+            roles=PORTFOLIO_ROLES,
+        )
+
+    server.api.dependency_overrides[get_portfolio_identity] = identity
     server.api.dependency_overrides[get_authenticated_principal] = lambda: Principal(
         subject="test-admin",
         organization_id="test-organization",

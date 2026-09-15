@@ -59,3 +59,4 @@ jobs:
         env:
           PYTHONPATH: apps/engine
           PANDAX_TEST_POSTGRES_URL: postgresql+psycopg://actis:actis@localhost:5432/actis_test
+      - run: docker build --tag actis-api:ci .

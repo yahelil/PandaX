@@ -1,0 +1,88 @@
+services:
+  - type: web
+    name: actis-api-staging
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: PANDAX_ENVIRONMENT
+        value: staging
+      - key: PANDAX_DATABASE_HARD_STOP_MB
+        value: "100"
+      - key: PANDAX_STORAGE_BUCKET
+        value: actis-evidence
+      - key: PANDAX_SIGNER_PROVIDER
+        value: secret
+      - key: PANDAX_NOTIFICATION_DAILY_LIMIT
+        value: "80"
+      - key: PANDAX_DATABASE_URL
+        sync: false
+      - key: PANDAX_STORAGE_URL
+        sync: false
+      - key: PANDAX_STORAGE_SECRET_KEY
+        sync: false
+      - key: PANDAX_SIGNING_KEY_B64
+        sync: false
+      - key: PANDAX_SIGNING_KEY_ID
+        sync: false
+      - key: PANDAX_SIGNING_KEY_VERSION
+        sync: false
+      - key: PANDAX_SIGNING_KEY_REGISTRY_B64
+        sync: false
+      - key: PANDAX_OIDC_ISSUER
+        sync: false
+      - key: PANDAX_OIDC_AUDIENCE
+        value: authenticated
+      - key: PANDAX_OIDC_JWKS_URI
+        sync: false
+      - key: PANDAX_CORS_ORIGINS
+        sync: false
+
+  - type: web
+    name: actis-api-beta
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health/ready
+    autoDeployTrigger: checksPass
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: PANDAX_ENVIRONMENT
+        value: beta
+      - key: PANDAX_DATABASE_HARD_STOP_MB
+        value: "250"
+      - key: PANDAX_STORAGE_BUCKET
+        value: actis-evidence
+      - key: PANDAX_SIGNER_PROVIDER
+        value: secret
+      - key: PANDAX_NOTIFICATION_DAILY_LIMIT
+        value: "80"
+      - key: PANDAX_DATABASE_URL
+        sync: false
+      - key: PANDAX_STORAGE_URL
+        sync: false
+      - key: PANDAX_STORAGE_SECRET_KEY
+        sync: false
+      - key: PANDAX_SIGNING_KEY_B64
+        sync: false
+      - key: PANDAX_SIGNING_KEY_ID
+        sync: false
+      - key: PANDAX_SIGNING_KEY_VERSION
+        sync: false
+      - key: PANDAX_SIGNING_KEY_REGISTRY_B64
+        sync: false
+      - key: PANDAX_OIDC_ISSUER
+        sync: false
+      - key: PANDAX_OIDC_AUDIENCE
+        value: authenticated
+      - key: PANDAX_OIDC_JWKS_URI
+        sync: false
+      - key: PANDAX_CORS_ORIGINS
+        sync: false

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import datetime, timedelta, timezone
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 
@@ -26,13 +27,18 @@ def repository() -> Iterator[PortfolioRepository]:
 
 @pytest.fixture
 def client(repository: PortfolioRepository) -> TestClient:
+    def identity(request: Request) -> PortfolioIdentity:
+        return PortfolioIdentity(
+            actor_id="member-compliance-lead",
+            organization_id=request.path_params.get("organization_id"),
+            roles=PORTFOLIO_ROLES,
+        )
+
     app = FastAPI()
     app.include_router(
         create_portfolio_router(
             lambda: repository,
-            lambda: PortfolioIdentity(
-                actor_id="member-compliance-lead", roles=PORTFOLIO_ROLES
-            ),
+            identity,
         )
     )
     return TestClient(app)
@@ -145,6 +151,27 @@ def test_organization_create_list_detail_and_update(client: TestClient, reposito
     )
     assert [event.action for event in events] == ["organization.created", "organization.updated"]
     assert all(event.actor_id == "member-compliance-lead" for event in events)
+
+
+def test_organization_creation_requires_recent_reauthentication(
+    repository: PortfolioRepository,
+):
+    def stale_admin() -> PortfolioIdentity:
+        return PortfolioIdentity(
+            actor_id="member-org-admin",
+            roles=frozenset({"org_admin"}),
+            reauthenticated_at=datetime.now(timezone.utc) - timedelta(hours=1),
+        )
+
+    app = FastAPI()
+    app.include_router(create_portfolio_router(lambda: repository, stale_admin))
+
+    response = TestClient(app).post("/v1/organizations", json=organization_payload())
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "recent reauthentication required"}
+    assert response.headers["www-authenticate"] == 'Bearer error="insufficient_authentication"'
+    assert repository.list_organizations() == []
 
 
 def test_product_contract_supports_portfolio_fields_and_updates(client: TestClient, repository: PortfolioRepository):

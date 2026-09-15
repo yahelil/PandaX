@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from .auth import authorize_request
 from .portfolio_api import IdentityDependency, PORTFOLIO_ROLES, PortfolioIdentity, local_identity
 from .search_notifications import (
     NotificationNotFound,
@@ -159,10 +160,7 @@ def _grouped(query: str, results: list[SearchResult]) -> dict[str, Any]:
 
 
 def _authorize(identity: PortfolioIdentity, organization_id: str) -> None:
-    if identity.organization_id and identity.organization_id != organization_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
-    if identity.roles.isdisjoint(PORTFOLIO_ROLES):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
+    authorize_request(identity, organization_id, PORTFOLIO_ROLES)
 
 
 def _call(operation: Callable[[], Any]):

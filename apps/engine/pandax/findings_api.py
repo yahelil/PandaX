@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .auth import authorize_request
 from .findings import (
     FindingAuditRecord,
     FindingConflict,
@@ -210,7 +211,7 @@ def create_findings_router(
         repository: Annotated[FindingRepository, Depends(repository_dependency)],
         identity: Annotated[PortfolioIdentity, Depends(identity_dependency)],
     ):
-        _authorize(identity, organization_id, REMEDIATION_ROLES)
+        _authorize(identity, organization_id, REMEDIATION_ROLES, sensitive=True)
         return _call(lambda: repository.assign(
             organization_id, product_id, release_id, finding_id,
             assignee_id=body.assignee_id, expected_version=body.expected_version,
@@ -227,7 +228,7 @@ def create_findings_router(
         repository: Annotated[FindingRepository, Depends(repository_dependency)],
         identity: Annotated[PortfolioIdentity, Depends(identity_dependency)],
     ):
-        _authorize(identity, organization_id, DECISION_ROLES)
+        _authorize(identity, organization_id, DECISION_ROLES, sensitive=True)
         record = _call(lambda: repository.decide(
             organization_id, product_id, release_id, finding_id,
             decision=body.decision, rationale=body.rationale,
@@ -245,7 +246,7 @@ def create_findings_router(
         repository: Annotated[FindingRepository, Depends(repository_dependency)],
         identity: Annotated[PortfolioIdentity, Depends(identity_dependency)],
     ):
-        _authorize(identity, organization_id, REMEDIATION_ROLES)
+        _authorize(identity, organization_id, REMEDIATION_ROLES, sensitive=True)
         record = _call(lambda: repository.update_remediation(
             organization_id, product_id, release_id, finding_id,
             plan=body.plan, status=body.status, due_date=body.due_date,
@@ -264,11 +265,14 @@ def _detail(repository: FindingRepository, record: FindingRecord) -> Mapping[str
     return values
 
 
-def _authorize(identity: PortfolioIdentity, organization_id: str, roles: frozenset[str]) -> None:
-    if identity.organization_id and identity.organization_id != organization_id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "organization not found")
-    if identity.roles.isdisjoint(roles):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "insufficient role")
+def _authorize(
+    identity: PortfolioIdentity,
+    organization_id: str,
+    roles: frozenset[str],
+    *,
+    sensitive: bool = False,
+) -> None:
+    authorize_request(identity, organization_id, roles, sensitive=sensitive)
 
 
 def _call(operation: Callable[[], Any]):

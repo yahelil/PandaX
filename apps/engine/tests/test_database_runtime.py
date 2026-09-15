@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
 from pandax import portfolio_runtime, server
+from pandax.analysis_storage import SupabaseAnalysisInputStorage
 from pandax.portfolio_runtime import DatabaseSettings, DatabaseStatus
 
 
@@ -39,6 +40,23 @@ def test_postgresql_pool_is_small_bounded_and_pooler_safe():
     assert options["pool_pre_ping"] is True
     assert options["connect_args"]["prepare_threshold"] is None
     assert "statement_timeout=15000" in options["connect_args"]["options"]
+
+
+def test_managed_storage_requires_private_supabase_configuration(monkeypatch):
+    monkeypatch.setenv("PANDAX_ENVIRONMENT", "beta")
+    for name in ("PANDAX_STORAGE_URL", "PANDAX_STORAGE_SECRET_KEY", "PANDAX_STORAGE_BUCKET"):
+        monkeypatch.delenv(name, raising=False)
+    with pytest.raises(ValueError, match="required"):
+        portfolio_runtime._analysis_storage()
+
+    monkeypatch.setenv("PANDAX_ANALYSIS_INPUT_DIR", "./local-objects")
+    with pytest.raises(ValueError, match="cannot use local"):
+        portfolio_runtime._analysis_storage()
+    monkeypatch.delenv("PANDAX_ANALYSIS_INPUT_DIR")
+    monkeypatch.setenv("PANDAX_STORAGE_URL", "https://project.supabase.co")
+    monkeypatch.setenv("PANDAX_STORAGE_SECRET_KEY", "secret")
+    monkeypatch.setenv("PANDAX_STORAGE_BUCKET", "actis-evidence")
+    assert isinstance(portfolio_runtime._analysis_storage(), SupabaseAnalysisInputStorage)
 
 
 def test_local_database_is_ready_without_managed_capacity(tmp_path):

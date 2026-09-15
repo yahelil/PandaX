@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -14,7 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Engine, make_url
 
 from .analysis_jobs import AnalysisJobRecord, AnalysisJobRepository
-from .analysis_storage import LocalAnalysisInputStorage
+from .analysis_storage import LocalAnalysisInputStorage, SupabaseAnalysisInputStorage
 from .auth import OIDCAuthenticator, OIDCSettings, Principal, Role
 from .compliance import ComplianceRepository
 from .documents import DocumentRepository
@@ -36,7 +37,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 MANAGED_ENVIRONMENTS = frozenset({"staging", "beta", "production"})
 DATABASE_HARD_STOP_MB = {"staging": 100, "beta": 250, "production": 350}
-EXPECTED_DATABASE_REVISION = "20260915_0011"
+EXPECTED_DATABASE_REVISION = "20260915_0012"
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,17 +182,48 @@ def database_allows_background_growth() -> bool:
         return False
 
 
+def _analysis_storage():
+    environment = runtime_environment()
+    configured_root = os.environ.get("PANDAX_ANALYSIS_INPUT_DIR", "").strip()
+    if environment in MANAGED_ENVIRONMENTS:
+        if configured_root:
+            raise ValueError("managed environments cannot use local analysis storage")
+        endpoint = os.environ.get("PANDAX_STORAGE_URL", "").strip()
+        api_key = os.environ.get("PANDAX_STORAGE_SECRET_KEY", "").strip()
+        bucket = os.environ.get("PANDAX_STORAGE_BUCKET", "").strip()
+        if not endpoint or not api_key or not bucket:
+            raise ValueError(
+                "PANDAX_STORAGE_URL, PANDAX_STORAGE_SECRET_KEY, and "
+                "PANDAX_STORAGE_BUCKET are required for managed environments"
+            )
+        parsed = urlsplit(endpoint)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("PANDAX_STORAGE_URL must be an HTTPS Supabase project URL")
+        return SupabaseAnalysisInputStorage(endpoint, api_key, bucket)
+    root = Path(configured_root) if configured_root else Path(
+        os.environ.get("PANDAX_DATA_DIR", Path.cwd() / "output" / ".pandax")
+    ) / "analysis-objects"
+    return LocalAnalysisInputStorage(root)
+
+
 @lru_cache(maxsize=1)
 def get_analysis_repository() -> AnalysisJobRepository:
-    configured = os.environ.get("PANDAX_ANALYSIS_INPUT_DIR", "").strip()
-    root = Path(configured) if configured else Path(os.environ.get("PANDAX_DATA_DIR", Path.cwd() / "output" / ".pandax")) / "analysis-objects"
     repository = AnalysisJobRepository(
         get_portfolio_repository().engine,
-        LocalAnalysisInputStorage(root),
+        _analysis_storage(),
     )
     if repository.engine.dialect.name == "sqlite":
         repository.create_schema()
     return repository
+
+
+def get_storage_status() -> dict[str, object]:
+    storage = get_analysis_repository().storage
+    storage.check_ready()
+    return {
+        "ready": True,
+        "provider": "supabase" if isinstance(storage, SupabaseAnalysisInputStorage) else "local",
+    }
 
 
 @lru_cache(maxsize=1)

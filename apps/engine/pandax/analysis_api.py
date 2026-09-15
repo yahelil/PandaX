@@ -15,7 +15,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import exposure, telemetry
@@ -31,6 +31,7 @@ from .analysis_jobs import (
     AnalysisJobRepository,
     AnalysisJobValidationError,
     AnalysisRunner,
+    EvidenceBundleRecord,
     pipeline_runner,
 )
 from .portfolio_api import (
@@ -44,6 +45,7 @@ from .organization_settings import OrganizationSettingsRepository
 ANALYSIS_EDIT_ROLES = frozenset(
     {"org_admin", "compliance_operator", "security_reviewer"}
 )
+EVIDENCE_ADMIN_ROLES = frozenset({"org_admin", "compliance_operator"})
 JobStatus = Literal["queued", "running", "completed", "failed", "unsupported"]
 
 
@@ -68,6 +70,13 @@ class EvidenceLinkResponse(ApiModel):
     href: str
 
 
+class EvidenceBundleLinkResponse(ApiModel):
+    sha256: str
+    size_bytes: int
+    retained_until: datetime
+    href: str
+
+
 class AnalysisResultResponse(ApiModel):
     components: int = 0
     findings: int = 0
@@ -77,6 +86,34 @@ class AnalysisResultResponse(ApiModel):
     input_version: str
     coverage_summary: dict[str, int] = Field(default_factory=dict)
     evidence: list[EvidenceLinkResponse] = Field(default_factory=list)
+    bundle: EvidenceBundleLinkResponse | None = None
+
+
+class EvidenceBundleResponse(ApiModel):
+    id: str
+    filename: str
+    sha256: str
+    size_bytes: int
+    created_at: datetime
+    retained_until: datetime
+    state: Literal["active", "deletion_pending", "deleted"]
+    legal_hold: bool
+    hold_reason: str | None
+    held_at: datetime | None
+    held_by: str | None
+    deleted_at: datetime | None
+    backup_expires_at: datetime | None
+    deletion_receipt: dict[str, Any] | None
+    export_href: str
+
+
+class EvidenceHoldRequest(ApiModel):
+    held: bool
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class EvidenceDeleteRequest(ApiModel):
+    reason: str = Field(min_length=1, max_length=500)
 
 
 class AnalysisJobResponse(ApiModel):
@@ -318,10 +355,98 @@ def create_analysis_router(
             dispatcher(work)
         return _job_response(job)
 
-    @router.get(
-        "/organizations/{organization_id}/products/{product_id}/releases/{release_id}/analysis-jobs/{job_id}/evidence/{digest}",
-        response_class=FileResponse,
+    evidence_route = (
+        "/organizations/{organization_id}/products/{product_id}/releases/{release_id}"
+        "/analysis-jobs/{job_id}/evidence"
     )
+
+    @router.get(evidence_route, response_model=EvidenceBundleResponse)
+    def get_evidence_bundle(
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        job_id: str,
+        repository: Repository,
+        identity: Identity,
+    ):
+        _authorize(identity, organization_id, PORTFOLIO_ROLES)
+        bundle = _call(lambda: repository.evidence_bundle(
+            organization_id, product_id, release_id, job_id
+        ))
+        return _bundle_response(bundle, evidence_route.format(
+            organization_id=organization_id,
+            product_id=product_id,
+            release_id=release_id,
+            job_id=job_id,
+        ))
+
+    @router.get(f"{evidence_route}/export", response_class=Response)
+    def export_evidence_bundle(
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        job_id: str,
+        repository: Repository,
+        identity: Identity,
+    ):
+        _authorize(identity, organization_id, PORTFOLIO_ROLES, sensitive=True)
+        content, filename = _call(lambda: repository.export_evidence(
+            organization_id, product_id, release_id, job_id
+        ))
+        return Response(
+            content=content,
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    @router.put(f"{evidence_route}/hold", response_model=EvidenceBundleResponse)
+    def set_evidence_hold(
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        job_id: str,
+        body: EvidenceHoldRequest,
+        repository: Repository,
+        identity: Identity,
+    ):
+        _authorize(identity, organization_id, EVIDENCE_ADMIN_ROLES, sensitive=True)
+        bundle = _call(lambda: repository.set_evidence_hold(
+            organization_id,
+            product_id,
+            release_id,
+            job_id,
+            held=body.held,
+            reason=body.reason,
+            actor_id=identity.actor_id,
+        ))
+        return _bundle_response(bundle, evidence_route.format(
+            organization_id=organization_id,
+            product_id=product_id,
+            release_id=release_id,
+            job_id=job_id,
+        ))
+
+    @router.delete(evidence_route)
+    def delete_evidence_bundle(
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        job_id: str,
+        body: EvidenceDeleteRequest,
+        repository: Repository,
+        identity: Identity,
+    ):
+        _authorize(identity, organization_id, EVIDENCE_ADMIN_ROLES, sensitive=True)
+        return _call(lambda: repository.delete_evidence(
+            organization_id,
+            product_id,
+            release_id,
+            job_id,
+            reason=body.reason,
+            actor_id=identity.actor_id,
+        ))
+
+    @router.get(f"{evidence_route}/{{digest}}", response_class=Response)
     def download_evidence(
         organization_id: str,
         product_id: str,
@@ -333,12 +458,16 @@ def create_analysis_router(
     ):
         _authorize(identity, organization_id, PORTFOLIO_ROLES)
         _scoped_job(repository, organization_id, product_id, release_id, job_id)
-        path, filename = _call(
-            lambda: repository.evidence_path(
+        content, filename = _call(
+            lambda: repository.evidence_content(
                 organization_id, product_id, release_id, job_id, digest
             )
         )
-        return FileResponse(path, filename=filename, media_type="application/octet-stream")
+        return Response(
+            content=content,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
 
     return router
 
@@ -439,6 +568,15 @@ def _public_result(result: Mapping[str, Any], prefix: str) -> dict[str, Any]:
             evidence.append(
                 {"name": str(item.get("name", "evidence")), "sha256": digest, "href": f"{prefix}/{digest}"}
             )
+    bundle = result.get("bundle")
+    public_bundle = None
+    if isinstance(bundle, Mapping):
+        public_bundle = {
+            "sha256": str(bundle.get("sha256", "")),
+            "size_bytes": int(bundle.get("size_bytes", 0)),
+            "retained_until": str(bundle.get("retained_until", "")),
+            "href": f"{prefix}/export",
+        }
     return {
         "components": int(result.get("components", 0)),
         "findings": int(result.get("findings", 0)),
@@ -448,4 +586,25 @@ def _public_result(result: Mapping[str, Any], prefix: str) -> dict[str, Any]:
         "input_version": str(result.get("input_version", "")),
         "coverage_summary": dict(result.get("coverage_summary", {})),
         "evidence": evidence,
+        "bundle": public_bundle,
+    }
+
+
+def _bundle_response(bundle: EvidenceBundleRecord, route: str) -> dict[str, Any]:
+    return {
+        "id": bundle.id,
+        "filename": bundle.filename,
+        "sha256": bundle.sha256,
+        "size_bytes": bundle.size_bytes,
+        "created_at": bundle.created_at,
+        "retained_until": bundle.retained_until,
+        "state": bundle.state,
+        "legal_hold": bundle.legal_hold,
+        "hold_reason": bundle.hold_reason,
+        "held_at": bundle.held_at,
+        "held_by": bundle.held_by,
+        "deleted_at": bundle.deleted_at,
+        "backup_expires_at": bundle.backup_expires_at,
+        "deletion_receipt": dict(bundle.deletion_receipt) if bundle.deletion_receipt else None,
+        "export_href": f"{route}/export",
     }

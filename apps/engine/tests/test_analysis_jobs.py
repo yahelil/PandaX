@@ -237,8 +237,8 @@ def test_run_projects_progress_result_and_downloadable_evidence(
     assert completed.status == "completed"
     assert completed.progress == 100
     assert completed.result["findings"] == 3
-    path, name = repository.evidence_path(*scope, job.id, digest)
-    assert path == evidence
+    content, name = repository.evidence_content(*scope, job.id, digest)
+    assert content == evidence.read_bytes()
     assert name == "manifest.json"
     history = repository.events(*scope, job.id)
     assert [item.sequence for item in history] == list(range(1, len(history) + 1))

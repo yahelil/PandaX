@@ -12,8 +12,9 @@ def test_production_migrations_form_one_ordered_head():
     config.set_main_option("script_location", str(root / "alembic"))
     scripts = ScriptDirectory.from_config(config)
 
-    assert scripts.get_heads() == ["20260915_0011"]
+    assert scripts.get_heads() == ["20260915_0012"]
     assert [revision.revision for revision in scripts.walk_revisions()] == [
+        "20260915_0012",
         "20260915_0011",
         "20260915_0010",
         "20260914_0009",
@@ -70,6 +71,12 @@ def test_tenant_authorization_migration_upgrades_existing_rows(tmp_path):
                 changes JSON NOT NULL
             )
         """))
+        connection.execute(text("""
+            CREATE TABLE analysis_jobs (
+                id VARCHAR(36) PRIMARY KEY,
+                size_bytes INTEGER NOT NULL
+            )
+        """))
         connection.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) PRIMARY KEY)"))
         connection.execute(text("INSERT INTO alembic_version VALUES ('20260915_0010')"))
         connection.execute(text("INSERT INTO portfolio_organizations VALUES ('org-a')"))
@@ -93,7 +100,7 @@ def test_tenant_authorization_migration_upgrades_existing_rows(tmp_path):
     command.upgrade(config, "head")
 
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "20260915_0011"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "20260915_0012"
         member = connection.execute(text("SELECT revoked_at FROM organization_team_members")).one()
         audit = connection.execute(text("SELECT previous_digest, digest FROM organization_settings_audit_events")).one()
     assert member.revoked_at == "2026-09-15 00:00:00"

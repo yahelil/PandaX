@@ -9,7 +9,7 @@ timeout, so a hung daemon fails the check instead of hanging the operator.
 
     python tools/poc_preflight.py [--firmware] [--pdf]
 
-Default checks are what every run needs: Python, the pandax package, Syft.
+Default checks are what every run needs: Python, the Actis package, Syft.
 Optional tools are checked only when their flag asks for them — a machine
 without Docker still passes a default run, because a default run does not use
 Docker.
@@ -103,13 +103,13 @@ def check_python() -> Check:
                  f"Python {wanted} or newer is required; this is {version}")
 
 
-def check_pandax() -> Check:
+def check_actis() -> Check:
     try:
-        version = importlib.metadata.version("pandax")
+        version = importlib.metadata.version("actis")
     except importlib.metadata.PackageNotFoundError:
-        return Check("pandax package", False, "not installed",
+        return Check("Actis package", False, "not installed",
                      "install the engine:  uv sync")
-    return Check("pandax package", True, version)
+    return Check("Actis package", True, version)
 
 
 def find_syft() -> Path | None:
@@ -171,7 +171,7 @@ def check_verapdf(explicit: Path | None) -> Check:
 
 
 def run_checks(firmware: bool, pdf: bool, verapdf: Path | None) -> list[Check]:
-    checks = [check_python(), check_pandax(), check_syft()]
+    checks = [check_python(), check_actis(), check_syft()]
     if firmware:
         checks.append(check_docker())
     if pdf:
@@ -184,7 +184,7 @@ def report(checks: list[Check], stream=None) -> None:
     # sys.stdout at import time and ignore any later redirection.
     stream = sys.stdout if stream is None else stream
     width = max(len(check.name) for check in checks)
-    print("PandaX PoC preflight", file=stream)
+    print("Actis by PandaX preflight", file=stream)
     print(file=stream)
     for check in checks:
         status = "PASS" if check.ok else "FAIL"

@@ -11,7 +11,7 @@ Engine on Linux). Pull this exact official unblob 26.6.4 image once:
 
 ```sh
 docker pull ghcr.io/onekey-sec/unblob@sha256:0779adc4fc7751c601eaaa2eaae1ad04279a8afadecb36af4315752b72f5e2f9
-pandax scan /path/to/firmware.bin
+actis scan /path/to/firmware.bin
 ```
 
 The existing `/api/scan` accepts `{"artifact": "/absolute/path/to/firmware.bin"}`
@@ -37,7 +37,7 @@ PowerShell example:
 ```powershell
 $env:PANDAX_FIRMWARE_MAX_OUTPUT_BYTES = '21474836480'
 $env:PANDAX_FIRMWARE_MAX_FILES = '200000'
-pandax scan 'C:/firmware/device.bin'
+actis scan 'C:/firmware/device.bin'
 ```
 
 ZIP/TAR keep their existing 512 MiB / 20,000-entry / depth-24 rules. Firmware

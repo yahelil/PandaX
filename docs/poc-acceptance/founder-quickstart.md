@@ -28,14 +28,14 @@ Nothing moves from pending to verified without a filed log under
 Check the machine before installing anything:
 
 ```bash
-python tools/poc_preflight.py             # Python, pandax package, Syft
+python tools/poc_preflight.py             # Python, Actis package, Syft
 python tools/poc_preflight.py --firmware  # also Docker CLI and daemon
 python tools/poc_preflight.py --pdf       # also veraPDF
 ```
 
 | Flag | Adds | Needed for |
 |---|---|---|
-| *(none)* | Python >= 3.10, `pandax` installed, Syft in `.tools/` or on PATH | every run |
+| *(none)* | Python >= 3.10, Actis installed, Syft in `.tools/` or on PATH | every run |
 | `--firmware` | Docker CLI on PATH, daemon reachable via `docker info` | firmware ingest (cards 03, 07, 19) |
 | `--pdf` | veraPDF on PATH, or `--verapdf PATH` | PDF/A validation (cards 10, 13) |
 
@@ -112,13 +112,13 @@ bootstrap step entirely.
 ## Step 3 · First scan — **pending**
 
 ```bash
-uv run pandax scan fixtures/smarthub-sh100-v2.3.1.zip
+uv run actis scan fixtures/smarthub-sh100-v2.3.1.zip
 ```
 
 Or from an SBOM:
 
 ```bash
-uv run pandax scan-sbom fixtures/example-sbom.cdx.json
+uv run actis scan-sbom fixtures/example-sbom.cdx.json
 ```
 
 `README.md` states the demo artifact should yield 11 components, ~102
@@ -135,13 +135,13 @@ in `evidence-index.md`.
 ## Step 4 · Proving it worked — **pending**
 
 ```bash
-uv run pandax verdict                                       # blockers, clocks, actions
-uv run pandax key export-public trusted-pandax-key.pem
-uv run pandax verify --trusted-key trusted-pandax-key.pem   # integrity, signature, trust
-uv run pandax tamper --target sbom.cdx.json                 # flips one byte
-uv run pandax verify --trusted-key trusted-pandax-key.pem   # must now fail, naming S2_SBOM
-uv run pandax clock --speed 1800                            # compressed 24h/72h/final
-uv run pandax serve                                         # local dashboard
+uv run actis verdict                                       # blockers, clocks, actions
+uv run actis key export-public trusted-actis-key.pem
+uv run actis verify --trusted-key trusted-actis-key.pem   # integrity, signature, trust
+uv run actis tamper --target sbom.cdx.json                 # flips one byte
+uv run actis verify --trusted-key trusted-actis-key.pem   # must now fail, naming S2_SBOM
+uv run actis clock --speed 1800                            # compressed 24h/72h/final
+uv run actis serve                                         # local dashboard
 ```
 
 The tamper step is the one worth capturing: a seal that never fails proves
@@ -149,7 +149,7 @@ nothing.
 
 Two commands belong to other owners and are needed for card 19:
 
-- **Standalone verifier** (card 06, Guy) — `pandax-verify <bundle> --trusted-key <key>`,
+- **Standalone verifier** (card 06, Guy) — `actis-verify <bundle> --trusted-key <key>`,
   run from an environment without PandaX installed. `--inspect-only` checks
   integrity without claiming the signer is trusted; the two are not the same
   result and must not be recorded as if they were.

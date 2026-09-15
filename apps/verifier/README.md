@@ -1,7 +1,7 @@
-# PandaX Evidence Verifier
+# Actis Evidence Verifier
 
-This is a small, independent program for checking evidence produced by PandaX.
-It does not need a PandaX account, a running PandaX server, or an internet
+This is a small, independent program for checking evidence produced by Actis by
+PandaX. It does not need an Actis account, a running Actis server, or an internet
 connection. A customer, auditor, insurer, lawyer, or regulator can run it on a
 copied evidence folder or ZIP file.
 
@@ -16,7 +16,7 @@ The verifier answers three separate questions:
 
 The third check matters because an attacker could alter evidence and place a
 new key and signature beside it. A key delivered separately gives the receiver
-an independent reference for the expected PandaX installation.
+an independent reference for the expected Actis installation.
 
 ## Install
 
@@ -37,7 +37,7 @@ configuration location, confirm its displayed fingerprint with the provider,
 and run:
 
 ```text
-pandax-verify evidence.zip --trusted-key pandax-public.pem
+actis-verify evidence.zip --trusted-key actis-public.pem
 ```
 
 A successful result says `TRUSTED` and exits with code 0.
@@ -45,7 +45,7 @@ A successful result says `TRUSTED` and exits with code 0.
 ## Inspect older evidence without a trusted key
 
 ```text
-pandax-verify evidence.zip --inspect-only
+actis-verify evidence.zip --inspect-only
 ```
 
 This can confirm that the bundle is internally intact, but it clearly reports
@@ -55,18 +55,22 @@ that signer trust was not established. A successful inspection exits with code
 ## Machine-readable result
 
 ```text
-pandax-verify evidence.zip --trusted-key pandax-public.pem --json
+actis-verify evidence.zip --trusted-key actis-public.pem --json
 ```
 
-The output uses the schema `pandax/verification-result/v1` and includes the
+Verification output uses the schema `actis/verification-result/v1` and includes the
 overall status, integrity and signature results, signer trust, key
-fingerprints, a plain-language reason, and every individual check.
+fingerprints, a plain-language reason, and every individual check. A trusted-key
+configuration error uses `actis/verifier-error/v1`.
 
 Exit codes are:
 
 - `0`: trusted, or an intact bundle in explicit inspection mode
 - `1`: untrusted, invalid, incomplete, or unsupported evidence
 - `2`: invalid command options or an unusable trusted-key configuration
+
+The frozen bundle contract, schemas, migration policy, and public-safe fixtures
+are in [`docs/evidence-format-v1.md`](../../docs/evidence-format-v1.md).
 
 ## Safety limits
 

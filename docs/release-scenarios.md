@@ -1,6 +1,6 @@
 # Public release comparison scenarios
 
-Start the dashboard with `uv run pandax serve`, select a **Release comparison**,
+Start the dashboard with `uv run actis serve`, select a **Release comparison**,
 and press **Run pipeline**. The five pairs and ten individual releases appear
 even on a fresh checkout. Official artifacts download on demand and are checked
 against committed SHA-256 digests before use. Run `uv run python tools/bootstrap.py`
@@ -24,7 +24,7 @@ separate from the scanner's matching rules and built-in scenario checks. The
 PDF builder reads only this reference. It does not read scan output.
 
 To repeat the comparison, pull the desired code, install its dependencies and
-restart `pandax serve`, then run `python tools/evaluate_reference.py`. This uses
+restart `actis serve`, then run `python tools/evaluate_reference.py`. This uses
 the dashboard HTTP API for all 14 reference inputs and four comparison actions.
 Exit 1 means at least one independent check failed; raw errors remain in the
 report. The engine itself is not modified by the evaluator. The reference is
@@ -41,16 +41,16 @@ a selected CVE test set, not a complete vulnerability census.
 CLI equivalents:
 
 ```sh
-uv run pandax compare list
-uv run pandax compare tomcat-partial-put
-uv run pandax compare openwrt-libubox
-uv run pandax compare curl-socks5
-uv run pandax compare openwrt-dnsmasq
-uv run pandax compare openssl-heartbleed
+uv run actis compare list
+uv run actis compare tomcat-partial-put
+uv run actis compare openwrt-libubox
+uv run actis compare curl-socks5
+uv run actis compare openwrt-dnsmasq
+uv run actis compare openssl-heartbleed
 ```
 
 A comparison exits 0 when its checks pass and 1 when they fail. The existing
-`pandax scan` command retains exit 2 for a KEV hit. A comparison passing means
+`actis scan` command retains exit 2 for a KEV hit. A comparison passing means
 its specified expectations were met, not that either release is secure.
 
 ## Real application example: Tomcat file uploads

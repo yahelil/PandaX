@@ -17,7 +17,7 @@ report reviewers and evidence recipients do not select trust keys.
 2. Export only the public half:
 
    ```powershell
-   pandax key export-public C:\onboarding\pandax-public.pem
+   actis key export-public C:\onboarding\actis-public.pem
    ```
 
 3. Record the printed SHA-256 fingerprint in the customer onboarding record.
@@ -28,8 +28,8 @@ report reviewers and evidence recipients do not select trust keys.
 6. Configure the verifier:
 
    ```powershell
-   $env:PANDAX_TRUSTED_KEY = "C:\secure-config\pandax-public.pem"
-   pandax verify C:\evidence\run-example
+   $env:PANDAX_TRUSTED_KEY = "C:\secure-config\actis-public.pem"
+   actis verify C:\evidence\run-example
    ```
 
 The public key is not secret, but its origin must be authenticated. Do not use a
@@ -47,7 +47,7 @@ evidence bundle as authoritative.
 - `incomplete`: required evidence or signature files are missing or malformed.
 
 For historical review without an available trusted key, use
-`pandax verify RUN --inspect-only`. This can confirm internal integrity, but the
+`actis verify RUN --inspect-only`. This can confirm internal integrity, but the
 result explicitly does not establish signer trust.
 
 The server reads the public key path from `PANDAX_TRUSTED_KEY`. Its
@@ -64,7 +64,7 @@ or ZIP directly, works offline, and does not import PandaX code:
 ```powershell
 cd apps\verifier
 python -m pip install .
-pandax-verify C:\evidence\case-snapshot.zip --trusted-key C:\secure-config\pandax-public.pem
+actis-verify C:\evidence\case-snapshot.zip --trusted-key C:\secure-config\actis-public.pem
 ```
 
 For machine-readable output, add `--json`. For historical evidence where no

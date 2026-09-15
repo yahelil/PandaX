@@ -72,7 +72,16 @@ def test_scan_sbom_command_forwards_options(monkeypatch, tmp_path: Path):
 def test_version_is_available_without_running_pipeline():
     result = runner.invoke(cli.app, ["--version"])
     assert result.exit_code == 0
-    assert result.stdout.strip() == "0.1.0"
+    assert result.stdout.strip() == "Actis by PandaX 0.1.0"
+
+
+def test_help_uses_public_brand_and_command_name():
+    result = runner.invoke(cli.app, ["--help"], prog_name="actis")
+    assert result.exit_code == 0
+    assert "Actis by PandaX" in result.stdout
+    assert "Usage: actis" in result.stdout
+    assert "Usage: pandax" not in result.stdout
+    assert "Run PandaX" not in result.stdout
 
 
 def test_scan_sbom_missing_file_exits_with_pipeline_error(tmp_path: Path):

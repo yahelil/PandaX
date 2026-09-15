@@ -45,7 +45,7 @@ if '--signatures' in sys.argv:
    f=p/item['path']
    if f.is_file() and hashlib.sha256(f.read_bytes()).hexdigest()!=item['sha256']:raise SystemExit('Signed file changed: '+str(f))
  print('PASS: all original manifest signatures and included signed file hashes verify.')
-print('Vendor input/extracted trees are intentionally omitted. This is not full pandax verify. Local demo signatures prove integrity, not independent certification.')
+print('Vendor input/extracted trees are intentionally omitted. This is not full actis verify. Local demo signatures prove integrity, not independent certification.')
 '''
 
 
@@ -165,7 +165,7 @@ Open **index.html** for an offline, clickable overview. Start with **pdf/PandaX_
 
 Output files are copied byte-for-byte, including original manifest/signature/public key, SBOM, findings, VEX, ledger and automatic PoC PDFs. Vendor source archives and extracted trees are omitted to keep this package shareable; their hashes remain in the original manifests and evidence/export-map.json lists omissions. Private signing keys, credentials, caches and Git metadata are excluded.
 
-Run `python3 verify_package.py` after extracting to verify all exported file hashes. For original manifest signatures and included signed output hashes, install `cryptography` and run `python3 verify_package.py --signatures`. This is **not full pandax verify** because vendor inputs are omitted. Original full verification responses are preserved. Demo signatures demonstrate integrity, not external certification or factual completeness.
+Run `python3 verify_package.py` after extracting to verify all exported file hashes. For original manifest signatures and included signed output hashes, install `cryptography` and run `python3 verify_package.py --signatures`. This is **not full actis verify** because vendor inputs are omitted. Original full verification responses are preserved. Demo signatures demonstrate integrity, not external certification or factual completeness.
 
 Automatic Annex VII / Declaration PDFs inside bundles are unreviewed PoC outputs, not the independent answer key or an approved compliance declaration. Raw evidence retains historical local paths/URLs for integrity; use the portable index and case links to navigate offline. Public advisory links need internet access. The package checksum detects file changes; it is not an independent attestation.
 '''

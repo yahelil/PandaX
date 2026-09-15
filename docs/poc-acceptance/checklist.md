@@ -92,7 +92,7 @@ second person can apply it without reading the board.
 
 ### 01 — CLI clock and verdict before final report · Yaheli
 
-- **Expected output** — `pandax clock` and `pandax verdict` output for the
+- **Expected output** — `actis clock` and `actis verdict` output for the
   pending, known and overdue fixtures; one historical bundle re-read.
 - **Pass** — all three fixtures run without `KeyError` when `final_report` is
   absent; pending measure availability is shown rather than assumed; a
@@ -114,7 +114,7 @@ second person can apply it without reading the board.
 - **Fail** — any path where a bundled key satisfies trust, or where absent trust
   configuration still reports VERIFIED.
 - **Evidence** — `results/logs/02__trust-matrix__<date>.txt`, from
-  `pandax verify` and `pandax-verify <bundle> --trusted-key <key>` /
+  `actis verify` and `actis-verify <bundle> --trusted-key <key>` /
   `--inspect-only`; plus `pytest apps/engine/tests/test_trusted_verification.py`.
 - **Owner on failure** — Guy.
 
@@ -173,10 +173,10 @@ second person can apply it without reading the board.
 - **Fail** — a re-sealed bundle reported as trusted, or integrity-only
   inspection presented as trusted verification.
 - **Evidence** — `results/logs/06__standalone-verify__<date>.txt` from
-  `pandax-verify` in a clean virtualenv, plus
+  `actis-verify` in a clean virtualenv, plus
   `pytest apps/verifier/tests/`.
 - **Note** — the card names `tools/verify_bundle.py`; the verifier shipped as
-  `apps/verifier` (`pandax-verify`). Confirm with Guy that this is the intended
+  `apps/verifier` (`actis-verify`). Confirm with Guy that this is the intended
   location before recording the card as passed.
 - **Owner on failure** — Guy.
 
@@ -339,7 +339,7 @@ second person can apply it without reading the board.
   source and retrieval date recorded.
 - **Fail** — an invented SRP API or schema, or any automatic submission.
 - **Evidence** — owner-reported `230002d`; re-run
-  `pytest apps/engine/tests/test_case_fields.py`; export via `pandax case export`.
+  `pytest apps/engine/tests/test_case_fields.py`; export via `actis case export`.
 - **Labelling** — **fully simulated.** Nothing here reaches ENISA.
 - **Owner on failure** — Yaheli.
 

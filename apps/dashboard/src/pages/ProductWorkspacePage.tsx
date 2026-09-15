@@ -16,10 +16,7 @@ export function ProductWorkspacePage() {
   const canRunAnalysis = usePermission("run_analysis");
   const product = demo.selectors.product(productId);
   if (!product) return <EmptyState title="Product not found" body="The product may have been removed or is outside your organization." action={<Link className="button" to="/products">Back to products</Link>} />;
-  const releases = demo.releases.filter((release) => release.productId === product.id);
   const findings = demo.findings.filter((finding) => finding.productId === product.id);
-  const compliance = demo.complianceItems.filter((item) => item.productId === product.id);
-  const documents = demo.documents.filter((document) => document.productId === product.id);
   const activeRelease = demo.selectors.release(product.activeReleaseId);
 
   return <main className="page">

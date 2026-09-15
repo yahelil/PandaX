@@ -4,13 +4,12 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from .auth import authorize_request
 from .portfolio_api import IdentityDependency, PORTFOLIO_ROLES, PortfolioIdentity, local_identity
 from .search_notifications import (
     NotificationNotFound,
-    NotificationRecord,
     SearchNotificationConflict,
     SearchNotificationError,
     SearchNotificationRepository,

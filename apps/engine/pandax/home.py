@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
 
 from sqlalchemy import and_, case, func, literal, or_, select, union_all
-from sqlalchemy.engine import Engine, RowMapping
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from .compliance import compliance_audit_events, compliance_items

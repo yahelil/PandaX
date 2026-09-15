@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from sqlalchemy import (
     JSON, CheckConstraint, Column, DateTime, Engine, ForeignKeyConstraint, Integer,
-    MetaData, String, Table, UniqueConstraint, insert, select, update,
+    String, Table, UniqueConstraint, insert, select, update,
 )
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session

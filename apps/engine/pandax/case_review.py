@@ -1,7 +1,5 @@
 """Factual timestamps and local human authorization, separate from signing."""
 import datetime as dt
-import json
-
 from .cases import CaseError, CaseConflict, _json, _utc_now
 
 

@@ -13,16 +13,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .auth import authorize_request, require_recent_reauthentication
 from .portfolio import (
     OrganizationChanges,
-    OrganizationRecord,
     PortfolioConflict,
     PortfolioError,
     PortfolioNotFound,
     PortfolioRepository,
     PortfolioValidationError,
     ProductChanges,
-    ProductRecord,
     ReleaseChanges,
-    ReleaseRecord,
 )
 
 CraClass = Literal["default", "important_i", "important_ii", "critical"]

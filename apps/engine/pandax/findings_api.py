@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .auth import authorize_request
 from .findings import (
-    FindingAuditRecord,
     FindingConflict,
     FindingError,
     FindingNotFound,

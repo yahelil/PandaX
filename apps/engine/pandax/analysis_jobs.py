@@ -34,7 +34,6 @@ from sqlalchemy import (
     String,
     Table,
     UniqueConstraint,
-    event,
     func,
     insert,
     select,

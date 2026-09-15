@@ -14,8 +14,6 @@ from .portfolio_api import (
     local_identity,
 )
 from .release_monitoring import (
-    MONITORING_SOURCES,
-    MonitoringRunEventRecord,
     ReleaseMonitoringConflict,
     ReleaseMonitoringError,
     ReleaseMonitoringNotFound,

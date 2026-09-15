@@ -27,7 +27,6 @@ from sqlalchemy import (
     Table,
     UniqueConstraint,
     create_engine,
-    delete,
     event,
     insert,
     select,

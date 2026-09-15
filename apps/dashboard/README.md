@@ -10,10 +10,10 @@ From repository root:
 
 ```powershell
 npm install
-npm run demo
+uv run actis serve
 ```
 
-Open the printed local URL. Demo changes persist across reloads. Use **Reset demo
+Open `http://127.0.0.1:4175`. Source changes hot-reload automatically. Demo changes persist across reloads. Use **Reset demo
 data** in Settings to restore the presentation baseline.
 
 ## Checks

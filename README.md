@@ -173,10 +173,18 @@ Covers zip-slip and decompression-bomb refusal, chain and signature tamper
 detection (including a re-linked forged chain), Annex VII/V completeness,
 Article 14 field mapping, and a full end-to-end run asserting the three KEV CVEs.
 
-**7 · The dashboard**
+**7 · The dashboards**
+
+Run the Actis product workspace with Vite hot reload:
 
 ```bash
-uv run actis serve      # http://127.0.0.1:8000
+uv run actis serve       # http://127.0.0.1:4175
+```
+
+The legacy engine inspection dashboard remains available only when explicitly invoked:
+
+```bash
+uv run uvicorn pandax.server:api --host 127.0.0.1 --port 8000
 ```
 
 Same event stream as the CLI, over SSE — the browser view is not a

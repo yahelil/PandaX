@@ -12,7 +12,28 @@ Send multipart fields `input_type` (`collector` or `raw_artifact`), `file`, and 
 
 ## Collector contract
 
-A Collector input is a ZIP with `actis-collector-manifest.json` at its root. The
+New customer-side Collector uploads are signed `actis/manifest/v1` ZIP bundles.
+The signed manifest carries `organization_id`, `product_id`, `release_id`,
+`collector` (`name` and `version`), `sbom_path` (`sbom.cdx.json`), source digest,
+and rules version as append-compatible fields. Payload is limited to the SBOM,
+`collection-summary.json`, `coverage.json`, and the required `ledger.jsonl`.
+The signed bundle also contains `manifest.json`, `manifest.sig`, and `pubkey.pem`.
+The upload is accepted only when the v1 inventory, ledger, and signature pass and
+the signer matches an **active**, organization-enrolled public Ed25519 key.
+Unsigned packages are rejected in staging, beta, and production. Existing
+`actis.collector/v1` jobs remain readable as historical inputs.
+
+Enroll a customer key before uploading. An organization administrator with recent
+MFA posts the public key and name to `/trust-keys/challenges`, signs the returned
+challenge locally, and posts `challenge_id`, public key, name, and signature to
+`/trust-keys`. The challenge expires after five minutes and can be used once.
+The private key is never sent to Actis. The local `actis key enrollment-proof`
+command requires the JSON challenge and an explicit `--signing-key` path.
+
+The original hash-only contract below is retained for development and historical
+readability; it is not a beta upload format.
+
+A legacy Collector input is a ZIP with `actis-collector-manifest.json` at its root. The
 manifest schema is versioned and bound to the route scope:
 
 ```json

@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -168,6 +169,18 @@ Index(
     trust_keys.c.organization_id,
     trust_keys.c.key_name,
     trust_keys.c.status,
+)
+
+trust_key_challenges = Table(
+    "organization_trust_key_challenges", portfolio_metadata,
+    _col("id", 36, primary_key=True),
+    _col("organization_id", 36, ForeignKey(organizations.c.id, ondelete="CASCADE"), nullable=False),
+    _col("key_name", 80, nullable=False),
+    _col("fingerprint", 64, nullable=False),
+    _col("nonce", 64, nullable=False),
+    _col("created_by", 128, nullable=False),
+    _col("expires_at", DateTime(timezone=True), nullable=False),
+    _col("consumed_at", DateTime(timezone=True), nullable=True),
 )
 
 analytics_events = Table(
@@ -486,28 +499,49 @@ class OrganizationSettingsRepository:
         key_name: str,
         public_key_pem: str,
         proof_signature: str,
+        challenge_id: str,
         actor_id: str,
         now: datetime | None = None,
     ) -> TrustKeyRecord:
         name = _trust_key_name(key_name)
         key, canonical_pem = _public_key(public_key_pem)
         fingerprint = public_key_fingerprint(key)
+        activated_at = _timestamp(now, "now") if now else _now()
+        actor = _required(actor_id, "actor_id", 128)
+        with Session(self.engine) as session:
+            challenge = session.execute(select(trust_key_challenges).where(
+                trust_key_challenges.c.id == challenge_id,
+                trust_key_challenges.c.organization_id == organization_id,
+            )).one_or_none()
+        if (
+            challenge is None or challenge.consumed_at is not None
+            or _aware(challenge.expires_at) <= activated_at
+            or challenge.key_name != name or challenge.fingerprint != fingerprint
+            or challenge.created_by != actor
+        ):
+            raise SettingsValidationError("trust key challenge is missing, expired, or already used")
         try:
             signature = bytes.fromhex(proof_signature)
             if len(signature) != 64:
                 raise ValueError
             key.verify(
                 signature,
-                trust_key_enrollment_payload(organization_id, name, fingerprint),
+                trust_key_enrollment_payload(organization_id, name, fingerprint, challenge.id, challenge.nonce),
             )
         except (InvalidSignature, TypeError, ValueError) as exc:
             raise SettingsValidationError("trust key proof of possession is invalid") from exc
 
-        activated_at = _timestamp(now, "now") if now else _now()
-        actor = _required(actor_id, "actor_id", 128)
         key_id = _id()
         with Session(self.engine) as session, session.begin():
             self._profile(session, organization_id)
+            consumed = session.execute(update(trust_key_challenges).where(
+                trust_key_challenges.c.id == challenge_id,
+                trust_key_challenges.c.organization_id == organization_id,
+                trust_key_challenges.c.consumed_at.is_(None),
+                trust_key_challenges.c.expires_at > activated_at,
+            ).values(consumed_at=activated_at))
+            if consumed.rowcount != 1:
+                raise SettingsValidationError("trust key challenge is already used")
             existing = session.execute(
                 select(trust_keys).where(
                     trust_keys.c.organization_id == organization_id,
@@ -567,6 +601,30 @@ class OrganizationSettingsRepository:
                 },
             )
         return self.get_trust_key(organization_id, key_id)
+
+    def create_trust_key_challenge(
+        self, organization_id: str, *, key_name: str,
+        public_key_pem: str, actor_id: str,
+    ) -> Mapping[str, str]:
+        name = _trust_key_name(key_name)
+        key, _ = _public_key(public_key_pem)
+        fingerprint = public_key_fingerprint(key)
+        challenge_id = _id()
+        nonce = secrets.token_hex(32)
+        expires_at = _now() + timedelta(minutes=5)
+        actor = _required(actor_id, "actor_id", 128)
+        with Session(self.engine) as session, session.begin():
+            self._profile(session, organization_id)
+            session.execute(insert(trust_key_challenges).values(
+                id=challenge_id, organization_id=organization_id,
+                key_name=name, fingerprint=fingerprint, nonce=nonce,
+                created_by=actor, expires_at=expires_at, consumed_at=None,
+            ))
+        return {
+            "challenge_id": challenge_id, "organization_id": organization_id,
+            "key_name": name, "fingerprint": fingerprint, "nonce": nonce,
+            "expires_at": expires_at.isoformat(),
+        }
 
     def get_trust_key(self, organization_id: str, key_id: str) -> TrustKeyRecord:
         with Session(self.engine) as session:
@@ -1051,7 +1109,8 @@ def _public_key(value: str) -> tuple[Ed25519PublicKey, str]:
 
 
 def trust_key_enrollment_payload(
-    organization_id: str, key_name: str, fingerprint: str
+    organization_id: str, key_name: str, fingerprint: str,
+    challenge_id: str, nonce: str,
 ) -> bytes:
     return canonical({
         "schema": "actis/trust-key-enrollment/v1",
@@ -1059,11 +1118,14 @@ def trust_key_enrollment_payload(
         "key_name": _trust_key_name(key_name),
         "algorithm": "Ed25519",
         "fingerprint": fingerprint,
+        "challenge_id": challenge_id,
+        "nonce": nonce,
     })
 
 
 def create_trust_key_enrollment(
-    key: Ed25519PrivateKey, organization_id: str, key_name: str
+    key: Ed25519PrivateKey, organization_id: str, key_name: str,
+    challenge: Mapping[str, str],
 ) -> Mapping[str, str]:
     public = key.public_key()
     pem = public.public_bytes(
@@ -1071,11 +1133,19 @@ def create_trust_key_enrollment(
         serialization.PublicFormat.SubjectPublicKeyInfo,
     ).decode("ascii")
     fingerprint = public_key_fingerprint(public)
+    if (
+        challenge.get("organization_id") != organization_id
+        or challenge.get("key_name") != key_name
+        or challenge.get("fingerprint") != fingerprint
+    ):
+        raise SettingsValidationError("trust key challenge does not match the signing key")
     return {
         "key_name": _trust_key_name(key_name),
         "public_key_pem": pem,
+        "challenge_id": challenge["challenge_id"],
         "proof_signature": key.sign(
-            trust_key_enrollment_payload(organization_id, key_name, fingerprint)
+            trust_key_enrollment_payload(organization_id, key_name, fingerprint,
+                                         challenge["challenge_id"], challenge["nonce"])
         ).hex(),
     }
 

@@ -12,8 +12,9 @@ def test_production_migrations_form_one_ordered_head():
     config.set_main_option("script_location", str(root / "alembic"))
     scripts = ScriptDirectory.from_config(config)
 
-    assert scripts.get_heads() == ["20260915_0013"]
+    assert scripts.get_heads() == ["20260915_0014"]
     assert [revision.revision for revision in scripts.walk_revisions()] == [
+        "20260915_0014",
         "20260915_0013",
         "20260915_0012",
         "20260915_0011",
@@ -101,7 +102,7 @@ def test_tenant_authorization_migration_upgrades_existing_rows(tmp_path):
     command.upgrade(config, "head")
 
     with engine.connect() as connection:
-        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "20260915_0013"
+        assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "20260915_0014"
         member = connection.execute(text("SELECT revoked_at FROM organization_team_members")).one()
         audit = connection.execute(text("SELECT previous_digest, digest FROM organization_settings_audit_events")).one()
     assert member.revoked_at == "2026-09-15 00:00:00"

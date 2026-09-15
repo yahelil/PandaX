@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import stat
 import tarfile
 import tempfile
@@ -51,6 +52,8 @@ from . import exposure, pipeline, telemetry
 from .analysis_storage import AnalysisInputStorage, AnalysisInputStorageError, MemoryAnalysisInputStorage
 from .portfolio import portfolio_metadata, products, releases
 from .stages.sbom import SbomError, inspect_sbom
+from .organization_settings import OrganizationSettingsRepository, SettingsValidationError
+from .settings_api import _bundle_directory
 
 MAX_SBOM_BYTES = 10 * 1024 * 1024
 MAX_COLLECTOR_BYTES = 25_000_000
@@ -376,12 +379,22 @@ class AnalysisJobRepository:
         clean_actor = _required(actor_id, "actor_id", 128)
         if not 1 <= retention_days <= 7300:
             raise AnalysisJobValidationError("retention_days must be between 1 and 7300")
-        safe_name, clean_media, preview, input_format, input_version, metadata = _validate_input(
-            clean_type, filename, media_type, content,
-            product_id=product_id, release_id=release_id,
-            raw_artifact_allowed=raw_artifact_allowed,
-            raw_artifact_consent=raw_artifact_consent,
-        )
+        if clean_type == "collector" and _signed_collector_present(content):
+            safe_name, clean_media, preview, input_format, input_version, metadata = _validate_signed_collector(
+                filename, media_type, content, organization_id, product_id, release_id,
+                actor_id, OrganizationSettingsRepository(self.engine),
+            )
+        else:
+            if clean_type == "collector" and os.environ.get("PANDAX_ENVIRONMENT", "development").lower() in {
+                "staging", "beta", "production"
+            }:
+                raise AnalysisJobValidationError("unsigned Collector packages are not accepted")
+            safe_name, clean_media, preview, input_format, input_version, metadata = _validate_input(
+                clean_type, filename, media_type, content,
+                product_id=product_id, release_id=release_id,
+                raw_artifact_allowed=raw_artifact_allowed,
+                raw_artifact_consent=raw_artifact_consent,
+            )
         digest = hashlib.sha256(content).hexdigest()
         supplemental = self._validate_supplemental_inputs(
             organization_id,
@@ -1470,6 +1483,72 @@ def _validate_collector(
         "entries": [{"path": path, "sha256": digest} for path, digest in sorted(digests.items())],
     }
     return safe_name, clean_media, preview, inspected.format, inspected.version, metadata
+
+
+def _signed_collector_present(content: bytes) -> bool:
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            return "manifest.json" in archive.namelist()
+    except (OSError, zipfile.BadZipFile):
+        return False
+
+
+def _validate_signed_collector(
+    filename: str, media_type: str, content: bytes,
+    organization_id: str, product_id: str, release_id: str,
+    actor_id: str, trust_repository: OrganizationSettingsRepository,
+) -> tuple[str, str, dict[str, Any], str, str, dict[str, Any]]:
+    safe_name = _safe_upload_filename(filename)
+    if not safe_name.lower().endswith(".zip") or _clean_media_type(media_type) not in COLLECTOR_MEDIA_TYPES:
+        raise AnalysisJobValidationError("signed Collector input must be a ZIP")
+    if not content or len(content) > MAX_COLLECTOR_BYTES:
+        raise AnalysisJobValidationError("Collector package must be between 1 byte and 25 MB")
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            entries = archive.infolist()
+            if len(entries) > MAX_COLLECTOR_ENTRIES or sum(entry.file_size for entry in entries) > MAX_COLLECTOR_UNCOMPRESSED_BYTES:
+                raise AnalysisJobValidationError("signed Collector package exceeds entry or uncompressed-size limit")
+            if any(entry.file_size and (not entry.compress_size or entry.file_size / entry.compress_size > MAX_COLLECTOR_COMPRESSION_RATIO) for entry in entries):
+                raise AnalysisJobValidationError("signed Collector package compression ratio exceeds limit")
+        with _bundle_directory(content) as directory:
+            manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
+            if manifest.get("schema") != "actis/manifest/v1":
+                raise AnalysisJobValidationError("signed Collector requires actis/manifest/v1")
+            if any(manifest.get(field) != value for field, value in (
+                ("organization_id", organization_id),
+                ("product_id", product_id), ("release_id", release_id),
+            )):
+                raise AnalysisJobValidationError("signed Collector organization/product/release binding mismatch")
+            collector = manifest.get("collector")
+            if not isinstance(collector, dict) or collector.get("name") != "Actis Collector":
+                raise AnalysisJobValidationError("signed Collector identity is missing")
+            version = _required(collector.get("version"), "collector.version", 64)
+            sbom_path = _collector_path(manifest.get("sbom_path"))
+            allowed = {"ledger.jsonl", "sbom.cdx.json", "collection-summary.json", "coverage.json"}
+            declared = {item.get("path") for item in manifest.get("files", []) if isinstance(item, dict)}
+            if sbom_path != "sbom.cdx.json" or declared - allowed or not {"ledger.jsonl", sbom_path, "collection-summary.json", "coverage.json"} <= declared:
+                raise AnalysisJobValidationError("signed Collector contains unsupported or missing payload files")
+            verification = trust_repository.verify_registered_bundle(
+                organization_id, directory, actor_id=actor_id,
+            )
+            if verification["status"] != "trusted" or verification["key_status"] != "active":
+                raise AnalysisJobValidationError("Collector signer is not an active enrolled customer key")
+            inspected = _validate_sbom((directory / sbom_path).read_bytes())
+    except (SettingsValidationError, OSError, ValueError, KeyError, TypeError, zipfile.BadZipFile) as exc:
+        raise AnalysisJobValidationError(f"signed Collector package is invalid: {exc}") from exc
+    preview = _preview_dict(inspected)
+    preview["collector"] = {"name": "Actis Collector", "version": version, "generated_at": manifest["created"]}
+    metadata = {
+        "schema": "actis/manifest/v1", "sbom_path": sbom_path,
+        "collector": collector,
+        "trust": {key: verification[key] for key in (
+            "status", "integrity_ok", "signature_valid", "signer_trust", "trust_source",
+            "trust_policy", "key_id", "key_version", "trusted_key_fingerprint", "verified_at",
+        )},
+        "source_digest": manifest.get("source_digest"),
+        "rules_version": manifest.get("rules_version"),
+    }
+    return safe_name, _clean_media_type(media_type), preview, inspected.format, inspected.version, metadata
 
 
 def _validate_raw(

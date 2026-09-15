@@ -247,6 +247,7 @@ def write_manifest(
     tool_versions: dict[str, str],
     ledger: Ledger,
     key: Ed25519PrivateKey,
+    extensions: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Digest every file in the bundle, commit to the ledger head, and sign."""
     run_dir = Path(run_dir)
@@ -274,6 +275,10 @@ def write_manifest(
         "files": files,
         "signature_note": SIGNING_NOTE,
     }
+    if extensions:
+        if set(extensions) & set(manifest):
+            raise ValueError("manifest extensions cannot replace v1 fields")
+        manifest.update(extensions)
 
     (run_dir / MANIFEST_NAME).write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"

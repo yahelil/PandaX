@@ -26,6 +26,10 @@ from pandax.analysis_storage import (
     LocalAnalysisInputStorage,
     MemoryAnalysisInputStorage,
 )
+from pandax.evidence import Ledger, write_manifest
+from pandax.organization_settings import create_trust_key_enrollment
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from pandax.organization_settings import OrganizationSettingsRepository
 from pandax.portfolio import PortfolioRepository, create_portfolio_engine
 from pandax.portfolio_api import PortfolioIdentity
@@ -57,6 +61,43 @@ def collector(*, product_id="product-1", release_id="release-1", payload_path="e
     with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("actis-collector-manifest.json", json.dumps(manifest))
         archive.writestr(payload_path, payload)
+    return output.getvalue()
+
+
+def signed_collector(root, settings, *, organization_id="org-1", product_id="product-1", release_id="release-1"):
+    key = Ed25519PrivateKey.generate()
+    pem = key.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode("ascii")
+    challenge = settings.create_trust_key_challenge(
+        organization_id, key_name="collector", public_key_pem=pem, actor_id="admin"
+    )
+    enrollment = create_trust_key_enrollment(key, organization_id, "collector", challenge)
+    registered = settings.enroll_trust_key(organization_id, **enrollment, actor_id="admin")
+    bundle = root / "signed-collector"
+    bundle.mkdir()
+    (bundle / "sbom.cdx.json").write_bytes(sbom())
+    (bundle / "collection-summary.json").write_text('{"status":"complete"}', encoding="utf-8")
+    (bundle / "coverage.json").write_text('{"status":"complete"}', encoding="utf-8")
+    ledger = Ledger(bundle)
+    ledger.append("COLLECT", "actis-collector", "0.1.0", [], [ledger.ref(bundle / "sbom.cdx.json")])
+    write_manifest(bundle, "collector-test", {}, {"collector": "0.1.0"}, ledger, key, extensions={
+        "organization_id": organization_id, "product_id": product_id,
+        "release_id": release_id, "collector": {"name": "Actis Collector", "version": "0.1.0"},
+        "sbom_path": "sbom.cdx.json", "rules_version": "test",
+    })
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+        for file in bundle.iterdir():
+            archive.write(file, file.name)
+    return output.getvalue(), registered
+
+
+def replace_signed_entry(content: bytes, name: str, replacement: bytes) -> bytes:
+    output = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(content)) as source, zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as target:
+        for entry in source.infolist():
+            target.writestr(entry.filename, replacement if entry.filename == name else source.read(entry))
     return output.getvalue()
 
 
@@ -118,6 +159,47 @@ def test_collector_is_bound_verified_stored_by_reference_and_executable(setup):
         yield ev.run_done("Complete", components=1, findings=0, kev=0, incidents=0)
 
     assert repository.run("org-1", "product-1", "release-1", job.id, runner).status == "completed"
+
+
+def test_signed_collector_requires_active_customer_key_and_signed_binding(setup, tmp_path):
+    repository, _, settings = setup
+    content, key = signed_collector(tmp_path, settings)
+    job = create(repository, content)
+    assert job.input_metadata["trust"]["status"] == "trusted"
+    assert job.input_metadata["trust"]["key_version"] == 1
+    settings.revoke_trust_key("org-1", key.id, reason="test", actor_id="admin")
+    with pytest.raises(AnalysisJobValidationError, match="active enrolled"):
+        create(repository, content, idempotency_key="signed-2")
+
+
+@pytest.mark.parametrize("binding", ["product_id", "release_id"])
+def test_signed_collector_rejects_wrong_release_binding(setup, tmp_path, binding):
+    repository, _, settings = setup
+    content, _ = signed_collector(tmp_path, settings, **{binding: "other"})
+    with pytest.raises(AnalysisJobValidationError, match="binding mismatch"):
+        create(repository, content)
+
+
+@pytest.mark.parametrize("entry", ["manifest.json", "sbom.cdx.json"])
+def test_signed_collector_rejects_tampering(setup, tmp_path, entry):
+    repository, _, settings = setup
+    content, _ = signed_collector(tmp_path, settings)
+    if entry == "manifest.json":
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            manifest = json.loads(archive.read(entry))
+        manifest["rules_version"] = "substituted"
+        replacement = json.dumps(manifest).encode()
+    else:
+        replacement = sbom().replace(b"camera-core", b"other-core")
+    with pytest.raises(AnalysisJobValidationError, match="active enrolled"):
+        create(repository, replace_signed_entry(content, entry, replacement))
+
+
+def test_managed_environment_rejects_legacy_unsigned_collector(setup, monkeypatch):
+    repository, _, _ = setup
+    monkeypatch.setenv("PANDAX_ENVIRONMENT", "beta")
+    with pytest.raises(AnalysisJobValidationError, match="unsigned"):
+        create(repository, collector())
 
 
 def test_missing_retained_input_fails_closed(setup):

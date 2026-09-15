@@ -1,7 +1,7 @@
 [project]
-name = "pandax"
+name = "actis"
 version = "0.1.0"
-description = "CRA Compliance-in-a-Box - artifact or SBOM to verifiable Annex VII dossier"
+description = "Actis by PandaX - artifact or SBOM to verifiable CRA evidence"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -23,7 +23,7 @@ dependencies = [
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-pandax = "pandax.cli:app"
+actis = "pandax.cli:app"
 
 [build-system]
 requires = ["hatchling"]

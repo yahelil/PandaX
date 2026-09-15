@@ -1,1 +1,2 @@
 *.pdf binary
+fixtures/evidence-v1/** -text

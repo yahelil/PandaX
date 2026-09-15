@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pandax.online/schemas/evidence/verifier-error-v1.schema.json",
+  "title": "Actis verifier configuration error v1",
+  "type": "object",
+  "required": ["schema", "error", "reason"],
+  "properties": {
+    "schema": { "const": "actis/verifier-error/v1" },
+    "error": { "const": "trusted_key_configuration" },
+    "reason": { "type": "string" }
+  },
+  "additionalProperties": false
+}

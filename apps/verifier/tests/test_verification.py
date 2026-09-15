@@ -52,7 +52,7 @@ def test_no_key_is_untrusted_but_explicit_inspection_can_exit_successfully(
 
     assert result.status == "untrusted" and not result.ok
     assert result.signer_trust == "not_configured"
-    assert normal_exit == 1 and normal_json["schema"] == "pandax/verification-result/v1"
+    assert normal_exit == 1 and normal_json["schema"] == "actis/verification-result/v1"
     assert inspect_exit == 0
     assert "TRUST NOT ESTABLISHED" in inspected_text
 
@@ -223,13 +223,14 @@ def test_malformed_trusted_key_is_configuration_exit_2(sealed_bundle, tmp_path, 
     payload = json.loads(capsys.readouterr().out)
 
     assert exit_code == 2
+    assert payload["schema"] == "actis/verifier-error/v1"
     assert payload["error"] == "trusted_key_configuration"
 
 
 def test_manifest_with_duplicate_json_key_is_rejected(sealed_bundle):
     run, trusted, _ = sealed_bundle
     (run / "manifest.json").write_text(
-        '{"schema":"pandax/manifest/v1","schema":"pandax/manifest/v1"}',
+        '{"schema":"actis/manifest/v1","schema":"actis/manifest/v1"}',
         encoding="utf-8",
     )
 

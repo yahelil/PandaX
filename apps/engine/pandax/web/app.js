@@ -804,7 +804,7 @@ function renderLedger() {
 function renderChecks(host, result) {
   host.innerHTML = "";
   for (const c of result.checks) {
-    const warning = c.category === "trust" && !c.ok && result.integrity_ok && result.signature_valid;
+    const warning = c.category === "signer_trust" && !c.ok && result.integrity_ok && result.signature_valid;
     const row = el("div", "check " + (c.ok ? "ok" : warning ? "warn" : "bad"));
     const body = el("div");
     body.append(el("div", "n", c.name), el("div", "d", c.detail));
@@ -845,7 +845,7 @@ async function runVerify() {
       status: "incomplete",
       integrity_ok: false,
       signature_valid: false,
-      checks: [{name: "trusted-key configuration", ok: false, category: "trust", detail: result.detail || "Verification is unavailable."}],
+      checks: [{name: "trusted-key configuration", ok: false, category: "signer_trust", detail: result.detail || "Verification is unavailable."}],
     });
     return;
   }

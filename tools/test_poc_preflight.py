@@ -104,7 +104,7 @@ def test_syft_on_path_is_accepted_when_tools_dir_is_empty(monkeypatch, tmp_path)
     assert poc_preflight.main([]) == 0
 
 
-def test_missing_pandax_package_fails_readably(monkeypatch, tmp_path, capsys):
+def test_missing_actis_package_fails_readably(monkeypatch, tmp_path, capsys):
     install_syft(monkeypatch, tmp_path)
     monkeypatch.setattr(subprocess, "run",
                         responder({"syft": completed(stdout="syft 1.51.1")}))
@@ -117,7 +117,7 @@ def test_missing_pandax_package_fails_readably(monkeypatch, tmp_path, capsys):
     assert poc_preflight.main([]) == 1
 
     out = capsys.readouterr().out
-    assert "FAIL  pandax package" in out
+    assert "FAIL  Actis package" in out
     assert "uv sync" in out
 
 

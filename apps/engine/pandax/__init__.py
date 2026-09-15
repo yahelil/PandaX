@@ -1,3 +1,3 @@
-"""PandaX - CRA Compliance-in-a-Box proof of concept."""
+"""Actis by PandaX."""
 
 __version__ = "0.1.0"

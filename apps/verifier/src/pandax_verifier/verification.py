@@ -18,7 +18,8 @@ LEDGER_NAME = "ledger.jsonl"
 MANIFEST_NAME = "manifest.json"
 SIG_NAME = "manifest.sig"
 PUBKEY_NAME = "pubkey.pem"
-MANIFEST_SCHEMA = "pandax/manifest/v1"
+MANIFEST_SCHEMA = "actis/manifest/v1"
+LEGACY_MANIFEST_SCHEMAS = {"pandax/manifest/v1"}
 CONTROL_FILES = {MANIFEST_NAME, SIG_NAME, PUBKEY_NAME}
 _HEX_DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
@@ -33,7 +34,7 @@ class JsonFormatError(ValueError):
 
 def canonical(value: Any) -> bytes:
     return json.dumps(
-        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
     ).encode("utf-8")
 
 
@@ -120,7 +121,7 @@ def _validate_manifest(manifest: Any) -> tuple[dict[str, Any], list[dict[str, st
             expected is int and isinstance(manifest[field], bool)
         ):
             raise ValueError(f"manifest field {field} must be {expected.__name__}")
-    if manifest["schema"] != MANIFEST_SCHEMA:
+    if manifest["schema"] not in {MANIFEST_SCHEMA, *LEGACY_MANIFEST_SCHEMAS}:
         raise ValueError(f"unsupported manifest schema: {manifest['schema']}")
     if manifest["ledger_records"] < 0:
         raise ValueError("manifest ledger_records cannot be negative")
@@ -273,7 +274,7 @@ def verify_bundle(
         try:
             parsed = _load_json(reader.read_bytes(MANIFEST_NAME), MANIFEST_NAME)
             manifest, listed_files = _validate_manifest(parsed)
-            add("manifest structure", True, "integrity", f"schema {MANIFEST_SCHEMA}")
+            add("manifest structure", True, "integrity", f"schema {manifest['schema']}")
         except BundleError as exc:
             add("manifest structure", False, "integrity", str(exc), "missing")
         except (JsonFormatError, ValueError) as exc:

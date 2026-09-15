@@ -39,6 +39,10 @@ def _detail(run_dir: Path, prefix: str) -> str:
     return ""
 
 
+def _key_path(run_dir: Path) -> Path:
+    return run_dir.parent / f"{run_dir.name}-signing-key.pem"
+
+
 def seal(run_dir: Path, files: dict[str, str], stages: int = 3):
     for name, body in files.items():
         (run_dir / name).write_text(body, encoding="utf-8")
@@ -47,7 +51,7 @@ def seal(run_dir: Path, files: dict[str, str], stages: int = 3):
     for i in range(stages):
         target = run_dir / names[i % len(names)]
         ledger.append(f"S{i}", "tool", "1.0", [], [ledger.ref(target)], {"i": i})
-    key = load_or_create_key(run_dir / "key.pem")
+    key = load_or_create_key(_key_path(run_dir))
     manifest = write_manifest(run_dir, "run-test", {}, {"syft": "1.51.1"}, ledger, key)
     return ledger, manifest
 
@@ -68,6 +72,12 @@ def test_canonical_is_reproducible_with_stdlib_only():
         ).encode("utf-8")
     ).hexdigest()
     assert record_digest(record) == expected
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_canonical_rejects_non_standard_json_numbers(value: float):
+    with pytest.raises(ValueError, match="Out of range float values"):
+        canonical({"value": value})
 
 
 # --- chain ------------------------------------------------------------------
@@ -180,13 +190,26 @@ def test_manifest_excludes_its_own_signature_files(run_dir: Path):
     assert listed.isdisjoint({"manifest.json", "manifest.sig", "pubkey.pem"})
 
 
+def test_manifest_refuses_private_key_pem_inside_bundle(run_dir: Path):
+    evidence_file = run_dir / "evidence.json"
+    evidence_file.write_text("{}", encoding="utf-8")
+    ledger = Ledger(run_dir)
+    ledger.append("TEST", "tool", "1", [], [ledger.ref(evidence_file)])
+    key = load_or_create_key(run_dir / "private.pem")
+
+    with pytest.raises(ValueError, match="private key PEM: private.pem"):
+        write_manifest(run_dir, "run-test", {}, {"tool": "1"}, ledger, key)
+
+    assert not (run_dir / "manifest.json").exists()
+
+
 # --- external trust --------------------------------------------------------
 
 
 def test_correct_external_key_establishes_trust(run_dir: Path, tmp_path: Path):
     seal(run_dir, {"a.json": "{}"})
     trusted = tmp_path / "trusted.pem"
-    key = load_or_create_key(run_dir / "key.pem")
+    key = load_or_create_key(_key_path(run_dir))
     fingerprint = write_public_key(key, trusted)
 
     result = verify_bundle(run_dir, trusted)
@@ -223,7 +246,7 @@ def test_wrong_external_key_is_untrusted_not_tampered(run_dir: Path, tmp_path: P
 def test_attacker_resealed_bundle_fails_external_trust(run_dir: Path, tmp_path: Path):
     seal(run_dir, {"a.json": '{"owner":"original"}'})
     trusted = tmp_path / "trusted.pem"
-    original = load_or_create_key(run_dir / "key.pem")
+    original = load_or_create_key(_key_path(run_dir))
     write_public_key(original, trusted)
 
     (run_dir / "a.json").write_text('{"owner":"attacker"}', encoding="utf-8")
@@ -261,7 +284,7 @@ def test_malformed_manifest_is_incomplete_instead_of_crashing(run_dir: Path):
 def test_changed_evidence_is_invalid_even_with_trusted_key(run_dir: Path, tmp_path: Path):
     seal(run_dir, {"a.json": "{}"})
     trusted = tmp_path / "trusted.pem"
-    write_public_key(load_or_create_key(run_dir / "key.pem"), trusted)
+    write_public_key(load_or_create_key(_key_path(run_dir)), trusted)
     (run_dir / "a.json").write_text('{"changed":true}', encoding="utf-8")
 
     result = verify_bundle(run_dir, trusted)

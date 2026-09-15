@@ -1,7 +1,7 @@
 [project]
-name = "pandax-evidence-verifier"
+name = "actis-evidence-verifier"
 version = "0.1.0"
-description = "Independent offline verifier for PandaX evidence bundles"
+description = "Independent offline verifier for Actis evidence bundles"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -12,7 +12,7 @@ dependencies = [
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-pandax-verify = "pandax_verifier.cli:entrypoint"
+actis-verify = "pandax_verifier.cli:entrypoint"
 
 [build-system]
 requires = ["hatchling"]

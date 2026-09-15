@@ -101,8 +101,9 @@ def create(repository, content, **changes):
 
 def test_collector_is_bound_verified_stored_by_reference_and_executable(setup):
     repository, storage, _ = setup
-    job = create(repository, collector())
-    replay = create(repository, collector())
+    content = collector()
+    job = create(repository, content)
+    replay = create(repository, content)
 
     assert job.input_type == "collector"
     assert replay.id == job.id and len(storage.objects) == 1

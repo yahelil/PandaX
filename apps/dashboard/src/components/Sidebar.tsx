@@ -5,7 +5,7 @@ import { useDemo } from '../data/DemoProvider'
 
 const primaryItems = [
   { to: '/', label: 'Home', icon: Home, end: true },
-  { to: '/products', label: 'Devices', icon: Monitor },
+  { to: '/products', label: 'Products', icon: Monitor },
   { to: '/findings', label: 'Findings', icon: FileWarning },
   { to: '/compliance', label: 'Compliance', icon: Scale },
 ]

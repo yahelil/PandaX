@@ -514,6 +514,7 @@ export class FixtureAdapter implements DataAdapter {
         createdAt: now(),
       };
       state.releases.push(created);
+      product.activeReleaseId ??= created.id;
       state.activities.unshift({ id: `activity-release-${state.activities.length + 1}`, type: "analysis", title: "Release registered", detail: `${product.name} ${created.version} is ready for evidence input.`, productId: product.id, releaseId: created.id, actorId: state.currentUserId, at: created.createdAt, targetUrl: `/products/${product.id}/releases/${created.id}` });
     });
     return structuredClone(created);

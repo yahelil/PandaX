@@ -10,4 +10,3 @@ export { CompliancePage } from "./CompliancePage";
 export { DocumentDetailPage } from "./DocumentDetailPage";
 export { SettingsPage } from "./SettingsPage";
 export { NotFoundPage } from "./NotFoundPage";
-export { ClientDemoPage } from "./ClientDemoPage";

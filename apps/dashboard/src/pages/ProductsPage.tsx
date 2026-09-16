@@ -119,7 +119,7 @@ export function ProductsPage() {
         } finally {
           setCreatePending(false);
         }
-      }} members={demo.state.members} rawArtifactsAllowed={demo.state.settings.security.allowRawArtifacts} /> : null}
+      }} members={demo.state.members} rawArtifactsAllowed={demo.state.settings.security.allowRawArtifacts} demoMode={demo.adapterStatus.mode === "fixture"} /> : null}
       <section className="panel devices-list">
         <div className="devices-toolbar" aria-label="Device filters">
           <label className="devices-search"><Search size={18} aria-hidden="true" /><input type="search" aria-label="Search devices" placeholder="Search devices..." value={query} onChange={(event) => setFilter(setQuery, event.target.value)} /></label>
@@ -168,7 +168,7 @@ interface InitialEvidence {
   rawArtifactConsent?: boolean;
 }
 
-function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawArtifactsAllowed }: { onCancel: () => void; onCreate: (input: CreateProductInput, evidence?: InitialEvidence) => Promise<void>; members: ReturnType<typeof useDemo>["state"]["members"]; pending: boolean; error?: string; rawArtifactsAllowed: boolean }) {
+function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawArtifactsAllowed, demoMode }: { onCancel: () => void; onCreate: (input: CreateProductInput, evidence?: InitialEvidence) => Promise<void>; members: ReturnType<typeof useDemo>["state"]["members"]; pending: boolean; error?: string; rawArtifactsAllowed: boolean; demoMode: boolean }) {
   const [assessmentOpen, setAssessmentOpen] = useState(false);
   const [assessment, setAssessment] = useState<CraClassificationAssessment>();
   const [evidenceKind, setEvidenceKind] = useState<InitialEvidence["kind"]>("sbom");
@@ -184,6 +184,10 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawAr
     if (!assessment || assessment.scopeResult === "out_of_scope") return;
     const data = new FormData(event.currentTarget);
     setValidationError(undefined);
+    if (demoMode && evidenceFile && evidenceKind !== "sbom") {
+      setValidationError("Archive and Collector analysis require the production engine. In this local demo, upload a JSON SBOM or create the product without evidence.");
+      return;
+    }
     if (evidenceFile && evidenceKind === "sbom") {
       if (!evidenceFile.name.toLowerCase().endsWith(".json")) {
         setValidationError("SBOM files must use a .json filename.");
@@ -214,6 +218,7 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawAr
         <fieldset className="supplemental-evidence span-2">
           <legend>Initial release evidence <span className="muted">(optional)</span></legend>
           <p>Upload an SBOM or signed Collector ZIP to create the first release and start analysis. You can add evidence later.</p>
+          {demoMode && evidenceKind !== "sbom" ? <div className="notice notice-warning">This option remains visible for the beta workflow, but analysis requires the production engine. Local demo mode will not invent archive results.</div> : null}
           <div className="supplemental-grid">
             <div className="field"><span className="field-label">Upload type</span><div className="upload-type-toggle" role="group" aria-label="Upload type"><button type="button" aria-pressed={evidenceKind === "sbom"} onClick={() => { setEvidenceKind("sbom"); setEvidenceFile(null); setRawArtifactConsent(false); setValidationError(undefined); }}>SBOM</button><button type="button" aria-pressed={evidenceKind === "collector_package"} onClick={() => { setEvidenceKind("collector_package"); setEvidenceFile(null); setRawArtifactConsent(false); setValidationError(undefined); }}>ZIP</button>{rawArtifactsAllowed ? <button type="button" aria-pressed={evidenceKind === "raw_artifact"} onClick={() => { setEvidenceKind("raw_artifact"); setEvidenceFile(null); setValidationError(undefined); }}>Build archive</button> : null}</div></div>
             <label><span>Product release version</span><input className="input-field" name="version" required={Boolean(evidenceFile)} placeholder="1.0.0" /><small>This names your product release. The SBOM format and version are detected automatically.</small></label>

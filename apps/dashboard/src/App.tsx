@@ -5,7 +5,6 @@ import { HomePage } from './pages/HomePage'
 
 const AnalysisPage = lazy(() => import('./pages/AnalysisPage').then(({ AnalysisPage }) => ({ default: AnalysisPage })))
 const AnalysisResultPage = lazy(() => import('./pages/AnalysisResultPage').then(({ AnalysisResultPage }) => ({ default: AnalysisResultPage })))
-const ClientDemoPage = lazy(() => import('./pages/ClientDemoPage').then(({ ClientDemoPage }) => ({ default: ClientDemoPage })))
 const CompliancePage = lazy(() => import('./pages/CompliancePage').then(({ CompliancePage }) => ({ default: CompliancePage })))
 const DocumentDetailPage = lazy(() => import('./pages/DocumentDetailPage').then(({ DocumentDetailPage }) => ({ default: DocumentDetailPage })))
 const FindingDetailPage = lazy(() => import('./pages/FindingDetailPage').then(({ FindingDetailPage }) => ({ default: FindingDetailPage })))
@@ -22,19 +21,13 @@ export function App() {
       <Route element={<AppShell />}>
         <Route index element={<HomePage />} />
         <Route path="products" element={<ProductsPage />} />
-        <Route path="products/client-demo" element={<ClientDemoPage view="portfolio" />} />
-        <Route path="products/client-demo/home-hub" element={<ClientDemoPage view="product" />} />
-        <Route path="products/client-demo/upload" element={<ClientDemoPage view="upload" />} />
-        <Route path="products/client-demo/alert" element={<ClientDemoPage view="alert" />} />
         <Route path="products/:productId" element={<ProductWorkspacePage />} />
         <Route path="products/:productId/releases/:releaseId" element={<ReleaseWorkspacePage />} />
         <Route path="products/:productId/releases/:releaseId/analyze" element={<AnalysisPage />} />
         <Route path="analyses/:analysisId" element={<AnalysisResultPage />} />
         <Route path="findings" element={<FindingsPage />} />
-        <Route path="findings/client-demo" element={<ClientDemoPage view="finding" />} />
         <Route path="findings/:findingId" element={<FindingDetailPage />} />
         <Route path="compliance" element={<CompliancePage />} />
-        <Route path="compliance/client-demo" element={<ClientDemoPage view="documents" />} />
         <Route path="documents/:documentId" element={<DocumentDetailPage />} />
         <Route path="settings" element={<Navigate replace to="/settings/organization" />} />
         <Route path="settings/:section" element={<SettingsPage />} />

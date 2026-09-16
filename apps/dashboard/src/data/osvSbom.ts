@@ -23,6 +23,12 @@ export interface SbomAnalysis {
   findings: Finding[];
 }
 
+export interface SbomInspection {
+  format: string;
+  components: number;
+  matchableComponents: number;
+}
+
 export type SbomAnalyzer = (file: Blob, productId: string, releaseId: string) => Promise<SbomAnalysis>;
 
 function object(value: unknown): Record<string, unknown> {
@@ -44,6 +50,28 @@ function componentsFrom(document: Record<string, unknown>): Component[] {
       purl,
     }] : [];
   });
+}
+
+export async function inspectSbom(file: Blob): Promise<SbomInspection> {
+  let document: Record<string, unknown>;
+  try { document = object(JSON.parse((await file.text()).replace(/^\uFEFF/, ""))); }
+  catch (error) {
+    if (error instanceof SyntaxError) throw new Error("SBOM must be a valid JSON file.");
+    throw error;
+  }
+  let format: string;
+  if (document.bomFormat === "CycloneDX") {
+    if (document.specVersion !== "1.2" && document.specVersion !== "1.6") throw new Error("Unsupported CycloneDX version. Use CycloneDX JSON 1.2 or 1.6.");
+    format = `CycloneDX ${document.specVersion} JSON`;
+  } else if (typeof document.spdxVersion === "string") {
+    if (document.spdxVersion !== "SPDX-2.2" && document.spdxVersion !== "SPDX-2.3") throw new Error("Unsupported SPDX version. Use SPDX JSON 2.2 or 2.3.");
+    format = `${document.spdxVersion.replace("SPDX-", "SPDX ")} JSON`;
+  } else {
+    throw new Error("Unsupported SBOM format. Use CycloneDX JSON 1.2 or 1.6, or SPDX JSON 2.2 or 2.3.");
+  }
+  const rows = document.bomFormat === "CycloneDX" ? document.components : document.packages;
+  if (!Array.isArray(rows)) throw new Error("SBOM does not contain a component inventory.");
+  return { format, components: rows.length, matchableComponents: componentsFrom(document).length };
 }
 
 function severity(detail: OsvDetail): { severity: Severity; cvss: number } {
@@ -71,7 +99,7 @@ async function details(ids: string[]): Promise<Map<string, OsvDetail>> {
 }
 
 export const analyzeSbomWithOsv: SbomAnalyzer = async (file, productId, releaseId) => {
-  const document = object(JSON.parse(await file.text()));
+  const document = object(JSON.parse((await file.text()).replace(/^\uFEFF/, "")));
   const sourceRows = document.bomFormat === "CycloneDX" ? document.components : document.packages;
   const componentCount = Array.isArray(sourceRows) ? sourceRows.length : 0;
   const components = componentsFrom(document);

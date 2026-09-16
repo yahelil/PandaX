@@ -11,11 +11,11 @@ def test_free_isolated_non_root_deployment_config():
 
     assert [(service["name"], service["envVars"][0]["value"]) for service in services] == [
         ("actis-api-staging", "staging"),
-        ("actis-api-beta", "beta"),
     ]
     assert all(service["plan"] == "free" for service in services)
     assert all(service["region"] == "frankfurt" for service in services)
     assert all(service["healthCheckPath"] == "/health/ready" for service in services)
+    assert all("maxShutdownDelaySeconds" not in service for service in services)
     assert all(
         item.get("sync") is False
         for service in services

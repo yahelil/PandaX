@@ -33,10 +33,13 @@ method or enable R2, Supabase Pro/PITR, Render paid compute, or automatic upgrad
    `actis-evidence` bucket in each project.
 2. Create independent Ed25519 beta signing keys and public registries. Keep the
    recovery copies outside the repository and providers.
-3. In Render, apply `render.yaml` as a Blueprint from the private repository. Enter
-   each `sync: false` value from the matching Supabase/signing environment. Confirm
-   both services remain `Free`, use no disk, and expose `/health/ready` as the health
-   check. The container is non-root and binds Render's `PORT` on `0.0.0.0`.
+3. In Render, apply `render.yaml` as a Blueprint from the private repository. The
+   initial Blueprint contains only `actis-api-staging`; enter each `sync: false`
+   value from the staging Supabase/signing environment. Confirm the service remains
+   `Free`, uses no disk, and exposes `/health/ready` as the health check. The
+   container is non-root and binds Render's `PORT` on `0.0.0.0`. After staging
+   passes the acceptance drill, add `actis-api-beta` to the same Blueprint with its
+   isolated beta values and sync it. Never create either service manually.
 4. Create `actis-staging` and `actis-beta` Cloudflare Pages projects. Use repository
    root `/`, build command `npm ci && npm run build:dashboard`, and output directory
    `apps/dashboard/dist`. Set `VITE_ACTIS_MODE=production` plus the matching public

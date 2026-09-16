@@ -5,7 +5,7 @@ import sys
 import pytest
 from fastapi.testclient import TestClient
 
-from pandax import document_runtime, server
+from pandax import document_runtime, runtime_metadata, server
 from tools import beta_release
 
 
@@ -28,6 +28,17 @@ def test_build_endpoint_and_request_correlation(monkeypatch):
     generated = client.get("/health/live", headers={"X-Request-ID": "unsafe id"})
     assert generated.headers["X-Request-ID"] != "unsafe id"
     assert len(generated.headers["X-Request-ID"]) == 32
+
+
+@pytest.mark.parametrize("environment", ["staging", "beta"])
+def test_build_metadata_derives_environment_release_id(monkeypatch, environment):
+    monkeypatch.setenv("RENDER_GIT_COMMIT", "abc123def456789")
+    monkeypatch.setenv("PANDAX_ENVIRONMENT", environment)
+    monkeypatch.delenv("PANDAX_RELEASE_ID", raising=False)
+
+    assert runtime_metadata.build_metadata()["release_id"] == (
+        f"{environment}-abc123def456"
+    )
 
 
 def test_document_runtime_compiles_and_validates_with_pinned_tools(monkeypatch):

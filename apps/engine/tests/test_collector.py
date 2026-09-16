@@ -100,6 +100,75 @@ def test_filesystem_and_archive_inputs_use_bounded_shared_core(tmp_path, monkeyp
         assert b"raw local content" not in b"".join(archive.read(name) for name in archive.namelist())
 
 
+def test_sbom_command_generates_local_private_cyclonedx_without_credentials_or_network(tmp_path, monkeypatch):
+    source = tmp_path / "customer-source"
+    source.mkdir()
+    secret_path = str(source / "private" / "source.py")
+    raw_secret = "customer source must remain local"
+    (source / "component.txt").write_text(raw_secret, encoding="utf-8")
+    syft = tmp_path / "syft.exe"
+    syft.write_bytes(b"test stub")
+
+    def local_scan(scanned_source, scanned_syft, output):
+        assert scanned_source == source
+        assert scanned_syft == syft
+        return {
+            "bomFormat": "CycloneDX", "specVersion": "1.6",
+            "metadata": {"component": {"name": secret_path}},
+            "components": [{
+                "type": "library", "name": "safe-lib", "version": "2.0",
+                "purl": "pkg:generic/safe-lib@2.0", "bom-ref": secret_path,
+                "evidence": {"occurrences": [{"location": secret_path}]},
+                "properties": [{"name": "raw", "value": raw_secret}],
+            }],
+        }
+
+    monkeypatch.setattr(collector, "_scan_syft", local_scan)
+    monkeypatch.setattr(collector.httpx, "Client", lambda *args, **kwargs: pytest.fail("network used"))
+    output = tmp_path / "bom.cdx.json"
+    result = CliRunner().invoke(app, [
+        "sbom", str(source), "--output", str(output), "--syft", str(syft),
+        "--workspace", str(tmp_path / "work"),
+    ])
+
+    assert result.exit_code == 0, result.output
+    preview = json.loads(result.output)
+    document = json.loads(output.read_text(encoding="utf-8"))
+    serialized = output.read_text(encoding="utf-8")
+    assert preview["uploaded"] is False
+    assert preview["summary"]["privacy"] == "Source content and paths omitted; nothing was uploaded"
+    assert {field: preview["coverage"][field] for field in (
+        "components", "matchable_components", "unmatchable_components",
+    )} == {"components": 1, "matchable_components": 1, "unmatchable_components": 0}
+    assert document["bomFormat"] == "CycloneDX" and document["specVersion"] == "1.6"
+    assert set(document) == {"bomFormat", "specVersion", "version", "components"}
+    assert set(document["components"][0]) == {"type", "name", "version", "purl", "bom-ref"}
+    assert secret_path not in serialized and raw_secret not in serialized
+    assert preview["sha256"] == collector.sha256_file(output)
+    assert not list(tmp_path.glob(".bom.cdx.json.*.tmp"))
+
+
+def test_generate_sbom_and_signed_collect_share_identical_projection(tmp_path):
+    source = tmp_path / "source.json"
+    document = sbom("CycloneDX 1.6")
+    document["components"][0]["bom-ref"] = "C:/customer/private/source.js"
+    source.write_text(json.dumps(document), encoding="utf-8")
+    output = tmp_path / "bom.cdx.json"
+    collector.generate_sbom(source, output, workspace=tmp_path / "sbom-work")
+    package = collect(source, tmp_path)
+    with zipfile.ZipFile(package["package"]) as archive:
+        packaged = json.loads(archive.read("sbom.cdx.json"))
+    assert json.loads(output.read_text(encoding="utf-8")) == packaged
+
+
+def test_generate_sbom_refuses_output_inside_scanned_directory(tmp_path):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "component.txt").write_text("content", encoding="utf-8")
+    with pytest.raises(collector.CollectorError, match="outside"):
+        collector.generate_sbom(source, source / "bom.cdx.json")
+
+
 def test_links_traversal_and_duplicate_archive_paths_are_refused(tmp_path):
     source = tmp_path / "bad.zip"
     for writer in (

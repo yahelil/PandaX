@@ -30,6 +30,7 @@ import type {
   TeamMemberUpdate,
 } from "./types";
 import type { PrivacySafeAnalyticsEvent } from "./governanceApi";
+import type { AnalysisEvidenceFile } from "./releaseOperationsApi";
 
 export type DemoListener = () => void;
 
@@ -40,7 +41,7 @@ export type AdapterOperation =
   | "reject_document" | "load_document" | "download_document" | "request_document_approval"
   | "add_document_revision" | "self_file_document" | "update_settings" | "preview_analysis" | "run_analysis" | "run_monitoring"
   | "load_compliance" | "update_compliance" | "approve_compliance"
-  | "update_organization" | "update_team_member" | "update_integration";
+  | "update_organization" | "update_team_member" | "update_integration" | "select_active_release" | "download_release_report";
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -101,6 +102,8 @@ export interface DataAdapter {
   recordDocumentSelfFiling(input: RecordDocumentSelfFilingInput): MaybePromise<DocumentRecord>;
   createProduct(input: CreateProductInput): Promise<Product>;
   createRelease(input: CreateReleaseInput): Promise<Release>;
+  selectActiveRelease(productId: EntityId, releaseId: EntityId): Promise<Product>;
+  downloadReleaseReport(productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile>;
   previewAnalysis(draft: AnalysisDraft): Promise<AnalysisPreview>;
   runAnalysis(draft: AnalysisDraft): Promise<AnalysisJob>;
   getAnalysisJob(jobId: EntityId): AnalysisJob | undefined;

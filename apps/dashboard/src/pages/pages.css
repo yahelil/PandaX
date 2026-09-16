@@ -15,6 +15,10 @@
 .text-link { color:var(--accent); font-weight:650; text-decoration:none; }
 .panel { background:var(--surface); border:1px solid var(--border); border-radius:14px; min-width:0; }
 .panel-pad { padding:20px; }
+.active-release-control { display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+.active-release-control h2 { margin:0 0 5px; font-size:18px; }
+.active-release-control p { margin:0; color:var(--text-muted); font-size:13px; max-width:560px; }
+.active-release-control .danger-text { width:100%; }
 .section-header { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; padding:20px 20px 14px; }
 .section-header h2 { margin:0; font-size:18px; letter-spacing:-.02em; }
 .section-header p { color:var(--text-muted); margin:5px 0 0; font-size:14px; line-height:1.5; }

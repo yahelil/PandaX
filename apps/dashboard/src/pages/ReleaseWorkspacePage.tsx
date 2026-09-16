@@ -11,11 +11,28 @@ export function ReleaseWorkspacePage() {
   const { productId = "", releaseId = "" } = useParams();
   const [params] = useSearchParams();
   const demo = useDemo();
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string>();
   const release = demo.selectors.release(releaseId);
   const product = demo.selectors.product(productId);
   const tab = releaseTabs.includes(params.get("tab") as typeof releaseTabs[number]) ? params.get("tab") as typeof releaseTabs[number] : "overview";
   if (!release || !product || release.productId !== product.id) return <EmptyState title="Release not found" body="This release is unavailable in the selected product." action={<Link className="button" to="/products">Back to products</Link>} />;
   const findings = demo.findings.filter((item) => item.releaseId === release.id);
+  const latestCompleted = demo.state.analysisJobs.filter((job) => job.draft.productId === product.id && job.draft.releaseId === release.id && job.status === "completed")
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  const downloadReport = async () => {
+    if (!latestCompleted) return;
+    setDownloading(true); setDownloadError(undefined);
+    try {
+      const file = await demo.actions.downloadReleaseReport(product.id, release.id, latestCompleted.id);
+      const url = URL.createObjectURL(file.blob);
+      const link = document.createElement("a");
+      link.href = url; link.download = file.filename ?? `actis-${release.id}-evidence.zip`;
+      document.body.appendChild(link); link.click(); link.remove();
+      URL.revokeObjectURL(url);
+    } catch (cause) { setDownloadError(cause instanceof Error ? cause.message : "Could not download release evidence."); }
+    finally { setDownloading(false); }
+  };
 
   return <main className="page">
     <Breadcrumbs items={[{ label: "Products", to: "/products" }, { label: product.name, to: `/products/${product.id}?tab=releases` }, { label: release.version }]} />
@@ -28,7 +45,7 @@ export function ReleaseWorkspacePage() {
       <section className="panel"><SectionHeader title="Analysis coverage" description="Latest known software composition and source coverage." /><dl className="definition-grid"><div><dt>SBOM status</dt><dd><StatusPill value={release.sbomStatus} /></dd></div><div><dt>Component identity</dt><dd><EvidenceMeter value={release.coverage.identifiedComponents} total={release.coverage.components} /></dd></div><div><dt>Advisory sources</dt><dd><EvidenceMeter value={release.coverage.advisorySourcesChecked} total={release.coverage.advisorySourcesExpected} /></dd></div><div><dt>Last analysis</dt><dd>{formatDate(release.lastAnalysisAt, true)}</dd></div></dl>{release.coverage.limitations.length ? <div className="panel-pad"><div className="coverage-callout"><strong>Coverage limitations</strong><br />{release.coverage.limitations.join(" ")}</div></div> : null}</section>
       <MonitoringPanel productId={product.id} releaseId={release.id} fallbackHealth={release.monitoringHealth} fallbackLastCheck={release.lastMonitoringCheckAt} />
       <FindingInsights findings={findings} analyses={demo.state.analysisJobs.filter((item) => item.draft.releaseId === release.id)}/>
-      <section className="panel wide"><SectionHeader title="Received artifacts" description="Traceable evidence used in the latest analysis." /><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Artifact</th><th>Kind</th><th>Size</th><th>Received</th><th>SHA-256</th></tr></thead><tbody>{release.artifacts.map((artifact) => <tr key={artifact.id}><td className="cell-strong">{artifact.name}</td><td>{artifact.kind.replaceAll("_", " ")}</td><td>{artifact.sizeLabel}</td><td>{formatDate(artifact.receivedAt, true)}</td><td className="mono">{artifact.sha256.slice(0, 16)}…</td></tr>)}</tbody></table></div></section>
+      <section className="panel wide"><SectionHeader title="Received artifacts" description="Traceable evidence and generated reports for this release." action={latestCompleted ? <button type="button" disabled={downloading} onClick={() => void downloadReport()}>{downloading ? "Preparing…" : "Download evidence & reports"}</button> : null} />{downloadError ? <p className="danger-text panel-pad" role="alert">{downloadError}</p> : null}<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Artifact</th><th>Kind</th><th>Size</th><th>Received</th><th>SHA-256</th></tr></thead><tbody>{release.artifacts.map((artifact) => <tr key={artifact.id}><td className="cell-strong">{artifact.name}</td><td>{artifact.kind.replaceAll("_", " ")}</td><td>{artifact.sizeLabel}</td><td>{formatDate(artifact.receivedAt, true)}</td><td className="mono">{artifact.sha256.slice(0, 16)}…</td></tr>)}</tbody></table></div></section>
     </div> : null}
     {tab === "findings" ? <ReleaseFindings releaseId={release.id} /> : null}
     {tab === "compliance" ? <ReleaseCompliance releaseId={release.id} /> : null}

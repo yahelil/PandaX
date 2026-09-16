@@ -5,7 +5,7 @@ import { createGovernanceApi, GovernanceApiError, mapCompliance, mapGovernanceSe
 import { createOperationsApi, OperationsApiError, type OperationsApi, type OperationsHome, type OperationsNotification, type OperationsSearchResult } from "./operationsApi";
 import { FixtureAdapter } from "./fixtureAdapter";
 import { createPortfolioApi, PortfolioApiError, type PortfolioApi } from "./portfolioApi";
-import { createReleaseOperationsApi, ReleaseOperationsApiError, type MonitoringRunEvent, type ReleaseAnalysisJob, type ReleaseMonitoringStatus, type ReleaseOperationsApi, type ReleaseScope } from "./releaseOperationsApi";
+import { createReleaseOperationsApi, ReleaseOperationsApiError, type AnalysisEvidenceFile, type MonitoringRunEvent, type ReleaseAnalysisJob, type ReleaseMonitoringStatus, type ReleaseOperationsApi, type ReleaseScope } from "./releaseOperationsApi";
 import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, ComplianceApprovalCommand, ComplianceItem, ComplianceUpdateCommand, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentDownloadMetadata, DocumentRecord, DocumentRevision, EntityId, Finding, FindingBatchDecisionInput, FindingDecisionInput, Integration, IntegrationUpdate, Notification, Organization, OrganizationProfileUpdate, Product, RecordDocumentSelfFilingInput, RegisterDocumentRevisionInput, Release, ReleaseMonitoringView, Remediation, RemediationInput, TeamMember, TeamMemberUpdate } from "./types";
 
 export type BearerTokenProvider = () => string | undefined | Promise<string | undefined>;
@@ -168,9 +168,9 @@ function mapAnalysisJob(job: ReleaseAnalysisJob, draft: AnalysisDraft): Analysis
     ? (job.stage.toLowerCase().includes("valid") ? "validating" : "analyzing")
     : job.status;
   const summary = job.result?.coverageSummary;
-  const sourceCount = summary?.advisory_sources_checked ?? 0;
+  const { checked: sourceCount, expected: expectedSources } = advisoryCoverage(summary);
   const limitations = [
-    ...(job.preview.skippedComponents ? [`${job.preview.skippedComponents} components could not be matched to a package identifier.`] : []),
+    ...((job.result?.skippedComponents ?? job.preview.skippedComponents) ? [`${job.result?.skippedComponents ?? job.preview.skippedComponents} components could not be matched to a package identifier.`] : []),
     ...(job.inputType === "sbom" ? ["Runtime reachability requires Collector or equivalent evidence."] : []),
   ];
   return {
@@ -189,13 +189,46 @@ function mapAnalysisJob(job: ReleaseAnalysisJob, draft: AnalysisDraft): Analysis
       componentCount: job.result.components,
       coverage: {
         components: job.result.components,
-        identifiedComponents: job.preview.matchableComponents,
+        identifiedComponents: job.result.matchableComponents ?? job.preview.matchableComponents,
         advisorySourcesChecked: sourceCount,
-        advisorySourcesExpected: summary?.advisory_sources_expected ?? sourceCount,
+        advisorySourcesExpected: expectedSources,
         limitations,
       },
       resultUrl: `/products/${job.productId}/releases/${job.releaseId}`,
     } : undefined,
+  };
+}
+
+function advisoryCoverage(summary?: Record<string, number>): { checked: number; expected: number } {
+  if (!summary) return { checked: 0, expected: 0 };
+  if (summary.advisory_sources_checked !== undefined) return {
+    checked: summary.advisory_sources_checked,
+    expected: summary.advisory_sources_expected ?? summary.advisory_sources_checked,
+  };
+  const states = ["completed", "failed", "unknown", "unsupported", "unscanned"];
+  return { checked: summary.completed ?? 0, expected: states.reduce((total, state) => total + (summary[state] ?? 0), 0) };
+}
+
+function projectRelease(release: Release, jobs: ReleaseAnalysisJob[], monitoring?: ReleaseMonitoringStatus): Release {
+  const completed = jobs.filter((job) => job.status === "completed" && job.result)
+    .sort((a, b) => (b.completedAt ?? "").localeCompare(a.completedAt ?? "") || b.id.localeCompare(a.id))[0];
+  if (!completed?.result) return { ...release, monitoringHealth: monitoring?.health ?? release.monitoringHealth, lastMonitoringCheckAt: monitoring?.lastCheckAt ?? release.lastMonitoringCheckAt };
+  const summary = completed.result.coverageSummary;
+  const { checked, expected } = advisoryCoverage(summary);
+  const skipped = completed.result.skippedComponents ?? completed.preview.skippedComponents;
+  const limitations = [
+    ...(skipped ? [`${skipped} components could not be matched to a package identifier.`] : []),
+    ...(completed.inputType === "sbom" ? ["Runtime reachability requires Collector or equivalent evidence."] : []),
+    ...(expected > checked ? ["Some advisory sources did not complete."] : []),
+  ];
+  return {
+    ...release,
+    sbomStatus: limitations.length ? "partial" : "validated",
+    coverage: { components: completed.result.components, identifiedComponents: completed.result.matchableComponents ?? completed.preview.matchableComponents, advisorySourcesChecked: checked, advisorySourcesExpected: expected, limitations },
+    artifacts: jobs.filter((job) => job.status === "completed").map((job) => ({ id: job.id, kind: job.inputType === "collector" ? "collector_package" as const : job.inputType, name: job.filename, sha256: job.sha256, receivedAt: job.completedAt ?? job.updatedAt, sizeLabel: `${Math.max(1, Math.round(job.sizeBytes / 1024))} KB` })),
+    lastAnalysisAt: completed.completedAt ?? completed.updatedAt,
+    monitoringHealth: monitoring?.health ?? release.monitoringHealth,
+    lastMonitoringCheckAt: monitoring?.lastCheckAt ?? release.lastMonitoringCheckAt,
   };
 }
 
@@ -494,8 +527,21 @@ export class ProductionAdapter implements DataAdapter {
     this.fixture.upsertRelease(created); return created;
   });
 
+  selectActiveRelease = async (productId: EntityId, releaseId: EntityId): Promise<Product> => this.mutation("select_active_release", async () => {
+    const product = await this.config.portfolioApi.updateProduct(this.config.organizationId, productId, { activeReleaseId: releaseId });
+    this.fixture.upsertProduct(product);
+    await this.refresh();
+    if (this.status.phase === "error") throw new Error(this.status.failure?.message ?? "Could not refresh the selected release.");
+    return product;
+  });
+
+  downloadReleaseReport = async (productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile> => {
+    if (!this.config.releaseOperationsApi) throw new Error("Production evidence export is unavailable.");
+    return this.config.releaseOperationsApi.downloadEvidenceBundle({ organizationId: this.config.organizationId, productId, releaseId }, jobId);
+  };
+
   previewAnalysis = async (draft: AnalysisDraft): Promise<AnalysisPreview> => {
-    if (!this.supportsProductionAnalysis(draft)) return this.fixture.previewAnalysis(draft);
+    if (!this.supportsProductionAnalysis(draft)) throw new Error("A release, evidence file, and production analysis service are required.");
     return this.mutation("preview_analysis", async () => {
       const uploaded = await this.uploadAnalysis(draft);
       return mapAnalysisPreview(uploaded);
@@ -503,7 +549,7 @@ export class ProductionAdapter implements DataAdapter {
   };
 
   runAnalysis = async (draft: AnalysisDraft): Promise<AnalysisJob> => {
-    if (!this.supportsProductionAnalysis(draft)) return this.fixture.runAnalysis(draft);
+    if (!this.supportsProductionAnalysis(draft)) throw new Error("A release, evidence file, and production analysis service are required.");
     return this.mutation("run_analysis", async () => {
       const uploaded = this.uploadedAnalysis.get(this.analysisKey(draft)) ?? await this.uploadAnalysis(draft);
       const scope = this.analysisScope(draft);
@@ -518,7 +564,7 @@ export class ProductionAdapter implements DataAdapter {
   getApproval = (documentId: EntityId): Approval | undefined => this.fixture.getApproval(documentId);
 
   loadReleaseMonitoring = async (productId: EntityId, releaseId: EntityId, options?: { signal?: AbortSignal }): Promise<ReleaseMonitoringView> => {
-    if (!this.config.releaseOperationsApi) return this.fixture.loadReleaseMonitoring(productId, releaseId);
+    if (!this.config.releaseOperationsApi) throw new Error("Production monitoring service is unavailable.");
     const scope = { organizationId: this.config.organizationId, productId, releaseId };
     const [status, events] = await Promise.all([
       this.config.releaseOperationsApi.getMonitoring(scope, options),
@@ -528,7 +574,7 @@ export class ProductionAdapter implements DataAdapter {
   };
 
   runReleaseMonitoring = async (productId: EntityId, releaseId: EntityId): Promise<ReleaseMonitoringView> => {
-    if (!this.config.releaseOperationsApi) return this.fixture.runReleaseMonitoring(productId, releaseId);
+    if (!this.config.releaseOperationsApi) throw new Error("Production monitoring service is unavailable.");
     return this.mutation("run_monitoring", async () => {
       const scope = { organizationId: this.config.organizationId, productId, releaseId };
       const status = await this.config.releaseOperationsApi!.runMonitoring(scope);
@@ -543,10 +589,19 @@ export class ProductionAdapter implements DataAdapter {
     try {
       const portfolio = Promise.all([this.config.portfolioApi.getOrganization(this.config.organizationId, options), this.config.portfolioApi.listProducts(this.config.organizationId, options)]).then(async ([organization, products]) => {
         const releases = (await Promise.all(products.map((product) => this.config.portfolioApi.listReleases(this.config.organizationId, product.id, options)))).flat();
-        const analysisJobs = this.config.releaseOperationsApi
-          ? (await Promise.all(releases.map((release) => this.config.releaseOperationsApi!.listAnalysisJobs({ organizationId: this.config.organizationId, productId: release.productId, releaseId: release.id }, options)))).flat()
-          : [];
-        return { organization, products, releases, analysisJobs };
+        const scopedJobs = this.config.releaseOperationsApi
+          ? await Promise.all(releases.map(async (release) => {
+              const scope = { organizationId: this.config.organizationId, productId: release.productId, releaseId: release.id };
+              const jobs = await this.config.releaseOperationsApi!.listAnalysisJobs(scope, options);
+              let monitoring: ReleaseMonitoringStatus | undefined;
+              if (jobs.some((job) => job.status === "completed")) {
+                try { monitoring = await this.config.releaseOperationsApi!.getMonitoring(scope, options); }
+                catch (error) { if (!(error instanceof ReleaseOperationsApiError && error.code === "not_found")) throw error; }
+              }
+              return { release, jobs, monitoring };
+            }))
+          : releases.map((release) => ({ release, jobs: [] as ReleaseAnalysisJob[], monitoring: undefined }));
+        return { organization, products, releases: scopedJobs.map(({ release, jobs, monitoring }) => projectRelease(release, jobs, monitoring)), analysisJobs: scopedJobs.flatMap(({ jobs }) => jobs) };
       });
       const operations = this.config.operationsApi ? Promise.all([this.config.operationsApi.getHome(this.config.organizationId, { signal: options?.signal }), this.config.operationsApi.listNotifications(this.config.organizationId, { view: "unread_action", signal: options?.signal })]) : undefined;
       const findingList = this.config.findingsApi ? this.config.findingsApi.listFindings(this.config.organizationId, { view: "all" }, options) : undefined;
@@ -675,7 +730,7 @@ export class ProductionAdapter implements DataAdapter {
     this.analysisTimers.set(jobId, setTimeout(() => {
       void this.config.releaseOperationsApi!.getAnalysisJob(scope, jobId).then((job) => {
         this.fixture.upsertAnalysisJob(mapAnalysisJob(job, draft));
-        if (this.isTerminalAnalysis(job)) this.analysisTimers.delete(jobId);
+        if (this.isTerminalAnalysis(job)) { this.analysisTimers.delete(jobId); setTimeout(() => { void this.refresh(); }, 250); }
         else this.pollAnalysis(scope, draft, jobId);
       }).catch((error) => {
         this.analysisTimers.delete(jobId);

@@ -11,6 +11,7 @@ const viteEntry = createRequire(import.meta.url).resolve("vite");
 const viteBin = resolve(dirname(viteEntry), "../../bin/vite.js");
 const port = Number.parseInt(process.env.ACTIS_E2E_PORT ?? "4178", 10);
 const baseUrl = `http://127.0.0.1:${port}`;
+const escapedBaseUrl = baseUrl.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const visualDir = process.env.ACTIS_E2E_VISUAL_DIR;
 const browserCandidates = [
   process.env.ACTIS_E2E_BROWSER,
@@ -50,6 +51,8 @@ server.stdout.on("data", (chunk) => serverOutput.push(String(chunk)));
 server.stderr.on("data", (chunk) => serverOutput.push(String(chunk)));
 
 let browser;
+let page;
+let completed = false;
 try {
   await waitForPreview(server);
   browser = await chromium.launch({ executablePath, headless: true });
@@ -73,14 +76,21 @@ try {
       }).observe({ type: "longtask", buffered: true });
     }
   });
-  const page = await context.newPage();
+  page = await context.newPage();
   const browserErrors = [];
   page.on("console", (message) => {
     if (message.type() === "error") browserErrors.push(`console: ${message.text()}`);
   });
-  page.on("pageerror", (error) => browserErrors.push(`page: ${error.message}`));
+  page.on("requestfailed", (request) => {
+    console.error(`Request failed: ${request.method()} ${request.url()} — ${request.failure()?.errorText}`);
+  });
+  page.on("pageerror", (error) => {
+    browserErrors.push(`page: ${error.message}`);
+    console.error(`Page error: ${error.stack ?? error.message}`);
+  });
 
-  await page.goto(baseUrl, { waitUntil: "networkidle" });
+  await page.goto(baseUrl, { waitUntil: "domcontentloaded", timeout: 15_000 });
+  await page.getByRole("complementary", { name: "Primary navigation" }).waitFor({ state: "visible", timeout: 15_000 });
   await assertCoreShell(page);
   await assertSingleMain(page, "Home");
   await assertAccessibilityBasics(page, "Home");
@@ -105,14 +115,28 @@ try {
   await assertThemeContrast(page, "dark");
 
   await page.getByRole("link", { name: /^Products$/ }).click();
-  await page.waitForURL(`${baseUrl}/products`);
-  await assertSingleMain(page, "Products");
-  await assertAccessibilityBasics(page, "Products");
-  await assertVisible(page.getByRole("heading", { name: "Products", exact: true }), "Products heading");
-  await assertVisible(page.getByRole("searchbox", { name: "Search products" }), "product search");
+  await waitForRoute(page, `${baseUrl}/products`, "Devices");
+  await assertSingleMain(page, "Devices");
+  await assertAccessibilityBasics(page, "Devices");
+  await assertVisible(page.getByRole("heading", { name: "Devices", exact: true }), "Devices heading");
+  await assertVisible(page.getByRole("searchbox", { name: "Search devices" }), "device search");
+  if (visualDir) await page.screenshot({ path: join(visualDir, "devices-dark-1440.png"), fullPage: true });
+  if (visualDir) {
+    await page.getByRole("button", { name: "Use light theme" }).click();
+    await page.locator("html[data-theme='light']").waitFor();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: join(visualDir, "devices-light-1440.png"), fullPage: true });
+    await page.getByRole("button", { name: "Use dark theme" }).click();
+    await page.locator("html[data-theme='dark']").waitFor();
+  }
+  await page.setViewportSize({ width: 640, height: 1000 });
+  await page.waitForTimeout(300);
+  await assertNoHorizontalOverflow(page, "Devices at 640px");
+  if (visualDir) await page.screenshot({ path: join(visualDir, "devices-dark-640.png"), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
 
   await page.getByRole("link", { name: "Home Hub", exact: true }).first().click();
-  await page.waitForURL(`${baseUrl}/products/product-home-hub`);
+  await waitForRoute(page, `${baseUrl}/products/product-home-hub`, "Home Hub");
   await assertSingleMain(page, "Product workspace");
   await assertVisible(page.getByRole("heading", { name: "Home Hub", exact: true }), "Home Hub heading");
   await assertVisible(page.getByRole("heading", { name: "Finding insights", exact: true }), "conditional finding insights");
@@ -123,11 +147,11 @@ try {
   }
   await page.getByRole("link", { name: /^Releases$/ }).click();
   await page.getByRole("link", { name: "1.8.0", exact: true }).click();
-  await page.waitForURL(`${baseUrl}/products/product-home-hub/releases/release-hub-1-8-0`);
+  await waitForRoute(page, `${baseUrl}/products/product-home-hub/releases/release-hub-1-8-0`, "Home Hub release");
   await assertSingleMain(page, "Release workspace");
   await assertVisible(page.getByRole("link", { name: "Analyze release" }), "release analysis action");
   await page.getByRole("link", { name: "Analyze release" }).click();
-  await page.waitForURL(`${baseUrl}/products/product-home-hub/releases/release-hub-1-8-0/analyze`);
+  await waitForRoute(page, `${baseUrl}/products/product-home-hub/releases/release-hub-1-8-0/analyze`, "Analysis input");
   await assertSingleMain(page, "Analysis input");
   await assertAccessibilityBasics(page, "Analysis input");
   await page.getByRole("button", { name: "Continue" }).click();
@@ -141,17 +165,17 @@ try {
   await page.getByRole("button", { name: "Continue" }).waitFor();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByRole("button", { name: "Run analysis" }).click();
-  await page.waitForURL(new RegExp(`${baseUrl}/analyses/analysis-`));
+  await waitForRoute(page, new RegExp(`^${escapedBaseUrl}/analyses/analysis-[^/]+$`), "Analysis result");
   await assertVisible(page.getByRole("heading", { name: "Analysis complete" }), "completed analysis", 5_000);
   await assertAccessibilityBasics(page, "Analysis result");
 
   await page.getByRole("complementary", { name: "Primary navigation" })
     .getByRole("link", { name: /^Findings / })
     .click();
-  await page.waitForURL(`${baseUrl}/findings`);
+  await waitForRoute(page, `${baseUrl}/findings`, "Findings");
   await assertSingleMain(page, "Findings");
   await page.getByRole("link", { name: "CVE-2026-27102", exact: true }).first().click();
-  await page.waitForURL(`${baseUrl}/findings/finding-hub-cve-2026-27102`);
+  await waitForRoute(page, `${baseUrl}/findings/finding-hub-cve-2026-27102`, "Finding detail");
   await assertSingleMain(page, "Finding detail");
   await page.getByLabel("Decision").selectOption("affected");
   await page.getByLabel("Rationale").fill("Production build evidence confirms the reachable TLS validation path is enabled.");
@@ -163,7 +187,7 @@ try {
   await assertVisible(page.getByText("Remediation plan updated."), "remediation confirmation");
 
   await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Compliance / }).click();
-  await page.waitForURL(`${baseUrl}/compliance`);
+  await waitForRoute(page, `${baseUrl}/compliance`, "Compliance");
   await assertSingleMain(page, "Compliance");
   await assertVisible(page.getByRole("textbox", { name: "Search compliance work" }), "compliance search");
   await assertAccessibilityBasics(page, "Compliance");
@@ -171,6 +195,7 @@ try {
   await assertVisible(page.getByText("Submit initial incident notification", { exact: true }).first(), "deadline case");
 
   await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Products$/ }).click();
+  await waitForRoute(page, `${baseUrl}/products`, "Devices");
   await page.getByRole("link", { name: "Smart Camera", exact: true }).first().click();
   await page.getByRole("navigation", { name: "Product workspace" }).getByRole("link", { name: "Documents" }).click();
   await page.getByRole("link", { name: "EU Declaration of Conformity — Smart Camera 2.4.1" }).click();
@@ -180,7 +205,7 @@ try {
   await assertVisible(page.getByRole("tab", { name: "Audit" }), "document audit history tab");
 
   await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Settings$/ }).click();
-  await page.waitForURL(`${baseUrl}/settings/organization`);
+  await waitForRoute(page, `${baseUrl}/settings/organization`, "Settings");
   await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "Appearance" }).click();
   await assertSingleMain(page, "Settings");
   await assertAccessibilityBasics(page, "Settings");
@@ -190,9 +215,30 @@ try {
   }
 
   console.log(`Actis dashboard E2E smoke passed with ${executablePath}`);
+  completed = true;
 } finally {
+  if (!completed) {
+    console.error(`Smoke test stopped at ${page?.url() ?? "before navigation"}`);
+    if (page && !page.isClosed()) {
+      try {
+        const path = join(dashboardRoot, "artifacts", "dashboard-e2e-failure.png");
+        mkdirSync(dirname(path), { recursive: true });
+        await page.screenshot({ path, fullPage: true, timeout: 5_000 });
+        console.error(`Failure screenshot: ${path}`);
+      } catch (error) {
+        console.error(`Could not capture failure screenshot: ${error.message}`);
+      }
+    }
+    if (serverOutput.length) console.error(`Dashboard preview output:\n${serverOutput.join("")}`);
+  }
   await browser?.close();
-  server.kill();
+  if (server.exitCode === null) server.kill();
+}
+
+async function waitForRoute(page, url, label) {
+  await page.waitForURL(url, { timeout: 15_000 });
+  await page.getByRole("main").waitFor({ state: "visible", timeout: 15_000 });
+  console.log(`Reached ${label}: ${page.url()}`);
 }
 
 async function waitForPreview(process) {

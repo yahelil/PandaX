@@ -1,5 +1,5 @@
 import { type FormEvent, useMemo, useState } from "react";
-import { ClipboardCheck, ShieldCheck } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, ClipboardCheck, Filter, Laptop, MoreVertical, Plus, Search, ShieldCheck } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { usePermission } from "../auth";
 import { useDemo } from "../data/DemoProvider";
@@ -7,10 +7,21 @@ import type { CraClassificationAssessment, CreateProductInput, Product, ReleaseA
 import { CraAssessmentWizard } from "./CraAssessmentWizard";
 import { craClassLabel } from "./craAssessment";
 import { analysisInputAccept, analysisInputHint } from "./analysisInput";
-import { PageHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
+import { formatDate, memberName } from "./PageKit";
 import "./pages.css";
+import "./devices.css";
 
-type SortKey = "name" | "readiness" | "actions" | "deadline";
+type SortKey = "name" | "findings" | "assessment";
+type ScopeStatus = "in_scope" | "out_of_scope" | "needs_review";
+const pageSize = 10;
+
+function scopeStatus(product: Product): ScopeStatus {
+  return product.classificationAssessment?.scopeResult ?? "needs_review";
+}
+
+function scopeLabel(status: ScopeStatus): string {
+  return status === "in_scope" ? "In scope" : status === "out_of_scope" ? "Out of scope" : "Needs review";
+}
 
 export function ProductsPage() {
   const demo = useDemo();
@@ -18,28 +29,63 @@ export function ProductsPage() {
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
   const [query, setQuery] = useState("");
-  const [readiness, setReadiness] = useState("all");
+  const [scope, setScope] = useState("all");
+  const [productClass, setProductClass] = useState("all");
+  const [owner, setOwner] = useState("all");
   const [monitoring, setMonitoring] = useState("all");
-  const [sort, setSort] = useState<SortKey>("actions");
+  const [sort, setSort] = useState<SortKey>("name");
+  const [moreFilters, setMoreFilters] = useState(false);
+  const [page, setPage] = useState(1);
+  const [selected, setSelected] = useState<string[]>([]);
   const [createPending, setCreatePending] = useState(false);
   const [createError, setCreateError] = useState<string>();
+  const openFindings = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const finding of demo.findings) {
+      if (finding.status !== "resolved") counts.set(finding.productId, (counts.get(finding.productId) ?? 0) + 1);
+    }
+    return counts;
+  }, [demo.findings]);
+  const latestAssessment = (product: Product) => [
+    product.classificationAssessment?.completedAt,
+    ...demo.releases.filter((release) => release.productId === product.id).map((release) => release.lastAnalysisAt),
+  ].filter((date): date is string => Boolean(date)).sort().at(-1);
   const visible = useMemo(() => {
-    const lower = query.toLowerCase();
+    const lower = query.trim().toLowerCase();
     return demo.products
       .filter((product) => !lower || `${product.name} ${product.identifier} ${product.manufacturer} ${product.tags.join(" ")}`.toLowerCase().includes(lower))
-      .filter((product) => readiness === "all" || product.readiness === readiness)
+      .filter((product) => scope === "all" || scopeStatus(product) === scope)
+      .filter((product) => productClass === "all" || product.craClass === productClass)
+      .filter((product) => owner === "all" || (owner === "unassigned" ? !product.ownerId : product.ownerId === owner))
       .filter((product) => monitoring === "all" || product.monitoringHealth === monitoring)
-      .sort((a, b) => compareProducts(a, b, sort));
-  }, [demo.products, monitoring, query, readiness, sort]);
+      .sort((a, b) => sort === "findings" ? (openFindings.get(b.id) ?? 0) - (openFindings.get(a.id) ?? 0) || a.name.localeCompare(b.name)
+        : sort === "assessment" ? (latestAssessment(b) ?? "").localeCompare(latestAssessment(a) ?? "") || a.name.localeCompare(b.name)
+        : a.name.localeCompare(b.name));
+  }, [demo.products, demo.releases, monitoring, openFindings, owner, productClass, query, scope, sort]);
+  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageProducts = visible.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const selectedOnPage = pageProducts.length > 0 && pageProducts.every((product) => selected.includes(product.id));
+  const setFilter = (setter: (value: string) => void, value: string) => { setter(value); setPage(1); setSelected([]); };
+  const toggleSelected = (id: string) => setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  const togglePage = () => setSelected((current) => selectedOnPage
+    ? current.filter((id) => !pageProducts.some((product) => product.id === id))
+    : [...new Set([...current, ...pageProducts.map((product) => product.id)])]);
+  const productRelease = (product: Product) => demo.selectors.release(product.activeReleaseId)
+    ?? demo.releases.filter((release) => release.productId === product.id).sort((a, b) => b.releaseDate.localeCompare(a.releaseDate))[0];
 
   return (
-    <main className="page">
-      <PageHeader
-        eyebrow="Portfolio"
-        title="Products"
-        description="Cybersecurity readiness, monitoring, and regulatory obligations across your portfolio."
-        actions={<button className="button button-primary" disabled={!canManagePortfolio} title={!canManagePortfolio ? "Org Admin or Compliance Operator permission required" : undefined} onClick={() => setAdding((value) => !value)}>Add product</button>}
-      />
+    <main className="page devices-page">
+      <header className="devices-heading">
+        <div><h1>Devices</h1><p>Manage the devices and products in scope for your cybersecurity assessments.</p></div>
+        <button className="button button-primary" disabled={!canManagePortfolio} title={!canManagePortfolio ? "Org Admin or Compliance Operator permission required" : undefined} onClick={() => setAdding((value) => !value)}><Plus size={19} /> Add device</button>
+      </header>
+      <section className="devices-stats" aria-label="Device summary">
+        <div className="devices-stat"><span className="devices-stat__icon devices-stat__icon--total"><Laptop size={26} /></span><div><span>Total devices</span><strong>{demo.products.length}</strong></div></div>
+        <div className="devices-stat"><span className="devices-stat__icon devices-stat__icon--scope"><span className="devices-stat__dot" /></span><div><span>In scope</span><strong>{demo.products.filter((product) => scopeStatus(product) === "in_scope").length}</strong></div></div>
+        <div className="devices-stat"><span className="devices-stat__icon devices-stat__icon--out"><span className="devices-stat__dot" /></span><div><span>Out of scope</span><strong>{demo.products.filter((product) => scopeStatus(product) === "out_of_scope").length}</strong></div></div>
+        <div className="devices-stat"><span className="devices-stat__icon devices-stat__icon--findings"><AlertTriangle size={25} /></span><div><span>With open findings</span><strong>{demo.products.filter((product) => (openFindings.get(product.id) ?? 0) > 0).length}</strong></div></div>
+      </section>
       {adding && canManagePortfolio ? <CreateProductPanel pending={createPending} error={createError} onCancel={() => setAdding(false)} onCreate={async (input, evidence) => {
         setCreatePending(true);
         setCreateError(undefined);
@@ -74,47 +120,47 @@ export function ProductsPage() {
           setCreatePending(false);
         }
       }} members={demo.state.members} rawArtifactsAllowed={demo.state.settings.security.allowRawArtifacts} /> : null}
-      <section className="panel">
-        <div className="toolbar" aria-label="Product filters">
-          <input className="search-field" type="search" aria-label="Search products" placeholder="Search products, identifiers, manufacturers…" value={query} onChange={(event) => setQuery(event.target.value)} />
-          <select className="select-field" aria-label="Readiness" value={readiness} onChange={(event) => setReadiness(event.target.value)}>
-            <option value="all">All readiness</option><option value="ready">Ready</option><option value="needs_attention">Needs attention</option><option value="incomplete_evidence">Incomplete evidence</option>
-          </select>
-          <select className="select-field" aria-label="Monitoring" value={monitoring} onChange={(event) => setMonitoring(event.target.value)}>
-            <option value="all">All monitoring</option><option value="healthy">Healthy</option><option value="degraded">Degraded</option><option value="failed">Failed</option><option value="inactive">Inactive</option>
-          </select>
-          <select className="select-field" aria-label="Sort products" value={sort} onChange={(event) => setSort(event.target.value as SortKey)}>
-            <option value="actions">Most actions</option><option value="deadline">Nearest deadline</option><option value="name">Name</option><option value="readiness">Readiness</option>
-          </select>
+      <section className="panel devices-list">
+        <div className="devices-toolbar" aria-label="Device filters">
+          <label className="devices-search"><Search size={18} aria-hidden="true" /><input type="search" aria-label="Search devices" placeholder="Search devices..." value={query} onChange={(event) => setFilter(setQuery, event.target.value)} /></label>
+          <select className="select-field" aria-label="Scope status" value={scope} onChange={(event) => setFilter(setScope, event.target.value)}><option value="all">All status</option><option value="in_scope">In scope</option><option value="out_of_scope">Out of scope</option><option value="needs_review">Needs review</option></select>
+          <select className="select-field" aria-label="CRA class" value={productClass} onChange={(event) => setFilter(setProductClass, event.target.value)}><option value="all">All CRA classes</option><option value="default">Default</option><option value="important_i">Important I</option><option value="important_ii">Important II</option><option value="critical">Critical</option></select>
+          <select className="select-field" aria-label="Owner" value={owner} onChange={(event) => setFilter(setOwner, event.target.value)}><option value="all">All owners</option><option value="unassigned">Unassigned</option>{demo.state.members.filter((member) => member.status === "active").map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select>
+          <button className="devices-more" type="button" aria-expanded={moreFilters} onClick={() => setMoreFilters((value) => !value)}><Filter size={17} /> More filters</button>
         </div>
+        {moreFilters ? <div className="devices-extra-filters"><label>Monitoring <select className="select-field" value={monitoring} onChange={(event) => setFilter(setMonitoring, event.target.value)}><option value="all">All monitoring</option><option value="healthy">Healthy</option><option value="degraded">Degraded</option><option value="failed">Failed</option><option value="inactive">Inactive</option></select></label><label>Sort by <select className="select-field" value={sort} onChange={(event) => { setSort(event.target.value as SortKey); setPage(1); }}><option value="name">Name A–Z</option><option value="findings">Most findings</option><option value="assessment">Latest assessment</option></select></label><button type="button" onClick={() => { setQuery(""); setScope("all"); setProductClass("all"); setOwner("all"); setMonitoring("all"); setSort("name"); setPage(1); setSelected([]); }}>Clear filters</button></div> : null}
+        {selected.length > 0 ? <div className="devices-selection" role="status">{selected.length} selected <button type="button" onClick={() => setSelected([])}>Clear selection</button></div> : null}
         <div className="data-table-wrap">
-          <table className="data-table">
-            <thead><tr><th>Product</th><th>Active release</th><th>CRA readiness</th><th>Monitoring</th><th>Actions</th><th>Next deadline</th><th>Owner</th></tr></thead>
-            <tbody>{visible.map((product) => {
-              const release = demo.selectors.release(product.activeReleaseId);
+          <table className="data-table devices-table">
+            <thead><tr><th><input type="checkbox" aria-label="Select devices on this page" checked={selectedOnPage} onChange={togglePage} /></th><th>Device name</th><th>Product / Version</th><th>CRA class</th><th>Status</th><th>Open findings</th><th>Last assessment</th><th>Owner</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <tbody>{pageProducts.map((product) => {
+              const release = productRelease(product);
+              const status = scopeStatus(product);
+              const findings = openFindings.get(product.id) ?? 0;
               return <tr key={product.id}>
-                <td><div className="cell-primary"><Link to={`/products/${product.id}`}>{product.name}</Link><small>{product.identifier} · {product.manufacturer}</small></div></td>
-                <td><Link to={`/products/${product.id}/releases/${release?.id}`}>{release?.version ?? "No release"}</Link></td>
-                <td><StatusPill value={product.readiness} /></td>
-                <td><StatusPill value={product.monitoringHealth} /></td>
-                <td><strong className={product.actionCount > 2 ? "danger-text" : ""}>{product.actionCount}</strong></td>
-                <td><div className="cell-primary"><span className={product.nextDeadline && new Date(product.nextDeadline) < new Date(Date.now() + 3 * 86_400_000) ? "danger-text" : ""}>{relativeDate(product.nextDeadline)}</span><small>{formatDate(product.nextDeadline)}</small></div></td>
+                <td><input type="checkbox" aria-label={`Select ${product.name}`} checked={selected.includes(product.id)} onChange={() => toggleSelected(product.id)} /></td>
+                <td><Link className="devices-name" to={`/products/${product.id}`}>{product.name}</Link></td>
+                <td>{release ? <Link className="devices-version" to={`/products/${product.id}/releases/${release.id}`}>{product.name} v{release.version}</Link> : <span className="devices-muted">No release yet</span>}</td>
+                <td><span className={`devices-class devices-class--${product.craClass}`}>{craClassLabel(product.craClass)}</span></td>
+                <td><span className={`devices-scope devices-scope--${status}`}><span />{scopeLabel(status)}</span></td>
+                <td><Link className={findings ? "devices-finding-count devices-finding-count--open" : "devices-finding-count"} to={`/findings?product=${encodeURIComponent(product.id)}`}>{findings}</Link></td>
+                <td>{formatDate(latestAssessment(product))}</td>
                 <td>{memberName(demo.state.members, product.ownerId)}</td>
+                <td><details className="devices-row-menu"><summary aria-label={`Actions for ${product.name}`}><MoreVertical size={18} /></summary><div><Link to={`/products/${product.id}`}>Open device</Link>{release ? <Link to={`/products/${product.id}/releases/${release.id}`}>Open release</Link> : null}<Link to={`/findings?product=${encodeURIComponent(product.id)}`}>View findings</Link></div></details></td>
               </tr>;
-            })}</tbody>
+            })}{pageProducts.length === 0 ? <tr><td colSpan={9} className="devices-empty">No devices match these filters.</td></tr> : null}</tbody>
           </table>
         </div>
-        <div className="mobile-card-list">{visible.map((product) => <article className="mobile-card" key={product.id}>
+        <div className="mobile-card-list">{pageProducts.map((product) => <article className="mobile-card devices-mobile-card" key={product.id}>
           <div className="cell-primary"><Link to={`/products/${product.id}`}>{product.name}</Link><small>{product.identifier}</small></div>
-          <div className="inline-actions"><StatusPill value={product.readiness} /><StatusPill value={product.monitoringHealth} /></div>
-          <span>{product.actionCount} open actions · {relativeDate(product.nextDeadline)}</span>
+          <span className={`devices-scope devices-scope--${scopeStatus(product)}`}><span />{scopeLabel(scopeStatus(product))}</span>
+          <span>{openFindings.get(product.id) ?? 0} open findings · {formatDate(latestAssessment(product))}</span>
         </article>)}</div>
+        <footer className="devices-footer"><span>Showing {pageProducts.length ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, visible.length)} of {visible.length} devices</span><nav aria-label="Device pages"><button type="button" aria-label="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}><ChevronLeft size={18} /></button>{Array.from({ length: pageCount }, (_, index) => <button type="button" key={index} aria-label={`Page ${index + 1}`} aria-current={currentPage === index + 1 ? "page" : undefined} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button type="button" aria-label="Next page" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}><ChevronRight size={18} /></button></nav></footer>
       </section>
-      <p className="muted">Showing {visible.length} of {demo.products.length} products</p>
     </main>
   );
 }
-
 interface InitialEvidence {
   file: File;
   kind: ReleaseArtifact["kind"];
@@ -153,7 +199,7 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawAr
   return <section className="panel analysis-card create-product-panel">
     {assessmentOpen ? <CraAssessmentWizard onCancel={() => setAssessmentOpen(false)} onComplete={completeAssessment} /> : null}
     <div hidden={assessmentOpen}>
-      <h2>Add product</h2><p>Complete the guided CRA assessment, then register product identity and matching evidence.</p>
+      <h2>Add device</h2><p>Complete the guided CRA assessment, then register product identity and matching evidence.</p>
       <form className="form-grid" onSubmit={submit}>
         <div className="cra-assessment-launch span-2">
           <div className="cra-assessment-launch__icon" aria-hidden="true">{assessment ? <ShieldCheck size={22} /> : <ClipboardCheck size={22} />}</div>
@@ -181,11 +227,4 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawAr
       </form>
     </div>
   </section>;
-}
-
-function compareProducts(a: Product, b: Product, sort: SortKey) {
-  if (sort === "name") return a.name.localeCompare(b.name);
-  if (sort === "actions") return b.actionCount - a.actionCount;
-  if (sort === "deadline") return (a.nextDeadline ? new Date(a.nextDeadline).getTime() : Infinity) - (b.nextDeadline ? new Date(b.nextDeadline).getTime() : Infinity);
-  return ({ needs_attention: 0, incomplete_evidence: 1, ready: 2 }[a.readiness] - { needs_attention: 0, incomplete_evidence: 1, ready: 2 }[b.readiness]);
 }

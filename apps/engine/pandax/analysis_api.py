@@ -79,6 +79,8 @@ class EvidenceBundleLinkResponse(ApiModel):
 
 class AnalysisResultResponse(ApiModel):
     components: int = 0
+    matchable_components: int | None = None
+    skipped_components: int | None = None
     findings: int = 0
     kev: int = 0
     incidents: int = 0
@@ -579,6 +581,8 @@ def _public_result(result: Mapping[str, Any], prefix: str) -> dict[str, Any]:
         }
     return {
         "components": int(result.get("components", 0)),
+        "matchable_components": result.get("matchable_components"),
+        "skipped_components": result.get("skipped_components"),
         "findings": int(result.get("findings", 0)),
         "kev": int(result.get("kev", 0)),
         "incidents": int(result.get("incidents", 0)),

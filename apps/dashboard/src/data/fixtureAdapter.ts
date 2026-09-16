@@ -76,42 +76,258 @@ function loadInitialState(): DemoState {
 }
 
 function escapePdfText(str: string): string {
-  const sanitized = str.replace(/[^\x20-\x7E]/g, " ");
+  const sanitized = String(str || "").replace(/[^\x20-\x7E]/g, " ");
   return sanitized.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
 }
 
-export function createFixturePdf(title: string, lines: string[]): Uint8Array {
-  const enc = new TextEncoder();
-  const contentStream = [
-    "BT",
-    "/F1 16 Tf",
-    "20 TL",
-    "50 740 Td",
-    `(${escapePdfText(title)}) Tj`,
-    "T*",
-    "/F1 10 Tf",
-    "14 TL",
-    "T*",
-    ...lines.map((line) => `(${escapePdfText(line)}) Tj T*`),
-    "ET",
-  ].join("\n");
+export interface FixturePdfFinding {
+  id: string;
+  reference?: string;
+  severity?: string;
+  title: string;
+  component?: string;
+  componentVersion?: string;
+  reachability?: string;
+  status?: string;
+}
 
+export interface FixturePdfInput {
+  title: string;
+  documentId: string;
+  productId: string;
+  productName?: string;
+  version: number;
+  status: string;
+  completeness: string;
+  format: string;
+  generatedAt: string;
+  findings: FixturePdfFinding[];
+}
+
+export function createFixturePdf(input: FixturePdfInput | string, legacyLines?: string[]): Uint8Array {
+  const enc = new TextEncoder();
+
+  let title = "";
+  let docId = "";
+  let productId = "";
+  let version = 1;
+  let status = "DRAFT";
+  let completeness = "COMPLETE";
+  let generatedAt = new Date().toISOString();
+  let format = "PDF/A-2b";
+  let findings: FixturePdfFinding[] = [];
+
+  if (typeof input === "string") {
+    title = input;
+    docId = "doc-demo";
+    productId = "prod-demo";
+    if (legacyLines && legacyLines.length > 0) {
+      for (const line of legacyLines) {
+        if (line.startsWith("Document ID: ")) docId = line.replace("Document ID: ", "");
+        else if (line.startsWith("Product ID: ")) productId = line.replace("Product ID: ", "");
+        else if (line.startsWith("Revision: ")) version = Number(line.replace("Revision: ", "")) || 1;
+        else if (line.startsWith("Status: ")) status = line.replace("Status: ", "").toUpperCase();
+        else if (line.startsWith("Completeness: ")) completeness = line.replace("Completeness: ", "").toUpperCase();
+        else if (line.startsWith("Generated: ")) generatedAt = line.replace("Generated: ", "");
+        else if (line.startsWith("Format: ")) format = line.replace("Format: ", "");
+        else if (line.startsWith("- [")) {
+          findings.push({ id: line, title: line, severity: line.includes("CRITICAL") ? "critical" : line.includes("HIGH") ? "high" : "medium" });
+        }
+      }
+    }
+  } else {
+    title = input.title;
+    docId = input.documentId;
+    productId = input.productName ? `${input.productName} (${input.productId})` : input.productId;
+    version = input.version;
+    status = (input.status || "draft").toUpperCase();
+    completeness = (input.completeness || "complete").toUpperCase();
+    generatedAt = input.generatedAt || new Date().toISOString();
+    format = input.format || "PDF/A-2b";
+    findings = input.findings || [];
+  }
+
+  const stream: string[] = [];
+
+  // Top header banner (Dark Navy)
+  stream.push("0.08 0.13 0.24 rg");
+  stream.push("50 712 512 44 re f");
+
+  stream.push("BT");
+  stream.push("1 1 1 rg");
+  stream.push("/F2 13 Tf");
+  stream.push("65 734 Td");
+  stream.push("(PANDAX CYBER COMPLIANCE & GOVERNANCE ENGINE) Tj");
+  stream.push("0.75 0.82 0.95 rg");
+  stream.push("/F1 8 Tf");
+  stream.push("0 -13 Td");
+  stream.push("(OFFICIAL REGULATORY EVIDENCE REPORT  |  CONFIDENTIAL) Tj");
+  stream.push("ET");
+
+  // Document Title
+  stream.push("BT");
+  stream.push("0.10 0.12 0.16 rg");
+  stream.push("/F2 17 Tf");
+  stream.push("50 675 Td");
+  stream.push(`(${escapePdfText(title)}) Tj`);
+  stream.push("ET");
+
+  // Top separator rule
+  stream.push("0.80 0.84 0.90 RG 1 w");
+  stream.push("50 660 m 562 660 l S");
+
+  // Metadata Card background & border
+  stream.push("0.96 0.97 0.98 rg");
+  stream.push("50 535 512 110 re f");
+  stream.push("0.82 0.85 0.90 RG 0.75 w");
+  stream.push("50 535 512 110 re S");
+
+  // Metadata Column 1 Labels
+  stream.push("BT");
+  stream.push("0.45 0.50 0.58 rg");
+  stream.push("/F2 8 Tf");
+  stream.push("16 TL");
+  stream.push("65 623 Td");
+  stream.push("(DOCUMENT ID:) Tj T*");
+  stream.push("(PRODUCT REF:) Tj T*");
+  stream.push("(REVISION / STATUS:) Tj T*");
+  stream.push("(EVIDENCE COMPLETENESS:) Tj T*");
+  stream.push("(FORMAT SPECIFICATION:) Tj T*");
+  stream.push("(GENERATION DATE:) Tj T*");
+  stream.push("ET");
+
+  // Metadata Column 1 Values
+  stream.push("BT");
+  stream.push("0.12 0.15 0.20 rg");
+  stream.push("/F1 8.5 Tf");
+  stream.push("16 TL");
+  stream.push("195 623 Td");
+  stream.push(`(${escapePdfText(docId)}) Tj T*`);
+  stream.push(`(${escapePdfText(productId)}) Tj T*`);
+  stream.push(`(Revision ${version}  -  ${escapePdfText(status)}) Tj T*`);
+  stream.push(`(${escapePdfText(completeness)}) Tj T*`);
+  stream.push(`(${escapePdfText(format)} (ISO 19005-2 compliance)) Tj T*`);
+  stream.push(`(${escapePdfText(generatedAt)}) Tj T*`);
+  stream.push("ET");
+
+  // Findings Section Header
+  stream.push("BT");
+  stream.push("0.10 0.12 0.16 rg");
+  stream.push("/F2 12 Tf");
+  stream.push("50 495 Td");
+  stream.push(`(Associated Security Findings (${findings.length})) Tj`);
+  stream.push("ET");
+
+  stream.push("0.80 0.84 0.90 RG 0.5 w");
+  stream.push("50 485 m 562 485 l S");
+
+  // Findings Cards
+  let curY = 425;
+  if (findings.length === 0) {
+    stream.push("0.98 0.98 0.99 rg");
+    stream.push(`50 ${curY} 512 45 re f`);
+    stream.push("0.88 0.90 0.92 RG 0.5 w");
+    stream.push(`50 ${curY} 512 45 re S`);
+    stream.push("BT");
+    stream.push("0.35 0.40 0.45 rg");
+    stream.push("/F1 9 Tf");
+    stream.push(`65 ${curY + 18} Td`);
+    stream.push("(No unresolved security findings recorded against this product revision.) Tj");
+    stream.push("ET");
+  } else {
+    for (const f of findings.slice(0, 3)) {
+      const isCritical = (f.severity || "").toLowerCase() === "critical";
+      const isHigh = (f.severity || "").toLowerCase() === "high";
+      const badgeR = isCritical ? "0.82 0.15 0.15" : isHigh ? "0.85 0.35 0.10" : "0.20 0.45 0.80";
+
+      stream.push("0.98 0.98 0.99 rg");
+      stream.push(`50 ${curY} 512 50 re f`);
+      stream.push("0.88 0.90 0.93 RG 0.5 w");
+      stream.push(`50 ${curY} 512 50 re S`);
+
+      stream.push(`${badgeR} rg`);
+      stream.push(`50 ${curY} 4 50 re f`);
+
+      stream.push("BT");
+      stream.push(`${badgeR} rg`);
+      stream.push("/F2 8.5 Tf");
+      stream.push(`65 ${curY + 33} Td`);
+      stream.push(`([${escapePdfText((f.severity || "UNKNOWN").toUpperCase())}]  ${escapePdfText(f.reference || f.id)}) Tj`);
+
+      stream.push("0.10 0.12 0.16 rg");
+      stream.push("/F2 9.5 Tf");
+      stream.push("0 -13 Td");
+      stream.push(`(${escapePdfText(f.title)}) Tj`);
+
+      stream.push("0.45 0.50 0.55 rg");
+      stream.push("/F1 8 Tf");
+      stream.push("0 -11 Td");
+      const comp = f.component ? `${f.component} ${f.componentVersion || ""}` : "System";
+      const reach = f.reachability || "unknown";
+      const statusText = f.status || "needs_review";
+      stream.push(`(Component: ${escapePdfText(comp)}   |   Reachability: ${escapePdfText(reach)}   |   Status: ${escapePdfText(statusText)}) Tj`);
+      stream.push("ET");
+
+      curY -= 60;
+    }
+
+    if (findings.length > 3) {
+      stream.push("BT");
+      stream.push("0.45 0.50 0.55 rg");
+      stream.push("/F1 8 Tf");
+      stream.push(`65 ${curY + 45} Td`);
+      stream.push(`(... and ${findings.length - 3} additional security findings catalogued in evidence storage.) Tj`);
+      stream.push("ET");
+    }
+  }
+
+  // Regulatory Notice box at bottom
+  stream.push("0.94 0.96 0.99 rg");
+  stream.push("50 85 512 48 re f");
+  stream.push("0.72 0.80 0.92 RG 0.5 w");
+  stream.push("50 85 512 48 re S");
+
+  stream.push("BT");
+  stream.push("0.20 0.32 0.55 rg");
+  stream.push("/F2 8 Tf");
+  stream.push("65 118 Td");
+  stream.push("(REGULATORY COMPLIANCE NOTICE) Tj");
+  stream.push("/F1 7.5 Tf");
+  stream.push("10 TL");
+  stream.push("T*");
+  stream.push("(This document certifies technical findings, verification evidence, and conformity decisions recorded at generation time.) Tj T*");
+  stream.push("(Maintained under controlled revision management compliant with EU Cyber Resilience Act (CRA) Article 14 and ISO standards.) Tj");
+  stream.push("ET");
+
+  // Footer
+  stream.push("0.85 0.88 0.92 RG 0.5 w");
+  stream.push("50 55 m 562 55 l S");
+
+  stream.push("BT");
+  stream.push("0.50 0.55 0.60 rg");
+  stream.push("/F1 7.5 Tf");
+  stream.push("50 42 Td");
+  stream.push("(PandaX Product Security Platform  --  Automated Evidence & CRA Verification Pack  --  Page 1 of 1) Tj");
+  stream.push("ET");
+
+  const contentStream = stream.join("\n");
   const streamBytes = enc.encode(contentStream);
   const headerBytes = enc.encode("%PDF-1.4\n%\xFF\xFF\xFF\xFF\n");
 
   const obj1 = enc.encode("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
   const obj2 = enc.encode("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
-  const obj3 = enc.encode("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n");
+  const obj3 = enc.encode("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>\nendobj\n");
   const obj4 = enc.encode("4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n");
-  const obj5Prefix = enc.encode(`5 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n`);
-  const obj5Suffix = enc.encode("\nendstream\nendobj\n");
+  const obj5 = enc.encode("5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>\nendobj\n");
+  const obj6Prefix = enc.encode(`6 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n`);
+  const obj6Suffix = enc.encode("\nendstream\nendobj\n");
 
-  const obj5 = new Uint8Array(obj5Prefix.length + streamBytes.length + obj5Suffix.length);
-  obj5.set(obj5Prefix, 0);
-  obj5.set(streamBytes, obj5Prefix.length);
-  obj5.set(obj5Suffix, obj5Prefix.length + streamBytes.length);
+  const obj6 = new Uint8Array(obj6Prefix.length + streamBytes.length + obj6Suffix.length);
+  obj6.set(obj6Prefix, 0);
+  obj6.set(streamBytes, obj6Prefix.length);
+  obj6.set(obj6Suffix, obj6Prefix.length + streamBytes.length);
 
-  const objects = [obj1, obj2, obj3, obj4, obj5];
+  const objects = [obj1, obj2, obj3, obj4, obj5, obj6];
   const offsets: number[] = [];
   let currentOffset = headerBytes.length;
   for (const obj of objects) {
@@ -120,11 +336,11 @@ export function createFixturePdf(title: string, lines: string[]): Uint8Array {
   }
 
   const xrefOffset = currentOffset;
-  let xref = "xref\n0 6\n0000000000 65535 f \n";
+  let xref = "xref\n0 7\n0000000000 65535 f \n";
   for (const offset of offsets) {
     xref += `${offset.toString().padStart(10, "0")} 00000 n \n`;
   }
-  const trailer = `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  const trailer = `trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
   const footerBytes = enc.encode(xref + trailer);
 
   const totalLength = currentOffset + footerBytes.length;
@@ -447,21 +663,28 @@ export class FixtureAdapter implements DataAdapter {
   private generateDocumentBlob(document: DocumentRecord, version: number, format: DocumentRecord["format"]): Blob {
     if (format === "PDF/A-2b") {
       const findings = this.state.findings.filter((item) => item.productId === document.productId);
-      const lines = [
-        `Document ID: ${document.id}`,
-        `Revision: ${version}`,
-        `Product ID: ${document.productId}`,
-        `Status: ${document.status}`,
-        `Completeness: ${document.completeness}`,
-        `Generated: ${document.updatedAt || now()}`,
-        `Format: ${format}`,
-        "",
-        `Security Findings (${findings.length}):`,
-        ...(findings.length > 0
-          ? findings.slice(0, 8).map((f) => `- [${f.severity.toUpperCase()}] ${f.id}: ${f.title}`)
-          : ["None recorded."]),
-      ];
-      const pdfBytes = createFixturePdf(document.name, lines);
+      const product = this.state.products.find((item) => item.id === document.productId);
+      const pdfBytes = createFixturePdf({
+        title: document.name,
+        documentId: document.id,
+        productId: document.productId,
+        productName: product?.name,
+        version,
+        status: document.status,
+        completeness: document.completeness,
+        format,
+        generatedAt: document.updatedAt || now(),
+        findings: findings.map((f) => ({
+          id: f.id,
+          reference: f.reference,
+          severity: f.severity,
+          title: f.title,
+          component: f.component,
+          componentVersion: f.componentVersion,
+          reachability: f.reachability,
+          status: f.status,
+        })),
+      });
       return new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
     }
 

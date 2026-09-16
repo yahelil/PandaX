@@ -68,6 +68,15 @@ are rejected; process those with the local Collector. Archive extraction retains
 the existing traversal, link, duplicate, depth, entry-count, and decompression
 limits.
 
+A raw archive may contain source code, dependency manifests and lockfiles, build
+outputs, assets, and other regular files. Uploading it sends those bytes to the
+hosted service for extraction and Syft analysis; it is therefore distinct from
+the local Collector privacy path. Explicit consent is required for every raw
+archive. Links, special files, encrypted ZIP entries, duplicate paths, traversal,
+and empty archives are rejected before storage, then checked again by the worker.
+The structural preview records only regular-file count and declared uncompressed
+bytes; component counts are not claimed until Syft completes.
+
 Accepted raw inputs retain consent actor/time, digest, media type, size, and expiry
 as immutable analysis audit events and job metadata. The existing analysis job
 runs the bounded archive ingestion and pinned Syft scanner, writes a CycloneDX 1.6

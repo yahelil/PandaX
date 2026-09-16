@@ -6,7 +6,7 @@ import { useDemo } from "../data/DemoProvider";
 import type { CraClassificationAssessment, CreateProductInput, Product, ReleaseArtifact } from "../data/types";
 import { CraAssessmentWizard } from "./CraAssessmentWizard";
 import { craClassLabel } from "./craAssessment";
-import { analysisInputAccept, analysisInputHint } from "./analysisInput";
+import { analysisInputAccept, analysisInputHint, validateSbomFormatVersion } from "./analysisInput";
 import { formatDate, memberName } from "./PageKit";
 import "./pages.css";
 import "./devices.css";
@@ -174,19 +174,23 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawAr
   const [evidenceKind, setEvidenceKind] = useState<InitialEvidence["kind"]>("sbom");
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
   const [rawArtifactConsent, setRawArtifactConsent] = useState(false);
-  const sbomAnswer = assessment?.answers.find((answer) => answer.questionId === "sbom")?.answer;
-  const hasSbom = sbomAnswer === "yes" || sbomAnswer === "partial";
+  const [validationError, setValidationError] = useState<string>();
   const completeAssessment = (value: CraClassificationAssessment) => {
-    const declaredSbom = value.answers.find((answer) => answer.questionId === "sbom")?.answer;
     setAssessment(value);
     setAssessmentOpen(false);
-    setEvidenceKind(declaredSbom === "yes" || declaredSbom === "partial" ? "sbom" : "collector_package");
-    setEvidenceFile(null);
-    setRawArtifactConsent(false);
   };
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!assessment || assessment.scopeResult === "out_of_scope") return;
+    setValidationError(undefined);
+    if (evidenceFile && evidenceKind === "sbom") {
+      if (!evidenceFile.name.toLowerCase().endsWith(".json")) {
+        setValidationError("SBOM files must use a .json filename.");
+        return;
+      }
+      try { await validateSbomFormatVersion(evidenceFile); }
+      catch (cause) { setValidationError(cause instanceof Error ? cause.message : "SBOM format is unsupported."); return; }
+    }
     const data = new FormData(event.currentTarget);
     const input = {
       name: String(data.get("name")), identifier: String(data.get("identifier")), manufacturer: String(data.get("manufacturer")),
@@ -194,18 +198,13 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawAr
       classificationAssessment: assessment, supportUntil: String(data.get("supportUntil")), ownerId: String(data.get("ownerId")) || undefined,
     } satisfies CreateProductInput;
     const version = String(data.get("version")).trim();
-    void onCreate(input, evidenceFile ? { file: evidenceFile, kind: evidenceKind, version, rawArtifactConsent } : undefined);
+    await onCreate(input, evidenceFile ? { file: evidenceFile, kind: evidenceKind, version, rawArtifactConsent } : undefined);
   };
   return <section className="panel analysis-card create-product-panel">
-    {assessmentOpen ? <CraAssessmentWizard onCancel={() => setAssessmentOpen(false)} onComplete={completeAssessment} /> : null}
+    {assessmentOpen ? <CraAssessmentWizard initialAssessment={assessment} onCancel={() => setAssessmentOpen(false)} onComplete={completeAssessment} /> : null}
     <div hidden={assessmentOpen}>
-      <h2>Add device</h2><p>Complete the guided CRA assessment, then register product identity and matching evidence.</p>
+      <h2>Add device</h2><p>Enter product details, review CRA classification, and add release evidence if available.</p>
       <form className="form-grid" onSubmit={submit}>
-        <div className="cra-assessment-launch span-2">
-          <div className="cra-assessment-launch__icon" aria-hidden="true">{assessment ? <ShieldCheck size={22} /> : <ClipboardCheck size={22} />}</div>
-          <div><span className="field-label">CRA classification</span>{assessment ? <><strong>{assessment.scopeResult === "out_of_scope" ? "Likely outside scope" : craClassLabel(assessment.recommendedClass)}</strong><p>{assessment.rationale}</p><small>Readiness {assessment.readinessScore}% · {assessment.actions.length} actions · {assessment.classificationStatus.replaceAll("_", " ")}</small></> : <><strong>Start here</strong><p>Answers determine classification and which evidence upload options appear.</p></>}</div>
-          <button type="button" onClick={() => setAssessmentOpen(true)}>{assessment ? "Reassess" : "Start CRA assessment"}</button>
-        </div>
         <div className="field"><label htmlFor="product-name">Product name</label><input id="product-name" name="name" className="input-field" required placeholder="Industrial Sensor Gateway" /></div>
         <div className="field"><label htmlFor="product-id">Product identifier</label><input id="product-id" name="identifier" className="input-field" required placeholder="ACM-GTW-620" /></div>
         <div className="field"><label htmlFor="manufacturer">Manufacturer</label><input id="manufacturer" name="manufacturer" className="input-field" required defaultValue="Acme Devices GmbH" /></div>
@@ -214,14 +213,20 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawAr
         <div className="field span-2"><label htmlFor="description">Description</label><textarea id="description" name="description" className="textarea-field" placeholder="Describe the product, intended purpose, connected functionality, and users." /><span className="field-hint">The description provides context; classification comes from structured assessment answers.</span></div>
         {assessment && assessment.scopeResult !== "out_of_scope" ? <fieldset className="supplemental-evidence span-2">
           <legend>Initial release evidence <span className="muted">(optional)</span></legend>
-          <p>{hasSbom ? "You declared an SBOM. Upload it now to create the first release and start analysis." : "No SBOM was declared. Use a Collector ZIP or permitted product archive instead."}</p>
+          <p>Upload an SBOM, signed Collector ZIP, or permitted product archive to create the first release and start analysis. You can add evidence later.</p>
           <div className="supplemental-grid">
-            <label><span>Evidence type</span><select className="select-field" value={evidenceKind} onChange={(event) => { setEvidenceKind(event.target.value as InitialEvidence["kind"]); setEvidenceFile(null); setRawArtifactConsent(false); }}>{hasSbom ? <option value="sbom">SBOM</option> : <><option value="collector_package">Collector ZIP</option>{rawArtifactsAllowed ? <option value="raw_artifact">Build archive</option> : null}</>}</select></label>
-            <label><span>Release version</span><input className="input-field" name="version" required={Boolean(evidenceFile)} placeholder="1.0.0" /></label>
+            <label><span>Evidence type</span><select className="select-field" value={evidenceKind} onChange={(event) => { setEvidenceKind(event.target.value as InitialEvidence["kind"]); setEvidenceFile(null); setRawArtifactConsent(false); setValidationError(undefined); }}><option value="sbom">SBOM</option><option value="collector_package">Collector ZIP</option>{rawArtifactsAllowed ? <option value="raw_artifact">Build archive</option> : null}</select></label>
+            <label><span>Product release version</span><input className="input-field" name="version" required={Boolean(evidenceFile)} placeholder="1.0.0" /><small>This names your product release. The SBOM format and version are detected automatically.</small></label>
           </div>
-          <label className="upload-zone"><strong>{evidenceFile?.name ?? `Choose ${evidenceKind === "sbom" ? "SBOM" : evidenceKind === "collector_package" ? "Collector ZIP" : "build archive"}`}</strong><input type="file" accept={analysisInputAccept(evidenceKind)} onChange={(event) => setEvidenceFile(event.target.files?.[0] ?? null)} /><p>{analysisInputHint(evidenceKind)}</p></label>
+          <label className="upload-zone"><strong>{evidenceFile?.name ?? `Choose ${evidenceKind === "sbom" ? "SBOM" : evidenceKind === "collector_package" ? "Collector ZIP" : "build archive"}`}</strong><input type="file" accept={analysisInputAccept(evidenceKind)} onChange={(event) => { setEvidenceFile(event.target.files?.[0] ?? null); setValidationError(undefined); }} /><p>{analysisInputHint(evidenceKind)}</p></label>
           {evidenceKind === "raw_artifact" ? <label className="notice notice-warning"><input type="checkbox" checked={rawArtifactConsent} onChange={(event) => setRawArtifactConsent(event.target.checked)} /> I confirm this artifact may be processed to identify components and security evidence.</label> : null}
         </fieldset> : null}
+        <div className="cra-assessment-launch span-2">
+          <div className="cra-assessment-launch__icon" aria-hidden="true">{assessment ? <ShieldCheck size={22} /> : <ClipboardCheck size={22} />}</div>
+          <div><span className="field-label">CRA classification</span>{assessment ? <><strong>{craClassLabel(assessment.recommendedClass)}</strong><p>{assessment.rationale}</p><small>{assessment.classificationStatus.replaceAll("_", " ")}</small></> : <><strong>Check and classify</strong><p>Review CRA product scope and select the category that describes your product.</p></>}</div>
+          <button type="button" onClick={() => setAssessmentOpen(true)}>{assessment ? "Edit assessment" : "Start CRA assessment"}</button>
+        </div>
+        {validationError ? <p className="danger-text span-2" role="alert">{validationError}</p> : null}
         {error ? <p className="danger-text span-2" role="alert">{error}</p> : null}
         <div className="inline-actions span-2"><button className="button-primary" type="submit" disabled={pending || !assessment || assessment.scopeResult === "out_of_scope" || evidenceKind === "raw_artifact" && Boolean(evidenceFile) && !rawArtifactConsent}>{pending ? "Creating product…" : evidenceFile ? "Create and analyze" : "Create product"}</button><button type="button" onClick={onCancel} disabled={pending}>Cancel</button>{!assessment ? <span className="field-hint">Complete the CRA assessment before creating this product.</span> : null}</div>
       </form>

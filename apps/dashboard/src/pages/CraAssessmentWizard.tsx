@@ -1,190 +1,132 @@
-import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, RotateCcw, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, ShieldCheck, X } from "lucide-react";
 import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import type { CraClassificationAssessment } from "../data/types";
 import {
   CLASSIFICATION_GROUPS,
   CRA_CATEGORY_SOURCE_URL,
   CRA_SOURCE_URL,
-  READINESS_QUESTIONS,
-  SCOPE_QUESTIONS,
   assessmentCompletionAction,
   buildCraAssessment,
   craClassLabel,
-  scopeOutcome,
-  type ReadinessAnswer,
-  type ScopeAnswer,
 } from "./craAssessment";
 
-type Phase = "scope" | "classification" | "readiness" | "result";
+type Phase = "scope" | "classification" | "result";
 
 interface Props {
   onCancel: () => void;
   onComplete: (assessment: CraClassificationAssessment) => void;
+  initialAssessment?: CraClassificationAssessment;
 }
 
-const PHASES: Phase[] = ["scope", "classification", "readiness", "result"];
+const PHASES: Phase[] = ["scope", "classification", "result"];
 
-export function CraAssessmentWizard({ onCancel, onComplete }: Props) {
-  const [phase, setPhase] = useState<Phase>("scope");
-  const [scopeIndex, setScopeIndex] = useState(0);
+export function CraAssessmentWizard({ onCancel, onComplete, initialAssessment }: Props) {
+  const [phase, setPhase] = useState<Phase>(initialAssessment ? "result" : "scope");
   const [classificationIndex, setClassificationIndex] = useState(0);
-  const [readinessIndex, setReadinessIndex] = useState(0);
-  const [scopeAnswers, setScopeAnswers] = useState<Record<string, ScopeAnswer>>({});
-  const [categorySelections, setCategorySelections] = useState<Record<string, string>>({});
-  const [readinessAnswers, setReadinessAnswers] = useState<Record<string, ReadinessAnswer>>({});
-  const [completedAt, setCompletedAt] = useState<string>();
-  const [confirmed, setConfirmed] = useState(false);
+  const [categorySelections, setCategorySelections] = useState<Record<string, string>>(() => Object.fromEntries(
+    initialAssessment?.answers.filter((answer) => answer.questionId.startsWith("category-")).map((answer) => [answer.questionId.slice("category-".length), answer.answer]) ?? [],
+  ));
+  const [completedAt, setCompletedAt] = useState(initialAssessment?.completedAt);
+  const [confirmed, setConfirmed] = useState(Boolean(initialAssessment?.confirmedAt));
+  const [scopeInfoOpen, setScopeInfoOpen] = useState(false);
   const containerRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     containerRef.current?.scrollIntoView({ block: "start" });
     headingRef.current?.focus({ preventScroll: true });
-  }, [phase, scopeIndex, classificationIndex, readinessIndex]);
+  }, [phase, classificationIndex]);
+
+  useEffect(() => {
+    if (scopeInfoOpen) dialogRef.current?.focus();
+  }, [scopeInfoOpen]);
 
   const assessment = useMemo(() => buildCraAssessment({
-    scopeAnswers,
-    categorySelections,
-    readinessAnswers,
-    completedAt,
-    confirmed,
-  }), [categorySelections, completedAt, confirmed, readinessAnswers, scopeAnswers]);
+    scopeAnswers: {}, scopeReviewed: true, categorySelections, completedAt, confirmed,
+  }), [categorySelections, completedAt, confirmed]);
   const completionAction = assessmentCompletionAction(assessment);
-
-  const finish = () => {
-    setCompletedAt(new Date().toISOString());
-    setPhase("result");
-  };
-
-  const answerScope = (answer: ScopeAnswer) => {
-    const question = SCOPE_QUESTIONS[scopeIndex];
-    const nextAnswers = { ...scopeAnswers, [question.id]: answer };
-    setScopeAnswers(nextAnswers);
-    if (answer === question.exclusionAnswer) {
-      setCompletedAt(new Date().toISOString());
-      setPhase("result");
-    } else if (scopeIndex === SCOPE_QUESTIONS.length - 1) {
-      setPhase("classification");
-    } else {
-      setScopeIndex((value) => value + 1);
-    }
-  };
 
   const continueClassification = () => {
     const group = CLASSIFICATION_GROUPS[classificationIndex];
     const selection = categorySelections[group.id];
     if (!selection) return;
-    const matchedCategory = group.categories.some((category) => category.id === selection);
-    if (matchedCategory || classificationIndex === CLASSIFICATION_GROUPS.length - 1) {
-      setPhase("readiness");
-      return;
+    if (group.categories.some((category) => category.id === selection) || classificationIndex === CLASSIFICATION_GROUPS.length - 1) {
+      setCompletedAt(new Date().toISOString());
+      setConfirmed(false);
+      setPhase("result");
+    } else {
+      setClassificationIndex((index) => index + 1);
     }
-    setClassificationIndex((value) => value + 1);
   };
 
-  const answerReadiness = (answer: ReadinessAnswer) => {
-    const question = READINESS_QUESTIONS[readinessIndex];
-    setReadinessAnswers((current) => ({ ...current, [question.id]: answer }));
-    if (readinessIndex === READINESS_QUESTIONS.length - 1) finish();
-    else setReadinessIndex((value) => value + 1);
+  const editAnswers = () => {
+    const matchingIndex = CLASSIFICATION_GROUPS.findIndex((group) => group.categories.some((category) => category.id === categorySelections[group.id]));
+    setClassificationIndex(matchingIndex >= 0 ? matchingIndex : CLASSIFICATION_GROUPS.length - 1);
+    setPhase("classification");
   };
 
   const goBack = () => {
-    if (phase === "scope") {
-      if (scopeIndex === 0) onCancel();
-      else setScopeIndex((value) => value - 1);
-      return;
-    }
-    if (phase === "classification") {
-      if (classificationIndex === 0) {
-        setPhase("scope");
-        setScopeIndex(SCOPE_QUESTIONS.length - 1);
-      } else setClassificationIndex((value) => value - 1);
-      return;
-    }
-    if (phase === "readiness") {
-      if (readinessIndex === 0) setPhase("classification");
-      else setReadinessIndex((value) => value - 1);
-      return;
-    }
-    if (scopeOutcome(scopeAnswers) === "out_of_scope") {
-      setPhase("scope");
-      return;
-    }
-    setPhase("readiness");
-    setReadinessIndex(READINESS_QUESTIONS.length - 1);
-  };
-
-  const restart = () => {
-    setPhase("scope");
-    setScopeIndex(0);
-    setClassificationIndex(0);
-    setReadinessIndex(0);
-    setScopeAnswers({});
-    setCategorySelections({});
-    setReadinessAnswers({});
-    setCompletedAt(undefined);
-    setConfirmed(false);
+    if (phase === "scope") onCancel();
+    else if (phase === "result") editAnswers();
+    else if (classificationIndex === 0) setPhase("scope");
+    else setClassificationIndex((index) => index - 1);
   };
 
   const phaseIndex = PHASES.indexOf(phase);
-  const currentCount = phase === "scope" ? SCOPE_QUESTIONS.length : phase === "classification" ? CLASSIFICATION_GROUPS.length : phase === "readiness" ? READINESS_QUESTIONS.length : 1;
-  const currentIndex = phase === "scope" ? scopeIndex : phase === "classification" ? classificationIndex : phase === "readiness" ? readinessIndex : 0;
-
   return <section ref={containerRef} className="cra-assessment" aria-label="Guided CRA assessment">
     <header className="cra-assessment__header">
-      <div><span className="eyebrow">Guided assessment</span><h2>CRA scope and classification</h2><p>Structured answers, exact category references, and an auditable recommendation.</p></div>
+      <div><span className="eyebrow">Guided assessment</span><h2>CRA classification</h2><p>Review whether the CRA may apply, then choose the category that describes your product.</p></div>
       <button className="icon-button" type="button" onClick={onCancel} aria-label="Close CRA assessment"><X size={20} /></button>
     </header>
     <ol className="cra-assessment__steps" aria-label="Assessment progress">
       {PHASES.map((item, index) => <li key={item} className={index < phaseIndex ? "done" : index === phaseIndex ? "active" : ""} aria-current={index === phaseIndex ? "step" : undefined}>
-        <span>{index < phaseIndex ? <CheckCircle2 size={16} /> : index + 1}</span>{item[0].toUpperCase() + item.slice(1)}
+        <span>{index < phaseIndex ? <CheckCircle2 size={16} /> : index + 1}</span>{item === "scope" ? "Check scope" : item === "classification" ? "Classify" : "Review"}
       </li>)}
     </ol>
 
     <div className="cra-assessment__body">
-      {phase !== "result" ? <div className="cra-assessment__counter">{phase.toUpperCase()} {currentIndex + 1} / {currentCount}</div> : null}
-      {phase === "scope" ? <QuestionHeading ref={headingRef} title="Is this product covered by the CRA?" question={SCOPE_QUESTIONS[scopeIndex].question} help={SCOPE_QUESTIONS[scopeIndex].help} source={SCOPE_QUESTIONS[scopeIndex].source} /> : null}
-      {phase === "classification" ? <ClassificationQuestion ref={headingRef} index={classificationIndex} selections={categorySelections} onChange={(value) => setCategorySelections((current) => ({ ...current, [CLASSIFICATION_GROUPS[classificationIndex].id]: value }))} /> : null}
-      {phase === "readiness" ? <QuestionHeading ref={headingRef} title="How prepared is the product?" question={READINESS_QUESTIONS[readinessIndex].question} help={READINESS_QUESTIONS[readinessIndex].help} source={READINESS_QUESTIONS[readinessIndex].source} /> : null}
-
-      {phase === "scope" ? <div className="cra-answer-grid">
-        <AnswerButton label="Yes" selected={scopeAnswers[SCOPE_QUESTIONS[scopeIndex].id] === "yes"} onClick={() => answerScope("yes")} />
-        <AnswerButton label="No" selected={scopeAnswers[SCOPE_QUESTIONS[scopeIndex].id] === "no"} onClick={() => answerScope("no")} />
-        <AnswerButton label="Not sure" selected={scopeAnswers[SCOPE_QUESTIONS[scopeIndex].id] === "not_sure"} onClick={() => answerScope("not_sure")} />
+      {phase === "scope" ? <div className="cra-question">
+        <span className="eyebrow">Before classification</span>
+        <h3 ref={headingRef} tabIndex={-1}>Check if your product needs CRA assessment</h3>
+        <p>CRA rules can apply to connected products containing software or firmware that are supplied on the EU market. Review the scope guide before continuing. This classification assumes your product is covered; it does not decide legal scope for you.</p>
+        <button className="cra-scope-link" type="button" onClick={() => setScopeInfoOpen(true)}>Check which products are affected <ExternalLink size={15} /></button>
       </div> : null}
-      {phase === "readiness" ? <div className="cra-answer-grid">
-        <AnswerButton label="Yes" selected={readinessAnswers[READINESS_QUESTIONS[readinessIndex].id] === "yes"} onClick={() => answerReadiness("yes")} />
-        <AnswerButton label="Partially" selected={readinessAnswers[READINESS_QUESTIONS[readinessIndex].id] === "partial"} onClick={() => answerReadiness("partial")} />
-        <AnswerButton label="No" selected={readinessAnswers[READINESS_QUESTIONS[readinessIndex].id] === "no"} onClick={() => answerReadiness("no")} />
-      </div> : null}
+      {phase === "classification" ? <>
+        <div className="cra-assessment__counter">CATEGORY {classificationIndex + 1} / {CLASSIFICATION_GROUPS.length}</div>
+        <ClassificationQuestion ref={headingRef} index={classificationIndex} selections={categorySelections} onChange={(value) => {
+          setCategorySelections((current) => ({ ...current, [CLASSIFICATION_GROUPS[classificationIndex].id]: value }));
+          setConfirmed(false);
+        }} />
+      </> : null}
       {phase === "result" ? <AssessmentResult ref={headingRef} assessment={assessment} confirmed={confirmed} onConfirmed={setConfirmed} /> : null}
     </div>
 
     <footer className="cra-assessment__footer">
       <button type="button" onClick={goBack}><ArrowLeft size={17} /> Back</button>
       <div className="inline-actions">
+        {phase === "scope" ? <button className="button-primary" type="button" onClick={() => setPhase("classification")}>Continue to classification</button> : null}
         {phase === "classification" ? <button className="button-primary" type="button" disabled={!categorySelections[CLASSIFICATION_GROUPS[classificationIndex].id]} onClick={continueClassification}>Continue</button> : null}
-        {phase === "result" ? <button type="button" onClick={restart}><RotateCcw size={17} /> Start over</button> : null}
-        {phase === "result" && assessment.scopeResult !== "out_of_scope" ? <button className="button-primary" type="button" disabled={completionAction.disabled} onClick={() => onComplete(buildCraAssessment({ scopeAnswers, categorySelections, readinessAnswers, completedAt, confirmed }))}>{completionAction.label}</button> : null}
-        {phase === "result" && assessment.scopeResult === "out_of_scope" ? <button className="button-primary" type="button" onClick={onCancel}>Close assessment</button> : null}
+        {phase === "result" ? <><button type="button" onClick={editAnswers}>Edit category answers</button><button className="button-primary" type="button" disabled={completionAction.disabled} onClick={() => onComplete(buildCraAssessment({ scopeAnswers: {}, scopeReviewed: true, categorySelections, completedAt, confirmed }))}>{completionAction.label}</button></> : null}
       </div>
     </footer>
+
+    {scopeInfoOpen ? <div className="cra-scope-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setScopeInfoOpen(false); }}>
+      <div ref={dialogRef} className="cra-scope-dialog" role="dialog" aria-modal="true" aria-labelledby="cra-scope-title" tabIndex={-1} onKeyDown={(event) => { if (event.key === "Escape") setScopeInfoOpen(false); }}>
+        <div className="cra-scope-dialog__header"><h3 id="cra-scope-title">Which products may be covered?</h3><button className="icon-button" type="button" aria-label="Close scope guide" onClick={() => setScopeInfoOpen(false)}><X size={20} /></button></div>
+        <p>The CRA generally concerns products with digital elements made available on the EU market whose intended or foreseeable use includes a connection to a device or network.</p>
+        <ul>
+          <li><strong>Often relevant:</strong> connected hardware, software, firmware, and components supplied commercially. An essential remote service designed for the product may also count.</li>
+          <li><strong>Check exclusions:</strong> some medical, vehicle, aviation, and marine products are governed by separate EU rules. Standalone services and non-commercial open-source software need separate consideration.</li>
+          <li><strong>Classification comes next:</strong> Annex III and IV list important and critical categories. Other covered products can follow the default route.</li>
+        </ul>
+        <p>This is a short guide, not a legal determination. If the scope is uncertain, consult the official regulation or a specialist.</p>
+        <a href={CRA_SOURCE_URL} target="_blank" rel="noreferrer">Read the official CRA scope and annexes <ExternalLink size={15} /></a>
+        <div className="inline-actions"><button className="button-primary" type="button" onClick={() => setScopeInfoOpen(false)}>Done</button></div>
+      </div>
+    </div> : null}
   </section>;
 }
-
-function AnswerButton({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
-  return <button className={`cra-answer${selected ? " selected" : ""}`} type="button" onClick={onClick}>{label}</button>;
-}
-
-const QuestionHeading = forwardRef<HTMLHeadingElement, { title: string; question: string; help: string; source: string }>(function QuestionHeading({ title, question, help, source }, ref) {
-  return <div className="cra-question">
-  <span className="eyebrow">{title}</span>
-  <h3 ref={ref} tabIndex={-1}>{question}</h3>
-  <p>{help}</p>
-  <a href={CRA_SOURCE_URL} target="_blank" rel="noreferrer">{source}<ExternalLink size={13} /></a>
-</div>;
-});
 
 const ClassificationQuestion = forwardRef<HTMLHeadingElement, { index: number; selections: Record<string, string>; onChange: (value: string) => void }>(function ClassificationQuestion({ index, selections, onChange }, ref) {
   const group = CLASSIFICATION_GROUPS[index];
@@ -200,24 +142,22 @@ const ClassificationQuestion = forwardRef<HTMLHeadingElement, { index: number; s
         <option value="none">None of these categories</option>
         <option value="not_sure">Not sure — requires review</option>
       </select>
-      <a href={CRA_CATEGORY_SOURCE_URL} target="_blank" rel="noreferrer">Official technical descriptions<ExternalLink size={13} /></a>
+      <a href={CRA_CATEGORY_SOURCE_URL} target="_blank" rel="noreferrer">Official technical descriptions <ExternalLink size={13} /></a>
     </div>
   </div>;
 });
 
 const AssessmentResult = forwardRef<HTMLHeadingElement, { assessment: CraClassificationAssessment; confirmed: boolean; onConfirmed: (value: boolean) => void }>(function AssessmentResult({ assessment, confirmed, onConfirmed }, ref) {
-  const outOfScope = assessment.scopeResult === "out_of_scope";
-  const needsReview = assessment.scopeResult === "needs_review" || assessment.answers.some((answer) => answer.answer === "not_sure");
-  const critical = !outOfScope && !needsReview && assessment.recommendedClass === "critical";
+  const needsReview = assessment.classificationStatus === "review_required" && assessment.answers.some((answer) => answer.answer === "not_sure");
+  const critical = !needsReview && assessment.recommendedClass === "critical";
   return <div className="cra-result" aria-live="polite">
-    <div className={`cra-result__hero ${critical ? "critical" : outOfScope || needsReview ? "warning" : "success"}`}>
-      {critical || outOfScope || needsReview ? <AlertTriangle size={28} /> : <ShieldCheck size={28} />}
-      <div><span className="eyebrow">Assessment result</span><h3 ref={ref} tabIndex={-1}>{outOfScope ? "Likely outside CRA product scope" : needsReview ? "Specialist review required" : craClassLabel(assessment.recommendedClass)}</h3><p>{assessment.rationale}</p></div>
+    <div className={`cra-result__hero ${critical ? "critical" : needsReview ? "warning" : "success"}`}>
+      {critical || needsReview ? <AlertTriangle size={28} /> : <ShieldCheck size={28} />}
+      <div><span className="eyebrow">Assessment result</span><h3 ref={ref} tabIndex={-1}>{needsReview ? "Specialist review required" : craClassLabel(assessment.recommendedClass)}</h3><p>{assessment.rationale}</p></div>
     </div>
-    {!outOfScope ? <div className="cra-result__metrics"><div><span>Recommended class</span><strong>{craClassLabel(assessment.recommendedClass)}</strong></div><div><span>Readiness</span><strong>{assessment.readinessScore}%</strong></div><div><span>Open actions</span><strong>{assessment.actions.length}</strong></div></div> : null}
+    <div className="cra-result__metrics"><div><span>Recommended class</span><strong>{craClassLabel(assessment.recommendedClass)}</strong></div></div>
     {assessment.categoryLabel ? <p className="notice"><strong>Matched core functionality:</strong> {assessment.categoryLabel}</p> : null}
-    {assessment.actions.length ? <div><h4>Readiness actions</h4><ul className="cra-action-list">{assessment.actions.map((action) => <li key={action.id}><span className={`status-pill status-${action.state}`}>{action.state}</span><div><strong>{action.title}</strong><p>{action.source}</p></div></li>)}</ul></div> : !outOfScope ? <p className="notice">No readiness gaps were declared. Evidence still needs independent verification.</p> : null}
-    {!outOfScope && !needsReview ? <label className="cra-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => onConfirmed(event.target.checked)} /><span><strong>Confirm classification</strong> I reviewed the answers and confirm this recommendation. The assessment record and confirmation will be retained.</span></label> : null}
-    <p className="cra-disclaimer">Decision support only. Verify intended purpose, exclusions, and the current legal text before relying on the result.</p>
+    {!needsReview ? <label className="cra-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => onConfirmed(event.target.checked)} /><span><strong>Confirm classification</strong> I reviewed the category answers and confirm this recommendation. The assessment record will be retained.</span></label> : null}
+    <p className="cra-disclaimer">Check CRA scope separately. This classification is decision support and does not replace the official legal text.</p>
   </div>;
 });

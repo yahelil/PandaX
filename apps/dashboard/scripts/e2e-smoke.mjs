@@ -135,6 +135,42 @@ try {
   if (visualDir) await page.screenshot({ path: join(visualDir, "devices-dark-640.png"), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
 
+  await page.getByRole("button", { name: "Add device" }).click();
+  await assertVisible(page.getByRole("heading", { name: "Add device" }), "add device form");
+  await page.getByRole("button", { name: "Start CRA assessment" }).click();
+  if (visualDir) await page.screenshot({ path: join(visualDir, "add-device-cra-scope.png"), fullPage: true });
+  await page.getByRole("button", { name: "Check which products are affected" }).click();
+  await assertVisible(page.getByRole("dialog", { name: "Which products may be covered?" }), "CRA scope guide");
+  if (visualDir) await page.screenshot({ path: join(visualDir, "add-device-cra-guide.png"), fullPage: true });
+  await page.getByRole("button", { name: "Done" }).click();
+  await page.getByRole("button", { name: "Continue to classification" }).click();
+  for (let index = 0; index < 3; index++) {
+    await page.getByLabel("Core functionality").selectOption("none");
+    await page.getByRole("button", { name: "Continue", exact: true }).click();
+  }
+  await page.getByRole("button", { name: "Edit category answers" }).click();
+  await page.getByRole("button", { name: "Back" }).click();
+  await assertVisible(page.getByRole("heading", { name: "Important Class II" }), "editable earlier category");
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+  await page.getByRole("checkbox", { name: "Confirm classification" }).check();
+  await page.getByRole("button", { name: "Use assessment" }).click();
+  await assertVisible(page.getByText("Supported JSON SBOMs: CycloneDX 1.2 or 1.6", { exact: false }), "supported SBOM formats");
+  if (visualDir) await page.screenshot({ path: join(visualDir, "add-device-evidence.png"), fullPage: true });
+  await page.getByRole("button", { name: "Edit assessment" }).click();
+  await assertVisible(page.getByRole("button", { name: "Edit category answers" }), "saved category answers");
+  await page.getByRole("button", { name: "Close CRA assessment" }).click();
+  await page.getByLabel("Product name").fill("Unsupported SBOM example");
+  await page.getByLabel("Product identifier").fill("EXAMPLE-UNSUPPORTED-SBOM");
+  await page.getByLabel("Product release version").fill("1.0.0");
+  await page.locator(".create-product-panel input[type=file]").setInputFiles({
+    name: "unsupported.cdx.json", mimeType: "application/json",
+    buffer: Buffer.from('{"bomFormat":"CycloneDX","specVersion":"custom"}'),
+  });
+  await page.getByRole("button", { name: "Create and analyze" }).click();
+  await assertVisible(page.getByRole("alert").filter({ hasText: "Unsupported CycloneDX version" }), "unsupported SBOM explanation");
+  await page.getByRole("button", { name: "Cancel" }).click();
+
   await page.getByRole("link", { name: "Home Hub", exact: true }).first().click();
   await waitForRoute(page, `${baseUrl}/products/product-home-hub`, "Home Hub");
   await assertSingleMain(page, "Product workspace");

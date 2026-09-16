@@ -1005,6 +1005,13 @@ api.include_router(case_router)
 from .analysis_api import create_analysis_router
 from .compliance_v1_api import create_compliance_v1_router
 from .documents_api import create_documents_router
+
+
+def _document_content_reader():
+    from .portfolio_runtime import get_document_content_reader
+
+    return get_document_content_reader()
+
 from .findings_api import create_findings_router
 from .home_api import create_home_router
 from .portfolio_api import create_portfolio_router
@@ -1055,7 +1062,11 @@ api.include_router(
     create_compliance_v1_router(get_compliance_repository, get_portfolio_identity)
 )
 api.include_router(
-    create_documents_router(get_document_repository, get_authenticated_principal)
+    create_documents_router(
+        get_document_repository,
+        get_authenticated_principal,
+        read_content=_document_content_reader(),
+    )
 )
 api.include_router(
     create_search_notifications_router(

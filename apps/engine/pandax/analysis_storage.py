@@ -27,6 +27,7 @@ class StoredAnalysisInput:
 class AnalysisInputStorage(Protocol):
     def put(self, organization_id: str, job_id: str, content: bytes) -> StoredAnalysisInput: ...
     def put_bundle(self, organization_id: str, bundle_id: str, content: bytes) -> StoredAnalysisInput: ...
+    def put_document(self, organization_id: str, document_id: str, content: bytes, suffix: str) -> StoredAnalysisInput: ...
     def get(self, object_key: str, expected_sha256: str) -> bytes: ...
     def delete(self, object_key: str) -> None: ...
     def check_ready(self) -> None: ...
@@ -45,6 +46,11 @@ class MemoryAnalysisInputStorage:
 
     def put_bundle(self, organization_id: str, bundle_id: str, content: bytes) -> StoredAnalysisInput:
         key, digest = _key("evidence-bundles", organization_id, bundle_id, content, ".zip")
+        self.objects[key] = bytes(content)
+        return StoredAnalysisInput(key, digest, len(content))
+
+    def put_document(self, organization_id: str, document_id: str, content: bytes, suffix: str) -> StoredAnalysisInput:
+        key, digest = _key("documents", organization_id, document_id, content, _suffix(suffix))
         self.objects[key] = bytes(content)
         return StoredAnalysisInput(key, digest, len(content))
 
@@ -77,6 +83,10 @@ class LocalAnalysisInputStorage:
 
     def put_bundle(self, organization_id: str, bundle_id: str, content: bytes) -> StoredAnalysisInput:
         key, digest = _key("evidence-bundles", organization_id, bundle_id, content, ".zip")
+        return self._put(key, digest, content)
+
+    def put_document(self, organization_id: str, document_id: str, content: bytes, suffix: str) -> StoredAnalysisInput:
+        key, digest = _key("documents", organization_id, document_id, content, _suffix(suffix))
         return self._put(key, digest, content)
 
     def _put(self, key: str, digest: str, content: bytes) -> StoredAnalysisInput:
@@ -141,6 +151,10 @@ class SupabaseAnalysisInputStorage:
         key, digest = _key("evidence-bundles", organization_id, bundle_id, content, ".zip")
         return self._upload(key, digest, content, "application/zip")
 
+    def put_document(self, organization_id: str, document_id: str, content: bytes, suffix: str) -> StoredAnalysisInput:
+        key, digest = _key("documents", organization_id, document_id, content, _suffix(suffix))
+        return self._upload(key, digest, content, "application/octet-stream")
+
     def get(self, object_key: str, expected_sha256: str) -> bytes:
         response = self._request(
             "GET",
@@ -204,6 +218,17 @@ class SupabaseAnalysisInputStorage:
             raise AnalysisInputStorageError(
                 f"managed evidence storage {action} failed ({response.status_code})"
             )
+
+
+def _suffix(value: str) -> str:
+    """A file extension, or nothing. Keys are content-addressed, so this is a
+    convenience for whoever looks in the bucket, never part of the identity."""
+    clean = value.strip()
+    if not clean:
+        return ""
+    if not re.fullmatch(r"\.[A-Za-z0-9]{1,12}", clean):
+        raise AnalysisInputStorageError("invalid storage object suffix")
+    return clean
 
 
 def _segment(value: str) -> str:

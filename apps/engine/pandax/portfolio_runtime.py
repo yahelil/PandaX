@@ -225,6 +225,22 @@ def get_analysis_repository() -> AnalysisJobRepository:
     return repository
 
 
+def get_document_content_reader():
+    """Read a document revision's bytes from the same private bucket.
+
+    Returned as a callable rather than an object so the documents router keeps
+    depending on a function it can be handed in a test.
+    """
+    from .document_content import read_document_content
+
+    def read(repository, organization_id: str, document_id: str, revision: int):
+        # Resolved per call, so importing the server does not open a bucket.
+        storage = get_analysis_repository().storage
+        return read_document_content(repository, storage, organization_id, document_id, revision)
+
+    return read
+
+
 def get_storage_status() -> dict[str, object]:
     storage = get_analysis_repository().storage
     storage.check_ready()

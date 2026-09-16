@@ -1,11 +1,12 @@
 """HTTP interface for regulatory documents; storage downloads remain adapter-owned."""
 from datetime import datetime
-from typing import Annotated, Any, Callable, Literal, Mapping, TypeVar
+from typing import Annotated, Any, Callable, Literal, Mapping, Protocol, TypeVar
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .auth import Principal, Role, authorize_request
+from .document_content import DocumentContent, DocumentContentUnavailable, content_disposition
 from .documents import (
     DocumentConflict, DocumentError, DocumentNotFound, DocumentRepository,
     DocumentValidationError,
@@ -149,7 +150,8 @@ class DownloadMetadataResponse(ApiModel):
     size_bytes: int
     storage_locator: str
     content_type: str
-    download_type: Literal["storage_metadata_only"]
+    # "content_available" means the content route below can serve the bytes.
+    download_type: Literal["storage_metadata_only", "content_available"]
 
 
 def _unauthenticated() -> Principal:
@@ -164,6 +166,25 @@ def _authorize(
     sensitive: bool = False,
 ) -> None:
     authorize_request(principal, organization_id, roles, sensitive=sensitive)
+
+
+class ContentReader(Protocol):
+    """Produces the bytes a revision describes. Absent where there is no bucket."""
+
+    def __call__(
+        self, repository: DocumentRepository, organization_id: str,
+        document_id: str, revision: int,
+    ) -> DocumentContent: ...
+
+
+def _content(
+    reader: ContentReader, repository: DocumentRepository,
+    organization_id: str, document_id: str, revision: int,
+) -> DocumentContent:
+    try:
+        return reader(repository, organization_id, document_id, revision)
+    except DocumentContentUnavailable as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, str(exc)) from exc
 
 
 def _call(operation: Callable[[], Result]) -> Result:
@@ -182,6 +203,7 @@ def _call(operation: Callable[[], Result]) -> Result:
 def create_documents_router(
     repository_dependency: RepositoryDependency,
     identity_dependency: IdentityDependency = _unauthenticated,
+    read_content: ContentReader | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/v1/organizations/{organization_id}/documents", tags=["documents"])
     Repository = Annotated[DocumentRepository, Depends(repository_dependency)]
@@ -235,7 +257,28 @@ def create_documents_router(
     @router.get("/{document_id}/revisions/{revision}/download", response_model=DownloadMetadataResponse)
     def download_metadata(document_id: str, revision: int, organization_id: str, repository: Repository, principal: Identity):
         _authorize(principal, organization_id, READ_ROLES)
-        return _call(lambda: repository.download_metadata(organization_id, document_id, revision))
+        metadata = dict(_call(lambda: repository.download_metadata(organization_id, document_id, revision)))
+        if read_content is not None:
+            # Only claim the bytes are there when something can actually serve them.
+            metadata["download_type"] = "content_available"
+        return metadata
+
+    @router.get("/{document_id}/revisions/{revision}/download/content")
+    def download_content(document_id: str, revision: int, organization_id: str, repository: Repository, principal: Identity):
+        _authorize(principal, organization_id, READ_ROLES)
+        if read_content is None:
+            raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, "document content is not served here")
+        content = _call(lambda: _content(read_content, repository, organization_id, document_id, revision))
+        return Response(
+            content=content.content,
+            media_type=content.content_type,
+            headers={
+                "content-disposition": content_disposition(content.filename),
+                "content-length": str(content.size_bytes),
+                "x-content-sha256": content.content_hash,
+                "cache-control": "private, no-store",
+            },
+        )
 
     @router.post("/{document_id}/revisions/{revision}/approval-request", response_model=RevisionResponse)
     def request_approval(body: ApprovalRequest, document_id: str, revision: int, organization_id: str, repository: Repository, principal: Identity):

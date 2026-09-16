@@ -500,14 +500,34 @@ class PortfolioRepository:
 
     def set_active_release(self, organization_id: str, product_id: str, release_id: str | None, actor_id: str) -> ProductRecord:
         with self._transaction() as session:
-            product = self._product_row(session, organization_id, product_id)
+            product = session.execute(select(products).where(
+                (products.c.id == product_id) & (products.c.organization_id == organization_id)
+            ).with_for_update()).mappings().one_or_none()
             if product is None:
                 raise PortfolioNotFound("product not found")
             if release_id is not None:
                 release = self._release_row(session, organization_id, release_id)
                 if release is None or release["product_id"] != product_id:
                     raise PortfolioValidationError("active release must belong to the product and organization")
+                if release["status"] not in {"supported", "active"}:
+                    raise PortfolioValidationError("only a completed supported release can be active")
+            if product["active_release_id"] == release_id:
+                return _product_record(product)
             changed_at = _utc_now()
+            previous_id = product["active_release_id"]
+            if previous_id:
+                session.execute(update(releases).where(
+                    (releases.c.id == previous_id)
+                    & (releases.c.product_id == product_id)
+                    & (releases.c.organization_id == organization_id)
+                    & (releases.c.status == "active")
+                ).values(status="supported", updated_at=changed_at))
+            if release_id:
+                session.execute(update(releases).where(
+                    (releases.c.id == release_id)
+                    & (releases.c.product_id == product_id)
+                    & (releases.c.organization_id == organization_id)
+                ).values(status="active", updated_at=changed_at))
             session.execute(update(products).where((products.c.id == product_id) & (products.c.organization_id == organization_id)).values(active_release_id=release_id, updated_at=changed_at))
             self._audit(session, organization_id, "product", product_id, "product.active_release_changed", actor_id, {"active_release_id": release_id})
         return self.get_product(organization_id, product_id)

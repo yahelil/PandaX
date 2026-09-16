@@ -9,9 +9,9 @@ from pathlib import Path
 
 import typer
 
-from .collector import CollectorError, collect as collect_package, inspect_package, upload as upload_package
+from .collector import CollectorError, collect as collect_package, generate_sbom, inspect_package, upload as upload_package
 
-app = typer.Typer(name="actis-collector", help="Collect, sign and optionally upload minimized PandaX evidence")
+app = typer.Typer(name="actis-collector", help="Generate local SBOMs or collect signed Actis evidence")
 
 
 def _show(preview: dict) -> None:
@@ -34,6 +34,20 @@ def _token(token_env: str) -> str:
 def _fail(exc: Exception) -> None:
     typer.echo(str(exc), err=True)
     raise typer.Exit(code=1)
+
+
+@app.command("sbom")
+def sbom_command(
+    source: Path = typer.Argument(..., help="Directory, ZIP/TAR archive, CycloneDX or SPDX JSON"),
+    output: Path = typer.Option(..., "--output", "-o", help="Local CycloneDX 1.6 JSON destination"),
+    syft: Path | None = typer.Option(None, "--syft"),
+    workspace: Path | None = typer.Option(None, "--workspace"),
+) -> None:
+    """Generate a minimized SBOM locally. Nothing is uploaded."""
+    try:
+        typer.echo(json.dumps(generate_sbom(source, output, syft=syft, workspace=workspace), indent=2))
+    except (CollectorError, OSError, ValueError) as exc:
+        _fail(exc)
 
 
 @app.command("collect")

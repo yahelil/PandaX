@@ -7,7 +7,7 @@ import type { PortfolioApi } from "./portfolioApi";
 import { PortfolioApiError } from "./portfolioApi";
 import type { OperationsApi } from "./operationsApi";
 import { createRuntimeDataAdapter, ProductionAdapter } from "./productionAdapter";
-import type { ReleaseAnalysisJob, ReleaseMonitoringStatus, ReleaseOperationsApi } from "./releaseOperationsApi";
+import { ReleaseOperationsApiError, type ReleaseAnalysisJob, type ReleaseMonitoringStatus, type ReleaseOperationsApi } from "./releaseOperationsApi";
 import type { Organization, Product, Release } from "./types";
 
 const organization: Organization = {
@@ -89,6 +89,7 @@ function releaseOperations(job: ReleaseAnalysisJob): ReleaseOperationsApi {
     runAnalysisJob: vi.fn(async () => job),
     listAnalysisEvents: vi.fn(async () => []),
     downloadEvidence: vi.fn(async () => ({ blob: new Blob(), contentType: "application/json" })),
+    downloadEvidenceBundle: vi.fn(async () => ({ blob: new Blob(), contentType: "application/zip", filename: "evidence.zip" })),
     getMonitoring: unsupported,
     configureMonitoring: unsupported,
     runMonitoring: unsupported,
@@ -118,6 +119,32 @@ describe("ProductionAdapter", () => {
     expect(adapter.getSnapshot().documents).toEqual(initial.documents);
     expect(adapter.getSnapshot().settings).toEqual(initial.settings);
     expect(adapter.getStatusSnapshot()).toMatchObject({ mode: "production", phase: "ready" });
+  });
+
+  it("projects completed release evidence and lets an operator select the active release", async () => {
+    const completed: ReleaseAnalysisJob = {
+      id: "archive-run", organizationId: organization.id, productId: product.id, releaseId: release.id,
+      inputType: "raw_artifact", filename: "gateway.zip", mediaType: "application/zip", sizeBytes: 1024, sha256: "a".repeat(64),
+      preview: { format: "archive", version: "", components: 0, matchableComponents: 0, skippedComponents: 0, product: {} },
+      inputMetadata: {}, status: "completed", stage: "Completed", progress: 100,
+      result: { components: 12, matchableComponents: 11, skippedComponents: 1, findings: 2, kev: 0, incidents: 0, inputFormat: "CycloneDX", inputVersion: "1.6", coverageSummary: { completed: 3, failed: 1 }, evidence: [] },
+      createdAt: "2026-09-14T08:00:00Z", updatedAt: "2026-09-14T08:01:00Z", completedAt: "2026-09-14T08:01:00Z",
+    };
+    const releaseApi = releaseOperations(completed);
+    releaseApi.getMonitoring = vi.fn(async () => { throw new ReleaseOperationsApiError("Not configured", "not_found", 404); });
+    const selected = { ...product, activeReleaseId: release.id };
+    const portfolioApi = api({ updateProduct: vi.fn(async () => selected) });
+    const adapter = new ProductionAdapter({ organizationId: organization.id, portfolioApi, releaseOperationsApi: releaseApi, fixtureAdapter: new FixtureAdapter(createDemoState()) });
+
+    await adapter.initialize();
+    expect(adapter.getSnapshot().releases[0]).toMatchObject({
+      coverage: { components: 12, identifiedComponents: 11, advisorySourcesChecked: 3, advisorySourcesExpected: 4 },
+      artifacts: [{ name: "gateway.zip" }], sbomStatus: "partial",
+    });
+    await expect(adapter.selectActiveRelease(product.id, release.id)).resolves.toEqual(selected);
+    expect(portfolioApi.updateProduct).toHaveBeenCalledWith(organization.id, product.id, { activeReleaseId: release.id });
+    await adapter.downloadReleaseReport(product.id, release.id, completed.id);
+    expect(releaseApi.downloadEvidenceBundle).toHaveBeenCalledWith({ organizationId: organization.id, productId: product.id, releaseId: release.id }, completed.id);
   });
 
   it("retains the production Home counters and monitoring summary", async () => {

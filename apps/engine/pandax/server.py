@@ -8,12 +8,15 @@ over server-sent events instead of printing them.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import queue
 import re
 import shutil
 import tempfile
 import threading
+import time
+import uuid
 from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -35,6 +38,8 @@ WEB = Path(__file__).resolve().parent / "web"
 MAX_SBOM_BYTES = 50 * 1024 * 1024
 MAX_TELEMETRY_BYTES = 1024 * 1024
 MAX_EXPOSURE_CONTEXT_BYTES = 1024 * 1024
+REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+logger = logging.getLogger(__name__)
 
 
 def _advisory_service():
@@ -47,34 +52,46 @@ def _advisory_service():
 async def lifespan(app: FastAPI):
     from .advisory_watch import AdvisoryRefreshLoop
     from .portfolio_runtime import (
+        MANAGED_ENVIRONMENTS,
         database_allows_background_growth,
         database_settings,
+        get_analysis_repository,
         get_notification_delivery_worker,
         get_release_monitoring_repository,
+        get_release_monitoring_runner,
         get_storage_status,
+        runtime_environment,
     )
     from .notification_delivery import NotificationDeliveryLoop
-    from .release_monitoring import monitoring_store_runner
     from .release_monitoring_worker import ReleaseMonitoringLoop
 
+    from .runtime_metadata import build_metadata
+
+    logger.info("service_start build=%s", json.dumps(build_metadata(), sort_keys=True))
     database_settings()  # Managed environments fail before serving if PostgreSQL is absent.
     get_storage_status()  # Managed environments require a reachable private object bucket.
     _signing_state()  # Managed signing policy is checked before accepting work.
+    if runtime_environment() in MANAGED_ENVIRONMENTS:
+        from .artifact_runtime import require_hosted_scanner
+        from .document_runtime import require_hosted_document_tools
+        require_hosted_scanner()
+        require_hosted_document_tools()
+    if runtime_environment() in {"staging", "beta"}:
+        get_analysis_repository().fail_interrupted_jobs()
     interval = max(1, float(os.environ.get("PANDAX_ADVISORY_REFRESH_SECONDS", "3600")))
     loop = AdvisoryRefreshLoop(_advisory_service, interval)
     release_interval = max(
         1,
         float(os.environ.get("PANDAX_RELEASE_MONITORING_SECONDS", "60")),
     )
-    release_loop = ReleaseMonitoringLoop(
-        get_release_monitoring_repository,
-        monitoring_store_runner(
-            _monitor_store(),
-            lambda _organization_id, _product_id, release_id: release_id,
-        ),
-        interval_seconds=release_interval,
-        growth_allowed=database_allows_background_growth,
-    )
+    release_loop = None
+    if runtime_environment() not in {"staging", "beta", "production"}:
+        release_loop = ReleaseMonitoringLoop(
+            get_release_monitoring_repository,
+            get_release_monitoring_runner(),
+            interval_seconds=release_interval,
+            growth_allowed=database_allows_background_growth,
+        )
     delivery_loop = NotificationDeliveryLoop(
         get_notification_delivery_worker,
         interval_seconds=max(
@@ -86,13 +103,15 @@ async def lifespan(app: FastAPI):
     app.state.release_monitoring = release_loop
     app.state.notification_delivery = delivery_loop
     loop.start()
-    release_loop.start()
+    if release_loop:
+        release_loop.start()
     delivery_loop.start()
     try:
         yield
     finally:
         delivery_loop.stop()
-        release_loop.stop()
+        if release_loop:
+            release_loop.stop()
         loop.stop()
 
 
@@ -129,10 +148,38 @@ if cors_origins:
         allow_origins=cors_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Accept", "Authorization", "Content-Type", "Idempotency-Key"],
-        expose_headers=["Content-Disposition", "ETag"],
+        allow_headers=["Accept", "Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
+        expose_headers=["Content-Disposition", "ETag", "X-Request-ID"],
         max_age=600,
     )
+
+
+@api.middleware("http")
+async def correlate_requests(request: Request, call_next):
+    supplied = request.headers.get("X-Request-ID", "")
+    request_id = supplied if REQUEST_ID.fullmatch(supplied) else uuid.uuid4().hex
+    request.state.request_id = request_id
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception(
+            "request_failed request_id=%s method=%s path=%s",
+            request_id,
+            request.method,
+            request.url.path,
+        )
+        raise
+    response.headers["X-Request-ID"] = request_id
+    logger.info(
+        "request_complete request_id=%s method=%s path=%s status=%s duration_ms=%.1f",
+        request_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        (time.perf_counter() - started) * 1000,
+    )
+    return response
 
 
 @api.middleware("http")
@@ -186,9 +233,16 @@ def application_liveness() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@api.get("/health/build", include_in_schema=False)
+def application_build() -> dict[str, str]:
+    from .runtime_metadata import build_metadata
+
+    return build_metadata()
+
+
 @api.get("/health/ready", include_in_schema=False)
 def database_readiness() -> dict[str, object]:
-    from .portfolio_runtime import get_database_status, get_storage_status
+    from .portfolio_runtime import MANAGED_ENVIRONMENTS, get_database_status, get_storage_status, runtime_environment
 
     try:
         database = get_database_status()
@@ -205,9 +259,21 @@ def database_readiness() -> dict[str, object]:
         signer, registry = _signing_state()
     except Exception as exc:
         raise HTTPException(503, "signing custody unavailable") from exc
+    scanner = None
+    document_tools = None
+    if runtime_environment() in MANAGED_ENVIRONMENTS:
+        from .artifact_runtime import require_hosted_scanner
+        from .document_runtime import require_hosted_document_tools
+        try:
+            scanner = require_hosted_scanner()
+            document_tools = require_hosted_document_tools()
+        except RuntimeError as exc:
+            raise HTTPException(503, "required runtime tool unavailable") from exc
     return {
         **database.as_dict(),
         "storage": storage,
+        "artifact_scanner": scanner,
+        "document_tools": document_tools,
         "signing": {
             "provider": signer.identity.provider,
             "key_id": signer.identity.key_id,
@@ -1016,6 +1082,7 @@ from .findings_api import create_findings_router
 from .home_api import create_home_router
 from .portfolio_api import create_portfolio_router
 from .portfolio_runtime import (
+    database_allows_background_growth,
     get_analysis_repository,
     enroll_completed_analysis,
     get_compliance_repository,
@@ -1027,10 +1094,11 @@ from .portfolio_runtime import (
     get_portfolio_identity,
     get_portfolio_repository,
     get_release_monitoring_repository,
+    get_release_monitoring_runner,
     get_search_notification_repository,
 )
-from .release_monitoring import monitoring_store_runner
 from .release_monitoring_api import create_release_monitoring_router
+from .release_monitoring_scheduler_api import create_release_monitoring_scheduler_router
 from .search_notifications_api import create_search_notifications_router
 from .settings_api import create_settings_router
 
@@ -1048,11 +1116,15 @@ api.include_router(
 api.include_router(
     create_release_monitoring_router(
         get_release_monitoring_repository,
-        monitoring_store_runner(
-            _monitor_store(),
-            lambda _organization_id, _product_id, release_id: release_id,
-        ),
+        get_release_monitoring_runner(),
         get_portfolio_identity,
+    )
+)
+api.include_router(
+    create_release_monitoring_scheduler_router(
+        get_release_monitoring_repository,
+        get_release_monitoring_runner(),
+        database_allows_background_growth,
     )
 )
 api.include_router(

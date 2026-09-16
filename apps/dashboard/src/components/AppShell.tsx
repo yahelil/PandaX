@@ -50,6 +50,9 @@ export function AppShell() {
               <button type="button" onClick={() => { void actions.refresh().catch(() => undefined) }}>Retry</button>
             </div>
           ) : null}
+          {adapterStatus.mode === 'fixture' ? (
+            <div className="adapter-status" role="status">Local demo: changes stay in this browser. Only uploaded JSON SBOMs are analyzed, using OSV.</div>
+          ) : null}
           <Suspense fallback={<div className="adapter-status" role="status" aria-live="polite">Loading workspace…</div>}>
             <Outlet />
           </Suspense>

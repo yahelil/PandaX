@@ -128,8 +128,9 @@ export const READINESS_QUESTIONS: ReadinessQuestion[] = [
 
 export interface BuildAssessmentInput {
   scopeAnswers: Record<string, ScopeAnswer>;
+  scopeReviewed?: boolean;
   categorySelections: Record<string, string>;
-  readinessAnswers: Record<string, ReadinessAnswer>;
+  readinessAnswers?: Record<string, ReadinessAnswer>;
   completedAt?: string;
   confirmed?: boolean;
 }
@@ -152,17 +153,18 @@ export function readinessScore(answers: Record<string, ReadinessAnswer>): number
 }
 
 export function buildCraAssessment(input: BuildAssessmentInput): CraClassificationAssessment {
-  const scopeResult = scopeOutcome(input.scopeAnswers);
+  const scopeResult = input.scopeReviewed ? "in_scope" : scopeOutcome(input.scopeAnswers);
+  const readinessAnswers = input.readinessAnswers ?? {};
   const category = selectedCategory(input.categorySelections);
   const categoryUncertain = Object.values(input.categorySelections).includes("not_sure");
   const recommendedClass: CraClass = category?.craClass ?? "default";
   const answers: CraAssessmentAnswer[] = [
-    ...SCOPE_QUESTIONS.filter((question) => input.scopeAnswers[question.id]).map((question) => ({ questionId: question.id, question: question.question, answer: input.scopeAnswers[question.id], source: question.source })),
+    ...(input.scopeReviewed ? [{ questionId: "scope-guidance", question: "Reviewed CRA product scope guidance", answer: "reviewed", source: "CRA Art. 2" }] : SCOPE_QUESTIONS.filter((question) => input.scopeAnswers[question.id]).map((question) => ({ questionId: question.id, question: question.question, answer: input.scopeAnswers[question.id], source: question.source }))),
     ...CLASSIFICATION_GROUPS.filter((group) => input.categorySelections[group.id]).map((group) => ({ questionId: `category-${group.id}`, question: group.title, answer: input.categorySelections[group.id], source: category?.id === input.categorySelections[group.id] ? category.source : "CRA Annexes III–IV" })),
-    ...READINESS_QUESTIONS.filter((question) => input.readinessAnswers[question.id]).map((question) => ({ questionId: question.id, question: question.question, answer: input.readinessAnswers[question.id], source: question.source })),
+    ...READINESS_QUESTIONS.filter((question) => readinessAnswers[question.id]).map((question) => ({ questionId: question.id, question: question.question, answer: readinessAnswers[question.id], source: question.source })),
   ];
   const actions: CraAssessmentAction[] = READINESS_QUESTIONS.flatMap((question) => {
-    const answer = input.readinessAnswers[question.id];
+    const answer = readinessAnswers[question.id];
     return answer && answer !== "yes" ? [{ id: question.id, title: question.actionTitle, detail: question.help, source: question.source, state: answer === "partial" ? "partial" as const : "missing" as const }] : [];
   });
   const needsReview = scopeResult !== "in_scope" || categoryUncertain;
@@ -172,7 +174,7 @@ export function buildCraAssessment(input: BuildAssessmentInput): CraClassificati
       ? `The product's declared core functionality matches ${category.label}.`
       : categoryUncertain
         ? "No classification can be confirmed until the unresolved category answer is reviewed."
-        : "No Annex III or Annex IV category was selected; the standard product route is recommended.";
+        : "No Annex III or Annex IV category was selected; the standard product route is recommended. CRA scope should be checked separately.";
 
   return {
     rulesetVersion: CRA_RULESET_VERSION,
@@ -183,7 +185,7 @@ export function buildCraAssessment(input: BuildAssessmentInput): CraClassificati
     categoryId: category?.id,
     categoryLabel: category?.label,
     rationale,
-    readinessScore: readinessScore(input.readinessAnswers),
+    readinessScore: readinessScore(readinessAnswers),
     answers,
     actions,
     confirmedAt: input.confirmed && !needsReview ? (input.completedAt ?? new Date().toISOString()) : undefined,

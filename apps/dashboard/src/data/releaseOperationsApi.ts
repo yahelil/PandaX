@@ -59,6 +59,8 @@ export interface AnalysisEvidenceLink {
 
 export interface ReleaseAnalysisResult {
   components: number;
+  matchableComponents?: number;
+  skippedComponents?: number;
   findings: number;
   kev: number;
   incidents: number;
@@ -66,6 +68,7 @@ export interface ReleaseAnalysisResult {
   inputVersion: string;
   coverageSummary: Record<string, number>;
   evidence: AnalysisEvidenceLink[];
+  bundle?: { sha256: string; sizeBytes: number; retainedUntil: string; href: string };
 }
 
 export interface ReleaseAnalysisJob {
@@ -179,6 +182,7 @@ export interface ReleaseOperationsApi {
   runAnalysisJob(scope: ReleaseScope, jobId: string, options?: ReleaseOperationsRequestOptions): Promise<ReleaseAnalysisJob>;
   listAnalysisEvents(scope: ReleaseScope, jobId: string, options?: ReleaseOperationsRequestOptions): Promise<AnalysisJobEvent[]>;
   downloadEvidence(scope: ReleaseScope, jobId: string, digest: string, options?: ReleaseOperationsRequestOptions): Promise<AnalysisEvidenceFile>;
+  downloadEvidenceBundle(scope: ReleaseScope, jobId: string, options?: ReleaseOperationsRequestOptions): Promise<AnalysisEvidenceFile>;
   getMonitoring(scope: ReleaseScope, options?: ReleaseOperationsRequestOptions): Promise<ReleaseMonitoringStatus>;
   configureMonitoring(scope: ReleaseScope, input: MonitoringConfigurationInput, options?: ReleaseOperationsRequestOptions): Promise<ReleaseMonitoringStatus>;
   runMonitoring(scope: ReleaseScope, options?: ReleaseOperationsRequestOptions): Promise<ReleaseMonitoringStatus>;
@@ -300,12 +304,16 @@ function parseCoverageSummary(value: unknown): Record<string, number> {
 
 function parseResult(value: unknown): ReleaseAnalysisResult {
   const item = object(value, "analysis result");
+  const bundle = item.bundle == null ? undefined : object(item.bundle, "evidence bundle");
   return {
     components: integer(item, "components"), findings: integer(item, "findings"),
+    matchableComponents: item.matchable_components == null ? undefined : integer(item, "matchable_components"),
+    skippedComponents: item.skipped_components == null ? undefined : integer(item, "skipped_components"),
     kev: integer(item, "kev"), incidents: integer(item, "incidents"),
     inputFormat: string(item, "input_format"), inputVersion: string(item, "input_version"),
     coverageSummary: parseCoverageSummary(item.coverage_summary),
     evidence: list(item.evidence, "evidence", parseEvidence),
+    bundle: bundle ? { sha256: string(bundle, "sha256"), sizeBytes: integer(bundle, "size_bytes"), retainedUntil: string(bundle, "retained_until"), href: string(bundle, "href") } : undefined,
   };
 }
 
@@ -523,6 +531,9 @@ export function createReleaseOperationsApi(config: ReleaseOperationsApiConfig): 
     },
     async downloadEvidence(scope, jobId, digest, options) {
       return evidenceRequest(`${jobsPath(scope)}/${id(jobId)}/evidence/${id(digest)}`, options);
+    },
+    async downloadEvidenceBundle(scope, jobId, options) {
+      return evidenceRequest(`${jobsPath(scope)}/${id(jobId)}/evidence/export`, options);
     },
     async getMonitoring(scope, options) {
       return parseMonitoringStatus(await jsonRequest(monitoringPath(scope), { method: "GET" }, options));

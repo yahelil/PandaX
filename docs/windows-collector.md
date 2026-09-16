@@ -6,6 +6,36 @@ directories, ZIP/TAR archives, CycloneDX 1.2/1.6 JSON, and SPDX 2.2/2.3 JSON.
 It does not extract container images or SquashFS/UBIFS firmware. macOS and Linux
 packages are later work.
 
+## Generate an SBOM locally
+
+Download the verified Windows bundle from the
+[latest Collector release](https://github.com/yahelil/PandaX/releases/latest/download/actis-collector-windows-x64.zip),
+verify it as described below, and run:
+
+```powershell
+.\actis-collector\actis-collector.exe sbom C:\path\to\product `
+  --output .\bom.cdx.json
+```
+
+`sbom` needs no account, product ID, signing key, token, or network connection.
+It accepts a directory, ZIP/TAR archive, or existing CycloneDX/SPDX JSON. The
+bundled, pinned Syft build inventories directories and archives locally with
+update checks disabled. The command writes a privacy-minimized CycloneDX 1.6
+document atomically and prints its SHA-256, exact component coverage, tool
+versions, limitations, and `uploaded: false`.
+
+Only component type, name, version, package URL, and an opaque generated BOM
+reference are retained. Source contents, source paths, source filenames,
+Syft evidence, credentials, and working files are omitted. The user can inspect
+`bom.cdx.json` and explicitly upload it later. Nothing is sent automatically.
+Inputs with no versioned package URL fail rather than producing a misleading
+empty inventory.
+
+Uploading a raw source ZIP remains a separate, explicit hosted-analysis option.
+That option sends the archive to Actis; use `sbom` when source must remain local.
+
+## Create a signed Collector package
+
 Before collection, an organization administrator with recent MFA must enroll
 the **public** Ed25519 key in the organization trust registry using the
 five-minute, one-use challenge at `POST /trust-keys/challenges`, then sign its

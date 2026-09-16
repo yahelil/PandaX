@@ -75,7 +75,7 @@ def test_portfolio_lifecycle_is_persisted_and_audited(repository):
 
     assert repository.list_organizations() == [organization]
     assert repository.list_products(organization.id) == [active]
-    assert repository.list_releases(organization.id, product.id) == [release]
+    assert repository.list_releases(organization.id, product.id)[0].status == "active"
     assert active.active_release_id == release.id
     assert organization.country == "DE"
     assert organization.created_at.tzinfo == timezone.utc
@@ -161,6 +161,25 @@ def test_active_release_must_belong_to_same_product_and_tenant(repository):
     with pytest.raises(PortfolioValidationError, match="must belong"):
         repository.set_active_release(organization.id, camera.id, lock_release.id, "user-admin")
     assert repository.get_product(organization.id, camera.id).active_release_id is None
+
+
+def test_active_release_requires_completion_and_demotes_previous(repository):
+    organization = create_organization(repository)
+    product = create_product(repository, organization.id)
+    first = create_release(repository, organization.id, product.id, status="supported")
+    second = create_release(repository, organization.id, product.id, version="2.5.0", status="draft")
+
+    with pytest.raises(PortfolioValidationError, match="completed supported release"):
+        repository.set_active_release(organization.id, product.id, second.id, "user-admin")
+    assert repository.get_product(organization.id, product.id).active_release_id is None
+
+    repository.set_active_release(organization.id, product.id, first.id, "user-admin")
+    repository.update_release(organization.id, second.id, ReleaseChanges(status="supported"), "user-admin")
+    selected = repository.set_active_release(organization.id, product.id, second.id, "user-admin")
+
+    assert selected.active_release_id == second.id
+    assert repository.get_release(organization.id, first.id).status == "supported"
+    assert repository.get_release(organization.id, second.id).status == "active"
 
 
 def test_updates_are_typed_scoped_and_audited(repository):

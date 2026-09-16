@@ -10,6 +10,7 @@ import {
 
 import type { AdapterStatus, DataAdapter, MaybePromise, WorkspaceSearchResult } from "./adapter";
 import type { PrivacySafeAnalyticsEvent } from "./governanceApi";
+import type { AnalysisEvidenceFile } from "./releaseOperationsApi";
 import { createFixtureAdapter } from "./fixtureAdapter";
 import type {
   AnalysisDraft,
@@ -84,6 +85,8 @@ export interface DemoActions {
   recordDocumentSelfFiling(input: RecordDocumentSelfFilingInput): MaybePromise<DocumentRecord>;
   createProduct(input: CreateProductInput): Promise<Product>;
   createRelease(input: CreateReleaseInput): Promise<Release>;
+  selectActiveRelease(productId: EntityId, releaseId: EntityId): Promise<Product>;
+  downloadReleaseReport(productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile>;
   previewAnalysis(draft: AnalysisDraft): Promise<AnalysisPreview>;
   runAnalysis(draft: AnalysisDraft): Promise<AnalysisJob>;
   loadReleaseMonitoring(productId: EntityId, releaseId: EntityId, options?: { signal?: AbortSignal }): Promise<ReleaseMonitoringView>;
@@ -172,6 +175,8 @@ export function DemoProvider({ adapter: providedAdapter, currentUserOverride, ch
     recordDocumentSelfFiling: adapter.recordDocumentSelfFiling,
     createProduct: adapter.createProduct,
     createRelease: adapter.createRelease,
+    selectActiveRelease: adapter.selectActiveRelease,
+    downloadReleaseReport: adapter.downloadReleaseReport,
     previewAnalysis: adapter.previewAnalysis,
     runAnalysis: adapter.runAnalysis,
     loadReleaseMonitoring: adapter.loadReleaseMonitoring,

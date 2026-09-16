@@ -51,6 +51,7 @@ from . import events as pipeline_events
 from . import exposure, pipeline, telemetry
 from .analysis_storage import AnalysisInputStorage, AnalysisInputStorageError, MemoryAnalysisInputStorage
 from .portfolio import portfolio_metadata, products, releases
+from .stages import ingest as artifact_ingest
 from .stages.sbom import SbomError, inspect_sbom
 from .organization_settings import OrganizationSettingsRepository, SettingsValidationError
 from .settings_api import _bundle_directory
@@ -78,6 +79,7 @@ RAW_MEDIA_BY_EXTENSION = {
     ".bin": frozenset({"application/octet-stream"}),
     ".img": frozenset({"application/octet-stream"}),
 }
+HOSTED_ENVIRONMENTS = frozenset({"staging", "beta", "production"})
 INPUT_TYPES = frozenset({"sbom", "collector", "raw_artifact"})
 JOB_STATUSES = frozenset({"queued", "running", "completed", "failed", "unsupported"})
 TERMINAL_STATUSES = frozenset({"completed", "failed", "unsupported"})
@@ -739,6 +741,7 @@ class AnalysisJobRepository:
         run_dir: str | None = None
         artifacts: list[dict[str, Any]] = []
         summary: dict[str, Any] = {}
+        scratch: tempfile.TemporaryDirectory[str] | None = None
         if job.input_type == "collector":
             try:
                 with zipfile.ZipFile(io.BytesIO(content)) as archive:
@@ -753,6 +756,8 @@ class AnalysisJobRepository:
         )
 
         try:
+            if job.input_type == "raw_artifact":
+                scratch = tempfile.TemporaryDirectory(prefix="actis-analysis-")
             with ExitStack() as stack:
                 input_path = stack.enter_context(_temporary_sbom(content, suffix))
                 supplemental = job.input_metadata.get("supplemental_evidence", {})
@@ -761,11 +766,12 @@ class AnalysisJobRepository:
                 if job.input_type == "raw_artifact" and (runtime_path is not None or exposure_path is not None):
                     stream = pipeline.run(
                         input_path,
+                        out_base=Path(scratch.name),
                         telemetry_path=runtime_path,
                         exposure_context_path=exposure_path,
                     )
                 elif job.input_type == "raw_artifact":
-                    stream = pipeline.run(input_path)
+                    stream = pipeline.run(input_path, out_base=Path(scratch.name))
                 elif runtime_path is not None or exposure_path is not None:
                     stream = runner(
                         input_path,
@@ -791,7 +797,7 @@ class AnalysisJobRepository:
                     if item.kind == pipeline_events.RUN_DONE:
                         summary = {
                             key: item.data.get(key, 0)
-                            for key in ("components", "findings", "kev", "incidents")
+                            for key in ("components", "matchable_components", "skipped_components", "findings", "kev", "incidents")
                         }
                         summary["coverage_summary"] = item.data.get("coverage_summary", {})
                     self._record_pipeline_event(
@@ -814,7 +820,33 @@ class AnalysisJobRepository:
             self._finish(organization_id, product_id, release_id, job_id, result)
         except Exception as exc:
             self._fail(organization_id, product_id, release_id, job_id, str(exc))
+        finally:
+            if scratch is not None:
+                scratch.cleanup()
         return self.get(organization_id, product_id, release_id, job_id)
+
+    def fail_interrupted_jobs(self) -> int:
+        """Close work lost when the single beta API process was restarted."""
+        message = "Analysis was interrupted by a service restart. Upload the input again to retry."
+        with self._transaction() as session:
+            query = select(analysis_jobs).where(analysis_jobs.c.status == "running")
+            if self.engine.dialect.name == "postgresql":
+                query = query.with_for_update()
+            rows = session.execute(query).mappings().all()
+            now = _utc_now()
+            for row in rows:
+                session.execute(
+                    update(analysis_jobs)
+                    .where(analysis_jobs.c.id == row["id"])
+                    .values(status="failed", stage="Failed", error=message,
+                            completed_at=now, updated_at=now)
+                )
+                self._append_event(
+                    session, row["id"], kind="analysis.failed", status="failed",
+                    stage="Failed", progress=int(row["progress"]), message=message,
+                    details={"reason": "service_restart", "retry_required": True},
+                )
+            return len(rows)
 
     def _supplemental_path(
         self,
@@ -1235,6 +1267,29 @@ class AnalysisJobRepository:
                     result=_json_safe(result), completed_at=now, updated_at=now,
                 )
             )
+            # Commit the release lifecycle with the completed job. A later
+            # monitoring callback may fail, but the product still has a usable
+            # release and a stable active selection.
+            product = session.execute(select(products).where(
+                (products.c.id == product_id)
+                & (products.c.organization_id == organization_id)
+            ).with_for_update()).mappings().one()
+            release = session.execute(select(releases).where(
+                (releases.c.id == release_id)
+                & (releases.c.product_id == product_id)
+                & (releases.c.organization_id == organization_id)
+            ).with_for_update()).mappings().one()
+            if release["status"] == "draft":
+                session.execute(update(releases).where(releases.c.id == release_id).values(
+                    status="supported", updated_at=now,
+                ))
+            if product["active_release_id"] is None and release["status"] in {"draft", "supported", "active"}:
+                session.execute(update(products).where(products.c.id == product_id).values(
+                    active_release_id=release_id, updated_at=now,
+                ))
+                session.execute(update(releases).where(releases.c.id == release_id).values(
+                    status="active", updated_at=now,
+                ))
             self._append_event(
                 session, job_id, kind="analysis.completed", status="completed",
                 stage="Completed", progress=100, message="Analysis completed",
@@ -1562,27 +1617,119 @@ def _validate_raw(
     extension = next((suffix for suffix in sorted(RAW_MEDIA_BY_EXTENSION, key=len, reverse=True) if safe_name.lower().endswith(suffix)), None)
     if extension is None:
         raise AnalysisJobValidationError("unsupported raw artifact extension")
+    if extension in {".bin", ".img"} and os.environ.get("PANDAX_ENVIRONMENT", "development").lower() in HOSTED_ENVIRONMENTS:
+        raise AnalysisJobValidationError("hosted analysis supports ZIP and TAR archives; use the local Collector for firmware images")
     clean_media = _clean_media_type(media_type)
     if clean_media not in RAW_MEDIA_BY_EXTENSION[extension]:
         raise AnalysisJobValidationError("raw artifact media type does not match its extension")
     if not content or len(content) > MAX_RAW_ARTIFACT_BYTES:
         raise AnalysisJobValidationError("raw artifact must be between 1 byte and 50 MB")
-    if extension == ".zip" and not zipfile.is_zipfile(io.BytesIO(content)):
-        raise AnalysisJobValidationError("raw artifact content is not a valid ZIP archive")
-    if extension in {".tar", ".tar.gz", ".tgz"}:
-        try:
-            with tarfile.open(fileobj=io.BytesIO(content), mode="r:*"):
-                pass
-        except (OSError, tarfile.TarError) as exc:
-            raise AnalysisJobValidationError("raw artifact content is not a valid TAR archive") from exc
+    archive = (
+        _inspect_raw_archive(content, extension)
+        if extension in {".zip", ".tar", ".tar.gz", ".tgz"}
+        else None
+    )
     preview = {
         "format": "Raw artifact", "version": "1", "components": 0,
         "matchable_components": 0, "skipped_components": 0, "product": {},
         "analysis_support": None,
     }
-    return safe_name, clean_media, preview, "Raw artifact", "1", {
-        "extension": extension,
-    }
+    metadata: dict[str, Any] = {"extension": extension}
+    if archive is not None:
+        metadata["archive"] = archive
+    return safe_name, clean_media, preview, "Raw artifact", "1", metadata
+
+
+def _inspect_raw_archive(content: bytes, extension: str) -> dict[str, int]:
+    """Reject unsafe archive structure before retaining or scheduling it.
+
+    Extraction repeats the same fail-closed checks in the worker. This upload
+    preflight is intentionally metadata-only: source code and other regular
+    files are accepted without reading their contents.
+    """
+    if extension == ".zip":
+        if not zipfile.is_zipfile(io.BytesIO(content)):
+            raise AnalysisJobValidationError("raw artifact content is not a valid ZIP archive")
+        try:
+            with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                return _inspect_raw_zip(archive)
+        except AnalysisJobValidationError:
+            raise
+        except (OSError, RuntimeError, zipfile.BadZipFile) as exc:
+            raise AnalysisJobValidationError("raw artifact content is not a valid ZIP archive") from exc
+    try:
+        with tarfile.open(fileobj=io.BytesIO(content), mode="r:*") as archive:
+            return _inspect_raw_tar(archive)
+    except (OSError, EOFError, tarfile.TarError) as exc:
+        raise AnalysisJobValidationError("raw artifact content is not a valid TAR archive") from exc
+
+
+def _raw_archive_path(value: str) -> str:
+    if not value or "\x00" in value or "\\" in value or value.startswith("/") or (
+        len(value) > 1 and value[1] == ":"
+    ):
+        raise AnalysisJobValidationError("raw artifact contains an unsafe archive path")
+    path = PurePosixPath(value)
+    if any(part in {"", ".", ".."} for part in path.parts) or len(path.parts) > artifact_ingest.MAX_DEPTH:
+        raise AnalysisJobValidationError("raw artifact contains an unsafe archive path")
+    return value.rstrip("/")
+
+
+def _inspect_raw_zip(archive: zipfile.ZipFile) -> dict[str, int]:
+    entries = archive.infolist()
+    if not entries or len(entries) > artifact_ingest.MAX_ENTRIES:
+        raise AnalysisJobValidationError("raw artifact archive entry count exceeds limit")
+    seen: set[str] = set()
+    files = total = 0
+    for entry in entries:
+        path = _raw_archive_path(entry.filename)
+        identity = path.casefold()
+        if identity in seen:
+            raise AnalysisJobValidationError("raw artifact archive contains duplicate paths")
+        seen.add(identity)
+        mode = (entry.external_attr >> 16) & 0o170000
+        if entry.flag_bits & 0x1 or mode not in {0, stat.S_IFREG, stat.S_IFDIR}:
+            raise AnalysisJobValidationError("raw artifact archive contains a link, encrypted, or special entry")
+        if entry.is_dir():
+            continue
+        total += entry.file_size
+        files += 1
+        if entry.file_size and (
+            not entry.compress_size
+            or entry.file_size / entry.compress_size > artifact_ingest.MAX_COMPRESSION_RATIO
+        ):
+            raise AnalysisJobValidationError("raw artifact archive compression ratio exceeds limit")
+        if total > artifact_ingest.MAX_TOTAL_BYTES:
+            raise AnalysisJobValidationError("raw artifact archive uncompressed size exceeds limit")
+    if not files:
+        raise AnalysisJobValidationError("raw artifact archive contains no regular files")
+    return {"files": files, "uncompressed_bytes": total}
+
+
+def _inspect_raw_tar(archive: tarfile.TarFile) -> dict[str, int]:
+    seen: set[str] = set()
+    files = total = 0
+    for index, entry in enumerate(archive, 1):
+        if index > artifact_ingest.MAX_ENTRIES:
+            raise AnalysisJobValidationError("raw artifact archive entry count exceeds limit")
+        path = _raw_archive_path(entry.name)
+        identity = path.casefold()
+        if identity in seen:
+            raise AnalysisJobValidationError("raw artifact archive contains duplicate paths")
+        seen.add(identity)
+        if entry.issym() or entry.islnk():
+            raise AnalysisJobValidationError("raw artifact archive contains a link entry")
+        if entry.isdir():
+            continue
+        if not entry.isfile():
+            raise AnalysisJobValidationError("raw artifact archive contains a special entry")
+        files += 1
+        total += entry.size
+        if total > artifact_ingest.MAX_TOTAL_BYTES:
+            raise AnalysisJobValidationError("raw artifact archive uncompressed size exceeds limit")
+    if not files:
+        raise AnalysisJobValidationError("raw artifact archive contains no regular files")
+    return {"files": files, "uncompressed_bytes": total}
 
 
 def _safe_upload_filename(value: Any) -> str:

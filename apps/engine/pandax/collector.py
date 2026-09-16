@@ -104,10 +104,13 @@ def _check_tree(root: Path) -> tuple[int, int, str]:
 
 
 def _project_sbom(document: dict[str, Any]) -> tuple[dict[str, Any], int, int]:
-    normalised, product, _, _ = normalise_document(document)
+    normalised, _, _, _ = normalise_document(document)
     components = []
-    for item in normalised["components"]:
-        component = {field: item[field] for field in ("type", "name", "version", "purl", "bom-ref") if field in item}
+    for index, item in enumerate(normalised["components"]):
+        component = {field: item[field] for field in ("type", "name", "version", "purl") if field in item}
+        identity = "\0".join(str(component.get(field, "")) for field in ("type", "name", "version", "purl"))
+        reference_seed = str(index).encode() + b"\0" + identity.encode()
+        component["bom-ref"] = f"urn:actis:component:{hashlib.sha256(reference_seed).hexdigest()}"
         components.append(component)
     matchable = sum(is_matchable_purl(item.get("purl")) for item in components)
     if not matchable:
@@ -116,9 +119,6 @@ def _project_sbom(document: dict[str, Any]) -> tuple[dict[str, Any], int, int]:
         "bomFormat": "CycloneDX", "specVersion": "1.6", "version": 1,
         "components": components,
     }
-    product_name = product.get("product", {}).get("name")
-    if product_name:
-        minimal["metadata"] = {"component": {"type": "application", "name": product_name}}
     return minimal, matchable, len(components) - matchable
 
 
@@ -177,6 +177,68 @@ def _source_inventory(source: Path, work: Path, syft: Path | None) -> tuple[dict
     return _scan_syft(extracted, _syft_binary(syft), target), {"input_kind": "archive", "files_seen": count, "bytes_seen": total}, digest
 
 
+def _inventory(source: Path, work: Path, syft: Path | None) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], str]:
+    try:
+        document, coverage, source_digest = _source_inventory(source, work, syft)
+        sbom, matchable, skipped = _project_sbom(document)
+    except SbomError as exc:
+        raise CollectorError(f"inconclusive inventory: {exc}") from exc
+    coverage.update({
+        "schema": "actis/collector-coverage/v1",
+        "status": "inconclusive" if skipped else "inventory_complete",
+        "components": len(sbom["components"]), "matchable_components": matchable,
+        "unmatchable_components": skipped,
+        "extraction": "completed", "vulnerability_assessment": "not_performed",
+    })
+    summary = {
+        "schema": "actis/collection-summary/v1", "status": coverage["status"],
+        "limitations": ["Inventory only; hosted analysis has not run"] + ([f"{skipped} components lack a versioned purl"] if skipped else []),
+        "tool": {"collector": COLLECTOR_VERSION, "syft": SYFT_VERSION if coverage["input_kind"] != "sbom" else "not_used"},
+        "rules": {"identifier": "pandax-sbom-normalisation/1"},
+        "privacy": "Source content and paths omitted; nothing was uploaded",
+    }
+    return sbom, coverage, summary, source_digest
+
+
+def _validate_destination(source: Path, destination: Path) -> tuple[Path, Path]:
+    source = Path(source).expanduser().resolve(strict=True)
+    destination = Path(destination).expanduser().resolve()
+    if source == destination or source.is_dir() and destination.is_relative_to(source):
+        raise CollectorError("output destination must be outside the scanned input")
+    return source, destination
+
+
+def _write_json_atomic(destination: Path, document: dict[str, Any]) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    handle, temporary_name = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent)
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as stream:
+            json.dump(document, stream, ensure_ascii=False, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def generate_sbom(
+    source: Path, destination: Path, *, syft: Path | None = None,
+    workspace: Path | None = None,
+) -> dict[str, Any]:
+    """Generate a privacy-minimized CycloneDX 1.6 SBOM without uploading data."""
+    source, destination = _validate_destination(source, destination)
+    with tempfile.TemporaryDirectory(prefix="sbom-", dir=_working_root(workspace)) as temporary:
+        sbom, coverage, summary, source_digest = _inventory(source, Path(temporary), syft)
+        _write_json_atomic(destination, sbom)
+    return {
+        "sbom": str(destination), "sha256": sha256_file(destination),
+        "source_sha256": source_digest, "summary": summary, "coverage": coverage,
+        "uploaded": False,
+    }
+
+
 def collect(
     source: Path, destination: Path, *, organization_id: str, product_id: str,
     release_id: str, signing_key: Path, syft: Path | None = None,
@@ -185,34 +247,14 @@ def collect(
     """Produce a minimal, signed package. Source and working files stay local."""
     if not all(IDENTIFIER.fullmatch(value) for value in (organization_id, product_id, release_id)):
         raise CollectorError("organization, product and release IDs are required")
-    source = Path(source).expanduser().resolve(strict=True)
-    destination = Path(destination).expanduser().resolve()
-    if source.is_dir() and destination.is_relative_to(source):
-        raise CollectorError("package destination must be outside the scanned directory")
+    source, destination = _validate_destination(source, destination)
     key = _private_key(signing_key)
     with tempfile.TemporaryDirectory(prefix="collect-", dir=_working_root(workspace)) as temporary:
         work = Path(temporary)
-        try:
-            document, coverage, source_digest = _source_inventory(source, work, syft)
-            sbom, matchable, skipped = _project_sbom(document)
-        except SbomError as exc:
-            raise CollectorError(f"inconclusive inventory: {exc}") from exc
+        sbom, coverage, summary, source_digest = _inventory(source, work, syft)
         bundle = work / "package"
         bundle.mkdir()
         (bundle / "sbom.cdx.json").write_text(json.dumps(sbom, ensure_ascii=False, indent=2), encoding="utf-8")
-        coverage.update({
-            "schema": "actis/collector-coverage/v1",
-            "status": "inconclusive" if skipped else "inventory_complete",
-            "components": len(sbom["components"]), "matchable_components": matchable,
-            "unmatchable_components": skipped,
-            "extraction": "completed", "vulnerability_assessment": "not_performed",
-        })
-        summary = {
-            "schema": "actis/collection-summary/v1", "status": coverage["status"],
-            "limitations": ["Inventory only; hosted analysis has not run"] + ([f"{skipped} components lack a versioned purl"] if skipped else []),
-            "tool": {"collector": COLLECTOR_VERSION, "syft": SYFT_VERSION if coverage["input_kind"] != "sbom" else "not_used"},
-            "rules": {"identifier": "pandax-sbom-normalisation/1"},
-        }
         (bundle / "coverage.json").write_text(json.dumps(coverage, indent=2), encoding="utf-8")
         (bundle / "collection-summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
         ledger = Ledger(bundle)

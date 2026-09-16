@@ -116,6 +116,56 @@ class FindingObservation:
         return _recommendation_field(self.reachability_evidence, "review_required") is True
 
 
+def observation_from_scan_finding(
+    item: Mapping[str, Any], analysis_id: str
+) -> FindingObservation:
+    """Map the scanner finding shape into the durable portfolio projection."""
+
+    cve = str(item.get("cve") or "").strip() or None
+    reference_id = cve or str(item.get("osv_id") or "").strip()
+    exposure = item.get("exposure_evidence")
+    evidence = dict(exposure) if isinstance(exposure, Mapping) else {}
+    evidence.setdefault(
+        "assessment", str(item.get("exposure_assessment") or "not_assessed")
+    )
+    recommendation = evidence.get("recommendation")
+    limitations = (
+        recommendation.get("limitations")
+        if isinstance(recommendation, Mapping)
+        else None
+    )
+    if not isinstance(limitations, list) or any(
+        not isinstance(value, str) for value in limitations
+    ):
+        limitations = []
+    severity = str(item.get("severity") or "unknown").strip().lower()
+    if severity not in SEVERITIES:
+        severity = "unknown"
+    return FindingObservation(
+        reference_id=reference_id,
+        cve=cve,
+        component=str(item.get("component") or "unknown component"),
+        purl=str(item.get("purl") or "").strip() or None,
+        version=str(item.get("version") or "unknown"),
+        title=str(item.get("summary") or reference_id),
+        description=str(item.get("summary") or ""),
+        severity=severity,
+        kev=bool(item.get("kev")),
+        epss=float(item.get("epss") or 0),
+        reachability=str(item.get("reachability") or "unknown"),
+        reachability_evidence=evidence,
+        reachability_limitations=tuple(limitations),
+        source=str(item.get("source") or "analysis"),
+        provenance={
+            "analysis_id": analysis_id,
+            "osv_id": str(item.get("osv_id") or ""),
+            "source_url": str(item.get("source_url") or ""),
+            "coverage_status": str(item.get("coverage_status") or "unknown"),
+            "bom_ref": str(item.get("bom_ref") or ""),
+        },
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class FindingRecord:
     id: str

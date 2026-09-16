@@ -144,13 +144,15 @@ function TeamMemberEditor({ member, onClose }: { member: TeamMember; onClose: ()
 }
 
 function IntegrationSettings() {
-  const { state } = useDemo();
+  const { state, adapterStatus } = useDemo();
   const [editingId, setEditingId] = useState<string>();
   const integration = state.integrations.find((item) => item.id === editingId);
+  const localDemo = adapterStatus.mode === "fixture";
   return <section className="panel">
     <div className="section-header"><div><h2>Integrations</h2><p>Connect evidence collection and action notifications using externally managed credentials.</p></div></div>
-    {state.integrations.map((item) => <div className="setting-row settings-integration-row" key={item.id}><div><strong>{item.name}</strong><p>{item.description}{item.lastSyncAt ? ` Last activity ${formatDate(item.lastSyncAt, true)}.` : ""}</p><small className="muted">{item.secretReference ? "Credentials configured" : "Credentials not configured"}</small></div><div className="inline-actions"><StatusPill value={item.status} /><button type="button" aria-expanded={editingId === item.id} onClick={() => setEditingId((current) => current === item.id ? undefined : item.id)}>{editingId === item.id ? "Close" : item.status === "not_connected" ? "Connect" : "Configure"}</button></div></div>)}
-    {integration ? <IntegrationEditor key={integration.id} integration={integration} onClose={() => setEditingId(undefined)} /> : null}
+    {localDemo ? <div className="notice"><strong>Production only</strong><br />Demo mode does not connect, validate, or call external integrations.</div> : null}
+    {state.integrations.map((item) => <div className="setting-row settings-integration-row" key={item.id}><div><strong>{item.name}</strong><p>{item.description}{!localDemo && item.lastSyncAt ? ` Last activity ${formatDate(item.lastSyncAt, true)}.` : ""}</p><small className="muted">{localDemo ? "No service connected in demo mode" : item.secretReference ? "Credentials configured" : "Credentials not configured"}</small></div><div className="inline-actions">{localDemo ? <span className="muted">Unavailable</span> : <><StatusPill value={item.status} /><button type="button" aria-expanded={editingId === item.id} onClick={() => setEditingId((current) => current === item.id ? undefined : item.id)}>{editingId === item.id ? "Close" : item.status === "not_connected" ? "Connect" : "Configure"}</button></>}</div></div>)}
+    {!localDemo && integration ? <IntegrationEditor key={integration.id} integration={integration} onClose={() => setEditingId(undefined)} /> : null}
   </section>;
 }
 

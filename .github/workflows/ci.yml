@@ -59,3 +59,38 @@ jobs:
         env:
           PYTHONPATH: apps/engine
           PANDAX_TEST_POSTGRES_URL: postgresql+psycopg://actis:actis@localhost:5432/actis_test
+
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build immutable runtime image
+        run: >-
+          docker build
+          --build-arg RENDER_GIT_COMMIT=${{ github.sha }}
+          --tag actis-beta:${{ github.sha }} .
+      - name: Exercise scanner and document tools as runtime user
+        run: docker run --rm --entrypoint python actis-beta:${{ github.sha }} /app/tools/container_smoke.py
+      - name: Start and probe actual container
+        run: >-
+          docker run --detach --name actis-beta-smoke
+          --env PANDAX_ENVIRONMENT=development
+          --env PANDAX_SIGNING_KEY=/tmp/actis/development-signing-key.pem
+          --env PORT=10000
+          --publish 10000:10000
+          actis-beta:${{ github.sha }}
+      - name: Verify live and build endpoints
+        run: |
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:10000/health/live && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:10000/health/build | grep --fixed-strings '${{ github.sha }}'
+          curl --fail --silent http://127.0.0.1:10000/health/ready | grep --fixed-strings '"ready":true'
+      - name: Record image resource facts
+        if: always()
+        run: |
+          docker image inspect actis-beta:${{ github.sha }} --format 'bytes={{.Size}} digest={{.Id}} user={{.Config.User}}'
+          docker stats --no-stream actis-beta-smoke || true
+          docker logs actis-beta-smoke 2>&1 | tail -100

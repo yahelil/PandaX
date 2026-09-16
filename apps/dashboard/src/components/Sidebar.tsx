@@ -1,11 +1,11 @@
-import { FileWarning, Home, PackageSearch, Scale, Settings, X } from 'lucide-react'
-import { NavLink, useLocation, useSearchParams } from 'react-router-dom'
+import { FileWarning, Home, Monitor, Scale, Settings, X } from 'lucide-react'
+import { NavLink, useSearchParams } from 'react-router-dom'
 import { Brand } from './Brand'
 import { useDemo } from '../data/DemoProvider'
 
 const primaryItems = [
   { to: '/', label: 'Home', icon: Home, end: true },
-  { to: '/products', label: 'Products', icon: PackageSearch },
+  { to: '/products', label: 'Products', icon: Monitor },
   { to: '/findings', label: 'Findings', icon: FileWarning },
   { to: '/compliance', label: 'Compliance', icon: Scale },
 ]
@@ -13,8 +13,6 @@ const primaryItems = [
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { findings, complianceItems } = useDemo()
   const [searchParams] = useSearchParams()
-  const location = useLocation()
-  const isClientDemo = location.pathname.includes('/client-demo')
   const scopeParams = new URLSearchParams()
   const scopedProduct = searchParams.get('product')
   const scopedRelease = searchParams.get('release')
@@ -58,10 +56,10 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <Settings size={19} strokeWidth={1.9} aria-hidden="true" />
           <span>Settings</span>
         </NavLink>
-        {!isClientDemo && <div className="demo-marker" title="This workspace uses demonstration data">
+        <div className="demo-marker" title="Local demo data; no production service is connected">
           <span className="demo-marker__dot" />
-          Demo workspace
-        </div>}
+          Local demo
+        </div>
       </div>
     </aside>
   )

@@ -101,6 +101,13 @@ def test_server_exposes_portfolio_router_with_replaceable_repository(tmp_path):
         assert "/v1/organizations/{organization_id}/home" in server.api.openapi()["paths"]
         assert "/v1/organizations/{organization_id}/settings" in server.api.openapi()["paths"]
         assert "/v1/organizations/{organization_id}/analytics/events" in server.api.openapi()["paths"]
+        session = client.get("/v1/organizations/test-organization/session")
+        assert session.status_code == 200
+        assert session.json() == {
+            "subject": "test-admin",
+            "organization_id": "test-organization",
+            "roles": ["org_admin"],
+        }
     finally:
         server.api.dependency_overrides.pop(get_portfolio_repository, None)
         server.api.dependency_overrides.pop(get_portfolio_identity, None)

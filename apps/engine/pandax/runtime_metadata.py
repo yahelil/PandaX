@@ -11,7 +11,9 @@ def build_metadata() -> dict[str, str]:
     git_sha = os.environ.get("RENDER_GIT_COMMIT", "unknown")
     release_id = os.environ.get("PANDAX_RELEASE_ID", "").strip()
     if not release_id:
-        release_id = f"beta-{git_sha[:12]}" if git_sha != "unknown" else "unreleased"
+        environment = os.environ.get("PANDAX_ENVIRONMENT", "").strip()
+        prefix = "staging" if environment == "staging" else "beta"
+        release_id = f"{prefix}-{git_sha[:12]}" if git_sha != "unknown" else "unreleased"
     return {
         "application_version": __version__,
         "git_sha": git_sha,

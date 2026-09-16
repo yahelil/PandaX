@@ -26,6 +26,8 @@ describe("runtime authentication", () => {
       VITE_ACTIS_MODE: "production",
       VITE_ACTIS_API_URL: "https://api.actis.example",
       VITE_ACTIS_ORGANIZATION_ID: "org-acme",
+      VITE_ACTIS_SUPABASE_URL: "https://project.supabase.co",
+      VITE_ACTIS_SUPABASE_PUBLISHABLE_KEY: "public-key",
       VITE_ACTIS_OIDC_ISSUER: "https://identity.example",
       VITE_ACTIS_OIDC_CLIENT_ID: "actis-dashboard",
     }, "https://actis.example")).toMatchObject({
@@ -59,8 +61,11 @@ describe("runtime authentication", () => {
         authorization_endpoint: "https://identity.example/authorize",
         token_endpoint: "https://identity.example/token",
       }), { status: 200 });
+      if (String(input).endsWith("/v1/organizations/org-acme/session")) return new Response(JSON.stringify({
+        subject: "user-1", organization_id: "org-acme", roles: ["org_admin"],
+      }), { status: 200 });
       return new Response(JSON.stringify({
-        access_token: jwt({ sub: "user-1", org_id: "org-acme", name: "Jane Doe", roles: ["org_admin"], exp: 9_999_999 }),
+        access_token: jwt({ sub: "user-1", name: "Jane Doe", exp: 9_999_999 }),
         refresh_token: "refresh-two",
         token_type: "Bearer",
         expires_in: 300,
@@ -69,6 +74,7 @@ describe("runtime authentication", () => {
     const client = new BrowserOidcClient({
       issuer: "https://identity.example",
       clientId: "actis-dashboard",
+      apiUrl: "https://api.actis.example",
       organizationId: "org-acme",
       redirectUri: "https://actis.example/auth/callback",
       postLogoutRedirectUri: "https://actis.example/",
@@ -94,6 +100,7 @@ describe("runtime authentication", () => {
     }));
     const client = new BrowserOidcClient({
       issuer: "https://identity.example", clientId: "actis-dashboard", organizationId: "org-acme",
+      apiUrl: "https://api.actis.example",
       redirectUri: "https://actis.example/auth/callback", postLogoutRedirectUri: "https://actis.example/",
       fetch: vi.fn(), storage, location: { href: "https://actis.example/", assign: vi.fn() }, history: { replaceState: vi.fn() }, now: () => 1_000,
     });

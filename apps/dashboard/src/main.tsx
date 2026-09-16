@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { App } from './App'
@@ -9,6 +9,11 @@ import { createRuntimeDataAdapter } from './data/productionAdapter'
 import { ThemeProvider } from './components/ThemeProvider'
 import './styles/global.css'
 
+const SupabaseAuthorizationPage = lazy(async () => {
+  const module = await import('./auth/SupabaseAuthorizationPage')
+  return { default: module.SupabaseAuthorizationPage }
+})
+
 if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual'
 
 const root = createRoot(document.getElementById('root')!)
@@ -17,6 +22,7 @@ try {
   const config = readRuntimeConfig(import.meta.env)
   const authClient = config.mode === 'production' ? new BrowserOidcClient({
     ...config.oidc,
+    apiUrl: config.apiUrl,
     organizationId: config.organizationId,
   }) : undefined
   const dataAdapter = createRuntimeDataAdapter(config.mode === 'demo' ? { mode: 'demo' } : {
@@ -31,6 +37,9 @@ try {
 }
 
 function RuntimeRoot({ config, authClient, dataAdapter }: { config: RuntimeConfig; authClient?: AuthClient; dataAdapter: DataAdapter }) {
+  if (config.mode === 'production' && window.location.pathname === '/oauth/consent') {
+    return <StrictMode><Suspense fallback={<main className="auth-screen"><section className="auth-card"><h1>Preparing secure sign-in</h1><div className="auth-progress" /></section></main>}><SupabaseAuthorizationPage {...config.supabase} /></Suspense></StrictMode>
+  }
   return <StrictMode>
     <BrowserRouter>
       <AuthProvider mode={config.mode} client={authClient}>

@@ -4,6 +4,10 @@ export type RuntimeConfig =
       mode: "production";
       apiUrl: string;
       organizationId: string;
+      supabase: {
+        url: string;
+        publishableKey: string;
+      };
       oidc: {
         issuer: string;
         clientId: string;
@@ -23,6 +27,8 @@ export function readRuntimeConfig(env: RuntimeEnvironment, origin = globalThis.l
   if (mode !== "production") throw new Error("VITE_ACTIS_MODE must be explicitly set to demo or production.");
   const apiUrl = required(env, "VITE_ACTIS_API_URL");
   const organizationId = required(env, "VITE_ACTIS_ORGANIZATION_ID");
+  const supabaseUrl = required(env, "VITE_ACTIS_SUPABASE_URL");
+  const supabasePublishableKey = required(env, "VITE_ACTIS_SUPABASE_PUBLISHABLE_KEY");
   const issuer = required(env, "VITE_ACTIS_OIDC_ISSUER");
   const clientId = required(env, "VITE_ACTIS_OIDC_CLIENT_ID");
   const redirectUri = stringValue(env.VITE_ACTIS_OIDC_REDIRECT_URI) || `${origin}/auth/callback`;
@@ -31,6 +37,7 @@ export function readRuntimeConfig(env: RuntimeEnvironment, origin = globalThis.l
     mode,
     apiUrl,
     organizationId,
+    supabase: { url: supabaseUrl, publishableKey: supabasePublishableKey },
     oidc: {
       issuer,
       clientId,

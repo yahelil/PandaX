@@ -162,6 +162,19 @@ button { color: inherit; }
 .auth-card p { margin: 0; }
 .auth-card p { color: var(--text-muted); line-height: 1.6; }
 
+.auth-form,
+.auth-form label { display: grid; gap: 10px; }
+.auth-form { gap: 16px; }
+.auth-form input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--surface);
+}
+.auth-qr { width: min(240px, 100%); justify-self: center; }
+
 .auth-progress {
   height: 4px;
   overflow: hidden;

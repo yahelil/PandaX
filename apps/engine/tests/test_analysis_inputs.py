@@ -4,6 +4,7 @@ import hashlib
 import io
 import json
 import stat
+import tarfile
 import zipfile
 from datetime import date
 from pathlib import Path
@@ -346,6 +347,70 @@ def test_raw_requires_policy_consent_matching_type_and_records_immutable_consent
     completed = repository.run("org-1", "product-1", "release-1", job.id, lambda _: ())
     assert completed.status == "completed"
     assert scratch is not None and not scratch.exists()
+
+
+@pytest.mark.parametrize("kind", ["zip", "tar.gz"])
+def test_raw_source_archive_accepts_code_manifests_and_assets(setup, kind):
+    repository, _, _ = setup
+    files = {
+        "src/app.py": b"print('hello')\n",
+        "requirements.txt": b"requests==2.31.0\n",
+        "web/static/logo.svg": b"<svg/>\n",
+        "README.md": b"customer source bundle\n",
+    }
+    payload = io.BytesIO()
+    if kind == "zip":
+        with zipfile.ZipFile(payload, "w", zipfile.ZIP_DEFLATED) as archive:
+            for path, content in files.items():
+                archive.writestr(path, content)
+        filename, media_type = "source.zip", "application/zip"
+    else:
+        with tarfile.open(fileobj=payload, mode="w:gz") as archive:
+            for path, content in files.items():
+                info = tarfile.TarInfo(path)
+                info.size = len(content)
+                archive.addfile(info, io.BytesIO(content))
+        filename, media_type = "source.tar.gz", "application/gzip"
+
+    job = repository.create_input(
+        "org-1", "product-1", "release-1", input_type="raw_artifact",
+        filename=filename, media_type=media_type, content=payload.getvalue(),
+        idempotency_key=f"source-{kind}", actor_id="reviewer",
+        raw_artifact_allowed=True, raw_artifact_consent=True,
+    )
+
+    assert job.status == "queued"
+    assert job.preview["components"] == 0
+    assert job.input_metadata["archive"] == {
+        "files": len(files),
+        "uncompressed_bytes": sum(map(len, files.values())),
+    }
+
+
+@pytest.mark.parametrize("kind", ["zip", "tar"])
+def test_raw_archive_rejects_unsafe_structure_before_storage(setup, kind):
+    repository, storage, _ = setup
+    payload = io.BytesIO()
+    if kind == "zip":
+        with zipfile.ZipFile(payload, "w") as archive:
+            archive.writestr("../escape.py", b"print('unsafe')")
+        filename, media_type = "source.zip", "application/zip"
+    else:
+        with tarfile.open(fileobj=payload, mode="w") as archive:
+            info = tarfile.TarInfo("linked-source")
+            info.type = tarfile.SYMTYPE
+            info.linkname = "../outside"
+            archive.addfile(info)
+        filename, media_type = "source.tar", "application/x-tar"
+
+    with pytest.raises(AnalysisJobValidationError, match="unsafe|link"):
+        repository.create_input(
+            "org-1", "product-1", "release-1", input_type="raw_artifact",
+            filename=filename, media_type=media_type, content=payload.getvalue(),
+            idempotency_key=f"unsafe-{kind}", actor_id="reviewer",
+            raw_artifact_allowed=True, raw_artifact_consent=True,
+        )
+    assert not storage.objects
 
 
 def test_hosted_raw_upload_rejects_firmware_images(setup, monkeypatch):

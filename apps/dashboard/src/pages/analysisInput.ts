@@ -9,7 +9,7 @@ const accepted: Record<ReleaseArtifact["kind"], string> = {
 const hints: Record<ReleaseArtifact["kind"], string> = {
   collector_package: "Accepted: signed Actis Collector ZIP",
   sbom: "Supported JSON SBOMs: CycloneDX 1.2 or 1.6, and SPDX 2.2 or 2.3. The format and version are detected from the file.",
-  raw_artifact: "Accepted: ZIP, TAR, TAR.GZ, or TGZ up to 50 MB",
+  raw_artifact: "Accepted: source or build ZIP, TAR, TAR.GZ, or TGZ up to 50 MB. The archive is uploaded to Actis for analysis.",
 };
 
 export function analysisInputAccept(kind: ReleaseArtifact["kind"]): string {

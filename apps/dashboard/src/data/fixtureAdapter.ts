@@ -1,6 +1,7 @@
 import type { AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } from "./adapter";
 import { sanitizeAnalyticsEvent } from "./analytics";
 import { createDemoState, DEMO_IDS } from "./fixtures";
+import { analyzeSbomWithOsv, inspectSbom, type SbomAnalysis, type SbomAnalyzer } from "./osvSbom";
 import type { PrivacySafeAnalyticsEvent } from "./governanceApi";
 import type { AnalysisEvidenceFile } from "./releaseOperationsApi";
 import type {
@@ -45,14 +46,9 @@ function slugify(value: string): string {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-function digestFor(draft: AnalysisDraft): string {
-  let hash = 2166136261;
-  const input = `${draft.productId}:${draft.version}:${draft.fileName}:${draft.fileSize}`;
-  for (let index = 0; index < input.length; index += 1) {
-    hash ^= input.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `${(hash >>> 0).toString(16).padStart(8, "0")}8d44c7a0…${draft.fileSize.toString(16).padStart(4, "0")}`;
+async function sha256(file: Blob): Promise<string> {
+  const bytes = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return [...new Uint8Array(bytes)].map((value) => value.toString(16).padStart(2, "0")).join("");
 }
 
 function withAnalyticsSettings(state: DemoState): DemoState {
@@ -85,7 +81,7 @@ export class FixtureAdapter implements DataAdapter {
   private readonly analyticsEvents: PrivacySafeAnalyticsEvent[] = [];
   private readonly status: AdapterStatus = { mode: "fixture", phase: "ready" };
 
-  constructor(initialState?: DemoState, private readonly persist = true) {
+  constructor(initialState?: DemoState, private readonly persist = true, private readonly sbomAnalyzer: SbomAnalyzer = analyzeSbomWithOsv) {
     this.state = withAnalyticsSettings(initialState ? structuredClone(initialState) : loadInitialState());
   }
 
@@ -536,26 +532,36 @@ export class FixtureAdapter implements DataAdapter {
   downloadReleaseReport = async (productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile> => {
     const job = this.state.analysisJobs.find((item) => item.id === jobId && item.draft.productId === productId && item.draft.releaseId === releaseId && item.status === "completed");
     if (!job) throw new Error("Completed release analysis not found.");
-    return { blob: new Blob([JSON.stringify(job.result, null, 2)], { type: "application/json" }), contentType: "application/json", filename: `actis-${releaseId}-report.json` };
+    return { blob: new Blob([JSON.stringify(job.result, null, 2)], { type: "application/json" }), contentType: "application/json", filename: `actis-${releaseId}-analysis-result.json` };
   };
 
   previewAnalysis = async (draft: AnalysisDraft): Promise<AnalysisPreview> => {
     await new Promise((resolve) => setTimeout(resolve, 180));
-    const extensionValid = /\.(json|zip|spdx|cdx)$/i.test(draft.fileName);
-    const consentValid = draft.inputKind !== "raw_artifact" || draft.rawArtifactConsent === true;
-    const seed = Math.max(42, Math.min(386, Math.round(draft.fileSize / 8_000) + 61));
+    if (!draft.file || draft.fileSize <= 0) throw new Error("Choose an evidence file before validation.");
+    if (draft.inputKind !== "sbom") {
+      return {
+        valid: false,
+        releaseId: draft.releaseId,
+        detectedFormat: "Not inspected",
+        componentCount: 0,
+        identifiedComponentCount: 0,
+        warnings: ["Archive and Collector analysis require the production engine. Demo mode supports JSON SBOM analysis only."],
+        digest: await sha256(draft.file),
+      };
+    }
+    const inspection = await inspectSbom(draft.file);
     return {
-      valid: extensionValid && consentValid && draft.fileSize > 0,
+      valid: inspection.matchableComponents > 0,
       releaseId: draft.releaseId,
-      detectedFormat: draft.inputKind === "collector_package" ? "Signed Actis Collector package" : draft.inputKind === "sbom" ? (draft.fileName.toLowerCase().includes("spdx") ? "SPDX 2.3 JSON" : "CycloneDX 1.6 JSON") : "Firmware archive",
-      componentCount: seed,
-      identifiedComponentCount: Math.round(seed * (draft.inputKind === "raw_artifact" ? 0.91 : 0.97)),
+      detectedFormat: inspection.format,
+      componentCount: inspection.components,
+      identifiedComponentCount: inspection.matchableComponents,
       warnings: [
-        ...(!extensionValid ? ["Use a JSON, ZIP, SPDX, or CycloneDX input."] : []),
-        ...(!consentValid ? ["Confirm raw-artifact processing before continuing."] : []),
-        ...(draft.inputKind === "sbom" ? ["Runtime reachability requires Collector or equivalent evidence."] : []),
+        ...(inspection.matchableComponents === 0 ? ["No components contain a usable, versioned Package URL (purl)."] : []),
+        "Demo mode checks OSV only. CISA KEV, EPSS, vendor advisories, and continuous monitoring require the production engine.",
+        "Runtime reachability was not measured from SBOM-only input.",
       ],
-      digest: digestFor(draft),
+      digest: await sha256(draft.file),
     };
   };
 
@@ -584,7 +590,10 @@ export class FixtureAdapter implements DataAdapter {
     this.mutate((state) => { state.analysisJobs.unshift(job); });
     this.scheduleJob(job.id, 280, "validating", 28, "Validating package identity and provenance");
     this.scheduleJob(job.id, 780, "analyzing", 67, "Matching components against advisory sources");
-    this.scheduleCompletion(job.id, 1450, preview, releaseId);
+    const sbomAnalysis = draft.inputKind === "sbom" && draft.file
+      ? this.sbomAnalyzer(draft.file, draft.productId, releaseId)
+      : undefined;
+    this.scheduleCompletion(job.id, 1450, preview, releaseId, sbomAnalysis);
     return structuredClone(job);
   };
 
@@ -613,34 +622,22 @@ export class FixtureAdapter implements DataAdapter {
   loadReleaseMonitoring = async (productId: EntityId, releaseId: EntityId): Promise<ReleaseMonitoringView> => {
     const release = this.state.releases.find((item) => item.id === releaseId && item.productId === productId);
     if (!release) throw new Error("Release monitoring scope not found.");
-    const occurredAt = release.lastMonitoringCheckAt ?? release.createdAt;
     return {
       productId, releaseId,
-      enabledSources: ["osv", "cisa_kev", "epss", "native_advisory"],
+      enabledSources: [],
       cadenceMinutes: 60,
-      enabled: release.status !== "end_of_support",
-      health: release.monitoringHealth,
-      nextCheckAt: release.lastMonitoringCheckAt ? new Date(new Date(release.lastMonitoringCheckAt).getTime() + 3_600_000).toISOString() : undefined,
-      lastCheckAt: release.lastMonitoringCheckAt,
-      lastSuccessAt: release.monitoringHealth === "failed" ? undefined : release.lastMonitoringCheckAt,
-      consecutiveFailures: release.monitoringHealth === "failed" ? 2 : 0,
-      limitations: release.coverage.limitations,
+      enabled: false,
+      health: "inactive",
+      consecutiveFailures: 0,
+      limitations: ["Continuous monitoring requires the production engine and is unavailable in demo mode."],
       running: false,
-      recentEvents: [{ id: `monitoring-${releaseId}`, runId: `run-${releaseId}`, eventType: release.monitoringHealth === "failed" ? "failed" : "succeeded", trigger: "scheduled", health: release.monitoringHealth, message: release.monitoringHealth === "healthy" ? "Scheduled monitoring completed." : "Monitoring completed with coverage limitations.", actorId: "system", occurredAt, limitations: release.coverage.limitations }],
+      recentEvents: [],
     };
   };
 
   runReleaseMonitoring = async (productId: EntityId, releaseId: EntityId): Promise<ReleaseMonitoringView> => {
-    const checkedAt = now();
-    this.mutate((state) => {
-      const release = state.releases.find((item) => item.id === releaseId && item.productId === productId);
-      if (!release) throw new Error("Release monitoring scope not found.");
-      release.lastMonitoringCheckAt = checkedAt;
-      state.activities.unshift({ id: `activity-monitoring-${Date.now()}`, type: "monitoring", title: "Manual monitoring completed", detail: `${release.version} was checked against configured advisory sources.`, productId, releaseId, actorId: state.currentUserId, at: checkedAt, targetUrl: `/products/${productId}/releases/${releaseId}` });
-    });
-    const result = await this.loadReleaseMonitoring(productId, releaseId);
-    result.recentEvents[0] = { ...result.recentEvents[0], id: `monitoring-manual-${Date.now()}`, runId: `run-manual-${Date.now()}`, trigger: "manual", actorId: this.state.currentUserId, occurredAt: checkedAt, message: "Manual monitoring completed." };
-    return result;
+    await this.loadReleaseMonitoring(productId, releaseId);
+    throw new Error("Continuous monitoring is unavailable in demo mode. Connect the production engine to run advisory checks.");
   };
 
   replacePortfolio = (organization: DemoState["organization"], products: Product[], releases: Release[]): void => {
@@ -794,23 +791,43 @@ export class FixtureAdapter implements DataAdapter {
     this.timers.add(timer);
   }
 
-  private scheduleCompletion(jobId: string, delay: number, preview: AnalysisPreview, releaseId: string): void {
-    const timer = setTimeout(() => {
+  private scheduleCompletion(jobId: string, delay: number, preview: AnalysisPreview, releaseId: string, sbomAnalysis?: Promise<SbomAnalysis>): void {
+    const timer = setTimeout(async () => {
       this.timers.delete(timer);
+      let analyzed: SbomAnalysis | undefined;
+      try { analyzed = await sbomAnalysis; }
+      catch (error) {
+        this.mutate((state) => {
+          const job = state.analysisJobs.find((item) => item.id === jobId);
+          if (!job) return;
+          job.status = "failed";
+          job.progress = 100;
+          job.stage = "Advisory matching failed";
+          job.error = error instanceof Error ? error.message : "OSV advisory matching failed.";
+          job.updatedAt = now();
+        });
+        return;
+      }
       this.mutate((state) => {
         const job = state.analysisJobs.find((item) => item.id === jobId);
         const release = state.releases.find((item) => item.id === releaseId);
         if (!job || !release) return;
         const completedAt = now();
-        const limitations = job.draft.inputKind === "sbom" ? ["Runtime reachability was not measured from SBOM-only input."] : [];
+        const limitations = [
+          "Demo analysis checked OSV only; CISA KEV, EPSS, and vendor advisory sources were not checked.",
+          "Runtime reachability was not measured from SBOM-only input.",
+          "Continuous monitoring is unavailable in demo mode.",
+        ];
         const product = state.products.find((item) => item.id === release.productId);
         release.status = !product?.activeReleaseId || product.activeReleaseId === release.id ? "active" : "supported";
         release.sbomStatus = limitations.length ? "partial" : "validated";
-        release.monitoringHealth = "healthy";
-        release.readiness = limitations.length ? "incomplete_evidence" : "ready";
-        release.coverage = { components: preview.componentCount, identifiedComponents: preview.identifiedComponentCount, advisorySourcesChecked: 4, advisorySourcesExpected: 4, limitations };
+        release.monitoringHealth = "inactive";
+        release.readiness = "incomplete_evidence";
+        const componentCount = analyzed?.components ?? preview.componentCount;
+        const identifiedComponentCount = analyzed?.matchableComponents ?? preview.identifiedComponentCount;
+        release.coverage = { components: componentCount, identifiedComponents: identifiedComponentCount, advisorySourcesChecked: 1, advisorySourcesExpected: 4, limitations };
         release.lastAnalysisAt = completedAt;
-        release.lastMonitoringCheckAt = completedAt;
+        release.lastMonitoringCheckAt = undefined;
         release.artifacts.unshift({ id: `artifact-${job.id}`, kind: job.draft.inputKind, name: job.draft.fileName, sha256: preview.digest, receivedAt: completedAt, sizeLabel: `${Math.max(1, Math.round(job.draft.fileSize / 1024))} KB` });
         if (product) {
           if (!product.activeReleaseId) product.activeReleaseId = release.id;
@@ -823,8 +840,12 @@ export class FixtureAdapter implements DataAdapter {
         job.progress = 100;
         job.stage = limitations.length ? "Completed with coverage limitations" : "Analysis complete";
         job.updatedAt = completedAt;
-        job.result = { releaseId, newFindings: job.draft.inputKind === "sbom" ? 2 : 1, changedFindings: 1, componentCount: preview.componentCount, coverage: release.coverage, resultUrl: `/products/${release.productId}/releases/${release.id}` };
-        state.activities.unshift({ id: `activity-${job.id}`, type: "analysis", title: job.stage, detail: `${preview.componentCount} components analyzed for release ${release.version}.`, productId: release.productId, releaseId: release.id, actorId: state.currentUserId, at: completedAt, targetUrl: job.result.resultUrl });
+        if (analyzed) {
+          state.findings = state.findings.filter((finding) => finding.releaseId !== releaseId || !finding.id.startsWith(`finding-${releaseId}-`));
+          state.findings.push(...analyzed.findings);
+        }
+        job.result = { releaseId, newFindings: analyzed?.findings.length ?? 0, changedFindings: 0, componentCount, coverage: release.coverage, resultUrl: `/products/${release.productId}/releases/${release.id}` };
+        state.activities.unshift({ id: `activity-${job.id}`, type: "analysis", title: job.stage, detail: `${componentCount} components analyzed for release ${release.version}.`, productId: release.productId, releaseId: release.id, actorId: state.currentUserId, at: completedAt, targetUrl: job.result.resultUrl });
       });
     }, delay);
     this.timers.add(timer);

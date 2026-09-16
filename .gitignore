@@ -26,6 +26,7 @@ output/
 workspace/
 
 # Generated media and local plans
+brag-output/
 *.[pP][nN][gG]
 *.[jJ][pP][gG]
 *.[jJ][pP][eE][gG]

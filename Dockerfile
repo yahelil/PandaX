@@ -42,7 +42,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     JAVA_HOME=/opt/java/openjdk \
     PANDAX_ENVIRONMENT=beta \
     PANDAX_DATA_DIR=/tmp/actis/data \
-    PANDAX_VERAPDF=/app/workspace/tools/verapdf/bin/cli-1.30.2.jar
+    PANDAX_VERAPDF=/app/workspace/tools/verapdf/bin/cli-1.30.2.jar \
+    RENDER_GIT_COMMIT=${RENDER_GIT_COMMIT}
 WORKDIR /app
 
 COPY --from=java /opt/java/openjdk /opt/java/openjdk

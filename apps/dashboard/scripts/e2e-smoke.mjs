@@ -104,12 +104,26 @@ try {
   await assertVisible(page.getByRole("button", { name: "Use light theme" }), "dark-theme toggle");
   await assertThemeContrast(page, "dark");
 
-  await page.getByRole("link", { name: /^Products$/ }).click();
+  await page.getByRole("link", { name: /^Devices$/ }).click();
   await page.waitForURL(`${baseUrl}/products`);
-  await assertSingleMain(page, "Products");
-  await assertAccessibilityBasics(page, "Products");
-  await assertVisible(page.getByRole("heading", { name: "Products", exact: true }), "Products heading");
-  await assertVisible(page.getByRole("searchbox", { name: "Search products" }), "product search");
+  await assertSingleMain(page, "Devices");
+  await assertAccessibilityBasics(page, "Devices");
+  await assertVisible(page.getByRole("heading", { name: "Devices", exact: true }), "Devices heading");
+  await assertVisible(page.getByRole("searchbox", { name: "Search devices" }), "device search");
+  if (visualDir) await page.screenshot({ path: join(visualDir, "devices-dark-1440.png"), fullPage: true });
+  if (visualDir) {
+    await page.getByRole("button", { name: "Use light theme" }).click();
+    await page.locator("html[data-theme='light']").waitFor();
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: join(visualDir, "devices-light-1440.png"), fullPage: true });
+    await page.getByRole("button", { name: "Use dark theme" }).click();
+    await page.locator("html[data-theme='dark']").waitFor();
+  }
+  await page.setViewportSize({ width: 640, height: 1000 });
+  await page.waitForTimeout(300);
+  await assertNoHorizontalOverflow(page, "Devices at 640px");
+  if (visualDir) await page.screenshot({ path: join(visualDir, "devices-dark-640.png"), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
 
   await page.getByRole("link", { name: "Home Hub", exact: true }).first().click();
   await page.waitForURL(`${baseUrl}/products/product-home-hub`);
@@ -170,7 +184,7 @@ try {
   await page.getByRole("button", { name: "Deadlines" }).click();
   await assertVisible(page.getByText("Submit initial incident notification", { exact: true }).first(), "deadline case");
 
-  await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Products$/ }).click();
+  await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Devices$/ }).click();
   await page.getByRole("link", { name: "Smart Camera", exact: true }).first().click();
   await page.getByRole("navigation", { name: "Product workspace" }).getByRole("link", { name: "Documents" }).click();
   await page.getByRole("link", { name: "EU Declaration of Conformity — Smart Camera 2.4.1" }).click();

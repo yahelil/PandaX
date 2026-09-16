@@ -47,8 +47,10 @@ def _advisory_service():
 async def lifespan(app: FastAPI):
     from .advisory_watch import AdvisoryRefreshLoop
     from .portfolio_runtime import (
+        MANAGED_ENVIRONMENTS,
         database_allows_background_growth,
         database_settings,
+        get_analysis_repository,
         get_notification_delivery_worker,
         get_release_monitoring_repository,
         get_release_monitoring_runner,
@@ -61,6 +63,11 @@ async def lifespan(app: FastAPI):
     database_settings()  # Managed environments fail before serving if PostgreSQL is absent.
     get_storage_status()  # Managed environments require a reachable private object bucket.
     _signing_state()  # Managed signing policy is checked before accepting work.
+    if runtime_environment() in MANAGED_ENVIRONMENTS:
+        from .artifact_runtime import require_hosted_scanner
+        require_hosted_scanner()
+    if runtime_environment() in {"staging", "beta"}:
+        get_analysis_repository().fail_interrupted_jobs()
     interval = max(1, float(os.environ.get("PANDAX_ADVISORY_REFRESH_SECONDS", "3600")))
     loop = AdvisoryRefreshLoop(_advisory_service, interval)
     release_interval = max(
@@ -190,7 +197,7 @@ def application_liveness() -> dict[str, str]:
 
 @api.get("/health/ready", include_in_schema=False)
 def database_readiness() -> dict[str, object]:
-    from .portfolio_runtime import get_database_status, get_storage_status
+    from .portfolio_runtime import MANAGED_ENVIRONMENTS, get_database_status, get_storage_status, runtime_environment
 
     try:
         database = get_database_status()
@@ -207,9 +214,17 @@ def database_readiness() -> dict[str, object]:
         signer, registry = _signing_state()
     except Exception as exc:
         raise HTTPException(503, "signing custody unavailable") from exc
+    scanner = None
+    if runtime_environment() in MANAGED_ENVIRONMENTS:
+        from .artifact_runtime import require_hosted_scanner
+        try:
+            scanner = require_hosted_scanner()
+        except RuntimeError as exc:
+            raise HTTPException(503, "artifact scanner unavailable") from exc
     return {
         **database.as_dict(),
         "storage": storage,
+        "artifact_scanner": scanner,
         "signing": {
             "provider": signer.identity.provider,
             "key_id": signer.identity.key_id,

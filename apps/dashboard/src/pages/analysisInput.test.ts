@@ -3,10 +3,11 @@ import { describe, expect, it } from "vitest";
 import { analysisInputAccept, analysisInputHint } from "./analysisInput";
 
 describe("analysis input selection", () => {
-  it("offers every raw artifact type accepted by the production API", () => {
+  it("offers hosted archive formats without firmware images", () => {
     const accepted = analysisInputAccept("raw_artifact").split(",");
-    expect(accepted).toEqual(expect.arrayContaining([".zip", ".tar", ".tar.gz", ".tgz", ".bin", ".img"]));
-    expect(analysisInputHint("raw_artifact")).toContain("BIN");
+    expect(accepted).toEqual(expect.arrayContaining([".zip", ".tar", ".tar.gz", ".tgz"]));
+    expect(accepted).not.toContain(".bin");
+    expect(accepted).not.toContain(".img");
   });
 
   it("keeps Collector and SBOM choices narrowly scoped", () => {

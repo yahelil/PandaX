@@ -78,6 +78,7 @@ RAW_MEDIA_BY_EXTENSION = {
     ".bin": frozenset({"application/octet-stream"}),
     ".img": frozenset({"application/octet-stream"}),
 }
+HOSTED_ENVIRONMENTS = frozenset({"staging", "beta", "production"})
 INPUT_TYPES = frozenset({"sbom", "collector", "raw_artifact"})
 JOB_STATUSES = frozenset({"queued", "running", "completed", "failed", "unsupported"})
 TERMINAL_STATUSES = frozenset({"completed", "failed", "unsupported"})
@@ -739,6 +740,7 @@ class AnalysisJobRepository:
         run_dir: str | None = None
         artifacts: list[dict[str, Any]] = []
         summary: dict[str, Any] = {}
+        scratch: tempfile.TemporaryDirectory[str] | None = None
         if job.input_type == "collector":
             try:
                 with zipfile.ZipFile(io.BytesIO(content)) as archive:
@@ -753,6 +755,8 @@ class AnalysisJobRepository:
         )
 
         try:
+            if job.input_type == "raw_artifact":
+                scratch = tempfile.TemporaryDirectory(prefix="actis-analysis-")
             with ExitStack() as stack:
                 input_path = stack.enter_context(_temporary_sbom(content, suffix))
                 supplemental = job.input_metadata.get("supplemental_evidence", {})
@@ -761,11 +765,12 @@ class AnalysisJobRepository:
                 if job.input_type == "raw_artifact" and (runtime_path is not None or exposure_path is not None):
                     stream = pipeline.run(
                         input_path,
+                        out_base=Path(scratch.name),
                         telemetry_path=runtime_path,
                         exposure_context_path=exposure_path,
                     )
                 elif job.input_type == "raw_artifact":
-                    stream = pipeline.run(input_path)
+                    stream = pipeline.run(input_path, out_base=Path(scratch.name))
                 elif runtime_path is not None or exposure_path is not None:
                     stream = runner(
                         input_path,
@@ -814,7 +819,33 @@ class AnalysisJobRepository:
             self._finish(organization_id, product_id, release_id, job_id, result)
         except Exception as exc:
             self._fail(organization_id, product_id, release_id, job_id, str(exc))
+        finally:
+            if scratch is not None:
+                scratch.cleanup()
         return self.get(organization_id, product_id, release_id, job_id)
+
+    def fail_interrupted_jobs(self) -> int:
+        """Close work lost when the single beta API process was restarted."""
+        message = "Analysis was interrupted by a service restart. Upload the input again to retry."
+        with self._transaction() as session:
+            query = select(analysis_jobs).where(analysis_jobs.c.status == "running")
+            if self.engine.dialect.name == "postgresql":
+                query = query.with_for_update()
+            rows = session.execute(query).mappings().all()
+            now = _utc_now()
+            for row in rows:
+                session.execute(
+                    update(analysis_jobs)
+                    .where(analysis_jobs.c.id == row["id"])
+                    .values(status="failed", stage="Failed", error=message,
+                            completed_at=now, updated_at=now)
+                )
+                self._append_event(
+                    session, row["id"], kind="analysis.failed", status="failed",
+                    stage="Failed", progress=int(row["progress"]), message=message,
+                    details={"reason": "service_restart", "retry_required": True},
+                )
+            return len(rows)
 
     def _supplemental_path(
         self,
@@ -1562,6 +1593,8 @@ def _validate_raw(
     extension = next((suffix for suffix in sorted(RAW_MEDIA_BY_EXTENSION, key=len, reverse=True) if safe_name.lower().endswith(suffix)), None)
     if extension is None:
         raise AnalysisJobValidationError("unsupported raw artifact extension")
+    if extension in {".bin", ".img"} and os.environ.get("PANDAX_ENVIRONMENT", "development").lower() in HOSTED_ENVIRONMENTS:
+        raise AnalysisJobValidationError("hosted analysis supports ZIP and TAR archives; use the local Collector for firmware images")
     clean_media = _clean_media_type(media_type)
     if clean_media not in RAW_MEDIA_BY_EXTENSION[extension]:
         raise AnalysisJobValidationError("raw artifact media type does not match its extension")

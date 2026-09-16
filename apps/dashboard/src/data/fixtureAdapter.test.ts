@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createDemoState, DEMO_IDS } from "./fixtures";
 import { FixtureAdapter } from "./fixtureAdapter";
-import type { AnalysisDraft } from "./types";
+import type { AnalysisDraft, Finding } from "./types";
 
 class MemoryStorage implements Storage {
   private readonly values = new Map<string, string>();
@@ -142,6 +142,66 @@ describe("FixtureAdapter demo contract", () => {
     expect(completed).toMatchObject({ status: "completed", progress: 100 });
     expect(completed?.result).toMatchObject({ releaseId: DEMO_IDS.thermostatRelease, newFindings: 1, changedFindings: 1 });
     expect(adapter.getSnapshot().releases.find((item) => item.id === DEMO_IDS.thermostatRelease)).toMatchObject({ sbomStatus: "validated", monitoringHealth: "healthy", readiness: "ready" });
+  });
+
+  it("creates release-scoped findings from an uploaded SBOM", async () => {
+    vi.useFakeTimers();
+    const matched: Finding[] = [{
+      id: "finding-upload-ghsa-29mw-wpgm-hmr9",
+      reference: "GHSA-29mw-wpgm-hmr9",
+      productId: DEMO_IDS.thermostat,
+      releaseId: DEMO_IDS.thermostatRelease,
+      title: "Prototype pollution in lodash",
+      component: "lodash",
+      componentVersion: "4.17.19",
+      severity: "high",
+      cvss: 7.4,
+      status: "needs_review",
+      priority: "high",
+      kev: false,
+      activelyExploited: false,
+      affectedness: "unknown",
+      reachability: "unknown",
+      reachabilityRecommendation: "review",
+      reachabilityConfidence: "low",
+      reachabilityReasonCodes: ["sbom_component_match"],
+      reachabilityReviewRequired: true,
+      summary: "OSV returned this advisory for the exact versioned Package URL.",
+      actionReason: "Review affectedness and runtime reachability.",
+      introducedAt: "2026-09-16T00:00:00.000Z",
+      updatedAt: "2026-09-16T00:00:00.000Z",
+      decisions: [],
+      remediation: { status: "not_started" },
+      evidenceIds: [],
+    }];
+    const analyzer = vi.fn(async () => ({ components: 1, matchableComponents: 1, findings: matched }));
+    const adapter = new FixtureAdapter(createDemoState(), false, analyzer);
+    const file = new Blob([JSON.stringify({
+      bomFormat: "CycloneDX", specVersion: "1.2",
+      components: [{ name: "lodash", version: "4.17.19", purl: "pkg:npm/lodash@4.17.19" }],
+    })], { type: "application/json" });
+
+    const run = adapter.runAnalysis({
+      productId: DEMO_IDS.thermostat,
+      releaseId: DEMO_IDS.thermostatRelease,
+      version: "3.0.0",
+      channel: "stable",
+      inputKind: "sbom",
+      fileName: "bom.json",
+      fileSize: file.size,
+      file,
+    });
+    await vi.advanceTimersByTimeAsync(180);
+    const queued = await run;
+    await vi.advanceTimersByTimeAsync(1_450);
+
+    expect(analyzer).toHaveBeenCalledWith(file, DEMO_IDS.thermostat, DEMO_IDS.thermostatRelease);
+    expect(adapter.getAnalysisJob(queued.id)?.result?.newFindings).toBe(1);
+    expect(adapter.getSnapshot().findings).toContainEqual(expect.objectContaining({
+      reference: "GHSA-29mw-wpgm-hmr9",
+      productId: DEMO_IDS.thermostat,
+      releaseId: DEMO_IDS.thermostatRelease,
+    }));
   });
 
   it("persists a realistic manual monitoring check", async () => {

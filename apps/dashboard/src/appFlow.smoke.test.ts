@@ -95,10 +95,12 @@ describe("application flow smoke contracts", () => {
     expect(workspace).toContain("navigate(`/products/${productId}/releases/${created.id}/analyze`)");
     const products = source("./pages/ProductsPage.tsx");
     expect(products).toContain("Initial release evidence");
-    expect(products).toContain('value="sbom"');
-    expect(products).toContain('value="collector_package"');
-    expect(products).toContain('value="raw_artifact"');
+    expect(products).toContain('aria-label="Upload type"');
+    expect(products).toContain('>SBOM</button>');
+    expect(products).toContain('>ZIP</button>');
+    expect(products).toContain('>Build archive</button>');
     expect(products).toContain("rawArtifactConsent");
+    expect(products).not.toContain('{assessment && assessment.scopeResult !== "out_of_scope" ? <fieldset');
     expect(products).toContain("validateSbomFormatVersion(evidenceFile)");
     expect(products).toContain("Product release version");
     expect(products).toContain("initialAssessment={assessment}");

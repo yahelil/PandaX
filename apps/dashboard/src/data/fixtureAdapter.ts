@@ -1,6 +1,7 @@
 import type { AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } from "./adapter";
 import { sanitizeAnalyticsEvent } from "./analytics";
 import { createDemoState, DEMO_IDS } from "./fixtures";
+import { analyzeSbomWithOsv, type SbomAnalysis, type SbomAnalyzer } from "./osvSbom";
 import type { PrivacySafeAnalyticsEvent } from "./governanceApi";
 import type { AnalysisEvidenceFile } from "./releaseOperationsApi";
 import type {
@@ -85,7 +86,7 @@ export class FixtureAdapter implements DataAdapter {
   private readonly analyticsEvents: PrivacySafeAnalyticsEvent[] = [];
   private readonly status: AdapterStatus = { mode: "fixture", phase: "ready" };
 
-  constructor(initialState?: DemoState, private readonly persist = true) {
+  constructor(initialState?: DemoState, private readonly persist = true, private readonly sbomAnalyzer: SbomAnalyzer = analyzeSbomWithOsv) {
     this.state = withAnalyticsSettings(initialState ? structuredClone(initialState) : loadInitialState());
   }
 
@@ -584,7 +585,10 @@ export class FixtureAdapter implements DataAdapter {
     this.mutate((state) => { state.analysisJobs.unshift(job); });
     this.scheduleJob(job.id, 280, "validating", 28, "Validating package identity and provenance");
     this.scheduleJob(job.id, 780, "analyzing", 67, "Matching components against advisory sources");
-    this.scheduleCompletion(job.id, 1450, preview, releaseId);
+    const sbomAnalysis = draft.inputKind === "sbom" && draft.file
+      ? this.sbomAnalyzer(draft.file, draft.productId, releaseId)
+      : undefined;
+    this.scheduleCompletion(job.id, 1450, preview, releaseId, sbomAnalysis);
     return structuredClone(job);
   };
 
@@ -794,9 +798,23 @@ export class FixtureAdapter implements DataAdapter {
     this.timers.add(timer);
   }
 
-  private scheduleCompletion(jobId: string, delay: number, preview: AnalysisPreview, releaseId: string): void {
-    const timer = setTimeout(() => {
+  private scheduleCompletion(jobId: string, delay: number, preview: AnalysisPreview, releaseId: string, sbomAnalysis?: Promise<SbomAnalysis>): void {
+    const timer = setTimeout(async () => {
       this.timers.delete(timer);
+      let analyzed: SbomAnalysis | undefined;
+      try { analyzed = await sbomAnalysis; }
+      catch (error) {
+        this.mutate((state) => {
+          const job = state.analysisJobs.find((item) => item.id === jobId);
+          if (!job) return;
+          job.status = "failed";
+          job.progress = 100;
+          job.stage = "Advisory matching failed";
+          job.error = error instanceof Error ? error.message : "OSV advisory matching failed.";
+          job.updatedAt = now();
+        });
+        return;
+      }
       this.mutate((state) => {
         const job = state.analysisJobs.find((item) => item.id === jobId);
         const release = state.releases.find((item) => item.id === releaseId);
@@ -808,7 +826,9 @@ export class FixtureAdapter implements DataAdapter {
         release.sbomStatus = limitations.length ? "partial" : "validated";
         release.monitoringHealth = "healthy";
         release.readiness = limitations.length ? "incomplete_evidence" : "ready";
-        release.coverage = { components: preview.componentCount, identifiedComponents: preview.identifiedComponentCount, advisorySourcesChecked: 4, advisorySourcesExpected: 4, limitations };
+        const componentCount = analyzed?.components ?? preview.componentCount;
+        const identifiedComponentCount = analyzed?.matchableComponents ?? preview.identifiedComponentCount;
+        release.coverage = { components: componentCount, identifiedComponents: identifiedComponentCount, advisorySourcesChecked: 4, advisorySourcesExpected: 4, limitations };
         release.lastAnalysisAt = completedAt;
         release.lastMonitoringCheckAt = completedAt;
         release.artifacts.unshift({ id: `artifact-${job.id}`, kind: job.draft.inputKind, name: job.draft.fileName, sha256: preview.digest, receivedAt: completedAt, sizeLabel: `${Math.max(1, Math.round(job.draft.fileSize / 1024))} KB` });
@@ -823,8 +843,12 @@ export class FixtureAdapter implements DataAdapter {
         job.progress = 100;
         job.stage = limitations.length ? "Completed with coverage limitations" : "Analysis complete";
         job.updatedAt = completedAt;
-        job.result = { releaseId, newFindings: job.draft.inputKind === "sbom" ? 2 : 1, changedFindings: 1, componentCount: preview.componentCount, coverage: release.coverage, resultUrl: `/products/${release.productId}/releases/${release.id}` };
-        state.activities.unshift({ id: `activity-${job.id}`, type: "analysis", title: job.stage, detail: `${preview.componentCount} components analyzed for release ${release.version}.`, productId: release.productId, releaseId: release.id, actorId: state.currentUserId, at: completedAt, targetUrl: job.result.resultUrl });
+        if (analyzed) {
+          state.findings = state.findings.filter((finding) => finding.releaseId !== releaseId || !finding.id.startsWith(`finding-${releaseId}-`));
+          state.findings.push(...analyzed.findings);
+        }
+        job.result = { releaseId, newFindings: analyzed?.findings.length ?? 1, changedFindings: analyzed ? 0 : 1, componentCount, coverage: release.coverage, resultUrl: `/products/${release.productId}/releases/${release.id}` };
+        state.activities.unshift({ id: `activity-${job.id}`, type: "analysis", title: job.stage, detail: `${componentCount} components analyzed for release ${release.version}.`, productId: release.productId, releaseId: release.id, actorId: state.currentUserId, at: completedAt, targetUrl: job.result.resultUrl });
       });
     }, delay);
     this.timers.add(timer);

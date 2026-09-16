@@ -2,7 +2,9 @@
 
 Production React application for Actis by PandaX. Demo mode uses the same routes,
 components, domain types, and service boundary as the production client, backed by
-deterministic browser-local fixtures.
+browser-local fixtures. Uploaded SBOMs are the exception: their versioned Package
+URLs are sent to OSV.dev for live advisory matching, and resulting findings remain
+in the local demo state.
 
 ## Run demo
 

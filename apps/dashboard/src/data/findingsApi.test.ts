@@ -28,6 +28,10 @@ const findingDto = {
   kev: true,
   epss: 0.975,
   reachability: "reachable",
+  recommendation_reachability: "not_reachable",
+  recommendation_confidence: "high",
+  recommendation_reason_codes: ["component_excluded_from_build"],
+  recommendation_review_required: true,
   reachability_evidence: { paths: ["gateway -> logger"], method: "static_call_graph" },
   reachability_limitations: ["Runtime feature flags were not observed."],
   source: "osv",
@@ -111,6 +115,9 @@ describe("findings API", () => {
       status: "action_required",
       affectedness: "confirmed",
       reachability: "reachable",
+      reachabilityRecommendation: "not_reachable",
+      reachabilityConfidence: "high",
+      reachabilityReasonCodes: ["component_excluded_from_build"],
       remediation: { status: "in_progress", targetDate: "2026-09-15" },
       evidenceIds: ["evidence-test-42"],
       epss: 0.975,
@@ -189,6 +196,33 @@ describe("findings API", () => {
       plan: "Upgrade and retest", status: "verified", due_date: "2026-09-15",
       verification_evidence: [{ kind: "test_run", id: "run-42" }], expected_version: 6,
     });
+  });
+
+  it("approves release-scoped reachability recommendations in one batch", async () => {
+    const approved = {
+      ...findingDto,
+      current_decision: "not_affected",
+      status: "resolved",
+      recommendation_review_required: false,
+      version: 5,
+    };
+    const fetcher = fetchSequence(json([approved]));
+    const api = createFindingsApi({ baseUrl: "/engine", fetch: fetcher });
+
+    const result = await api.approveRecommendations("org/acme", "home hub", "release/1.4", {
+      items: [{ findingId: "finding/kev-1", expectedVersion: 4 }],
+      rationale: "Signed build evidence excludes the vulnerable code path.",
+    });
+
+    expect(fetcher.mock.calls[0][0]).toBe(
+      "/engine/v1/organizations/org%2Facme/products/home%20hub/releases/release%2F1.4/findings/recommendations/approve",
+    );
+    expect(fetcher.mock.calls[0][1]?.method).toBe("POST");
+    expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({
+      items: [{ finding_id: "finding/kev-1", expected_version: 4 }],
+      rationale: "Signed build evidence excludes the vulnerable code path.",
+    });
+    expect(result[0]).toMatchObject({ affectedness: "not_affected", status: "resolved" });
   });
 
   it.each([

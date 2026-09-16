@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import zipfile
 from types import SimpleNamespace
 from unittest.mock import Mock
 from collections.abc import Iterator
@@ -18,6 +20,7 @@ from pandax.analysis_api import create_analysis_router
 from pandax.analysis_jobs import AnalysisJobRepository
 from pandax.portfolio import PortfolioRepository, create_portfolio_engine
 from pandax.portfolio_api import PortfolioIdentity
+from pandax import portfolio_runtime
 from pandax.portfolio_runtime import enroll_completed_analysis
 
 
@@ -271,6 +274,71 @@ def test_completed_active_release_enrolls_hourly_monitoring(monkeypatch):
         enabled_sources=("osv", "cisa_kev", "epss"), cadence_minutes=60,
         enabled=True, actor_id="operator-1",
     )
+
+
+def test_completed_analysis_projects_reachability_recommendations(monkeypatch):
+    findings = [{
+        "cve": "CVE-2026-1000",
+        "osv_id": "OSV-1",
+        "purl": "pkg:npm/example@1.0.0",
+        "component": "example",
+        "version": "1.0.0",
+        "summary": "Example vulnerability",
+        "severity": "HIGH",
+        "source": "OSV",
+        "bom_ref": "component-example",
+        "reachability": "unknown",
+        "exposure_assessment": "evidence_supports_not_reachable",
+        "exposure_evidence": {
+            "recommendation": {
+                "reachability": "not_reachable",
+                "confidence": "high",
+                "reason_codes": ["component_excluded"],
+                "limitations": ["The component exclusion requires reviewer confirmation."],
+                "review_required": True,
+                "recommended_vex": {
+                    "state": "not_affected",
+                    "justification": "code_not_present",
+                },
+            },
+        },
+    }]
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as bundle:
+        bundle.writestr("findings.json", json.dumps(findings))
+    analysis = Mock()
+    analysis.export_evidence.return_value = (output.getvalue(), "evidence.zip")
+    repository = Mock()
+    portfolio = Mock()
+    portfolio.get_release.return_value = SimpleNamespace(status="retired")
+    monkeypatch.setattr(portfolio_runtime, "get_analysis_repository", lambda: analysis)
+    monkeypatch.setattr(portfolio_runtime, "get_finding_repository", lambda: repository)
+    monkeypatch.setattr(portfolio_runtime, "get_portfolio_repository", lambda: portfolio)
+    job = SimpleNamespace(
+        id="analysis-1", organization_id="org-1", product_id="product-1",
+        release_id="release-1", actor_id="operator-1", completed_at=None,
+        result={"bundle": {"id": "bundle-1"}},
+    )
+
+    enroll_completed_analysis(job)
+
+    projected = repository.upsert_from_analysis.call_args.args[4][0]
+    assert projected.reachability == "unknown"
+    assert projected.reachability_evidence["recommendation"] == {
+        "reachability": "not_reachable",
+        "confidence": "high",
+        "reason_codes": ["component_excluded"],
+        "limitations": ["The component exclusion requires reviewer confirmation."],
+        "review_required": True,
+        "recommended_vex": {
+            "state": "not_affected",
+            "justification": "code_not_present",
+        },
+    }
+    assert projected.reachability_limitations == (
+        "The component exclusion requires reviewer confirmation.",
+    )
+    assert projected.provenance["bom_ref"] == "component-example"
 
 
 def test_monitoring_enrollment_failure_keeps_analysis_complete_and_records_follow_up(setup):

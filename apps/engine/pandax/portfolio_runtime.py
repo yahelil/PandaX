@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import io
+import json
 import os
+import zipfile
 from dataclasses import asdict, dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any, Mapping
 from urllib.parse import urlsplit
 
 from fastapi import HTTPException, Request, Security, status
@@ -25,7 +28,7 @@ from .domain_projections import (
     ProjectedHomeReadModel,
     ProjectedSearchNotificationRepository,
 )
-from .findings import FindingRepository
+from .findings import FindingObservation, FindingRepository
 from .home import HomeReadModel
 from .notification_delivery import (
     NotificationDeliveryRepository, NotificationDeliveryWorker,
@@ -240,7 +243,9 @@ def get_release_monitoring_repository() -> ReleaseMonitoringRepository:
 
 
 def enroll_completed_analysis(job: AnalysisJobRecord) -> None:
-    """Enroll eligible releases in the standard hourly monitoring policy."""
+    """Project completed findings and enroll eligible releases for monitoring."""
+
+    _project_completed_findings(job)
 
     release = get_portfolio_repository().get_release(job.organization_id, job.release_id)
     if release.status not in {"active", "supported"}:
@@ -253,6 +258,76 @@ def enroll_completed_analysis(job: AnalysisJobRecord) -> None:
         cadence_minutes=60,
         enabled=True,
         actor_id=job.actor_id,
+    )
+
+
+def _project_completed_findings(job: AnalysisJobRecord) -> None:
+    """Load the sealed findings projection without retaining another bundle copy."""
+
+    result = getattr(job, "result", None)
+    if not isinstance(result, Mapping) or not isinstance(result.get("bundle"), Mapping):
+        return
+    content, _ = get_analysis_repository().export_evidence(
+        job.organization_id, job.product_id, job.release_id, job.id
+    )
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as bundle:
+            raw = json.loads(bundle.read("findings.json"))
+    except (KeyError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
+        raise ValueError("completed analysis bundle has invalid findings") from exc
+    if not isinstance(raw, list) or any(not isinstance(item, Mapping) for item in raw):
+        raise ValueError("completed analysis findings must be an array of objects")
+    observations = [_finding_observation(item, job.id) for item in raw]
+    get_finding_repository().upsert_from_analysis(
+        job.organization_id,
+        job.product_id,
+        job.release_id,
+        job.id,
+        observations,
+        actor_id=job.actor_id,
+        seen_at=job.completed_at,
+    )
+
+
+def _finding_observation(item: Mapping[str, Any], analysis_id: str) -> FindingObservation:
+    cve = str(item.get("cve") or "").strip() or None
+    reference_id = cve or str(item.get("osv_id") or "").strip()
+    exposure = item.get("exposure_evidence")
+    evidence = dict(exposure) if isinstance(exposure, Mapping) else {}
+    evidence.setdefault("assessment", str(item.get("exposure_assessment") or "not_assessed"))
+    recommendation = evidence.get("recommendation")
+    limitations = (
+        recommendation.get("limitations")
+        if isinstance(recommendation, Mapping)
+        else None
+    )
+    if not isinstance(limitations, list) or any(not isinstance(value, str) for value in limitations):
+        limitations = []
+    severity = str(item.get("severity") or "unknown").strip().lower()
+    if severity not in {"critical", "high", "medium", "low", "unknown"}:
+        severity = "unknown"
+    return FindingObservation(
+        reference_id=reference_id,
+        cve=cve,
+        component=str(item.get("component") or "unknown component"),
+        purl=str(item.get("purl") or "").strip() or None,
+        version=str(item.get("version") or "unknown"),
+        title=str(item.get("summary") or reference_id),
+        description=str(item.get("summary") or ""),
+        severity=severity,
+        kev=bool(item.get("kev")),
+        epss=float(item.get("epss") or 0),
+        reachability=str(item.get("reachability") or "unknown"),
+        reachability_evidence=evidence,
+        reachability_limitations=tuple(limitations),
+        source=str(item.get("source") or "analysis"),
+        provenance={
+            "analysis_id": analysis_id,
+            "osv_id": str(item.get("osv_id") or ""),
+            "source_url": str(item.get("source_url") or ""),
+            "coverage_status": str(item.get("coverage_status") or "unknown"),
+            "bom_ref": str(item.get("bom_ref") or ""),
+        },
     )
 
 

@@ -91,6 +91,23 @@ def test_reviewed_disabled_feature_supports_non_reachability_without_deciding_it
     assert assessment["dependency_path"] == ["SmartHub SH-100", "log4j-core"]
     assert any("build flag REMOTE_LOOKUPS" in row for row in assessment["negative_evidence"])
     assert assessment["decision"] == "not_made_automatically"
+    assert assessment["recommendation"] == {
+        "reachability": "not_reachable",
+        "confidence": "high",
+        "reason_codes": [
+            "build_flag_supports_not_reachable",
+            "network_not_exposed",
+            "vulnerable_feature_disabled",
+        ],
+        "limitations": [
+            "The SBOM dependency path proves declared inclusion only, not execution."
+        ],
+        "review_required": True,
+        "recommended_vex": {
+            "state": "not_affected",
+            "justification": "code_not_reachable",
+        },
+    }
     vex = triage.build_vex(ctx)["vulnerabilities"][0]
     assert vex["analysis"]["state"] == "in_triage"
     assert "supporting evidence" in vex["analysis"]["detail"]
@@ -113,6 +130,11 @@ def test_runtime_execution_and_disabled_feature_are_reported_as_a_conflict(ctx, 
     assessment = result["assessments"][0]
     assert assessment["positive_evidence"]
     assert assessment["negative_evidence"]
+    assert assessment["recommendation"]["reachability"] == "review"
+    assert assessment["recommendation"]["confidence"] == "low"
+    assert assessment["recommendation"]["recommended_vex"] == {
+        "state": "in_triage"
+    }
 
 
 def test_runtime_network_signal_conflicts_with_reviewed_non_exposure(ctx, tmp_path):
@@ -131,6 +153,52 @@ def test_runtime_network_signal_conflicts_with_reviewed_non_exposure(ctx, tmp_pa
     assert ctx.findings[0].exposure_assessment == "conflicting_evidence"
 
 
+def test_network_not_exposed_alone_does_not_recommend_not_reachable(ctx, tmp_path):
+    _prepare(ctx)
+    document = _document(
+        compiled_state="unknown",
+        feature_state="unknown",
+        network_exposure="not_exposed",
+        build_flags=[],
+    )
+
+    list(exposure.run(ctx, _write(tmp_path / "exposure.json", document)))
+
+    result = json.loads(ctx.path("exposure-assessments.json").read_text())
+    assessment = result["assessments"][0]
+    assert assessment["status"] == "insufficient_evidence"
+    assert assessment["recommendation"]["reachability"] == "review"
+    assert assessment["recommendation"]["reason_codes"] == ["network_not_exposed"]
+
+
+def test_excluded_component_recommends_reviewed_not_affected_without_applying_it(
+    ctx, tmp_path
+):
+    _prepare(ctx)
+    document = _document(
+        compiled_state="excluded",
+        feature_state="unknown",
+        network_exposure="unknown",
+        build_flags=[],
+    )
+
+    list(exposure.run(ctx, _write(tmp_path / "exposure.json", document)))
+
+    finding = ctx.findings[0]
+    assessment = json.loads(
+        ctx.path("exposure-assessments.json").read_text()
+    )["assessments"][0]
+    assert assessment["recommendation"]["reachability"] == "not_reachable"
+    assert assessment["recommendation"]["recommended_vex"] == {
+        "state": "not_affected",
+        "justification": "code_not_present",
+    }
+    assert assessment["review_required"] is True
+    assert finding.reachability == "unknown"
+    assert finding.exposure_evidence["recommendation"] == assessment["recommendation"]
+    assert triage.build_vex(ctx)["vulnerabilities"][0]["analysis"]["state"] == "in_triage"
+
+
 def test_runtime_network_signal_can_be_analyzed_without_a_context_file(ctx):
     _prepare(ctx)
     ctx.findings[0].runtime_evidence = [
@@ -146,6 +214,11 @@ def test_runtime_network_signal_can_be_analyzed_without_a_context_file(ctx):
     assert ctx.findings[0].exposure_assessment == "evidence_supports_reachable"
     assert not ctx.path("exposure-context.json").exists()
     assert ctx.path("exposure-assessments.json").exists()
+    assessment = json.loads(
+        ctx.path("exposure-assessments.json").read_text()
+    )["assessments"][0]
+    assert assessment["recommendation"]["reachability"] == "reachable"
+    assert assessment["recommendation"]["confidence"] == "high"
 
 
 def test_context_must_match_exact_product_release(ctx, tmp_path):

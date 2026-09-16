@@ -37,6 +37,8 @@ export interface FindingApiConfig {
 export type ApiFindingStatus = "needs_review" | "open" | "in_progress" | "resolved";
 export type ApiRemediationStatus = "not_planned" | "planned" | "in_progress" | "completed" | "verified";
 export type Reachability = "reachable" | "not_reachable" | "unknown";
+export type ReachabilityRecommendation = "reachable" | "not_reachable" | "review";
+export type ReachabilityConfidence = "high" | "medium" | "low";
 
 export interface FindingDecisionDto {
   id: string;
@@ -77,6 +79,10 @@ export interface FindingDto {
   kev: boolean;
   epss: number | null;
   reachability: Reachability;
+  recommendation_reachability: ReachabilityRecommendation | null;
+  recommendation_confidence: ReachabilityConfidence | null;
+  recommendation_reason_codes: string[];
+  recommendation_review_required: boolean;
   reachability_evidence: Record<string, unknown>;
   reachability_limitations: string[];
   source: string;
@@ -161,6 +167,11 @@ export interface DecisionRequest {
   expectedVersion: number;
 }
 
+export interface BatchDecisionRequest {
+  items: Array<{ findingId: string; expectedVersion: number }>;
+  rationale: string;
+}
+
 export interface VerificationEvidenceInput {
   [key: string]: unknown;
 }
@@ -179,6 +190,7 @@ export interface FindingsApi {
   getFinding(organizationId: string, productId: string, releaseId: string, findingId: string, options?: FindingRequestOptions): Promise<FindingDetail>;
   assignFinding(organizationId: string, productId: string, releaseId: string, findingId: string, input: AssignmentRequest, options?: FindingRequestOptions): Promise<ManagedFinding>;
   recordDecision(organizationId: string, productId: string, releaseId: string, findingId: string, input: DecisionRequest, options?: FindingRequestOptions): Promise<FindingDetail>;
+  approveRecommendations(organizationId: string, productId: string, releaseId: string, input: BatchDecisionRequest, options?: FindingRequestOptions): Promise<ManagedFinding[]>;
   updateRemediation(organizationId: string, productId: string, releaseId: string, findingId: string, input: RemediationRequest, options?: FindingRequestOptions): Promise<FindingDetail>;
   getDecisionHistory(organizationId: string, productId: string, releaseId: string, findingId: string, options?: FindingRequestOptions): Promise<FindingDecision[]>;
   getAuditHistory(organizationId: string, productId: string, releaseId: string, findingId: string, options?: FindingRequestOptions): Promise<FindingAuditEntry[]>;
@@ -191,6 +203,8 @@ const apiStatuses = ["needs_review", "open", "in_progress", "resolved"] as const
 const decisions = ["affected", "not_affected", "accepted_risk", "deferred"] as const;
 const remediationStatuses = ["not_planned", "planned", "in_progress", "completed", "verified"] as const;
 const reachabilityStates = ["reachable", "not_reachable", "unknown"] as const;
+const reachabilityRecommendations = ["reachable", "not_reachable", "review"] as const;
+const reachabilityConfidences = ["high", "medium", "low"] as const;
 
 function invalid(message: string, details?: unknown): never {
   throw new FindingApiError(message, "invalid_response", undefined, details);
@@ -293,6 +307,10 @@ function parseFinding(value: unknown): FindingDto {
     component_version: text(item, "component_version"), title: text(item, "title"), description: text(item, "description"),
     severity: member(item, "severity", severities), cvss, kev: flag(item, "kev"), epss,
     reachability: member(item, "reachability", reachabilityStates),
+    recommendation_reachability: nullableMember(item, "recommendation_reachability", reachabilityRecommendations),
+    recommendation_confidence: nullableMember(item, "recommendation_confidence", reachabilityConfidences),
+    recommendation_reason_codes: stringList(item, "recommendation_reason_codes"),
+    recommendation_review_required: flag(item, "recommendation_review_required"),
     reachability_evidence: object(item.reachability_evidence, "reachability_evidence"),
     reachability_limitations: stringList(item, "reachability_limitations"), source: text(item, "source"),
     provenance: object(item.provenance, "provenance"), first_seen_at: iso(text(item, "first_seen_at"), "first_seen_at"),
@@ -401,6 +419,10 @@ export function mapFinding(dto: FindingDto, history?: FindingDecisionDto[]): Man
     activelyExploited: false,
     affectedness: dto.current_decision === "affected" ? "confirmed" : dto.current_decision === "not_affected" ? "not_affected" : "unknown",
     reachability: dto.reachability,
+    reachabilityRecommendation: dto.recommendation_reachability ?? "review",
+    reachabilityConfidence: dto.recommendation_confidence ?? "low",
+    reachabilityReasonCodes: dto.recommendation_reason_codes,
+    reachabilityReviewRequired: dto.recommendation_review_required,
     summary: dto.description,
     actionReason: dto.decision_rationale ?? dto.reachability_limitations[0] ?? (dto.kev ? "Listed in CISA Known Exploited Vulnerabilities." : "Security review required."),
     introducedAt: dto.first_seen_at,
@@ -546,6 +568,14 @@ export function createFindingsApi(config: FindingApiConfig): FindingsApi {
     async recordDecision(organizationId, productId, releaseId, findingId, input, options) {
       const payload = { decision: input.decision, rationale: input.rationale, expected_version: input.expectedVersion };
       return mapFindingDetail(parseDetail(await request(`${item(organizationId, productId, releaseId, findingId)}/decisions`, { method: "POST", body: jsonBody(payload) }, options)));
+    },
+    async approveRecommendations(organizationId, productId, releaseId, input, options) {
+      const payload = {
+        items: input.items.map((entry) => ({ finding_id: entry.findingId, expected_version: entry.expectedVersion })),
+        rationale: input.rationale,
+      };
+      const path = `${release(organizationId, productId, releaseId)}/recommendations/approve`;
+      return parseList(await request(path, { method: "POST", body: jsonBody(payload) }, options)).map((dto) => mapFinding(dto));
     },
     async updateRemediation(organizationId, productId, releaseId, findingId, input, options) {
       const payload = {

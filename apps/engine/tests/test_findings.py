@@ -74,6 +74,22 @@ def ingest(repository, **changes):
     )[0]
 
 
+def recommendation(reachability="not_reachable", confidence="high"):
+    return {
+        "recommendation": {
+            "reachability": reachability,
+            "confidence": confidence,
+            "reason_codes": ["component_excluded_from_build"],
+            "limitations": ["Dependency path proves inclusion only."],
+            "review_required": True,
+            "recommended_vex": {
+                "state": "not_affected",
+                "justification": "code_not_present",
+            },
+        }
+    }
+
+
 def test_analysis_upsert_is_scoped_and_preserves_human_decision(repository):
     created = ingest(repository)
     reviewed = repository.decide(
@@ -177,3 +193,110 @@ def test_history_is_append_only_and_validation_is_strict(repository):
             plan="Upgrade", status="verified", due_date=None,
             verification_evidence=[], expected_version=2, actor_id="operator",
         )
+
+
+def test_recommendation_projection_and_atomic_batch_approval(repository):
+    first, second = repository.upsert_from_analysis(
+        "org-acme", "product-hub", "release-14", "analysis-recommendations",
+        [
+            observation(reachability="unknown", reachability_evidence=recommendation()),
+            observation(
+                reference_id="CVE-2026-1000", cve="CVE-2026-1000",
+                source_key="second", reachability="unknown",
+                reachability_evidence=recommendation(),
+            ),
+        ],
+        actor_id="analyzer", seen_at=NOW,
+    )
+
+    assert first.recommendation_reachability == "not_reachable"
+    assert first.recommendation_confidence == "high"
+    assert first.recommendation_reason_codes == ("component_excluded_from_build",)
+    assert first.recommendation_review_required is True
+    assert first.reachability_evidence["recommendation"]["limitations"] == [
+        "Dependency path proves inclusion only."
+    ]
+    assert first.reachability_evidence["recommendation"]["recommended_vex"] == {
+        "state": "not_affected", "justification": "code_not_present"
+    }
+
+    approved = repository.approve_not_reachable_recommendations(
+        "org-acme", "product-hub", "release-14",
+        [
+            {"finding_id": first.id, "expected_version": first.version},
+            {"finding_id": second.id, "expected_version": second.version},
+        ],
+        rationale="Reviewed release build records; both components were excluded.",
+        actor_id="reviewer",
+    )
+
+    assert [item.current_decision for item in approved] == ["not_affected", "not_affected"]
+    for item in approved:
+        decisions = repository.decisions("org-acme", item.id)
+        assert len(decisions) == 1
+        assert decisions[0].decision == "not_affected"
+        assert repository.audit_history("org-acme", item.id)[-1].action == "finding.recommendation_approved"
+
+
+@pytest.mark.parametrize(
+    "second_evidence,version_delta,error",
+    [
+        (recommendation(confidence="medium"), 0, FindingValidationError),
+        (recommendation(), 1, FindingConflict),
+    ],
+)
+def test_batch_approval_rolls_back_when_any_item_is_ineligible_or_stale(
+    repository, second_evidence, version_delta, error
+):
+    first, second = repository.upsert_from_analysis(
+        "org-acme", "product-hub", "release-14", "analysis-recommendations",
+        [
+            observation(reachability="unknown", reachability_evidence=recommendation()),
+            observation(
+                reference_id="CVE-2026-1000", cve="CVE-2026-1000",
+                source_key="second", reachability="unknown",
+                reachability_evidence=second_evidence,
+            ),
+        ],
+        actor_id="analyzer", seen_at=NOW,
+    )
+
+    with pytest.raises(error):
+        repository.approve_not_reachable_recommendations(
+            "org-acme", "product-hub", "release-14",
+            [
+                {"finding_id": first.id, "expected_version": first.version},
+                {"finding_id": second.id, "expected_version": second.version + version_delta},
+            ],
+            rationale="Reviewed release build records.", actor_id="reviewer",
+        )
+
+    unchanged = repository.get("org-acme", "product-hub", "release-14", first.id)
+    assert unchanged.current_decision is None
+    assert repository.decisions("org-acme", first.id) == []
+    assert all(
+        item.action != "finding.recommendation_approved"
+        for item in repository.audit_history("org-acme", first.id)
+    )
+
+
+def test_batch_approval_never_overwrites_an_existing_human_decision(repository):
+    created = ingest(
+        repository, reachability="unknown", reachability_evidence=recommendation()
+    )
+    decided = repository.decide(
+        "org-acme", "product-hub", "release-14", created.id,
+        decision="affected", rationale="Reviewer confirmed vulnerable execution.",
+        expected_version=created.version, actor_id="reviewer",
+    )
+
+    with pytest.raises(FindingConflict, match="already has a human decision"):
+        repository.approve_not_reachable_recommendations(
+            "org-acme", "product-hub", "release-14",
+            [{"finding_id": decided.id, "expected_version": decided.version}],
+            rationale="A later reviewer considered the recommendation.", actor_id="reviewer-2",
+        )
+
+    unchanged = repository.get("org-acme", "product-hub", "release-14", created.id)
+    assert unchanged.current_decision == "affected"
+    assert len(repository.decisions("org-acme", created.id)) == 1

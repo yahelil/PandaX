@@ -314,62 +314,133 @@ def _assess_finding(
 ) -> dict[str, Any]:
     positive: list[str] = []
     negative: list[str] = []
+    positive_codes: list[str] = []
+    negative_codes: list[str] = []
+    limitations: list[str] = []
     if reviewed:
         if reviewed["compiled_state"] == "excluded":
             negative.append("reviewed build evidence says the component was excluded")
+            negative_codes.append("component_excluded")
         elif reviewed["compiled_state"] == "included":
             positive.append("reviewed build evidence says the component was included")
+            positive_codes.append("component_included")
         if reviewed["feature_state"] == "disabled":
             negative.append("reviewed configuration evidence says the feature is disabled")
+            negative_codes.append("vulnerable_feature_disabled")
         elif reviewed["feature_state"] == "enabled":
             positive.append("reviewed configuration evidence says the feature is enabled")
+            positive_codes.append("vulnerable_feature_enabled")
         if reviewed["network_exposure"] == "not_exposed":
             negative.append("reviewed configuration evidence says it is not network-exposed")
+            negative_codes.append("network_not_exposed")
         elif reviewed["network_exposure"] == "exposed":
             positive.append("reviewed configuration evidence says it is network-exposed")
+            positive_codes.append("network_exposed")
         for flag in reviewed["build_flags"]:
             description = (
                 f"reviewed build flag {flag['name']} is {flag['state']}"
             )
             if flag["effect"] == "supports_reachable":
                 positive.append(description + " and supports reachability")
+                positive_codes.append("build_flag_supports_reachable")
             elif flag["effect"] == "supports_not_reachable":
                 negative.append(description + " and supports non-reachability")
+                negative_codes.append("build_flag_supports_not_reachable")
+    else:
+        limitations.append("No exact release-bound reviewed exposure context was supplied.")
     runtime_signals = {item.get("signal") for item in finding.runtime_evidence}
     if "component_executed" in runtime_signals:
         positive.append("approved runtime telemetry observed the component executing")
+        positive_codes.append("runtime_component_executed")
     if "network_exposed" in runtime_signals:
         positive.append("approved runtime telemetry observed network exposure")
+        positive_codes.append("runtime_network_exposed")
     if "component_loaded" in runtime_signals:
         positive.append("approved runtime telemetry observed the component loaded")
+        positive_codes.append("runtime_component_loaded")
     dependency_path = _dependency_path(ctx, finding.bom_ref)
+    if dependency_path:
+        limitations.append(
+            "The SBOM dependency path proves declared inclusion only, not execution."
+        )
+    else:
+        limitations.append("No product-root dependency path was established by the SBOM.")
 
-    decisive_negative = any(
-        text.startswith("reviewed build evidence says the component was excluded")
-        or text.startswith("reviewed configuration evidence says the feature is disabled")
-        or text.startswith("reviewed build flag")
-        for text in negative
-    )
+    decisive_negative_codes = {
+        "component_excluded",
+        "vulnerable_feature_disabled",
+        "build_flag_supports_not_reachable",
+    }
+    decisive_negative = bool(decisive_negative_codes & set(negative_codes))
     direct_network_conflict = bool(
         reviewed
         and reviewed["network_exposure"] == "not_exposed"
         and "network_exposed" in runtime_signals
     )
-    strong_positive = any(
-        "executing" in text
-        or "network-exposed" in text
-        or "network exposure" in text
-        or "supports reachability" in text
-        for text in positive
-    )
+    strong_positive_codes = {
+        "runtime_component_executed",
+        "runtime_network_exposed",
+        "network_exposed",
+        "build_flag_supports_reachable",
+    }
+    strong_positive = bool(strong_positive_codes & set(positive_codes))
     if (decisive_negative and strong_positive) or direct_network_conflict:
         status = "conflicting_evidence"
+        recommendation = {
+            "reachability": "review",
+            "confidence": "low",
+            "reason_codes": sorted(set(positive_codes + negative_codes)),
+            "limitations": [
+                *limitations,
+                "Positive and negative evidence conflict; no reachability conclusion is safe.",
+            ],
+            "review_required": True,
+            "recommended_vex": {"state": "in_triage"},
+        }
     elif decisive_negative:
         status = "evidence_supports_not_reachable"
+        justification = (
+            "code_not_present"
+            if "component_excluded" in negative_codes
+            else "code_not_reachable"
+        )
+        recommendation = {
+            "reachability": "not_reachable",
+            "confidence": "high",
+            "reason_codes": sorted(set(negative_codes)),
+            "limitations": limitations,
+            "review_required": True,
+            "recommended_vex": {
+                "state": "not_affected",
+                "justification": justification,
+            },
+        }
     elif strong_positive:
         status = "evidence_supports_reachable"
+        recommendation = {
+            "reachability": "reachable",
+            "confidence": "high",
+            "reason_codes": sorted(set(positive_codes)),
+            "limitations": limitations,
+            "review_required": True,
+            "recommended_vex": {"state": "exploitable"},
+        }
     else:
         status = "insufficient_evidence"
+        reason_codes = sorted(set(positive_codes + negative_codes))
+        if not reason_codes:
+            reason_codes = ["no_reachability_evidence"]
+        recommendation = {
+            "reachability": "review",
+            "confidence": "low",
+            "reason_codes": reason_codes,
+            "limitations": [
+                *limitations,
+                "Available evidence does not establish reachability or non-reachability.",
+            ],
+            "review_required": True,
+            "recommended_vex": {"state": "in_triage"},
+        }
     return {
         "cve": finding.cve,
         "purl": finding.purl,
@@ -387,6 +458,7 @@ def _assess_finding(
         "reviewed_context": reviewed,
         "runtime_observations": finding.runtime_evidence,
         "decision": "not_made_automatically",
+        "recommendation": recommendation,
     }
 
 
@@ -415,6 +487,7 @@ def run(ctx: RunContext, context_path: Path | None = None) -> ev.Stream:
             "positive": assessment["positive_evidence"],
             "negative": assessment["negative_evidence"],
             "dependency_path": assessment["dependency_path"],
+            "recommendation": assessment["recommendation"],
         }
 
     outputs: list[Path] = []

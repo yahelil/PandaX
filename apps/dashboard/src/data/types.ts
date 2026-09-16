@@ -9,7 +9,7 @@ export type CraClass = "default" | "important_i" | "important_ii" | "critical";
 export type ClassificationStatus = "confirmed" | "review_required";
 export type FindingStatus = "needs_review" | "action_required" | "in_remediation" | "accepted" | "resolved";
 export type DecisionKind = "affected" | "not_affected" | "accepted_risk" | "deferred";
-export type Role = "org_admin" | "compliance_operator" | "authorized_approver" | "read_only_auditor";
+export type Role = "org_admin" | "compliance_operator" | "security_reviewer" | "authorized_approver" | "read_only_auditor";
 
 export interface Scope {
   productId?: EntityId;
@@ -235,6 +235,10 @@ export interface Finding {
   activelyExploited: boolean;
   affectedness: "confirmed" | "not_affected" | "unknown";
   reachability: "reachable" | "not_reachable" | "unknown";
+  reachabilityRecommendation: "reachable" | "not_reachable" | "review";
+  reachabilityConfidence: "high" | "medium" | "low";
+  reachabilityReasonCodes: string[];
+  reachabilityReviewRequired: boolean;
   summary: string;
   actionReason: string;
   introducedAt: ISODate;
@@ -599,6 +603,11 @@ export interface IntegrationUpdate {
 export interface FindingDecisionInput {
   findingId: EntityId;
   decision: DecisionKind;
+  rationale: string;
+}
+
+export interface FindingBatchDecisionInput {
+  findingIds: EntityId[];
   rationale: string;
 }
 

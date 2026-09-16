@@ -19,6 +19,7 @@ const sections = [
 const managedRoles: Array<{ value: ManagedRole; label: string; description: string }> = [
   { value: "org_admin", label: "Org Admin", description: "Organization, access, integrations, and policy." },
   { value: "compliance_operator", label: "Compliance Operator", description: "Compliance workflows, evidence, and remediation." },
+  { value: "security_reviewer", label: "Security Reviewer", description: "Finding decisions and product-security review." },
   { value: "authorized_approver", label: "Authorized Approver", description: "Controlled document approvals." },
   { value: "read_only_auditor", label: "Read-only Auditor", description: "Read-only workspace and audit access." },
 ];

@@ -6,7 +6,7 @@ import { createOperationsApi, OperationsApiError, type OperationsApi, type Opera
 import { FixtureAdapter } from "./fixtureAdapter";
 import { createPortfolioApi, PortfolioApiError, type PortfolioApi } from "./portfolioApi";
 import { createReleaseOperationsApi, ReleaseOperationsApiError, type MonitoringRunEvent, type ReleaseAnalysisJob, type ReleaseMonitoringStatus, type ReleaseOperationsApi, type ReleaseScope } from "./releaseOperationsApi";
-import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, ComplianceApprovalCommand, ComplianceItem, ComplianceUpdateCommand, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentDownloadMetadata, DocumentRecord, DocumentRevision, EntityId, Finding, FindingDecisionInput, Integration, IntegrationUpdate, Notification, Organization, OrganizationProfileUpdate, Product, RecordDocumentSelfFilingInput, RegisterDocumentRevisionInput, Release, ReleaseMonitoringView, Remediation, RemediationInput, TeamMember, TeamMemberUpdate } from "./types";
+import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, ComplianceApprovalCommand, ComplianceItem, ComplianceUpdateCommand, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentDownloadMetadata, DocumentRecord, DocumentRevision, EntityId, Finding, FindingBatchDecisionInput, FindingDecisionInput, Integration, IntegrationUpdate, Notification, Organization, OrganizationProfileUpdate, Product, RecordDocumentSelfFilingInput, RegisterDocumentRevisionInput, Release, ReleaseMonitoringView, Remediation, RemediationInput, TeamMember, TeamMemberUpdate } from "./types";
 
 export type BearerTokenProvider = () => string | undefined | Promise<string | undefined>;
 
@@ -338,6 +338,31 @@ export class ProductionAdapter implements DataAdapter {
     return this.mutation("decide_finding", async () => {
       const updated = await this.config.findingsApi!.recordDecision(this.config.organizationId, scope.productId, scope.releaseId, input.findingId, { decision: input.decision, rationale: input.rationale, expectedVersion: scope.version });
       this.findingDetails.set(updated.id, updated); this.fixture.upsertFinding(updated); return updated;
+    });
+  };
+
+  recordFindingBatchDecision = async (input: FindingBatchDecisionInput): Promise<Finding[]> => {
+    if (!this.config.findingsApi) return this.fixture.recordFindingBatchDecision(input);
+    const groups = new Map<string, { productId: string; releaseId: string; items: Array<{ findingId: string; expectedVersion: number }> }>();
+    input.findingIds.forEach((findingId) => {
+      const scope = this.findingScope(findingId);
+      const key = `${scope.productId}\u0000${scope.releaseId}`;
+      const group = groups.get(key) ?? { productId: scope.productId, releaseId: scope.releaseId, items: [] };
+      group.items.push({ findingId, expectedVersion: scope.version });
+      groups.set(key, group);
+    });
+    return this.mutation("batch_decide_findings", async () => {
+      const updated = (await Promise.all([...groups.values()].map((group) => this.config.findingsApi!.approveRecommendations(
+        this.config.organizationId,
+        group.productId,
+        group.releaseId,
+        { items: group.items, rationale: input.rationale },
+      )))).flat();
+      updated.forEach((finding) => {
+        this.findingDetails.delete(finding.id);
+        this.fixture.upsertFinding(finding);
+      });
+      return updated;
     });
   };
 

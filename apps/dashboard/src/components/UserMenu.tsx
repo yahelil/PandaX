@@ -7,6 +7,7 @@ import { useDemo } from '../data/DemoProvider'
 const roleLabels = {
   org_admin: 'Org Admin',
   compliance_operator: 'Compliance Operator',
+  security_reviewer: 'Security Reviewer',
   authorized_approver: 'Authorized Approver',
   read_only_auditor: 'Read-only Auditor',
 } as const

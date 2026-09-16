@@ -16,7 +16,8 @@ and workflow, and the standalone verifier checks a copied package offline.
 - A finding is not proof that a product is exploitable. Absence of a finding is
   not proof that a product is secure.
 - Automation may preserve evidence and identify exact affected matches. It does
-  not automatically make a risk-reducing VEX conclusion such as
+  also produces deterministic, evidence-backed reachability recommendations.
+  It does not automatically apply a risk-reducing VEX conclusion such as
   `not_affected`; those conclusions require named review and supporting evidence.
 - The evidence seal proves integrity. An Ed25519 signature verified with a
   separately obtained public key ties a package to that approved signing key,

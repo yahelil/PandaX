@@ -37,7 +37,8 @@ describe("runtime authentication", () => {
   it("maps roles to the same permissions enforced by the API", () => {
     expect(hasPermission(["compliance_operator"], "manage_portfolio")).toBe(true);
     expect(hasPermission(["compliance_operator"], "run_analysis")).toBe(true);
-    expect(hasPermission(["compliance_operator"], "decide_findings")).toBe(true);
+    expect(hasPermission(["compliance_operator"], "decide_findings")).toBe(false);
+    expect(hasPermission(["security_reviewer"], "decide_findings")).toBe(true);
     expect(hasPermission(["authorized_approver"], "approve_documents")).toBe(true);
     expect(hasPermission(["read_only_auditor"], "manage_settings")).toBe(false);
     expect(hasPermission(["org_admin"], "approve_documents")).toBe(false);

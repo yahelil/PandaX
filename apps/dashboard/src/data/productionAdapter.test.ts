@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createDemoState } from "./fixtures";
 import { FixtureAdapter } from "./fixtureAdapter";
+import type { FindingsApi } from "./findingsApi";
 import type { PortfolioApi } from "./portfolioApi";
 import { PortfolioApiError } from "./portfolioApi";
 import type { OperationsApi } from "./operationsApi";
@@ -204,6 +205,39 @@ describe("ProductionAdapter", () => {
       phase: "error",
       failure: { operation: "create_release", code: "conflict", status: 409 },
     });
+  });
+
+  it("groups batch recommendation approvals by product release", async () => {
+    const initial = createDemoState();
+    const first = initial.findings[1];
+    const second = initial.findings[4];
+    const approveRecommendations = vi.fn(async () => []);
+    const findingsApi = { approveRecommendations } as unknown as FindingsApi;
+    const adapter = new ProductionAdapter({
+      organizationId: organization.id,
+      portfolioApi: api(),
+      findingsApi,
+      fixtureAdapter: new FixtureAdapter(initial),
+    });
+
+    await adapter.recordFindingBatchDecision({
+      findingIds: [first.id, second.id],
+      rationale: "Signed build evidence excludes both vulnerable paths.",
+    });
+
+    expect(approveRecommendations).toHaveBeenCalledTimes(2);
+    expect(approveRecommendations).toHaveBeenCalledWith(
+      organization.id,
+      first.productId,
+      first.releaseId,
+      { items: [{ findingId: first.id, expectedVersion: 1 }], rationale: "Signed build evidence excludes both vulnerable paths." },
+    );
+    expect(approveRecommendations).toHaveBeenCalledWith(
+      organization.id,
+      second.productId,
+      second.releaseId,
+      { items: [{ findingId: second.id, expectedVersion: 1 }], rationale: "Signed build evidence excludes both vulnerable paths." },
+    );
   });
 
   it("uploads an SBOM once and maps the completed production analysis", async () => {

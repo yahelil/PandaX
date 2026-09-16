@@ -1,6 +1,7 @@
 export type AuthRole =
   | "org_admin"
   | "compliance_operator"
+  | "security_reviewer"
   | "authorized_approver"
   | "read_only_auditor";
 
@@ -73,7 +74,7 @@ const ROLE_ALIASES: Record<string, AuthRole> = {
   org_admin: "org_admin",
   compliance_operator: "compliance_operator",
   authorized_approver: "authorized_approver",
-  security_reviewer: "compliance_operator",
+  security_reviewer: "security_reviewer",
   viewer: "read_only_auditor",
   read_only_auditor: "read_only_auditor",
 };

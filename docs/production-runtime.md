@@ -59,6 +59,29 @@ pg_restore --no-owner --no-privileges \
 Do not print either URL, enable shell tracing, or restore over a live database.
 Card d08 owns scheduled backups, encryption/media handling, and recurring drills.
 
+## Scheduled release monitoring
+
+Managed Render services do not run an in-process release-monitoring timer. One
+cron-only Cloudflare Worker wakes the API hourly and waits for a single bounded
+batch at `POST /internal/jobs/release-monitoring`. The API claims at most 25 due
+releases through PostgreSQL; leases make overlapping invocations safe, and the
+80% database-capacity stop is applied before any work is claimed.
+
+Generate a different random value of at least 32 characters for staging and beta.
+Store it as `PANDAX_SCHEDULER_SECRET` in both the Render service and the Worker's
+encrypted secrets. Set the Worker's `PANDAX_API_URL` variable to the HTTPS Render
+origin. Never place the secret in Wrangler configuration, logs, or Git. The Worker
+has no public HTTP handler, performs no retry, and uses only the hourly cron in
+`apps/release-monitoring-worker/wrangler.jsonc`.
+
+A run loads `sbom.cdx.json` from the latest completed release evidence bundle,
+refreshes OSV, CISA KEV, and EPSS, and upserts only observed findings. Human
+decisions and findings not returned by a refresh are retained. Source or evidence
+failures record degraded/failed monitoring history rather than implying a clean
+release. Verify staging by invoking one scheduled event, checking the PostgreSQL
+monitoring event, restarting Render, and confirming the same status and finding
+history remain visible.
+
 ## Evidence signing custody
 
 Every sealing path uses the same provider-neutral Ed25519 signer. Development

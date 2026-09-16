@@ -25,6 +25,7 @@ export interface AuthSession {
 export interface OidcClientConfig {
   issuer: string;
   clientId: string;
+  apiUrl: string;
   organizationId: string;
   redirectUri: string;
   postLogoutRedirectUri: string;
@@ -189,7 +190,7 @@ export class BrowserOidcClient implements AuthClient {
       redirect_uri: this.config.redirectUri,
       code_verifier: pending.verifier,
     }));
-    const session = this.sessionFromTokens(tokens, undefined, pending.nonce);
+    const session = await this.sessionFromTokens(tokens, undefined, pending.nonce);
     this.setSession(session);
     const returnUrl = new URL(pending.returnTo, this.config.redirectUri);
     this.browserHistory.replaceState({}, "", `${returnUrl.pathname}${returnUrl.search}${returnUrl.hash}`);
@@ -208,8 +209,8 @@ export class BrowserOidcClient implements AuthClient {
       grant_type: "refresh_token",
       client_id: this.config.clientId,
       refresh_token: refreshToken,
-    })).then((tokens) => {
-      const session = this.sessionFromTokens(tokens, previous);
+    })).then(async (tokens) => {
+      const session = await this.sessionFromTokens(tokens, previous);
       this.setSession(session);
       return session;
     }).catch(() => {
@@ -237,18 +238,23 @@ export class BrowserOidcClient implements AuthClient {
     return value as TokenResponse;
   }
 
-  private sessionFromTokens(tokens: TokenResponse, previous?: AuthSession, expectedNonce?: string): AuthSession {
+  private async sessionFromTokens(tokens: TokenResponse, previous?: AuthSession, expectedNonce?: string): Promise<AuthSession> {
     const idToken = tokens.id_token ?? previous?.idToken;
     const claims = decodeClaims(idToken ?? tokens.access_token);
     if (expectedNonce && claims.nonce !== expectedNonce) throw new Error("Sign-in nonce did not match.");
-    const organizationClaim = this.config.organizationClaim ?? "org_id";
-    const organizationId = stringClaim(claims[organizationClaim]);
-    if (!organizationId || organizationId !== this.config.organizationId) throw new Error("Your session does not grant access to this organization.");
     const subject = stringClaim(claims.sub);
     if (!subject) throw new Error("Your session is missing a subject identifier.");
-    const rolesClaim = claims[this.config.rolesClaim ?? "roles"];
-    const rawRoles = Array.isArray(rolesClaim) ? rolesClaim : typeof rolesClaim === "string" ? rolesClaim.split(" ") : [];
-    const roles = normalizeRoles(rawRoles);
+    const authority = await this.fetcher(
+      `${this.config.apiUrl.replace(/\/$/, "")}/v1/organizations/${encodeURIComponent(this.config.organizationId)}/session`,
+      { headers: { Accept: "application/json", Authorization: `Bearer ${tokens.access_token}` } },
+    );
+    if (!authority.ok) throw new Error("Your session does not grant access to this organization.");
+    const membership = await authority.json() as { subject?: unknown; organization_id?: unknown; roles?: unknown };
+    if (membership.subject !== subject || membership.organization_id !== this.config.organizationId) {
+      throw new Error("Your session does not grant access to this organization.");
+    }
+    const roles = normalizeRoles(Array.isArray(membership.roles) ? membership.roles : []);
+    if (!roles.length) throw new Error("Your session has no active application role.");
     const email = stringClaim(claims.email);
     const name = stringClaim(claims.name) || email || subject;
     return {
@@ -256,7 +262,7 @@ export class BrowserOidcClient implements AuthClient {
       idToken,
       refreshToken: tokens.refresh_token ?? previous?.refreshToken,
       expiresAt: this.now() + Number(tokens.expires_in) * 1000,
-      user: { subject, organizationId, name, email, initials: initials(name), roles },
+      user: { subject, organizationId: this.config.organizationId, name, email, initials: initials(name), roles },
     };
   }
 

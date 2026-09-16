@@ -30,7 +30,9 @@ npm run test:e2e --workspace @pandax/dashboard
 Demo builds explicitly set `VITE_ACTIS_MODE=demo`. Production builds must set
 `VITE_ACTIS_MODE=production`, `VITE_ACTIS_API_URL`,
 `VITE_ACTIS_ORGANIZATION_ID`, `VITE_ACTIS_OIDC_ISSUER`, and
-`VITE_ACTIS_OIDC_CLIENT_ID`. Optional variables configure redirect URI, post-logout
+`VITE_ACTIS_OIDC_CLIENT_ID`. The first-party Supabase consent screen also requires
+`VITE_ACTIS_SUPABASE_URL` and the public `VITE_ACTIS_SUPABASE_PUBLISHABLE_KEY`.
+Optional variables configure redirect URI, post-logout
 redirect URI, scopes, and custom organization/role claim names.
 
 The dashboard uses OIDC Authorization Code with PKCE, restores and refreshes the

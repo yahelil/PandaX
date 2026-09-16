@@ -39,7 +39,8 @@ Create or connect only the `actis-staging` Cloudflare Pages Free project:
 - custom domain: `staging.pandax.online`
 
 Set `VITE_ACTIS_MODE=production` and the matching public API URL, organization
-ID, Supabase OIDC issuer/client ID, redirect URI, logout URI, and scopes. Every
+ID, Supabase URL and publishable key, OIDC issuer/client ID, redirect URI, logout
+URI, and scopes. Every
 `VITE_*` value is public browser configuration; never place a password, token,
 service-role key, signing key, or other secret there. Set API CORS to the single
 dashboard origin. Verify valid TLS and that HTTP redirects to HTTPS.

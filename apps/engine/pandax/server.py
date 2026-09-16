@@ -20,10 +20,10 @@ import uuid
 from collections import Counter
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Annotated, Any, Iterator
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
@@ -1094,6 +1094,20 @@ from .release_monitoring_api import create_release_monitoring_router
 from .release_monitoring_scheduler_api import create_release_monitoring_scheduler_router
 from .search_notifications_api import create_search_notifications_router
 from .settings_api import create_settings_router
+from .auth import Principal
+
+
+@api.get("/v1/organizations/{organization_id}/session")
+async def application_session(
+    principal: Annotated[Principal, Depends(get_authenticated_principal)],
+) -> dict[str, object]:
+    """Return application authority resolved from the database membership."""
+
+    return {
+        "subject": principal.subject,
+        "organization_id": principal.organization_id,
+        "roles": sorted(role.value for role in principal.roles),
+    }
 
 api.include_router(
     create_portfolio_router(get_portfolio_repository, get_portfolio_identity)

@@ -7,6 +7,7 @@ import type { DataAdapter } from './data/adapter'
 import { DemoProvider } from './data/DemoProvider'
 import { createRuntimeDataAdapter } from './data/productionAdapter'
 import { ThemeProvider } from './components/ThemeProvider'
+import { SupabaseAuthorizationPage } from './auth/SupabaseAuthorizationPage'
 import './styles/global.css'
 
 if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual'
@@ -17,6 +18,7 @@ try {
   const config = readRuntimeConfig(import.meta.env)
   const authClient = config.mode === 'production' ? new BrowserOidcClient({
     ...config.oidc,
+    apiUrl: config.apiUrl,
     organizationId: config.organizationId,
   }) : undefined
   const dataAdapter = createRuntimeDataAdapter(config.mode === 'demo' ? { mode: 'demo' } : {
@@ -31,6 +33,9 @@ try {
 }
 
 function RuntimeRoot({ config, authClient, dataAdapter }: { config: RuntimeConfig; authClient?: AuthClient; dataAdapter: DataAdapter }) {
+  if (config.mode === 'production' && window.location.pathname === '/oauth/consent') {
+    return <StrictMode><SupabaseAuthorizationPage {...config.supabase} /></StrictMode>
+  }
   return <StrictMode>
     <BrowserRouter>
       <AuthProvider mode={config.mode} client={authClient}>

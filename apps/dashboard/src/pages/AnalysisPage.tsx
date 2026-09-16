@@ -10,7 +10,7 @@ import "./pages.css";
 const sourceCopy: Record<ReleaseArtifact["kind"], { title: string; body: string }> = {
   collector_package: { title: "Collector package", body: "Recommended. Adds signed provenance and verified release binding." },
   sbom: { title: "SBOM", body: "CycloneDX or SPDX software composition evidence." },
-  raw_artifact: { title: "Raw product artifact", body: "Firmware or build archive processed in this environment." },
+  raw_artifact: { title: "Raw product artifact", body: "ZIP or TAR build archive processed in this environment." },
 };
 
 export function AnalysisPage() {

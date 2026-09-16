@@ -62,15 +62,23 @@ existing analysis worker.
 
 Raw ingestion is fail-closed. An organization administrator must first enable
 `security.allow_raw_artifacts`. Each upload then requires explicit consent by an
-authorized operator. Allowed filename/media-type pairs are `.zip`/
-`application/zip`, `.tar`/`application/x-tar`, `.tar.gz` or `.tgz`/
-`application/gzip`, and `.bin` or `.img`/`application/octet-stream`; maximum size
-is 50 MB.
+authorized operator. Hosted analysis accepts ZIP, TAR, TAR.GZ, and TGZ archives
+up to 50 MB, with matching media types. Hosted `.bin` and `.img` firmware images
+are rejected; process those with the local Collector. Archive extraction retains
+the existing traversal, link, duplicate, depth, entry-count, and decompression
+limits.
 
 Accepted raw inputs retain consent actor/time, digest, media type, size, and expiry
-as immutable analysis audit events and job metadata. Until a production artifact
-analysis worker is configured, the job is returned as `unsupported` with an
-explicit explanation. It is never given fabricated findings and cannot be started.
+as immutable analysis audit events and job metadata. The existing analysis job
+runs the bounded archive ingestion and pinned Syft scanner, writes a CycloneDX 1.6
+SBOM, and continues through the normal release analysis. The sealed evidence ZIP
+is copied to private storage before temporary run files are removed. A service
+restart marks an interrupted job failed with an upload-again message.
+
+The root API `Dockerfile` installs the pinned Linux Syft build after checking its
+release archive digest. Managed API startup and `/health/ready` require that exact
+scanner version. Build the image from the repository root; apply Alembic migrations
+and configure the managed database, private storage, and signer before starting it.
 
 ## Storage and retention
 

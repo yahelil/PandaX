@@ -6,6 +6,7 @@ import json
 import stat
 import zipfile
 from datetime import date
+from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
@@ -332,13 +333,83 @@ def test_raw_requires_policy_consent_matching_type_and_records_immutable_consent
         "analysis.uploaded", "analysis.consent_recorded",
     ]
 
-    def runner(path):
+    scratch: Path | None = None
+
+    def runner(path, *, out_base):
+        nonlocal scratch
+        scratch = out_base
+        assert out_base.is_dir()
         assert path.name.endswith(".bin") and path.read_bytes() == b"firmware"
         yield ev.run_done("Complete", components=1, findings=0, kev=0, incidents=0)
 
     monkeypatch.setattr("pandax.analysis_jobs.pipeline.run", runner)
     completed = repository.run("org-1", "product-1", "release-1", job.id, lambda _: ())
     assert completed.status == "completed"
+    assert scratch is not None and not scratch.exists()
+
+
+def test_hosted_raw_upload_rejects_firmware_images(setup, monkeypatch):
+    repository, _, _ = setup
+    monkeypatch.setenv("PANDAX_ENVIRONMENT", "beta")
+    with pytest.raises(AnalysisJobValidationError, match="ZIP and TAR"):
+        repository.create_input(
+            "org-1", "product-1", "release-1", input_type="raw_artifact",
+            filename="firmware.img", media_type="application/octet-stream",
+            content=b"firmware", idempotency_key="firmware", actor_id="reviewer",
+            raw_artifact_allowed=True, raw_artifact_consent=True,
+        )
+
+
+def test_hosted_archive_result_is_retained_before_scratch_cleanup(setup, monkeypatch):
+    repository, _, _ = setup
+    payload = io.BytesIO()
+    with zipfile.ZipFile(payload, "w") as archive:
+        archive.writestr("requirements.txt", "actis-beta-demo==0.0.1\n")
+    job = repository.create_input(
+        "org-1", "product-1", "release-1", input_type="raw_artifact",
+        filename="app.zip", media_type="application/zip", content=payload.getvalue(),
+        idempotency_key="archive", actor_id="reviewer", raw_artifact_allowed=True,
+        raw_artifact_consent=True,
+    )
+    scratch: Path | None = None
+
+    def runner(path, *, out_base):
+        nonlocal scratch
+        scratch = out_base
+        run_dir = out_base / "run-archive"
+        run_dir.mkdir()
+        (run_dir / "sbom.cdx.json").write_bytes(sbom())
+        yield ev.log("RUN", "Analysis started", run_dir=str(run_dir))
+        yield ev.run_done("Complete", components=1, findings=0, kev=0, incidents=0)
+
+    monkeypatch.setattr("pandax.analysis_jobs.pipeline.run", runner)
+    finished = repository.run("org-1", "product-1", "release-1", job.id, lambda _: ())
+    assert finished.status == "completed" and finished.result["bundle"]
+    content, _ = repository.export_evidence("org-1", "product-1", "release-1", job.id)
+    with zipfile.ZipFile(io.BytesIO(content)) as bundle:
+        assert bundle.read("sbom.cdx.json") == sbom()
+    assert scratch is not None and not scratch.exists()
+
+
+def test_restart_closes_running_job_without_changing_queued_job(setup):
+    repository, _, _ = setup
+    first = repository.create(
+        "org-1", "product-1", "release-1", filename="first.cdx.json",
+        media_type="application/json", content=sbom(), idempotency_key="first",
+        actor_id="reviewer",
+    )
+    second = repository.create(
+        "org-1", "product-1", "release-1", filename="second.cdx.json",
+        media_type="application/json", content=sbom(), idempotency_key="second",
+        actor_id="reviewer",
+    )
+    repository.start("org-1", "product-1", "release-1", first.id)
+    assert repository.fail_interrupted_jobs() == 1
+    failed = repository.get("org-1", "product-1", "release-1", first.id)
+    assert failed.status == "failed" and "Upload the input again" in failed.error
+    assert repository.get("org-1", "product-1", "release-1", second.id).status == "queued"
+    assert repository.events("org-1", "product-1", "release-1", first.id)[-1].details["reason"] == "service_restart"
+    assert repository.fail_interrupted_jobs() == 0
 
 
 def test_typed_upload_api_enforces_rbac_settings_and_hides_storage_reference(setup):

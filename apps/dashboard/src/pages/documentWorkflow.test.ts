@@ -37,3 +37,16 @@ it("exports exact download metadata without claiming document bytes", () => {
     storage_locator: "s3://evidence/report.pdf", retrieval: "storage_metadata_only",
   });
 });
+
+it("exports exact download metadata when content is available", () => {
+  const metadata: DocumentDownloadMetadata = {
+    documentId: "document-1", version: 4, filename: "report.pdf", format: "PDF/A-2b",
+    contentHash: "a".repeat(64), sizeBytes: 9042, storageLocator: "s3://evidence/report.pdf",
+    contentType: "application/pdf", downloadType: "content_available",
+  };
+  expect(JSON.parse(createDownloadManifest(metadata))).toEqual({
+    document_id: "document-1", revision: 4, filename: "report.pdf", format: "PDF/A-2b",
+    content_type: "application/pdf", size_bytes: 9042, sha256: "a".repeat(64),
+    storage_locator: "s3://evidence/report.pdf", retrieval: "content_available",
+  });
+});

@@ -1,4 +1,4 @@
-import type { AppSettings, ComplianceAuditEntry, ComplianceItem, Integration, Organization, TeamMember } from "./types";
+import type { AppSettings, ComplianceAuditEntry, ComplianceItem, DocumentDownloadFile, Integration, Organization, TeamMember } from "./types";
 import { sanitizeAnalyticsEvent } from "./analytics";
 
 export type GovernanceErrorCode = "unauthenticated" | "forbidden" | "not_found" | "conflict" | "validation" | "http_error" | "invalid_response" | "aborted" | "network";
@@ -65,7 +65,7 @@ export interface DocumentContentInput { format: DocumentFormat; contentHash: str
 export interface CreateDocumentInput extends DocumentContentInput { productId: string; releaseId?: string; caseId?: string; name: string; kind: DocumentKind }
 export interface AddDocumentRevisionInput extends DocumentContentInput { expectedCurrentRevision: number }
 export interface DocumentFilters { productId?: string; releaseId?: string; kind?: DocumentKind; status?: DocumentStatus; sort?: "updated_desc" | "created_desc" | "name_asc" | "kind_asc" }
-export interface DownloadMetadataDto { documentId: string; revision: number; filename: string; format: DocumentFormat; contentHash: string; sizeBytes: number; storageLocator: string; contentType: string; downloadType: "storage_metadata_only" }
+export interface DownloadMetadataDto { documentId: string; revision: number; filename: string; format: DocumentFormat; contentHash: string; sizeBytes: number; storageLocator: string; contentType: string; downloadType: "storage_metadata_only" | "content_available" }
 
 export interface OrganizationProfileDto { name: string; legalName: string; country: string; registrationNumber: string; timezone: string }
 export interface GovernanceSettingsDto {
@@ -108,6 +108,7 @@ export interface GovernanceApi {
   addDocumentRevision(org: string, document: string, input: AddDocumentRevisionInput, options?: GovernanceRequestOptions): Promise<DocumentRevisionDto>;
   getDocumentRevision(org: string, document: string, revision: number, options?: GovernanceRequestOptions): Promise<DocumentRevisionDto>;
   getDownloadMetadata(org: string, document: string, revision: number, options?: GovernanceRequestOptions): Promise<DownloadMetadataDto>;
+  downloadDocumentContent(org: string, document: string, revision: number, options?: GovernanceRequestOptions): Promise<DocumentDownloadFile>;
   requestDocumentApproval(org: string, document: string, revision: number, expectedStatus: DocumentStatus, comment?: string, options?: GovernanceRequestOptions): Promise<DocumentRevisionDto>;
   approveDocument(org: string, document: string, revision: number, expectedStatus: DocumentStatus, comment?: string, options?: GovernanceRequestOptions): Promise<DocumentRevisionDto>;
   rejectDocument(org: string, document: string, revision: number, expectedStatus: DocumentStatus, reason: string, options?: GovernanceRequestOptions): Promise<DocumentRevisionDto>;
@@ -150,7 +151,7 @@ function parseDocument(value: unknown): GovernanceDocumentDto { const x=obj(valu
 function parseEvent(value: unknown): DocumentEventDto { const x=obj(value,"document event"); return {id:s(x,"id"),organizationId:s(x,"organization_id"),documentId:s(x,"document_id"),revision:n(x,"revision"),sequence:n(x,"sequence"),eventType:s(x,"event_type"),actorId:s(x,"actor_id"),reason:ns(x,"reason"),occurredAt:s(x,"occurred_at"),details:rec(x,"details")}; }
 function parseFiling(value: unknown): SelfFilingDto { const x=obj(value,"self-filing record"); if (x.actis_submitted_externally !== false) bad("self-filing response must state Actis did not submit externally",x.actis_submitted_externally); return {id:s(x,"id"),organizationId:s(x,"organization_id"),documentId:s(x,"document_id"),revision:n(x,"revision"),externalSubmissionReference:s(x,"external_submission_reference"),submittedAt:s(x,"submitted_at"),receiptEvidenceLocator:s(x,"receipt_evidence_locator"),receiptContentHash:ns(x,"receipt_content_hash"),recordedBy:s(x,"recorded_by"),recordedAt:s(x,"recorded_at"),recordType:e(x,"record_type",["operator_recorded_external_submission"] as const),actisSubmittedExternally:false}; }
 function parseDetail(value: unknown): DocumentDetailDto { const x=obj(value,"document detail"); return {document:parseDocument(x.document),revisions:list(x.revisions,parseRevision),audit:list(x.audit,parseEvent),approvalHistory:list(x.approval_history,parseEvent),selfFilings:list(x.self_filings,parseFiling)}; }
-function parseDownload(value: unknown): DownloadMetadataDto { const x=obj(value,"download metadata"); return {documentId:s(x,"document_id"),revision:n(x,"revision"),filename:s(x,"filename"),format:e(x,"format",enums.documentFormat),contentHash:s(x,"content_hash"),sizeBytes:n(x,"size_bytes"),storageLocator:s(x,"storage_locator"),contentType:s(x,"content_type"),downloadType:e(x,"download_type",["storage_metadata_only"] as const)}; }
+function parseDownload(value: unknown): DownloadMetadataDto { const x=obj(value,"download metadata"); return {documentId:s(x,"document_id"),revision:n(x,"revision"),filename:s(x,"filename"),format:e(x,"format",enums.documentFormat),contentHash:s(x,"content_hash"),sizeBytes:n(x,"size_bytes"),storageLocator:s(x,"storage_locator"),contentType:s(x,"content_type"),downloadType:e(x,"download_type",["storage_metadata_only","content_available"] as const)}; }
 function parseSettings(value: unknown): GovernanceSettingsDto { const x=obj(value,"settings"),p=rec(x,"organization_profile"),no=rec(x,"notifications"),se=rec(x,"security"),ap=rec(x,"appearance"),an=rec(x,"analytics"); return {organizationId:s(x,"organization_id"),version:n(x,"version"),organizationProfile:{name:s(p,"name"),legalName:s(p,"legal_name"),country:s(p,"country"),registrationNumber:s(p,"registration_number"),timezone:s(p,"timezone")},notifications:{urgentFindings:b(no,"urgent_findings"),deadlineWarnings:b(no,"deadline_warnings"),monitoringFailures:b(no,"monitoring_failures"),approvalRequests:b(no,"approval_requests"),emailDigest:e(no,"email_digest",enums.digest)},security:{sessionTimeoutMinutes:n(se,"session_timeout_minutes"),evidenceRetentionMonths:n(se,"evidence_retention_months"),requireMfa:b(se,"require_mfa"),allowRawArtifacts:b(se,"allow_raw_artifacts")},appearance:{theme:e(ap,"theme",enums.theme),density:e(ap,"density",enums.density)},analytics:{enabled:b(an,"enabled"),retentionDays:n(an,"retention_days")},updatedBy:ns(x,"updated_by"),updatedAt:ns(x,"updated_at")}; }
 function parseMember(value: unknown): GovernanceTeamMemberDto { const x=obj(value,"team member"),rawRoles=x.roles; if(!Array.isArray(rawRoles))bad("roles must be an array",rawRoles); const roles=rawRoles.map(role=>e({role},"role",enums.roles)); return {id:s(x,"id"),organizationId:s(x,"organization_id"),subject:s(x,"subject"),name:s(x,"name"),email:s(x,"email"),title:s(x,"title"),initials:s(x,"initials"),roles,status:e(x,"status",enums.teamStatus),lastActiveAt:ns(x,"last_active_at"),version:n(x,"version"),createdAt:s(x,"created_at"),updatedAt:s(x,"updated_at")}; }
 function parseIntegration(value: unknown): GovernanceIntegrationDto { const x=obj(value,"integration"); return {id:s(x,"id"),organizationId:s(x,"organization_id"),name:s(x,"name"),type:e(x,"type",enums.integrationType),status:e(x,"status",enums.integrationStatus),description:s(x,"description"),configuration:rec(x,"configuration"),secretReference:ns(x,"secret_reference"),lastSyncAt:ns(x,"last_sync_at"),version:n(x,"version"),createdAt:s(x,"created_at"),updatedAt:s(x,"updated_at")}; }
@@ -161,6 +162,14 @@ function snakeSettings(input: UpdateSettingsInput): R { const section=(value:obj
 function content(input: DocumentContentInput): R { return {format:input.format,content_hash:input.contentHash,storage_locator:input.storageLocator,size_bytes:input.sizeBytes,provenance:input.provenance}; }
 function errorCode(status:number):GovernanceErrorCode{return status===401?"unauthenticated":status===403?"forbidden":status===404?"not_found":status===409?"conflict":status===422?"validation":"http_error"}
 function errorMessage(body:unknown,status:number):string{if(body&&typeof body==="object"&&"detail" in body){const d=(body as {detail?:unknown}).detail;if(typeof d==="string")return d;if(Array.isArray(d)){const m=d.flatMap(x=>x&&typeof x==="object"&&"msg" in x&&typeof x.msg==="string"?[x.msg]:[]);if(m.length)return m.join("; ")}}return `Governance request failed (${status})`}
+function responseFilename(response: Response): string | undefined {
+  const disposition = response.headers.get("content-disposition") ?? "";
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (encoded) {
+    try { return decodeURIComponent(encoded); } catch { return encoded; }
+  }
+  return disposition.match(/filename="?([^";]+)"?/i)?.[1];
+}
 
 export function mapGovernanceSettings(dto: GovernanceSettingsDto): { organization: Organization; settings: AppSettings } { return {organization:{id:dto.organizationId,name:dto.organizationProfile.name,legalName:dto.organizationProfile.legalName,country:dto.organizationProfile.country,registrationNumber:dto.organizationProfile.registrationNumber,defaultTimezone:dto.organizationProfile.timezone},settings:{notifications:dto.notifications,security:dto.security,appearance:dto.appearance,analytics:dto.analytics}}; }
 export function mapCompliance(dto: ComplianceDto, audit?: ComplianceAuditDto[]): ComplianceItem { const type:ComplianceItem["type"]=dto.kind==="missing_document"?"missing_evidence":dto.kind; return {id:dto.id,type,title:dto.title,requirement:dto.sourceType,productId:dto.productId,releaseId:dto.releaseId,priority:dto.priority==="critical"?"urgent":dto.priority==="medium"?"normal":dto.priority,status:dto.status==="resolved"||dto.status==="approved"?"complete":dto.status==="in_progress"||dto.status==="acknowledged"?"in_progress":dto.status==="pending_approval"?"blocked":"open",lifecycleStatus:dto.status,readiness:dto.readiness,dueAt:dto.dueAt,ownerId:dto.ownerId,reason:dto.description,targetUrl:`/compliance?item=${encodeURIComponent(dto.id)}`,sourceId:dto.sourceId,reportingStage:dto.reportingStage,selfFilingRecordId:dto.selfFilingRecordId,selfFilingRecordUrl:dto.selfFilingRecordUrl,approvedBy:dto.approvedBy,approvedAt:dto.approvedAt,acknowledgedAt:dto.acknowledgedAt,resolvedAt:dto.resolvedAt,version:dto.version,createdAt:dto.createdAt,updatedAt:dto.updatedAt,audit:audit?.map(mapComplianceAudit)}; }
@@ -185,6 +194,32 @@ export function createGovernanceApi(config: GovernanceApiConfig): GovernanceApi 
     async addDocumentRevision(o,d,v,x){return parseRevision(await request(`${item(o,"documents",d)}/revisions`,{method:"POST",body:json({...content(v),expected_current_revision:v.expectedCurrentRevision})},x))},
     async getDocumentRevision(o,d,r,x){return parseRevision(await request(docRevision(o,d,r),{method:"GET"},x))},
     async getDownloadMetadata(o,d,r,x){return parseDownload(await request(`${docRevision(o,d,r)}/download`,{method:"GET"},x))},
+    async downloadDocumentContent(o,d,r,x){
+      const token=(await config.getBearerToken?.())?.trim();
+      const headers=new Headers();
+      if(token)headers.set("Authorization",`Bearer ${token}`);
+      let response:Response;
+      try{
+        response=await fetcher(`${base}${docRevision(o,d,r)}/download/content`,{method:"GET",headers,signal:x?.signal});
+      }catch(cause){
+        if(x?.signal?.aborted||(cause instanceof DOMException&&cause.name==="AbortError"))
+          throw new GovernanceApiError("Governance request aborted","aborted",undefined,undefined,{cause});
+        throw new GovernanceApiError("Governance service unavailable","network",undefined,undefined,{cause});
+      }
+      if(!response.ok){
+        const ct=response.headers.get("content-type")?.toLowerCase()??"";
+        let body:unknown;
+        if(ct.includes("application/json")||ct.includes("+json")){
+          try{body=await response.json()}catch{body=undefined}
+        }
+        throw new GovernanceApiError(errorMessage(body,response.status),errorCode(response.status),response.status,body);
+      }
+      return {
+        blob:await response.blob(),
+        contentType:response.headers.get("content-type")||"application/octet-stream",
+        filename:responseFilename(response),
+      };
+    },
     async requestDocumentApproval(o,d,r,expectedStatus,comment,x){return parseRevision(await request(`${docRevision(o,d,r)}/approval-request`,{method:"POST",body:json({expected_status:expectedStatus,comment})},x))},
     async approveDocument(o,d,r,expectedStatus,comment,x){return parseRevision(await request(`${docRevision(o,d,r)}/approve`,{method:"POST",body:json({expected_status:expectedStatus,comment})},x))},
     async rejectDocument(o,d,r,expectedStatus,reason,x){return parseRevision(await request(`${docRevision(o,d,r)}/reject`,{method:"POST",body:json({expected_status:expectedStatus,reason})},x))},

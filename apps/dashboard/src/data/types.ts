@@ -392,8 +392,15 @@ export interface DocumentDownloadMetadata {
   sizeBytes: number;
   storageLocator: string;
   contentType: string;
-  downloadType: "storage_metadata_only";
+  downloadType: "storage_metadata_only" | "content_available";
 }
+
+export interface DocumentDownloadFile {
+  blob: Blob;
+  contentType: string;
+  filename?: string;
+}
+
 
 export interface RegisterDocumentRevisionInput {
   documentId: EntityId;

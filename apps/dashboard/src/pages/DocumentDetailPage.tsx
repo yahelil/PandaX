@@ -128,6 +128,27 @@ export function DocumentDetailPage() {
     }
   };
 
+  const handleDownloadContent = async (metadata: DocumentDownloadMetadata) => {
+    setBusy("download-content");
+    setFeedback(undefined);
+    try {
+      const file = await demo.actions.downloadDocument(document.id, metadata.version);
+      const url = URL.createObjectURL(file.blob);
+      const link = globalThis.document.createElement("a");
+      link.href = url;
+      link.download = file.filename || metadata.filename;
+      globalThis.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setFeedback({ tone: "success", text: `Document ${file.filename || metadata.filename} downloaded successfully.` });
+    } catch (error) {
+      setFeedback({ tone: "error", text: error instanceof Error ? error.message : "Unable to download document content." });
+    } finally {
+      setBusy(undefined);
+    }
+  };
+
   const submitRevision = (event: FormEvent) => {
     event.preventDefault();
     if (!sha256Pattern.test(revision.contentHash)) {
@@ -225,8 +246,33 @@ export function DocumentDetailPage() {
                   <strong>{download.filename}</strong>
                   <span>{download.contentType} · {readableBytes(download.sizeBytes)}</span>
                   <code title={download.storageLocator}>{download.storageLocator}</code>
-                  <button type="button" className="button-small" onClick={() => downloadManifest(download)}>Export download manifest</button>
-                  <small>Document bytes remain in configured evidence storage; the manifest preserves the verified locator and digest.</small>
+                  {download.downloadType === "content_available" ? (
+                    <>
+                      <button
+                        type="button"
+                        className="button-small"
+                        onClick={() => void handleDownloadContent(download)}
+                        disabled={busy === "download-content"}
+                      >
+                        {busy === "download-content" ? "Downloading…" : "Download document"}
+                      </button>
+                      <button
+                        type="button"
+                        className="button-small"
+                        onClick={() => downloadManifest(download)}
+                      >
+                        Export download manifest
+                      </button>
+                      <small>Authorized content verified against recorded digest and served from private storage.</small>
+                    </>
+                  ) : (
+                    <>
+                      <button type="button" className="button-small" onClick={() => downloadManifest(download)}>
+                        Export download manifest
+                      </button>
+                      <small>Document bytes remain in configured evidence storage; the manifest preserves the verified locator and digest.</small>
+                    </>
+                  )}
                 </div>
               ) : null}
             </div>

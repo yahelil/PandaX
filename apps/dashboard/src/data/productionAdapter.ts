@@ -6,7 +6,7 @@ import { createOperationsApi, OperationsApiError, type OperationsApi, type Opera
 import { FixtureAdapter } from "./fixtureAdapter";
 import { createPortfolioApi, PortfolioApiError, type PortfolioApi } from "./portfolioApi";
 import { createReleaseOperationsApi, ReleaseOperationsApiError, type AnalysisEvidenceFile, type MonitoringRunEvent, type ReleaseAnalysisJob, type ReleaseMonitoringStatus, type ReleaseOperationsApi, type ReleaseScope } from "./releaseOperationsApi";
-import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, ComplianceApprovalCommand, ComplianceItem, ComplianceUpdateCommand, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentDownloadMetadata, DocumentRecord, DocumentRevision, EntityId, Finding, FindingBatchDecisionInput, FindingDecisionInput, Integration, IntegrationUpdate, Notification, Organization, OrganizationProfileUpdate, Product, RecordDocumentSelfFilingInput, RegisterDocumentRevisionInput, Release, ReleaseMonitoringView, Remediation, RemediationInput, TeamMember, TeamMemberUpdate } from "./types";
+import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, ComplianceApprovalCommand, ComplianceItem, ComplianceUpdateCommand, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentDownloadFile, DocumentDownloadMetadata, DocumentRecord, DocumentRevision, EntityId, Finding, FindingBatchDecisionInput, FindingDecisionInput, Integration, IntegrationUpdate, Notification, Organization, OrganizationProfileUpdate, Product, RecordDocumentSelfFilingInput, RegisterDocumentRevisionInput, Release, ReleaseMonitoringView, Remediation, RemediationInput, TeamMember, TeamMemberUpdate } from "./types";
 
 export type BearerTokenProvider = () => string | undefined | Promise<string | undefined>;
 
@@ -474,6 +474,18 @@ export class ProductionAdapter implements DataAdapter {
     return this.mutation("download_document", async () => {
       const metadata = await this.config.governanceApi!.getDownloadMetadata(this.config.organizationId, documentId, version ?? detail.document.currentRevision);
       return { documentId: metadata.documentId, version: metadata.revision, filename: metadata.filename, format: documentFormat(metadata.format), contentHash: metadata.contentHash, sizeBytes: metadata.sizeBytes, storageLocator: metadata.storageLocator, contentType: metadata.contentType, downloadType: metadata.downloadType };
+    });
+  };
+
+  downloadDocument = async (documentId: EntityId, version?: number): Promise<DocumentDownloadFile> => {
+    if (!this.config.governanceApi) return this.fixture.downloadDocument(documentId, version);
+    const detail = this.requireDocumentDetail(documentId);
+    return this.mutation("download_document_content", async () => {
+      return this.config.governanceApi!.downloadDocumentContent(
+        this.config.organizationId,
+        documentId,
+        version ?? detail.document.currentRevision,
+      );
     });
   };
 

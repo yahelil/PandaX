@@ -18,6 +18,7 @@ import type {
   DemoState,
   DocumentRecord,
   DocumentDownloadMetadata,
+  DocumentDownloadFile,
   EntityId,
   Finding,
   FindingDecisionInput,
@@ -391,7 +392,30 @@ export class FixtureAdapter implements DataAdapter {
       sizeBytes: selected?.sizeBytes ?? document.sizeBytes ?? 0,
       storageLocator: selected?.storageLocator ?? document.storageLocator ?? `fixture://documents/${documentId}/revisions/${selected?.version ?? document.version}`,
       contentType,
-      downloadType: "storage_metadata_only",
+      downloadType: "content_available",
+    };
+  };
+
+  downloadDocument = async (documentId: EntityId, version?: number): Promise<DocumentDownloadFile> => {
+    const document = this.state.documents.find((item) => item.id === documentId);
+    if (!document) throw new Error(`Unknown document: ${documentId}`);
+    const selected = document.revisions?.find((item) => item.version === (version ?? document.version));
+    const format = selected?.format ?? document.format;
+    const extension = format === "PDF/A-2b" ? "pdf" : format === "ZIP" ? "zip" : "json";
+    const contentType = format === "PDF/A-2b" ? "application/pdf" : format === "ZIP" ? "application/zip" : "application/json";
+    const filename = `${slugify(document.name)}-v${selected?.version ?? document.version}.${extension}`;
+    const payload = JSON.stringify({
+      document_id: document.id,
+      name: document.name,
+      revision: selected?.version ?? document.version,
+      format,
+      generated_at: now(),
+      findings: this.state.findings.filter((item) => item.productId === document.productId),
+    }, null, 2);
+    return {
+      blob: new Blob([payload], { type: contentType }),
+      contentType,
+      filename,
     };
   };
 

@@ -396,4 +396,71 @@ describe("governance API", () => {
     await expect(api.getSettings("org")).rejects.toMatchObject({ code: "invalid_response", message: "Governance service returned a non-JSON response" });
     await expect(api.getSettings("org")).rejects.toBeInstanceOf(GovernanceApiError);
   });
+
+  it("fetches download metadata with content_available and downloads document bytes", async () => {
+    const downloadDto = {
+      document_id: "document/1",
+      revision: 2,
+      filename: "smart-camera-release-report.json",
+      format: "json",
+      content_hash: "d".repeat(64),
+      size_bytes: 1024,
+      storage_locator: "s3://actis-documents/org-acme/doc-1/rev-2.json",
+      content_type: "application/json",
+      download_type: "content_available",
+    };
+
+    const contentBytes = new TextEncoder().encode(JSON.stringify({ report: "ok" }));
+    const contentResponse = new Response(contentBytes, {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        "content-disposition": 'attachment; filename="smart-camera-release-report.json"',
+        "content-length": String(contentBytes.length),
+        "x-content-sha256": "d".repeat(64),
+      },
+    });
+
+    const fetcher = fetchSequence(json(downloadDto), contentResponse);
+    const api = createGovernanceApi({
+      baseUrl: "https://engine.example.test/",
+      getBearerToken: async () => "auth-token",
+      fetch: fetcher,
+    });
+
+    const metadata = await api.getDownloadMetadata("org/acme", "document/1", 2);
+    expect(metadata).toMatchObject({
+      documentId: "document/1",
+      revision: 2,
+      downloadType: "content_available",
+      filename: "smart-camera-release-report.json",
+      format: "json",
+    });
+
+    const file = await api.downloadDocumentContent("org/acme", "document/1", 2);
+    expect(fetcher.mock.calls[1][0]).toBe("https://engine.example.test/v1/organizations/org%2Facme/documents/document%2F1/revisions/2/download/content");
+    expect(new Headers(fetcher.mock.calls[1][1]?.headers).get("Authorization")).toBe("Bearer auth-token");
+    expect(file.contentType).toBe("application/json");
+    expect(file.filename).toBe("smart-camera-release-report.json");
+    expect(await file.blob.text()).toBe(JSON.stringify({ report: "ok" }));
+  });
+
+  it("maps download content errors cleanly when storage is not wired or service unavailable", async () => {
+    const fetcher = fetchSequence(
+      json({ detail: "document content is not served here" }, 501),
+      json({ detail: "storage object unreadable" }, 503),
+    );
+    const api = createGovernanceApi({ baseUrl: "", fetch: fetcher });
+
+    await expect(api.downloadDocumentContent("org", "doc", 1)).rejects.toMatchObject({
+      name: "GovernanceApiError",
+      status: 501,
+      message: "document content is not served here",
+    });
+    await expect(api.downloadDocumentContent("org", "doc", 1)).rejects.toMatchObject({
+      name: "GovernanceApiError",
+      status: 503,
+      message: "storage object unreadable",
+    });
+  });
 });

@@ -13,6 +13,7 @@ describe("document detail states", () => {
 
   it("does not present fixture-only export wording", () => {
     expect(source).not.toContain("Demo export");
+    expect(source).toContain("Download document");
     expect(source).toContain("Export download manifest");
     expect(source).toContain("Document bytes remain in configured evidence storage");
   });

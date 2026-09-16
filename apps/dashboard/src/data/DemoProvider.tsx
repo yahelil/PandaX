@@ -25,6 +25,7 @@ import type {
   DemoState,
   DocumentRecord,
   DocumentDownloadMetadata,
+  DocumentDownloadFile,
   EntityId,
   Finding,
   FindingDecisionInput,
@@ -80,6 +81,7 @@ export interface DemoActions {
   rejectDocument(documentId: EntityId, comment: string): MaybePromise<DocumentRecord>;
   loadDocumentDetail(documentId: EntityId, options?: { signal?: AbortSignal }): Promise<DocumentRecord | undefined>;
   getDocumentDownload(documentId: EntityId, version?: number): Promise<DocumentDownloadMetadata>;
+  downloadDocument(documentId: EntityId, version?: number): Promise<DocumentDownloadFile>;
   requestDocumentApproval(documentId: EntityId, comment?: string): MaybePromise<DocumentRecord>;
   addDocumentRevision(input: RegisterDocumentRevisionInput): MaybePromise<DocumentRecord>;
   recordDocumentSelfFiling(input: RecordDocumentSelfFilingInput): MaybePromise<DocumentRecord>;
@@ -170,6 +172,7 @@ export function DemoProvider({ adapter: providedAdapter, currentUserOverride, ch
     rejectDocument: adapter.rejectDocument,
     loadDocumentDetail: adapter.loadDocumentDetail,
     getDocumentDownload: adapter.getDocumentDownload,
+    downloadDocument: adapter.downloadDocument,
     requestDocumentApproval: adapter.requestDocumentApproval,
     addDocumentRevision: adapter.addDocumentRevision,
     recordDocumentSelfFiling: adapter.recordDocumentSelfFiling,

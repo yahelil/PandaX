@@ -15,8 +15,13 @@ describe("document adapter workflow", () => {
     await expect(adapter.getDocumentDownload(draft.id)).resolves.toMatchObject({
       documentId: draft.id,
       version: draft.version,
-      downloadType: "storage_metadata_only",
+      downloadType: "content_available",
     });
+    const downloaded = await adapter.downloadDocument(draft.id);
+    expect(downloaded.blob.size).toBeGreaterThan(0);
+    expect(downloaded.contentType).toBe("application/json");
+    expect(downloaded.filename).toContain("home-hub");
+    expect(downloaded.filename).toContain("vex");
     expect(adapter.recordDocumentSelfFiling({
       documentId: draft.id,
       externalSubmissionReference: "ENISA-2026-0014",

@@ -28,7 +28,7 @@ from .domain_projections import (
     ProjectedHomeReadModel,
     ProjectedSearchNotificationRepository,
 )
-from .findings import FindingObservation, FindingRepository
+from .findings import FindingRepository, observation_from_scan_finding
 from .home import HomeReadModel
 from .notification_delivery import (
     NotificationDeliveryRepository, NotificationDeliveryWorker,
@@ -37,7 +37,7 @@ from .notification_delivery import (
 from .organization_settings import OrganizationSettingsRepository, SettingsNotFound
 from .portfolio import PortfolioRepository, create_portfolio_engine
 from .portfolio_api import PortfolioIdentity
-from .release_monitoring import ReleaseMonitoringRepository
+from .release_monitoring import ReleaseMonitoringRepository, ReleaseMonitoringRunner
 from .search_notifications import SearchNotificationRepository
 
 
@@ -242,6 +242,15 @@ def get_release_monitoring_repository() -> ReleaseMonitoringRepository:
     return repository
 
 
+@lru_cache(maxsize=1)
+def get_release_monitoring_runner() -> ReleaseMonitoringRunner:
+    from .release_monitoring_refresh import durable_release_monitoring_runner
+
+    return durable_release_monitoring_runner(
+        get_analysis_repository(), get_finding_repository()
+    )
+
+
 def enroll_completed_analysis(job: AnalysisJobRecord) -> None:
     """Project completed findings and enroll eligible releases for monitoring."""
 
@@ -277,7 +286,7 @@ def _project_completed_findings(job: AnalysisJobRecord) -> None:
         raise ValueError("completed analysis bundle has invalid findings") from exc
     if not isinstance(raw, list) or any(not isinstance(item, Mapping) for item in raw):
         raise ValueError("completed analysis findings must be an array of objects")
-    observations = [_finding_observation(item, job.id) for item in raw]
+    observations = [observation_from_scan_finding(item, job.id) for item in raw]
     get_finding_repository().upsert_from_analysis(
         job.organization_id,
         job.product_id,
@@ -286,48 +295,6 @@ def _project_completed_findings(job: AnalysisJobRecord) -> None:
         observations,
         actor_id=job.actor_id,
         seen_at=job.completed_at,
-    )
-
-
-def _finding_observation(item: Mapping[str, Any], analysis_id: str) -> FindingObservation:
-    cve = str(item.get("cve") or "").strip() or None
-    reference_id = cve or str(item.get("osv_id") or "").strip()
-    exposure = item.get("exposure_evidence")
-    evidence = dict(exposure) if isinstance(exposure, Mapping) else {}
-    evidence.setdefault("assessment", str(item.get("exposure_assessment") or "not_assessed"))
-    recommendation = evidence.get("recommendation")
-    limitations = (
-        recommendation.get("limitations")
-        if isinstance(recommendation, Mapping)
-        else None
-    )
-    if not isinstance(limitations, list) or any(not isinstance(value, str) for value in limitations):
-        limitations = []
-    severity = str(item.get("severity") or "unknown").strip().lower()
-    if severity not in {"critical", "high", "medium", "low", "unknown"}:
-        severity = "unknown"
-    return FindingObservation(
-        reference_id=reference_id,
-        cve=cve,
-        component=str(item.get("component") or "unknown component"),
-        purl=str(item.get("purl") or "").strip() or None,
-        version=str(item.get("version") or "unknown"),
-        title=str(item.get("summary") or reference_id),
-        description=str(item.get("summary") or ""),
-        severity=severity,
-        kev=bool(item.get("kev")),
-        epss=float(item.get("epss") or 0),
-        reachability=str(item.get("reachability") or "unknown"),
-        reachability_evidence=evidence,
-        reachability_limitations=tuple(limitations),
-        source=str(item.get("source") or "analysis"),
-        provenance={
-            "analysis_id": analysis_id,
-            "osv_id": str(item.get("osv_id") or ""),
-            "source_url": str(item.get("source_url") or ""),
-            "coverage_status": str(item.get("coverage_status") or "unknown"),
-            "bom_ref": str(item.get("bom_ref") or ""),
-        },
     )
 
 
@@ -474,6 +441,7 @@ def reset_portfolio_repository() -> None:
     get_portfolio_repository.cache_clear()
     get_analysis_repository.cache_clear()
     get_release_monitoring_repository.cache_clear()
+    get_release_monitoring_runner.cache_clear()
     get_finding_repository.cache_clear()
     get_compliance_repository.cache_clear()
     get_document_repository.cache_clear()

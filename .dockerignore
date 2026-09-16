@@ -1,11 +1,15 @@
 *
 !pyproject.toml
+!uv.lock
 !README.md
 !apps/
 !apps/engine/
 !apps/engine/**
 !tools/
 !tools/bootstrap.py
+!tools/setup_verapdf.py
+!tools/beta_release.py
+!tools/container_smoke.py
 !alembic.ini
 !alembic/
 !alembic/**

@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  define: mode === 'demo' ? {
+  define: (mode === 'demo' || mode === 'development') ? {
     'import.meta.env.VITE_ACTIS_MODE': JSON.stringify('demo'),
   } : undefined,
   server: {

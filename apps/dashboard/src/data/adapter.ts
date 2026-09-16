@@ -14,6 +14,7 @@ import type {
   EntityId,
   Finding,
   FindingDecisionInput,
+  FindingBatchDecisionInput,
   Integration,
   IntegrationUpdate,
   Organization,
@@ -34,7 +35,7 @@ export type DemoListener = () => void;
 
 export type AdapterOperation =
   | "initialize" | "refresh" | "search" | "create_product" | "create_release"
-  | "mark_notification_read" | "acknowledge_notification" | "ingest_analytics" | "assign_finding" | "decide_finding"
+  | "mark_notification_read" | "acknowledge_notification" | "ingest_analytics" | "assign_finding" | "decide_finding" | "batch_decide_findings"
   | "update_remediation" | "load_finding" | "approve_document"
   | "reject_document" | "load_document" | "download_document" | "request_document_approval"
   | "add_document_revision" | "self_file_document" | "update_settings" | "preview_analysis" | "run_analysis" | "run_monitoring"
@@ -86,6 +87,7 @@ export interface DataAdapter {
   loadFindingDetail(findingId: EntityId, options?: { signal?: AbortSignal }): Promise<Finding | undefined>;
   assignFinding(findingId: EntityId, memberId?: EntityId): MaybePromise<Finding>;
   recordFindingDecision(input: FindingDecisionInput): MaybePromise<Finding>;
+  recordFindingBatchDecision(input: FindingBatchDecisionInput): MaybePromise<Finding[]>;
   updateRemediation(input: RemediationInput): MaybePromise<Finding>;
   loadComplianceDetail(itemId: EntityId, options?: { signal?: AbortSignal }): Promise<ComplianceItem | undefined>;
   updateCompliance(input: ComplianceUpdateCommand): MaybePromise<ComplianceItem>;

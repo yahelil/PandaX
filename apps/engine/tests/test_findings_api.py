@@ -61,6 +61,27 @@ def client(repository, roles={"security_reviewer"}, organization_id="org-acme") 
     return TestClient(app)
 
 
+def recommended_finding(repository, *, confidence="high"):
+    return repository.upsert_from_analysis(
+        "org-acme", "product-hub", "release-14", "analysis-recommendation",
+        [FindingObservation(
+            reference_id="CVE-2026-1000", cve="CVE-2026-1000",
+            component="optional-codec", purl="pkg:generic/optional-codec@1.0", version="1.0",
+            title="Optional codec vulnerability", severity="medium",
+            reachability="unknown", source="osv", source_key="recommended",
+            reachability_evidence={"recommendation": {
+                "reachability": "not_reachable", "confidence": confidence,
+                "reason_codes": ["component_excluded_from_build"], "review_required": True,
+                "limitations": ["Dependency path proves inclusion only."],
+                "recommended_vex": {
+                    "state": "not_affected", "justification": "code_not_present",
+                },
+            }},
+        )],
+        actor_id="analyzer",
+    )[0]
+
+
 def test_default_action_queue_filters_detail_and_history(repository):
     api = client(repository)
 
@@ -133,3 +154,72 @@ def test_validation_maps_to_422(repository):
         "expected_version": found["version"],
     })
     assert invalid.status_code == 422
+
+
+def test_batch_recommendation_approval_is_authorized_and_exposes_vex_ready_state(repository):
+    recommended = recommended_finding(repository)
+    api = client(repository)
+
+    listed = next(
+        item for item in api.get(BASE, params={"view": "all"}).json()
+        if item["id"] == recommended.id
+    )
+    response = api.post(BASE + "/recommendations/approve", json={
+        "rationale": "Reviewed release build record confirms component exclusion.",
+        "items": [{"finding_id": recommended.id, "expected_version": recommended.version}],
+    })
+
+    assert listed["recommendation_reachability"] == "not_reachable"
+    assert listed["recommendation_confidence"] == "high"
+    assert listed["recommendation_reason_codes"] == ["component_excluded_from_build"]
+    assert response.status_code == 201
+    approved = response.json()[0]
+    assert approved["current_decision"] == "not_affected"
+    assert approved["decision_rationale"].startswith("Reviewed release")
+    assert approved["reachability_evidence"]["recommendation"] == {
+        "reachability": "not_reachable",
+        "confidence": "high",
+        "reason_codes": ["component_excluded_from_build"],
+        "review_required": True,
+        "limitations": ["Dependency path proves inclusion only."],
+        "recommended_vex": {
+            "state": "not_affected", "justification": "code_not_present",
+        },
+    }
+
+    vex_response = api.get(BASE + "/vex")
+    assert vex_response.status_code == 200
+    vex = vex_response.json()
+    assert vex["bomFormat"] == "CycloneDX"
+    assert vex["specVersion"] == "1.6"
+    vulnerability = next(
+        item for item in vex["vulnerabilities"] if item["id"] == "CVE-2026-1000"
+    )
+    assert vulnerability["analysis"] == {
+        "state": "not_affected",
+        "justification": "code_not_present",
+        "detail": "Reviewed release build record confirms component exclusion.",
+    }
+
+    viewer = client(repository, roles={"viewer"})
+    assert viewer.post(BASE + "/recommendations/approve", json={
+        "rationale": "Not authorized.",
+        "items": [{"finding_id": recommended.id, "expected_version": approved["version"]}],
+    }).status_code == 403
+
+
+def test_batch_recommendation_approval_maps_stale_and_ineligible_to_safe_errors(repository):
+    eligible = recommended_finding(repository)
+    api = client(repository)
+    stale = api.post(BASE + "/recommendations/approve", json={
+        "rationale": "Reviewed build evidence.",
+        "items": [{"finding_id": eligible.id, "expected_version": eligible.version + 1}],
+    })
+    assert stale.status_code == 409
+
+    ineligible = recommended_finding(repository, confidence="medium")
+    rejected = api.post(BASE + "/recommendations/approve", json={
+        "rationale": "Reviewed build evidence.",
+        "items": [{"finding_id": ineligible.id, "expected_version": ineligible.version}],
+    })
+    assert rejected.status_code == 422

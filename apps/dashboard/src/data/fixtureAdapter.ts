@@ -19,6 +19,7 @@ import type {
   EntityId,
   Finding,
   FindingDecisionInput,
+  FindingBatchDecisionInput,
   Integration,
   IntegrationUpdate,
   Organization,
@@ -279,6 +280,16 @@ export class FixtureAdapter implements DataAdapter {
       updated = structuredClone(finding);
     });
     return updated;
+  };
+
+  recordFindingBatchDecision = (input: FindingBatchDecisionInput): Finding[] => {
+    const rationale = input.rationale.trim();
+    if (!rationale) throw new Error("A rationale is required for batch approval.");
+    return input.findingIds.map((findingId) => this.recordFindingDecision({
+      findingId,
+      decision: "not_affected",
+      rationale,
+    }));
   };
 
   updateRemediation = (input: RemediationInput): Finding => {

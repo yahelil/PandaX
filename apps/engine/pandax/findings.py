@@ -62,6 +62,20 @@ FINDING_STATUSES = frozenset({"needs_review", "open", "in_progress", "resolved"}
 DECISIONS = frozenset({"affected", "not_affected", "accepted_risk", "deferred"})
 REMEDIATION_STATUSES = frozenset({"not_planned", "planned", "in_progress", "completed", "verified"})
 ACTION_STATUSES = frozenset({"needs_review", "open", "in_progress"})
+RECOMMENDED_REACHABILITY = frozenset({"reachable", "not_reachable", "review"})
+RECOMMENDATION_CONFIDENCE = frozenset({"high", "medium", "low"})
+RECOMMENDED_VEX_STATES = frozenset({"exploitable", "not_affected", "in_triage"})
+RECOMMENDED_VEX_JUSTIFICATIONS = frozenset({
+    "code_not_present",
+    "code_not_reachable",
+    "requires_configuration",
+    "requires_dependency",
+    "requires_environment",
+    "protected_by_compiler",
+    "protected_at_runtime",
+    "protected_at_perimeter",
+    "protected_by_mitigating_control",
+})
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +97,23 @@ class FindingObservation:
     reachability_limitations: Sequence[str] = ()
     provenance: Mapping[str, Any] | None = None
     source_key: str | None = None
+
+    @property
+    def recommendation_reachability(self) -> str | None:
+        return _recommendation_field(self.reachability_evidence, "reachability")
+
+    @property
+    def recommendation_confidence(self) -> str | None:
+        return _recommendation_field(self.reachability_evidence, "confidence")
+
+    @property
+    def recommendation_reason_codes(self) -> tuple[str, ...]:
+        value = _recommendation_field(self.reachability_evidence, "reason_codes")
+        return tuple(value) if isinstance(value, list) else ()
+
+    @property
+    def recommendation_review_required(self) -> bool:
+        return _recommendation_field(self.reachability_evidence, "review_required") is True
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +154,23 @@ class FindingRecord:
     version: int
     created_at: datetime
     updated_at: datetime
+
+    @property
+    def recommendation_reachability(self) -> str | None:
+        return _recommendation_field(self.reachability_evidence, "reachability")
+
+    @property
+    def recommendation_confidence(self) -> str | None:
+        return _recommendation_field(self.reachability_evidence, "confidence")
+
+    @property
+    def recommendation_reason_codes(self) -> tuple[str, ...]:
+        value = _recommendation_field(self.reachability_evidence, "reason_codes")
+        return tuple(value) if isinstance(value, list) else ()
+
+    @property
+    def recommendation_review_required(self) -> bool:
+        return _recommendation_field(self.reachability_evidence, "review_required") is True
 
 
 @dataclass(frozen=True, slots=True)
@@ -421,6 +469,91 @@ class FindingRepository:
             }, now)
         return self.get(organization_id, product_id, release_id, finding_id)
 
+    def approve_not_reachable_recommendations(
+        self,
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        approvals: Sequence[Mapping[str, Any]],
+        *,
+        rationale: str,
+        actor_id: str,
+    ) -> list[FindingRecord]:
+        """Approve eligible advisory recommendations in one transaction."""
+        if not approvals:
+            raise FindingValidationError("at least one approval is required")
+        if len(approvals) > 100:
+            raise FindingValidationError("at most 100 approvals are allowed")
+        clean_rationale = _required(rationale, "rationale", 4000)
+        clean_actor = _required(actor_id, "actor_id", 128)
+        normalized: list[tuple[str, int]] = []
+        for approval in approvals:
+            if not isinstance(approval, Mapping):
+                raise FindingValidationError("approval must be an object")
+            finding_id = _required(approval.get("finding_id"), "finding_id", 36)
+            expected_version = approval.get("expected_version")
+            if isinstance(expected_version, bool) or not isinstance(expected_version, int) or expected_version < 1:
+                raise FindingValidationError("expected_version must be a positive integer")
+            normalized.append((finding_id, expected_version))
+        ids = [finding_id for finding_id, _ in normalized]
+        if len(ids) != len(set(ids)):
+            raise FindingValidationError("batch contains duplicate finding ids")
+
+        now = _utc_now()
+        with self._transaction() as session:
+            rows = [
+                self._required_finding(session, organization_id, product_id, release_id, finding_id)
+                for finding_id, _ in normalized
+            ]
+            for current, (_, expected_version) in zip(rows, normalized, strict=True):
+                if current["version"] != expected_version:
+                    raise FindingConflict("finding was modified; refresh and retry")
+                recommendation = _recommendation(current["reachability_evidence"])
+                if not (
+                    recommendation
+                    and recommendation.get("reachability") == "not_reachable"
+                    and recommendation.get("confidence") == "high"
+                    and recommendation.get("review_required") is True
+                ):
+                    raise FindingValidationError(
+                        "finding is not eligible for high-confidence not-reachable approval"
+                    )
+                if current["current_decision"] is not None:
+                    raise FindingConflict("finding already has a human decision")
+
+            for current, (finding_id, expected_version) in zip(rows, normalized, strict=True):
+                new_version = self._update_versioned(session, current, expected_version, {
+                    "current_decision": "not_affected",
+                    "decision_rationale": clean_rationale,
+                    "decision_by": clean_actor,
+                    "decided_at": now,
+                    "status": "resolved",
+                    "updated_at": now,
+                })
+                session.execute(insert(finding_decisions).values(
+                    id=str(uuid4()), finding_id=finding_id, organization_id=organization_id,
+                    decision="not_affected", rationale=clean_rationale, actor_id=clean_actor,
+                    occurred_at=now, finding_version=new_version,
+                ))
+                self._audit(
+                    session,
+                    finding_id,
+                    organization_id,
+                    "finding.recommendation_approved",
+                    clean_actor,
+                    {
+                        "decision": "not_affected",
+                        "rationale": clean_rationale,
+                        "recommendation": dict(_recommendation(current["reachability_evidence"]) or {}),
+                        "version": new_version,
+                    },
+                    now,
+                )
+        return [
+            self.get(organization_id, product_id, release_id, finding_id)
+            for finding_id, _ in normalized
+        ]
+
     def update_remediation(
         self, organization_id: str, product_id: str, release_id: str, finding_id: str,
         *, plan: str | None, status: str, due_date: date | None,
@@ -574,6 +707,13 @@ def _observation(value: FindingObservation | Mapping[str, Any]) -> FindingObserv
     ).hexdigest()
     cvss = _score(value.cvss, "cvss", 10.0)
     epss = _score(value.epss, "epss", 1.0)
+    reachability_evidence = _json_object(
+        value.reachability_evidence or {}, "reachability_evidence"
+    )
+    if "recommendation" in reachability_evidence:
+        reachability_evidence["recommendation"] = _validate_recommendation(
+            reachability_evidence["recommendation"]
+        )
     return FindingObservation(
         reference_id=reference_id, cve=cve.upper() if cve else None,
         component=_required(value.component, "component", 255),
@@ -583,7 +723,7 @@ def _observation(value: FindingObservation | Mapping[str, Any]) -> FindingObserv
         severity=_choice(value.severity, SEVERITIES, "severity"), cvss=cvss,
         kev=bool(value.kev), epss=epss,
         reachability=_choice(value.reachability, REACHABILITY_STATES, "reachability"),
-        reachability_evidence=_json_object(value.reachability_evidence or {}, "reachability_evidence"),
+        reachability_evidence=reachability_evidence,
         reachability_limitations=tuple(_required(item, "reachability limitation", 1000) for item in value.reachability_limitations),
         source=source, provenance=_json_object(value.provenance or {}, "provenance"),
         source_key=_required(source_key, "source_key", 128),
@@ -601,6 +741,153 @@ def _technical_values(value: FindingObservation) -> dict[str, Any]:
         "reachability_evidence": dict(value.reachability_evidence or {}),
         "reachability_limitations": list(value.reachability_limitations),
         "source": value.source, "provenance": dict(value.provenance or {}),
+    }
+
+
+def _validate_recommendation(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise FindingValidationError("recommendation must be an object")
+    required = {"reachability", "confidence", "reason_codes", "review_required"}
+    allowed = required | {"limitations", "recommended_vex"}
+    if not required <= set(value) or not set(value) <= allowed:
+        raise FindingValidationError(
+            "recommendation must contain core fields and no unsupported fields"
+        )
+    reachability = _choice(
+        value.get("reachability"), RECOMMENDED_REACHABILITY, "recommendation reachability"
+    )
+    confidence = _choice(
+        value.get("confidence"), RECOMMENDATION_CONFIDENCE, "recommendation confidence"
+    )
+    reason_codes = value.get("reason_codes")
+    if not isinstance(reason_codes, list):
+        raise FindingValidationError("recommendation reason_codes must be a list")
+    clean_codes = [_required(item, "recommendation reason code", 120) for item in reason_codes]
+    if len(clean_codes) > 100:
+        raise FindingValidationError("recommendation has too many reason codes")
+    if len(clean_codes) != len(set(clean_codes)):
+        raise FindingValidationError("recommendation reason codes must be unique")
+    if value.get("review_required") is not True:
+        raise FindingValidationError("recommendation review_required must be true")
+    normalized: dict[str, Any] = {
+        "reachability": reachability,
+        "confidence": confidence,
+        "reason_codes": clean_codes,
+        "review_required": True,
+    }
+    if "limitations" in value:
+        limitations = value["limitations"]
+        if not isinstance(limitations, list):
+            raise FindingValidationError("recommendation limitations must be a list")
+        if len(limitations) > 100:
+            raise FindingValidationError("recommendation has too many limitations")
+        normalized["limitations"] = [
+            _required(item, "recommendation limitation", 1000) for item in limitations
+        ]
+    if "recommended_vex" in value:
+        vex = value["recommended_vex"]
+        if not isinstance(vex, Mapping) or not {"state"} <= set(vex) <= {"state", "justification"}:
+            raise FindingValidationError(
+                "recommendation recommended_vex must contain state and optional justification"
+            )
+        normalized_vex = {
+            "state": _choice(vex.get("state"), RECOMMENDED_VEX_STATES, "recommended VEX state")
+        }
+        if "justification" in vex:
+            normalized_vex["justification"] = _choice(
+                vex.get("justification"),
+                RECOMMENDED_VEX_JUSTIFICATIONS,
+                "recommended VEX justification",
+            )
+        normalized["recommended_vex"] = normalized_vex
+    return normalized
+
+
+def _recommendation(evidence: Any) -> Mapping[str, Any] | None:
+    if not isinstance(evidence, Mapping):
+        return None
+    value = evidence.get("recommendation")
+    return value if isinstance(value, Mapping) else None
+
+
+def _recommendation_field(evidence: Any, field: str) -> Any:
+    recommendation = _recommendation(evidence)
+    return recommendation.get(field) if recommendation else None
+
+
+def build_cyclonedx_vex(
+    records: Sequence[FindingRecord],
+    *,
+    product_id: str,
+    release_id: str,
+    generated_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Build a dynamic VEX projection from reviewed hosted finding state."""
+
+    generated = _aware(generated_at or _utc_now(), "generated_at")
+    vulnerabilities: list[dict[str, Any]] = []
+    valid_justifications = {"code_not_present", "code_not_reachable"}
+    for record in records:
+        recommendation = _recommendation(record.reachability_evidence) or {}
+        recommended_vex = recommendation.get("recommended_vex")
+        justification = (
+            recommended_vex.get("justification")
+            if isinstance(recommended_vex, Mapping)
+            else None
+        )
+        if (
+            record.current_decision == "not_affected"
+            and recommended_vex
+            and recommended_vex.get("state") == "not_affected"
+            and justification in valid_justifications
+        ):
+            analysis = {
+                "state": "not_affected",
+                "justification": justification,
+                "detail": record.decision_rationale or "Approved reviewer decision.",
+            }
+        elif record.current_decision in {"affected", "accepted_risk"}:
+            analysis = {
+                "state": "exploitable",
+                "detail": record.decision_rationale or "Approved reviewer decision.",
+            }
+        else:
+            analysis = {
+                "state": "in_triage",
+                "detail": (
+                    "A reviewed, standards-mapped decision is required before risk is reduced."
+                ),
+            }
+        component_ref = str(record.provenance.get("bom_ref") or record.purl or record.id)
+        vulnerabilities.append({
+            "bom-ref": f"vuln-{record.id}",
+            "id": record.cve or record.reference_id,
+            "source": {"name": record.source},
+            "description": record.description,
+            "affects": [{"ref": component_ref}],
+            "analysis": analysis,
+            "properties": [
+                {"name": "pandax:finding-id", "value": record.id},
+                {
+                    "name": "pandax:review-decision",
+                    "value": record.current_decision or "unreviewed",
+                },
+            ],
+        })
+    return {
+        "bomFormat": "CycloneDX",
+        "specVersion": "1.6",
+        "version": 1,
+        "metadata": {
+            "timestamp": generated.isoformat(timespec="seconds").replace("+00:00", "Z"),
+            "tools": {"components": [{"type": "application", "name": "pandax", "version": "0.1.0"}]},
+            "component": {
+                "type": "device",
+                "name": product_id,
+                "version": release_id,
+            },
+        },
+        "vulnerabilities": vulnerabilities,
     }
 
 

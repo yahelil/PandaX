@@ -170,8 +170,9 @@ def _run(
         yield from match.run(ctx, feeds)
         if telemetry_path is not None:
             yield from telemetry.apply(ctx, telemetry_path)
-        if exposure_context_path is not None or ctx.runtime_telemetry_path is not None:
-            yield from exposure.run(ctx, exposure_context_path)
+        # Always produce an advisory reachability assessment. Missing evidence
+        # remains explicit and conservative rather than omitting the analysis.
+        yield from exposure.run(ctx, exposure_context_path)
         yield from triage.run(ctx, feeds)
         source_path = ctx.path("release-source.json")
         if source_path.exists():

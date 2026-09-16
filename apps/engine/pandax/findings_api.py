@@ -14,11 +14,14 @@ from .findings import (
     FindingRecord,
     FindingRepository,
     FindingValidationError,
+    build_cyclonedx_vex,
 )
 from .portfolio_api import IdentityDependency, PORTFOLIO_ROLES, PortfolioIdentity, local_identity
 
 Severity = Literal["critical", "high", "medium", "low", "unknown"]
 Reachability = Literal["reachable", "not_reachable", "unknown"]
+RecommendedReachability = Literal["reachable", "not_reachable", "review"]
+RecommendationConfidence = Literal["high", "medium", "low"]
 FindingStatus = Literal["needs_review", "open", "in_progress", "resolved"]
 Decision = Literal["affected", "not_affected", "accepted_risk", "deferred"]
 RemediationStatus = Literal["not_planned", "planned", "in_progress", "completed", "verified"]
@@ -73,6 +76,10 @@ class FindingResponse(ApiModel):
     reachability: Reachability
     reachability_evidence: dict[str, Any]
     reachability_limitations: list[str]
+    recommendation_reachability: RecommendedReachability | None = None
+    recommendation_confidence: RecommendationConfidence | None = None
+    recommendation_reason_codes: list[str] = Field(default_factory=list)
+    recommendation_review_required: bool = False
     source: str
     provenance: dict[str, Any]
     first_seen_at: datetime
@@ -106,6 +113,23 @@ class DecisionCreate(ApiModel):
     decision: Decision
     rationale: str = Field(min_length=1, max_length=4000)
     expected_version: int = Field(ge=1)
+
+
+class RecommendationApprovalItem(ApiModel):
+    finding_id: str = Field(min_length=1, max_length=36)
+    expected_version: int = Field(ge=1)
+
+
+class RecommendationBatchApproval(ApiModel):
+    rationale: str = Field(min_length=1, max_length=4000)
+    items: list[RecommendationApprovalItem] = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_unique_findings(self) -> "RecommendationBatchApproval":
+        finding_ids = [item.finding_id for item in self.items]
+        if len(finding_ids) != len(set(finding_ids)):
+            raise ValueError("items must contain unique finding ids")
+        return self
 
 
 class RemediationUpdate(ApiModel):
@@ -185,6 +209,49 @@ def create_findings_router(
             assignee_id=assignee_id, sort=sort,
         ))
 
+    @router.post(
+        release_collection + "/recommendations/approve",
+        response_model=list[FindingResponse],
+        status_code=status.HTTP_201_CREATED,
+    )
+    def approve_recommendations(
+        body: RecommendationBatchApproval,
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        repository: Annotated[FindingRepository, Depends(repository_dependency)],
+        identity: Annotated[PortfolioIdentity, Depends(identity_dependency)],
+    ):
+        _authorize(identity, organization_id, DECISION_ROLES, sensitive=True)
+        return _call(lambda: repository.approve_not_reachable_recommendations(
+            organization_id,
+            product_id,
+            release_id,
+            [item.model_dump() for item in body.items],
+            rationale=body.rationale,
+            actor_id=identity.actor_id,
+        ))
+
+    @router.get(release_collection + "/vex")
+    def export_reviewed_vex(
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        repository: Annotated[FindingRepository, Depends(repository_dependency)],
+        identity: Annotated[PortfolioIdentity, Depends(identity_dependency)],
+    ):
+        _authorize(identity, organization_id, PORTFOLIO_ROLES)
+        records = _call(lambda: repository.list(
+            organization_id,
+            product_id=product_id,
+            release_id=release_id,
+            action_required=False,
+            sort="severity",
+        ))
+        return build_cyclonedx_vex(
+            records, product_id=product_id, release_id=release_id
+        )
+
     item = release_collection + "/{finding_id}"
 
     @router.get(item, response_model=FindingDetailResponse)
@@ -259,6 +326,12 @@ def create_findings_router(
 
 def _detail(repository: FindingRepository, record: FindingRecord) -> Mapping[str, Any]:
     values = {name: getattr(record, name) for name in record.__dataclass_fields__}
+    values.update({
+        "recommendation_reachability": record.recommendation_reachability,
+        "recommendation_confidence": record.recommendation_confidence,
+        "recommendation_reason_codes": record.recommendation_reason_codes,
+        "recommendation_review_required": record.recommendation_review_required,
+    })
     values["decision_history"] = _call(lambda: repository.decisions(record.organization_id, record.id))
     values["audit_history"] = _call(lambda: repository.audit_history(record.organization_id, record.id))
     return values

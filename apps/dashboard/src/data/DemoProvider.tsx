@@ -27,6 +27,7 @@ import type {
   EntityId,
   Finding,
   FindingDecisionInput,
+  FindingBatchDecisionInput,
   Integration,
   IntegrationUpdate,
   Organization,
@@ -69,6 +70,7 @@ export interface DemoActions {
   loadFindingDetail(findingId: EntityId, options?: { signal?: AbortSignal }): Promise<Finding | undefined>;
   assignFinding(findingId: EntityId, memberId?: EntityId): MaybePromise<Finding>;
   decideFinding(input: FindingDecisionInput): MaybePromise<Finding>;
+  decideFindings(input: FindingBatchDecisionInput): MaybePromise<Finding[]>;
   updateRemediation(input: RemediationInput): MaybePromise<Finding>;
   loadComplianceDetail(itemId: EntityId, options?: { signal?: AbortSignal }): Promise<ComplianceItem | undefined>;
   updateCompliance(input: ComplianceUpdateCommand): MaybePromise<ComplianceItem>;
@@ -156,6 +158,7 @@ export function DemoProvider({ adapter: providedAdapter, currentUserOverride, ch
     loadFindingDetail: adapter.loadFindingDetail,
     assignFinding: adapter.assignFinding,
     decideFinding: adapter.recordFindingDecision,
+    decideFindings: adapter.recordFindingBatchDecision,
     updateRemediation: adapter.updateRemediation,
     loadComplianceDetail: adapter.loadComplianceDetail,
     updateCompliance: adapter.updateCompliance,

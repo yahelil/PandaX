@@ -25,6 +25,17 @@ describe("CRA assessment", () => {
     expect(assessmentCompletionAction(buildCraAssessment({ ...input, confirmed: true }))).toEqual({ label: "Use assessment", disabled: false });
   });
 
+  it("records the scope guide review without inventing readiness answers", () => {
+    const assessment = buildCraAssessment({
+      scopeAnswers: {}, scopeReviewed: true,
+      categorySelections: { critical: "none", important_ii: "none", important_i: "none" },
+      readinessAnswers: {}, confirmed: true,
+    });
+    expect(assessment.scopeResult).toBe("in_scope");
+    expect(assessment.answers.map((answer) => answer.questionId)).toEqual(["scope-guidance", "category-critical", "category-important_ii", "category-important_i"]);
+    expect(assessment.actions).toEqual([]);
+  });
+
   it("allows an uncertain assessment to be saved for specialist review", () => {
     const assessment = buildCraAssessment({
       scopeAnswers: { ...inScope, "commercial-supply": "not_sure" },

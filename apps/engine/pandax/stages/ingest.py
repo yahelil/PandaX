@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import stat
 import tarfile
 import zipfile
 from pathlib import Path
@@ -18,6 +19,7 @@ STAGE = "S1 INGEST"
 MAX_TOTAL_BYTES = 512 * 1024 * 1024  # decompression bomb ceiling
 MAX_ENTRIES = 20_000
 MAX_DEPTH = 24
+MAX_COMPRESSION_RATIO = 100
 
 
 class UnsafeArtifact(Exception):
@@ -30,7 +32,7 @@ def _safe_target(dest_root: Path, member_name: str) -> Path:
     Blocks absolute paths, drive letters, and ../ traversal by comparing the
     fully resolved path against the resolved destination root.
     """
-    if member_name.startswith(("/", "\\")) or (
+    if "\\" in member_name or member_name.startswith(("/", "\\")) or (
         len(member_name) > 1 and member_name[1] == ":"
     ):
         raise UnsafeArtifact(f"absolute path in archive: {member_name!r}")
@@ -46,16 +48,28 @@ def _safe_target(dest_root: Path, member_name: str) -> Path:
 
 def _extract_zip(src: Path, dest: Path) -> tuple[int, int]:
     total = count = 0
+    seen: set[str] = set()
     with zipfile.ZipFile(src) as zf:
         infos = zf.infolist()
         if len(infos) > MAX_ENTRIES:
             raise UnsafeArtifact(f"archive has {len(infos)} entries, limit {MAX_ENTRIES}")
         for info in infos:
+            identity = info.filename.rstrip("/").casefold()
+            if identity in seen:
+                raise UnsafeArtifact(f"duplicate archive path: {info.filename!r}")
+            seen.add(identity)
+            mode = (info.external_attr >> 16) & 0o170000
+            if mode not in {0, stat.S_IFREG, stat.S_IFDIR} or info.flag_bits & 1:
+                raise UnsafeArtifact(f"link or special archive entry refused: {info.filename!r}")
             target = _safe_target(dest, info.filename)
             if info.is_dir():
                 target.mkdir(parents=True, exist_ok=True)
                 continue
             total += info.file_size
+            if info.file_size and (not info.compress_size or info.file_size / info.compress_size > MAX_COMPRESSION_RATIO):
+                raise UnsafeArtifact(
+                    f"decompression bomb: compression ratio exceeds {MAX_COMPRESSION_RATIO}: {info.filename!r}"
+                )
             if total > MAX_TOTAL_BYTES:
                 raise UnsafeArtifact(
                     f"uncompressed size exceeds {MAX_TOTAL_BYTES:,} bytes "
@@ -70,10 +84,15 @@ def _extract_zip(src: Path, dest: Path) -> tuple[int, int]:
 
 def _extract_tar(src: Path, dest: Path, recorded_links: list | None = None) -> tuple[int, int]:
     total = count = 0
+    seen: set[str] = set()
     with tarfile.open(src) as tf:
         for index, member in enumerate(tf, 1):
             if index > MAX_ENTRIES:
                 raise UnsafeArtifact(f"archive exceeds {MAX_ENTRIES} entries")
+            identity = member.name.rstrip("/").casefold()
+            if identity in seen:
+                raise UnsafeArtifact(f"duplicate archive path: {member.name!r}")
+            seen.add(identity)
             target = _safe_target(dest, member.name)
             if member.issym() or member.islnk():
                 if recorded_links is not None:
@@ -86,7 +105,7 @@ def _extract_tar(src: Path, dest: Path, recorded_links: list | None = None) -> t
                 target.mkdir(parents=True, exist_ok=True)
                 continue
             if not member.isfile():
-                continue
+                raise UnsafeArtifact(f"special archive entry refused: {member.name!r}")
             total += member.size
             count += 1
             if total > MAX_TOTAL_BYTES:

@@ -271,6 +271,7 @@ def write_manifest(
     tool_versions: dict[str, str],
     ledger: Ledger,
     signer: Signer | Ed25519PrivateKey,
+    extensions: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Digest every file in the bundle, commit to the ledger head, and sign."""
     if isinstance(signer, Ed25519PrivateKey):
@@ -303,6 +304,11 @@ def write_manifest(
         "signature_note": SIGNING_NOTE,
         "signing": signer.identity.as_manifest(),
     }
+    if extensions:
+        if set(extensions) & set(manifest):
+            raise ValueError("manifest extensions cannot replace v1 fields")
+        manifest.update(extensions)
+
     payload = canonical(manifest)
     audit = {
         "event": "evidence.sign",

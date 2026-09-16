@@ -57,7 +57,13 @@ def trust_scope(tmp_path):
 
 
 def _enroll(repository, organization_id: str, key: Ed25519PrivateKey, name="release-signing", **kwargs):
-    enrollment = create_trust_key_enrollment(key, organization_id, name)
+    pem = key.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode("ascii")
+    challenge = repository.create_trust_key_challenge(
+        organization_id, key_name=name, public_key_pem=pem, actor_id="admin"
+    )
+    enrollment = create_trust_key_enrollment(key, organization_id, name, challenge)
     return repository.enroll_trust_key(
         organization_id,
         **enrollment,
@@ -117,7 +123,13 @@ def test_proof_rotation_revocation_and_registry_verification(trust_scope):
 def test_enrollment_rejects_bad_proof_and_private_material(trust_scope):
     repository, _ = trust_scope
     key = Ed25519PrivateKey.generate()
-    enrollment = create_trust_key_enrollment(key, "org-acme", "release-signing")
+    pem = key.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode("ascii")
+    challenge = repository.create_trust_key_challenge(
+        "org-acme", key_name="release-signing", public_key_pem=pem, actor_id="admin"
+    )
+    enrollment = create_trust_key_enrollment(key, "org-acme", "release-signing", challenge)
     with pytest.raises(SettingsValidationError, match="proof of possession"):
         repository.enroll_trust_key(
             "org-acme",
@@ -135,7 +147,13 @@ def test_enrollment_rejects_bad_proof_and_private_material(trust_scope):
             key_name="release-signing",
             public_key_pem=private_pem,
             proof_signature="00" * 64,
+            challenge_id=challenge["challenge_id"],
             actor_id="admin",
+        )
+    with pytest.raises(SettingsValidationError, match="expired"):
+        repository.enroll_trust_key(
+            "org-acme", **enrollment, actor_id="admin",
+            now=datetime.now(timezone.utc) + timedelta(minutes=6),
         )
 
 
@@ -147,10 +165,20 @@ def test_trust_api_is_tenant_scoped_and_verifies_zip(trust_scope):
     app = FastAPI()
     app.include_router(create_settings_router(lambda: repository, lambda: identity["value"]))
     client = TestClient(app)
-    enrollment = create_trust_key_enrollment(key, "org-acme", "release-signing")
+    pem = key.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode("ascii")
+    challenge_response = client.post("/v1/organizations/org-acme/trust-keys/challenges", json={
+        "key_name": "release-signing", "public_key_pem": pem,
+    })
+    assert challenge_response.status_code == 201
+    enrollment = create_trust_key_enrollment(
+        key, "org-acme", "release-signing", challenge_response.json()
+    )
 
     created = client.post("/v1/organizations/org-acme/trust-keys", json=enrollment)
     assert created.status_code == 201 and "PRIVATE KEY" not in created.text
+    assert client.post("/v1/organizations/org-acme/trust-keys", json=enrollment).status_code == 422
     result = client.post(
         "/v1/organizations/org-acme/trust-verifications",
         files={"bundle": (archive.name, archive.read_bytes(), "application/zip")},
@@ -178,12 +206,25 @@ def test_trust_api_is_tenant_scoped_and_verifies_zip(trust_scope):
 
 def test_cli_enrollment_proof_contains_only_public_material(tmp_path):
     private = tmp_path / "customer.pem"
+    key = Ed25519PrivateKey.generate()
+    private.write_bytes(key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ))
+    challenge = {
+        "challenge_id": "00000000-0000-0000-0000-000000000001",
+        "organization_id": "org-acme", "key_name": "release-signing",
+        "fingerprint": __import__("pandax.evidence", fromlist=["public_key_fingerprint"]).public_key_fingerprint(key.public_key()),
+        "nonce": "0" * 64,
+    }
+    challenge_file = tmp_path / "challenge.json"
+    challenge_file.write_text(json.dumps(challenge), encoding="utf-8")
     result = CliRunner().invoke(
         cli.app,
-        ["key", "enrollment-proof", "org-acme", "release-signing", "--signing-key", str(private)],
+        ["key", "enrollment-proof", "org-acme", "release-signing", "--signing-key", str(private), "--challenge", str(challenge_file)],
     )
     assert result.exit_code == 0
     payload = json.loads(result.stdout)
-    assert set(payload) == {"key_name", "public_key_pem", "proof_signature"}
+    assert set(payload) == {"key_name", "public_key_pem", "proof_signature", "challenge_id"}
     assert "PUBLIC KEY" in payload["public_key_pem"] and "PRIVATE KEY" not in result.stdout
     assert private.exists()

@@ -247,6 +247,21 @@ class TrustKeyEnrollmentRequest(ApiModel):
     key_name: str = Field(min_length=1, max_length=80)
     public_key_pem: str = Field(min_length=1, max_length=1000)
     proof_signature: str = Field(pattern=r"^[0-9a-fA-F]{128}$")
+    challenge_id: str = Field(min_length=36, max_length=36)
+
+
+class TrustKeyChallengeRequest(ApiModel):
+    key_name: str = Field(min_length=1, max_length=80)
+    public_key_pem: str = Field(min_length=1, max_length=1000)
+
+
+class TrustKeyChallengeResponse(ApiModel):
+    challenge_id: str
+    organization_id: str
+    key_name: str
+    fingerprint: str
+    nonce: str
+    expires_at: datetime
 
 
 class TrustKeyResponse(ApiModel):
@@ -357,7 +372,20 @@ def create_settings_router(repository_dependency: RepositoryDependency, identity
             key_name=body.key_name,
             public_key_pem=body.public_key_pem,
             proof_signature=body.proof_signature,
+            challenge_id=body.challenge_id,
             actor_id=principal.subject,
+        ))
+
+    @router.post("/trust-keys/challenges", response_model=TrustKeyChallengeResponse,
+                 status_code=status.HTTP_201_CREATED)
+    def create_trust_key_challenge(
+        body: TrustKeyChallengeRequest, organization_id: str,
+        repository: Repository, principal: Identity,
+    ):
+        _authorize(principal, organization_id, ADMIN_ROLES, sensitive=True)
+        return _call(lambda: repository.create_trust_key_challenge(
+            organization_id, key_name=body.key_name,
+            public_key_pem=body.public_key_pem, actor_id=principal.subject,
         ))
 
     @router.get("/trust-keys", response_model=list[TrustKeyResponse])

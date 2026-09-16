@@ -117,15 +117,19 @@ def enrollment_proof(
     organization_id: str = typer.Argument(..., help="Actis organization ID"),
     key_name: str = typer.Argument(..., help="Stable key name, such as release-signing"),
     signing_key: Optional[Path] = typer.Option(
-        None, "--signing-key", help="Private signing key (default: PANDAX_SIGNING_KEY)"
+        None, "--signing-key", help="Customer-owned private signing key"
     ),
+    challenge_file: Path = typer.Option(..., "--challenge", help="JSON challenge from the trust-keys/challenges endpoint"),
 ) -> None:
     """Create public enrollment material while keeping the private key local."""
     try:
+        if signing_key is None:
+            raise ValueError("--signing-key is required")
         enrollment = create_trust_key_enrollment(
-            load_or_create_key(signing_key or signing_key_path()),
+            load_or_create_key(signing_key),
             organization_id,
             key_name,
+            json.loads(challenge_file.read_text(encoding="utf-8")),
         )
     except (OSError, TypeError, ValueError) as exc:
         raise typer.BadParameter(f"signing key cannot be used: {exc}") from exc

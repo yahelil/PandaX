@@ -25,6 +25,7 @@ kms = ["google-cloud-kms>=3.5,<4"]
 
 [project.scripts]
 actis = "pandax.cli:app"
+actis-collector = "pandax.collector_cli:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -44,6 +45,7 @@ include = [
 
 [tool.pytest.ini_options]
 testpaths = ["apps/engine/tests", "apps/verifier/tests"]
+pythonpath = ["."]
 cache_dir = "workspace/cache/pytest"
 markers = [
     "slow: end-to-end tests needing the bootstrapped syft binary and network",

@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives import serialization
 
 from conftest import canonical, digest, ledger_record, seal, write_public_key
 from pandax_verifier.bundle import BundleError, open_bundle
@@ -71,6 +72,73 @@ def test_wrong_key_and_attacker_resealed_bundle_are_untrusted(sealed_bundle):
     assert result.integrity_ok and result.signature_valid
     assert result.signer_trust == "untrusted"
     assert result.bundle_key_fingerprint != original_fingerprint
+
+
+def test_versioned_registry_trusts_historical_key_and_rejects_revoked(tmp_path):
+    run = tmp_path / "run"
+    run.mkdir()
+    evidence = run / "evidence.json"
+    evidence.write_text("{}", encoding="utf-8")
+    key = Ed25519PrivateKey.generate()
+    public_pem = key.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("ascii")
+    fingerprint = digest(
+        key.public_key().public_bytes(
+            serialization.Encoding.DER,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+    signing = {
+        "provider": "secret",
+        "algorithm": "Ed25519",
+        "key_id": "beta-release",
+        "key_version": "1",
+        "public_key_fingerprint": fingerprint,
+    }
+    seal(
+        run,
+        key,
+        [ledger_record("evidence.json", digest(evidence.read_bytes()))],
+        signing=signing,
+    )
+    current = Ed25519PrivateKey.generate()
+    current_pem = current.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode("ascii")
+    current_fingerprint = digest(
+        current.public_key().public_bytes(
+            serialization.Encoding.DER,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+    )
+    registry = {
+        "schema": "actis/signing-key-registry/v1",
+        "keys": [
+            {**signing, "public_key_pem": public_pem, "status": "historical"},
+            {
+                "provider": "secret",
+                "algorithm": "Ed25519",
+                "key_id": "beta-release",
+                "key_version": "2",
+                "public_key_fingerprint": current_fingerprint,
+                "public_key_pem": current_pem,
+                "status": "active",
+            },
+        ],
+    }
+    registry_path = tmp_path / "registry.json"
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    assert verify_bundle(run, trusted_registry=registry_path).status == "trusted"
+    assert main([str(run), "--trusted-key-registry", str(registry_path), "--json"]) == 0
+
+    registry["keys"][0]["status"] = "revoked"
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+    result = verify_bundle(run, trusted_registry=registry_path)
+    assert result.status == "untrusted"
+    assert any("revoked" in check.detail for check in result.checks)
 
 
 @pytest.mark.parametrize(
@@ -155,6 +223,15 @@ def test_trusted_key_inside_directory_bundle_is_rejected(sealed_bundle):
 
     with pytest.raises(TrustedKeyConfigurationError, match="stored separately"):
         verify_bundle(run, run / "pubkey.pem")
+
+
+def test_trusted_registry_inside_directory_bundle_is_rejected(sealed_bundle):
+    run, _, _ = sealed_bundle
+    registry = run / "registry.json"
+    registry.write_text("{}", encoding="utf-8")
+
+    with pytest.raises(TrustedKeyConfigurationError, match="stored separately"):
+        verify_bundle(run, trusted_registry=registry)
 
 
 @pytest.mark.parametrize(

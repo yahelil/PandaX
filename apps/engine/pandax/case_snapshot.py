@@ -10,8 +10,9 @@ from pathlib import Path
 from .cases import CaseError, CaseNotFound, _utc_now
 from .case_review import attestation, record
 from .case_export import render
-from .context import signing_key_path
-from .evidence import Ledger, load_or_create_key, write_manifest
+from .context import KEY_PATH
+from .evidence import Ledger, write_manifest
+from .signing import configured_signer
 
 
 def create_snapshot(service, db, case, body):
@@ -22,7 +23,7 @@ def create_snapshot(service, db, case, body):
     snapshot_id = 'snapshot-' + uuid.uuid4().hex
     # Scans and case snapshots share one installation identity. The private key
     # stays outside every exported bundle.
-    key = load_or_create_key(signing_key_path())
+    signer = configured_signer(KEY_PATH)
     with tempfile.TemporaryDirectory(prefix='case-export-', dir=service.store.path.parent) as directory:
         root = Path(directory)
         (root / 'case.json').write_text(json.dumps(case, ensure_ascii=False, indent=2), encoding='utf-8')
@@ -35,7 +36,7 @@ def create_snapshot(service, db, case, body):
             (root / (row['id'] + '.bin')).write_bytes(row['content'])
         ledger = Ledger(root)
         ledger.append('CASE_SNAPSHOT', 'PandaX', '0.1.0', [], [ledger.ref(p) for p in sorted(root.iterdir())], {'case_id': case['id'], 'revision': revision, 'version': case['version']})
-        write_manifest(root, snapshot_id, case['source_product'], {'pandax': '0.1.0'}, ledger, key)
+        write_manifest(root, snapshot_id, case['source_product'], {'pandax': '0.1.0'}, ledger, signer)
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as archive:
             for file in sorted(root.iterdir()):

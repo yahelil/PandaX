@@ -17,7 +17,9 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import logging
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,14 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
     Ed25519PublicKey,
+)
+
+from .signing import (
+    PrivateKeySigner,
+    Signer,
+    SigningConfigurationError,
+    SigningKeyRegistry,
+    parse_registry,
 )
 
 GENESIS = "0" * 64
@@ -49,6 +59,7 @@ SIGNING_NOTE = (
     "separately. This identifies a configured signing installation, not a legal "
     "person or an eIDAS qualified electronic seal."
 )
+logger = logging.getLogger(__name__)
 
 
 # --- primitives -------------------------------------------------------------
@@ -137,6 +148,19 @@ def _validate_manifest_structure(manifest: dict[str, Any]) -> None:
         raise ValueError(f"unsupported manifest schema: {manifest['schema']}")
     if manifest["ledger_records"] < 0:
         raise ValueError("manifest ledger_records cannot be negative")
+    signing = manifest.get("signing")
+    if signing is not None:
+        required = {
+            "provider", "algorithm", "key_id", "key_version", "public_key_fingerprint"
+        }
+        if not isinstance(signing, dict) or set(signing) != required:
+            raise ValueError("manifest signing metadata is malformed")
+        if not all(isinstance(signing[field], str) and signing[field] for field in required):
+            raise ValueError("manifest signing metadata values must be non-empty strings")
+        if signing["algorithm"] != "Ed25519" or not re.fullmatch(
+            r"[0-9a-f]{64}", signing["public_key_fingerprint"]
+        ):
+            raise ValueError("manifest signing metadata is invalid")
 
 
 # --- ledger -----------------------------------------------------------------
@@ -246,10 +270,14 @@ def write_manifest(
     product: dict[str, Any],
     tool_versions: dict[str, str],
     ledger: Ledger,
-    key: Ed25519PrivateKey,
+    signer: Signer | Ed25519PrivateKey,
     extensions: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Digest every file in the bundle, commit to the ledger head, and sign."""
+    if isinstance(signer, Ed25519PrivateKey):
+        signer = PrivateKeySigner(signer, "file", "legacy-local", "1")
+    if not isinstance(signer, Signer):
+        raise TypeError("signer does not implement the signing interface")
     run_dir = Path(run_dir)
     skip = {MANIFEST_NAME, SIG_NAME, PUBKEY_NAME}
     files: list[dict[str, str]] = []
@@ -274,22 +302,66 @@ def write_manifest(
         "ledger_records": len(ledger.records),
         "files": files,
         "signature_note": SIGNING_NOTE,
+        "signing": signer.identity.as_manifest(),
     }
     if extensions:
         if set(extensions) & set(manifest):
             raise ValueError("manifest extensions cannot replace v1 fields")
         manifest.update(extensions)
 
-    (run_dir / MANIFEST_NAME).write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    (run_dir / SIG_NAME).write_text(key.sign(canonical(manifest)).hex(), encoding="utf-8")
-    (run_dir / PUBKEY_NAME).write_bytes(
-        key.public_key().public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    payload = canonical(manifest)
+    audit = {
+        "event": "evidence.sign",
+        "run_id": run_id,
+        "provider": signer.identity.provider,
+        "key_id": signer.identity.key_id,
+        "key_version": signer.identity.key_version,
+        "payload_sha256": sha256_bytes(payload),
+    }
+    started = time.perf_counter()
+    try:
+        signature = signer.sign(payload)
+        public_key_pem = signer.public_key_pem()
+        signer_public = _parse_public_key(public_key_pem)
+        signer_public.verify(signature, payload)
+    except Exception:
+        logger.error(
+            "signing_audit %s",
+            json.dumps(
+                {
+                    **audit,
+                    "outcome": "failed",
+                    "latency_ms": round((time.perf_counter() - started) * 1000, 3),
+                }
+            ),
         )
+        raise
+    logger.info(
+        "signing_audit %s",
+        json.dumps(
+            {
+                **audit,
+                "outcome": "succeeded",
+                "latency_ms": round((time.perf_counter() - started) * 1000, 3),
+            }
+        ),
     )
+
+    pending = {
+        run_dir / f".{MANIFEST_NAME}.tmp": json.dumps(
+            manifest, indent=2, ensure_ascii=False
+        ).encode("utf-8"),
+        run_dir / f".{SIG_NAME}.tmp": signature.hex().encode("ascii"),
+        run_dir / f".{PUBKEY_NAME}.tmp": public_key_pem,
+    }
+    try:
+        for path, content in pending.items():
+            path.write_bytes(content)
+        for path in pending:
+            path.replace(run_dir / path.name[1:-4])
+    finally:
+        for path in pending:
+            path.unlink(missing_ok=True)
     return manifest
 
 
@@ -361,6 +433,16 @@ def load_trusted_key(path: Path) -> Ed25519PublicKey:
     except (OSError, TypeError, ValueError) as exc:
         raise TrustedKeyConfigurationError(
             f"trusted key cannot be loaded from {path}: {exc}"
+        ) from exc
+
+
+def load_trusted_registry(path: Path) -> SigningKeyRegistry:
+    path = Path(path)
+    try:
+        return parse_registry(json.loads(path.read_text(encoding="utf-8")))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, SigningConfigurationError) as exc:
+        raise TrustedKeyConfigurationError(
+            f"trusted key registry cannot be loaded from {path}: {exc}"
         ) from exc
 
 
@@ -451,6 +533,9 @@ def verify_run(run_dir: Path) -> list[Check]:
         pub = _parse_public_key((run_dir / PUBKEY_NAME).read_bytes())
         sig = bytes.fromhex((run_dir / SIG_NAME).read_text(encoding="utf-8").strip())
         pub.verify(sig, canonical(manifest))
+        signing = manifest.get("signing")
+        if signing and public_key_fingerprint(pub) != signing["public_key_fingerprint"]:
+            raise ValueError("bundled public key does not match signing metadata")
         checks.append(
             Check(
                 "ed25519 signature",
@@ -667,8 +752,13 @@ def verify_run(run_dir: Path) -> list[Check]:
 def verify_bundle(
     run_dir: Path,
     trusted_key: Path | Ed25519PublicKey | None = None,
+    trusted_registry: Path | SigningKeyRegistry | None = None,
 ) -> VerificationResult:
     """Inspect a bundle and separately decide whether its signer is trusted."""
+    if trusted_key is not None and trusted_registry is not None:
+        raise TrustedKeyConfigurationError(
+            "trusted key and trusted key registry are mutually exclusive"
+        )
     run_dir = Path(run_dir)
     checks = verify_run(run_dir)
     integrity_checks = [check for check in checks if check.category == "integrity"]
@@ -689,12 +779,43 @@ def verify_bundle(
     except (OSError, TypeError, ValueError):
         pass
 
-    if trusted_key is None:
-        signer_trust = "not_configured"
-        trusted_fingerprint = None
-        trust_ok = False
-        trust_detail = "no independently supplied trusted key was configured"
-    else:
+    trust_blocker = ""
+    if trusted_registry is not None:
+        if isinstance(trusted_registry, (str, Path)):
+            registry_path = Path(trusted_registry)
+            if registry_path.resolve().is_relative_to(run_dir.resolve()):
+                raise TrustedKeyConfigurationError(
+                    "the trusted key registry must be stored separately from the evidence bundle"
+                )
+        registry = (
+            load_trusted_registry(trusted_registry)
+            if isinstance(trusted_registry, (str, Path))
+            else trusted_registry
+        )
+        if not isinstance(registry, SigningKeyRegistry):
+            raise TrustedKeyConfigurationError("trusted key registry is invalid")
+        try:
+            manifest = _load_json_object(
+                (run_dir / MANIFEST_NAME).read_text(encoding="utf-8"), MANIFEST_NAME
+            )
+            signing = manifest.get("signing")
+            if not isinstance(signing, dict):
+                raise ValueError("bundle has no signed key identity")
+            entry = registry.find(
+                str(signing.get("provider")),
+                str(signing.get("key_id")),
+                str(signing.get("key_version")),
+            )
+            if entry is None:
+                raise ValueError("signed key identity is absent from trusted registry")
+            if entry.public_key_fingerprint != signing.get("public_key_fingerprint"):
+                raise ValueError("trusted registry fingerprint does not match signed identity")
+            key = entry.public_key()
+            trust_blocker = "trusted key version is revoked" if entry.status == "revoked" else ""
+        except (OSError, TypeError, ValueError, SigningConfigurationError) as exc:
+            key = None
+            trust_blocker = str(exc)
+    elif trusted_key is not None:
         key = (
             load_trusted_key(trusted_key)
             if isinstance(trusted_key, (str, Path))
@@ -702,26 +823,40 @@ def verify_bundle(
         )
         if not isinstance(key, Ed25519PublicKey):
             raise TrustedKeyConfigurationError("trusted key is not Ed25519")
+    else:
+        key = None
+
+    if key is None:
+        signer_trust = "not_configured"
+        trusted_fingerprint = None
+        trust_ok = False
+        trust_detail = trust_blocker or "no independently supplied trusted key was configured"
+    else:
         trusted_fingerprint = public_key_fingerprint(key)
-        try:
-            manifest = json.loads((run_dir / MANIFEST_NAME).read_text(encoding="utf-8"))
-            signature = bytes.fromhex(
-                (run_dir / SIG_NAME).read_text(encoding="utf-8").strip()
-            )
-            key.verify(signature, canonical(manifest))
-            signer_trust = "trusted"
-            trust_ok = True
-            trust_detail = f"signature verified with trusted key {trusted_fingerprint}"
-        except InvalidSignature:
+        if trust_blocker:
             signer_trust = "untrusted"
             trust_ok = False
-            trust_detail = (
-                "signature does not verify with the independently supplied trusted key"
-            )
-        except (OSError, ValueError, TypeError) as exc:
-            signer_trust = "untrusted"
-            trust_ok = False
-            trust_detail = f"signer trust could not be evaluated: {exc}"
+            trust_detail = trust_blocker
+        else:
+            try:
+                manifest = json.loads((run_dir / MANIFEST_NAME).read_text(encoding="utf-8"))
+                signature = bytes.fromhex(
+                    (run_dir / SIG_NAME).read_text(encoding="utf-8").strip()
+                )
+                key.verify(signature, canonical(manifest))
+                signer_trust = "trusted"
+                trust_ok = True
+                trust_detail = f"signature verified with trusted key {trusted_fingerprint}"
+            except InvalidSignature:
+                signer_trust = "untrusted"
+                trust_ok = False
+                trust_detail = (
+                    "signature does not verify with the independently supplied trusted key"
+                )
+            except (OSError, ValueError, TypeError) as exc:
+                signer_trust = "untrusted"
+                trust_ok = False
+                trust_detail = f"signer trust could not be evaluated: {exc}"
 
     checks.append(
         Check(

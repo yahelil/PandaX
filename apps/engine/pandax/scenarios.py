@@ -172,7 +172,8 @@ def run_scenario(scenario_id: str, out_base: Path | None = None) -> ev.Stream:
     # Seal a small comparison bundle too: it records the input manifests and
     # their digests; source runs remain independently verifiable.
     from .context import KEY_PATH, new_run_dir
-    from .evidence import Ledger, load_or_create_key, write_manifest
+    from .evidence import Ledger, write_manifest
+    from .signing import configured_signer
     dest, run_id = new_run_dir(out_base)
     path = dest / 'comparison.json'
     path.write_text(json.dumps(report, indent=2), encoding='utf-8')
@@ -185,7 +186,8 @@ def run_scenario(scenario_id: str, out_base: Path | None = None) -> ev.Stream:
                           if (dest / f'{side}.manifest.json').exists()],
                   outputs=[ledger.ref(path)], params={'scenario': scenario_id})
     write_manifest(run_dir=dest, run_id=run_id, product={'name': scenario['name'] + ' comparison'},
-                   tool_versions={'pandax.scenarios': '1'}, ledger=ledger, key=load_or_create_key(KEY_PATH))
+                   tool_versions={'pandax.scenarios': '1'}, ledger=ledger,
+                   signer=configured_signer(KEY_PATH))
     yield ev.run_done('Comparison checks passed' if report['passed'] else 'Comparison checks failed',
                      ev.GOOD if report['passed'] else ev.ALERT_LVL,
                      run_id=run_id, run_dir=str(dest), comparison=report, comparison_passed=report['passed'])

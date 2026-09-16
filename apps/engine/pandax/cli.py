@@ -356,6 +356,11 @@ def verify(
         "--trusted-key",
         help="Independently supplied Ed25519 public key (default: PANDAX_TRUSTED_KEY)",
     ),
+    trusted_key_registry: Optional[Path] = typer.Option(
+        None,
+        "--trusted-key-registry",
+        help="Versioned public-key registry supplied separately from evidence",
+    ),
     inspect_only: bool = typer.Option(
         False,
         "--inspect-only",
@@ -366,8 +371,13 @@ def verify(
     ),
 ) -> None:
     """Verify bundle integrity and signer trust as separate claims."""
-    if trusted_key is not None and inspect_only:
-        raise typer.BadParameter("--trusted-key and --inspect-only cannot be used together")
+    selected_trust = sum(
+        value is not None for value in (trusted_key, trusted_key_registry)
+    ) + int(inspect_only)
+    if selected_trust > 1:
+        raise typer.BadParameter(
+            "--trusted-key, --trusted-key-registry, and --inspect-only are mutually exclusive"
+        )
     target = _resolve_run(run_dir)
     console.print()
     console.print(
@@ -385,14 +395,18 @@ def verify(
     )
 
     configured = None
-    if not inspect_only:
+    if not inspect_only and trusted_key_registry is None:
         configured = trusted_key or (
             Path(os.environ["PANDAX_TRUSTED_KEY"])
             if os.environ.get("PANDAX_TRUSTED_KEY")
             else None
         )
     try:
-        result = verify_bundle(target, configured)
+        result = verify_bundle(
+            target,
+            configured,
+            trusted_registry=trusted_key_registry,
+        )
     except TrustedKeyConfigurationError as exc:
         console.print(f"[bold red]Trusted-key configuration error:[/] {exc}")
         raise typer.Exit(code=2) from exc

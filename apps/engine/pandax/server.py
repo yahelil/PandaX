@@ -26,7 +26,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 
 from . import events as ev
 from .cases import CaseStore
-from .context import OUT_DIR, ROOT
+from .context import KEY_PATH, OUT_DIR, ROOT
 from .evidence import TrustedKeyConfigurationError, verify_bundle
 from .monitoring import MonitoringError, MonitoringStore
 from .stages.sbom import is_matchable_purl
@@ -49,14 +49,17 @@ async def lifespan(app: FastAPI):
     from .portfolio_runtime import (
         database_allows_background_growth,
         database_settings,
+        get_notification_delivery_worker,
         get_release_monitoring_repository,
         get_storage_status,
     )
+    from .notification_delivery import NotificationDeliveryLoop
     from .release_monitoring import monitoring_store_runner
     from .release_monitoring_worker import ReleaseMonitoringLoop
 
     database_settings()  # Managed environments fail before serving if PostgreSQL is absent.
     get_storage_status()  # Managed environments require a reachable private object bucket.
+    _signing_state()  # Managed signing policy is checked before accepting work.
     interval = max(1, float(os.environ.get("PANDAX_ADVISORY_REFRESH_SECONDS", "3600")))
     loop = AdvisoryRefreshLoop(_advisory_service, interval)
     release_interval = max(
@@ -72,13 +75,23 @@ async def lifespan(app: FastAPI):
         interval_seconds=release_interval,
         growth_allowed=database_allows_background_growth,
     )
+    delivery_loop = NotificationDeliveryLoop(
+        get_notification_delivery_worker,
+        interval_seconds=max(
+            1, float(os.environ.get("PANDAX_NOTIFICATION_DELIVERY_SECONDS", "30"))
+        ),
+        growth_allowed=database_allows_background_growth,
+    )
     app.state.advisory_refresh = loop
     app.state.release_monitoring = release_loop
+    app.state.notification_delivery = delivery_loop
     loop.start()
     release_loop.start()
+    delivery_loop.start()
     try:
         yield
     finally:
+        delivery_loop.stop()
         release_loop.stop()
         loop.stop()
 
@@ -188,7 +201,42 @@ def database_readiness() -> dict[str, object]:
         storage = get_storage_status()
     except Exception as exc:
         raise HTTPException(503, "evidence storage unavailable") from exc
-    return {**database.as_dict(), "storage": storage}
+    try:
+        signer, registry = _signing_state()
+    except Exception as exc:
+        raise HTTPException(503, "signing custody unavailable") from exc
+    return {
+        **database.as_dict(),
+        "storage": storage,
+        "signing": {
+            "provider": signer.identity.provider,
+            "key_id": signer.identity.key_id,
+            "key_version": signer.identity.key_version,
+            "public_key_fingerprint": signer.identity.public_key_fingerprint,
+            "registry_keys": len(registry.keys),
+        },
+    }
+
+
+def _signing_state():
+    from .signing import configured_registry, configured_signer
+
+    signer = configured_signer(KEY_PATH)
+    return signer, configured_registry(signer)
+
+
+@api.get("/.well-known/actis-signing-keys.json", include_in_schema=False)
+def signing_key_registry() -> dict[str, Any]:
+    from .signing import configured_registry, configured_signer, load_registry_b64
+
+    try:
+        encoded = os.environ.get("PANDAX_SIGNING_KEY_REGISTRY_B64", "").strip()
+        if encoded:
+            return load_registry_b64(encoded).as_dict()
+        signer = configured_signer(KEY_PATH)
+        return configured_registry(signer).as_dict()
+    except Exception as exc:
+        raise HTTPException(503, "signing-key registry unavailable") from exc
 
 
 def _case_store() -> CaseStore:

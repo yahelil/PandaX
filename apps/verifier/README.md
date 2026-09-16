@@ -40,6 +40,15 @@ and run:
 actis-verify evidence.zip --trusted-key actis-public.pem
 ```
 
+After key rotation, verify against a separately distributed versioned registry:
+
+```powershell
+actis-verify evidence.zip --trusted-key-registry actis-signing-keys.json
+```
+
+Active and historical versions can establish trust. Revoked versions remain
+identifiable but return an untrusted result.
+
 A successful result says `TRUSTED` and exits with code 0.
 
 ## Inspect older evidence without a trusted key

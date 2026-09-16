@@ -63,6 +63,7 @@ def seal(
     records: list[dict[str, object]],
     *,
     schema: str = "actis/manifest/v1",
+    signing: dict[str, str] | None = None,
 ) -> dict[str, object]:
     ledger = "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in records)
     (run / "ledger.jsonl").write_text(ledger, encoding="utf-8")
@@ -87,6 +88,8 @@ def seal(
         "files": files,
         "signature_note": "fixture",
     }
+    if signing is not None:
+        manifest["signing"] = signing
     (run / "manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
     )

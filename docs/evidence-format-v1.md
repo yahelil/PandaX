@@ -63,6 +63,9 @@ Required fields are:
 `signature_note` is optional, informational signed text. Other manifest fields
 are allowed for forward-compatible metadata: v1 readers must preserve them when
 canonicalizing and checking the signature, but may otherwise ignore them.
+New Actis writers include a signed `signing` object with `provider`, `algorithm`,
+`key_id`, `key_version`, and `public_key_fingerprint`. This identifies the exact
+key version without changing Ed25519 encoding or making the bundled key trusted.
 Control files (`manifest.json`, `manifest.sig`, and `pubkey.pem`) must not appear
 in `files`, because the manifest cannot commit to itself or its derived seal.
 
@@ -111,6 +114,11 @@ configuration. A machine-readable trusted-key configuration error uses
 `actis/verifier-error/v1`, specified by
 [verifier-error-v1.schema.json](schemas/verifier-error-v1.schema.json).
 Inspection success never changes `signer_trust` to `trusted`.
+
+A separately distributed `actis/signing-key-registry/v1` document can contain
+active, historical, and revoked public-key versions. A matching active or
+historical entry can establish trust; a revoked entry cannot. Installations may
+publish this public-only document at `/.well-known/actis-signing-keys.json`.
 
 ## Compatibility and migration policy
 

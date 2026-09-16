@@ -21,9 +21,9 @@ from .context import (
     KEY_PATH,
     RunContext,
     new_run_dir,
-    signing_key_path,
 )
-from .evidence import Ledger, load_or_create_key, sha256_file, write_manifest
+from .evidence import Ledger, sha256_file, write_manifest
+from .signing import configured_signer
 from .feeds import Feeds
 from .stages import clock, dossier, ingest, match, sbom, triage
 from . import exposure, telemetry
@@ -193,22 +193,24 @@ def _run(
 
     # --- seal the bundle -----------------------------------------------------
     yield ev.start(STAGE_SEAL, "hash-chaining and signing the evidence bundle")
-    configured_key_path = signing_key_path(KEY_PATH)
-    key = load_or_create_key(configured_key_path)
+    signer = configured_signer(KEY_PATH)
     manifest = write_manifest(
         run_dir=run_dir,
         run_id=run_id,
         product=ctx.product.get("product", {}),
         tool_versions=ctx.tool_versions,
         ledger=ledger,
-        key=key,
+        signer=signer,
     )
     yield ev.log(STAGE_SEAL, f"ledger: {len(ledger.records)} chained records")
     yield ev.log(STAGE_SEAL, f"chain root: {manifest['ledger_root']}", ev.GOOD)
     yield ev.log(
         STAGE_SEAL, f"manifest covers {len(manifest['files'])} files", ev.GOOD
     )
-    yield ev.log(STAGE_SEAL, f"signing key: {configured_key_path}")
+    yield ev.log(
+        STAGE_SEAL,
+        f"signing key: {signer.identity.provider}:{signer.identity.key_id}:v{signer.identity.key_version}",
+    )
     yield ev.artifact(
         STAGE_SEAL, "manifest.json", sha256_file(run_dir / "manifest.json")
     )

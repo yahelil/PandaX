@@ -7,7 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict
 
 from .auth import authorize_request
-from .portfolio_api import IdentityDependency, PORTFOLIO_ROLES, PortfolioIdentity, local_identity
+from .notification_delivery import DeliveryConflict, DeliveryNotFound, NotificationDeliveryError
+from .portfolio_api import (
+    IdentityDependency, PORTFOLIO_EDIT_ROLES, PORTFOLIO_ROLES,
+    PortfolioIdentity, local_identity,
+)
 from .search_notifications import (
     NotificationNotFound,
     SearchNotificationConflict,
@@ -69,6 +73,23 @@ class NotificationResponse(ApiModel):
     last_seen_at: datetime
     created_at: datetime
     updated_at: datetime
+
+
+class DeliveryResponse(ApiModel):
+    id: str
+    organization_id: str
+    notification_id: str
+    integration_id: str
+    channel: Literal["email", "webhook", "jira"]
+    status: Literal["queued", "delivering", "retrying", "delivered", "dead_letter", "suppressed"]
+    attempt_count: int
+    max_attempts: int
+    next_attempt_at: datetime
+    provider_reference: str | None
+    error_code: str | None
+    created_at: datetime
+    updated_at: datetime
+    delivered_at: datetime | None
 
 
 RepositoryDependency = Callable[[], SearchNotificationRepository]
@@ -138,6 +159,31 @@ def create_search_notifications_router(
             organization_id, notification_id, actor_id=identity.actor_id,
         ))
 
+    @router.get(collection + "/deliveries", response_model=list[DeliveryResponse])
+    def list_deliveries(
+        organization_id: str,
+        repository: Repository,
+        identity: Identity,
+        delivery_status: Literal["queued", "delivering", "retrying", "delivered", "dead_letter", "suppressed"] | None = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 100,
+    ):
+        _authorize(identity, organization_id)
+        return _call(lambda: repository.list_deliveries(
+            organization_id, status=delivery_status, limit=limit
+        ))
+
+    @router.post(collection + "/deliveries/{delivery_id}/retry", response_model=DeliveryResponse)
+    def retry_delivery(
+        organization_id: str,
+        delivery_id: str,
+        repository: Repository,
+        identity: Identity,
+    ):
+        authorize_request(
+            identity, organization_id, PORTFOLIO_EDIT_ROLES, sensitive=True
+        )
+        return _call(lambda: repository.retry_delivery(organization_id, delivery_id))
+
     return router
 
 
@@ -170,6 +216,12 @@ def _call(operation: Callable[[], Any]):
     except SearchNotificationConflict as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
     except SearchNotificationValidationError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    except DeliveryNotFound as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except DeliveryConflict as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except (NotificationDeliveryError, ValueError) as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
     except SearchNotificationError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc

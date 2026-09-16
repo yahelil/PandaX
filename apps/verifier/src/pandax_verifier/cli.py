@@ -23,6 +23,11 @@ def _parser() -> argparse.ArgumentParser:
         help="Public key received separately from the evidence",
     )
     trust.add_argument(
+        "--trusted-key-registry",
+        type=Path,
+        help="Versioned public-key registry received separately from the evidence",
+    )
+    trust.add_argument(
         "--inspect-only",
         action="store_true",
         help="Check integrity without claiming that the signer is trusted",
@@ -57,7 +62,11 @@ def _print_human(result: object) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        result = verify_bundle(args.bundle, trusted_key=args.trusted_key)
+        result = verify_bundle(
+            args.bundle,
+            trusted_key=args.trusted_key,
+            trusted_registry=args.trusted_key_registry,
+        )
     except TrustedKeyConfigurationError as exc:
         if args.json:
             print(

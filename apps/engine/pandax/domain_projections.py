@@ -17,15 +17,18 @@ from .search_notifications import (
 class DomainProjector:
     """Idempotent tenant-scoped projection at production read boundaries."""
 
-    def __init__(self, engine: Engine):
+    def __init__(self, engine: Engine, *, delivery_daily_limit: int = 500):
         self.engine = engine
+        self.delivery_daily_limit = delivery_daily_limit
 
     def project(self, organization_id: str) -> None:
         ComplianceRepository(self.engine).project_release_evidence(organization_id)
         snapshot = HomeReadModel(self.engine).get(
             organization_id, queue_limit=50, recent_limit=1,
         )
-        inbox = SearchNotificationRepository(self.engine)
+        inbox = SearchNotificationRepository(
+            self.engine, delivery_daily_limit=self.delivery_daily_limit
+        )
         for action in snapshot.action_queue:
             inbox.upsert_notification(
                 organization_id,
@@ -44,9 +47,13 @@ class DomainProjector:
 
 
 class ProjectedHomeReadModel(HomeReadModel):
-    def __init__(self, engine: Engine, *, clock: Any = None):
+    def __init__(
+        self, engine: Engine, *, clock: Any = None, delivery_daily_limit: int = 500
+    ):
         super().__init__(engine, clock=clock)
-        self.projector = DomainProjector(engine)
+        self.projector = DomainProjector(
+            engine, delivery_daily_limit=delivery_daily_limit
+        )
 
     def get(
         self,
@@ -69,9 +76,11 @@ class ProjectedComplianceRepository(ComplianceRepository):
 
 
 class ProjectedSearchNotificationRepository(SearchNotificationRepository):
-    def __init__(self, engine: Engine):
-        super().__init__(engine)
-        self.projector = DomainProjector(engine)
+    def __init__(self, engine: Engine, *, delivery_daily_limit: int = 500):
+        super().__init__(engine, delivery_daily_limit=delivery_daily_limit)
+        self.projector = DomainProjector(
+            engine, delivery_daily_limit=delivery_daily_limit
+        )
 
     def list_notifications(self, organization_id: str, **filters: Any):
         self.projector.project(organization_id)

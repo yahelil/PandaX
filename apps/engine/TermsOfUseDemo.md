@@ -1,139 +1,68 @@
-# Terms of Use — Actis by PandaX
+# Terms of Use — Actis by PandaX (private-beta draft)
 
-**Last updated: [DATE]**
+**Draft revised:** 16 September 2026
+**Status:** Internal draft for legal and company review. It is not approved for publication or customer acceptance.
 
-These Terms of Use ("**Terms**") are a binding agreement between **[PANDAX LEGAL ENTITY NAME], [entity type], registered at [ADDRESS], [company/VAT number]** ("**PandaX**," "**we**," "**us**," or "**our**") and the organization or individual accessing or using the Actis product and any related websites, software, documents, exports, or services (together, the "**Service**") ("**you**," "**your**," or the "**Customer**").
+> **Before publication:** Confirm the contracting entity's registered name, legal form, registered address and registration number; the governing law and courts; the privacy/data-processing documents; and the liability allocation. PandaX is the product brand, but the repository does not establish these legal facts. Do not replace them with a test customer's details or infer them from the team's location.
 
-**By accessing or using the Service, creating an account, or clicking to accept these Terms, you agree to be bound by them. If you do not agree, do not access or use the Service.** If you accept these Terms on behalf of a company or other legal entity, you represent that you have authority to bind that entity, and "you" refers to that entity.
+These Terms of Use (the **Terms**) will govern access to the invite-only Actis private beta offered under the PandaX brand by **[CONFIRMED LEGAL CONTRACTING ENTITY, LEGAL FORM, REGISTERED ADDRESS AND REGISTRATION NUMBER]** (**PandaX**, **we**, **us**) to the organization that accepts them (**Customer**, **you**). The individual accepting for a Customer must be authorized to bind that organization. The effective version and acceptance time must be recorded in the product before a Customer submits beta data. Any signed pilot agreement or order prevails over these Terms where it expressly says so.
 
----
+## 1. What the beta provides
 
-## 1. Definitions
+Actis includes a customer-side Collector, a hosted product and release workspace, analysis of authorized software inventories, review workflows, draft Cyber Resilience Act (CRA) materials, evidence exports, and an independent offline verifier. The CRA means [Regulation (EU) 2024/2847](https://eur-lex.europa.eu/eli/reg/2024/2847/oj), as applicable to the Customer's products. **Input** is material the Customer supplies or authorizes Actis to process; **Output** is the findings, records, drafts and exports generated from it.
 
-- **"Service"** means the Actis software, the PandaX platform, associated tools, and any records, drafts, documents, reports, exports, or other output generated through them ("**Output**").
-- **"Input"** means any data, files, software bills of materials (SBOMs), scan reports, findings, documents, configurations, or other materials you or a third party provide to or connect with the Service.
-- **"CRA"** means Regulation (EU) 2024/2847 (the EU Cyber Resilience Act) and any related or successor regulation, guidance, or standard.
-- **"Documentation"** means user guides and materials we make available describing the Service.
+The beta is invitation-only, pre-production and free of charge. There is no paid subscription, automatic upgrade or production service-level commitment under these Terms. Access to the beta is not approval to start an external pilot: PandaX must separately authorize a pilot before real customer data is accepted.
 
----
+The first customer Collector release supports Windows x64 collection from directories, ZIP/TAR archives, CycloneDX 1.2/1.6 JSON and SPDX 2.2/2.3 JSON. Other operating systems, container images and specialist firmware extraction are outside this first release. Supported inputs and limits may be described more precisely in the product documentation.
 
-## 2. Nature of the Service — What Actis Is and Is Not
+## 2. Collection, uploads and account security
 
-2.1 **Documentation tooling only.** Actis is a software tool that helps you assemble, organize, and draft product-security and compliance documentation from Input you provide or connect. The Service produces documentation and records. **It does not perform, and is not a substitute for, security testing, vulnerability scanning, penetration testing, code review, conformity assessment, certification, audit, or legal advice.**
+The Collector processes supported source material locally and creates a minimized evidence package. It shows the package before upload and requires an explicit upload approval. Raw source files and customer private signing keys are not part of the ordinary Collector package. A separate raw-artifact upload, if enabled for an organization, requires its own authorization and consent; it is not part of the first Collector release.
 
-2.2 **No legal, regulatory, or professional advice.** Nothing produced by or communicated through the Service constitutes legal advice, regulatory advice, a legal opinion, a conformity opinion, a certificate, an attestation, or a verdict of any kind. The Service does not determine, and does not represent, that you, your products, or your Output are compliant with the CRA or any other law, regulation, or standard. **You are solely responsible for your own compliance and for obtaining independent legal and professional advice.**
+The Customer controls its signing key and is responsible for protecting the private key, enrolling only approved public keys, and promptly revoking a key that is lost or compromised. A valid evidence signature establishes package integrity and a match to an enrolled key; it is not a legal identity certificate or a qualified electronic seal. The Customer must protect its accounts and short-lived access tokens, maintain authorized users and roles, and tell PandaX promptly about suspected unauthorized access.
 
-2.3 **No guarantee of completeness or detection.** The Service depends entirely on the Input provided to it and on third-party tools and data sources outside our control. **The Service does not, and does not purport to, detect, identify, find, catch, flag, or report all vulnerabilities, defects, risks, missing evidence, non-conformities, or issues of any kind.** Absence of a finding, flag, or item in any Output does not mean that no vulnerability, defect, risk, or issue exists. You must not rely on the Service to identify every issue or to be complete, accurate, or error-free.
+The Customer may submit only material it is entitled to use and share for this purpose. The beta is not intended to receive secrets, credentials, private keys, unnecessary personal data or unrelated sensitive material. The Customer must remove such material before upload, even when a preview or automated exclusion check is available. Each Customer user must comply with applicable law and the product documentation and must not interfere with the Service or another customer's access.
 
-2.4 **You remain in control and responsible.** The Service does not submit, file, or transmit anything to any authority, platform, or third party without your explicit authorization. You are responsible for reviewing all Output before use, submission, or reliance. Any decision to ship a product, submit a report, make a regulatory filing, or rely on any Output is yours alone.
+## 3. Findings, drafts and Customer decisions
 
-2.5 **Third-party inputs and tools.** The Service is neutral as to and may connect with third-party scanners, data feeds, and tools. We do not control, verify, endorse, or accept responsibility for the accuracy, completeness, timeliness, or availability of any third-party Input, tool, feed, or service, and we are not liable for them.
+Actis inventories components and compares supported identifiers with vulnerability and other external data sources. Coverage, extraction and source limitations are part of the result. A missing finding does not establish that a product is secure, free of vulnerabilities, or compliant. A finding alone does not prove exploitability or product impact. Partial or unsupported extraction is inconclusive, not a clean result.
 
----
+The Service helps organize evidence and prepare reviewable CRA workflow drafts. It does not conduct penetration testing, code review, independent conformity assessment or certification, and does not provide legal advice or a compliance verdict. The Customer must review and validate Input, findings, source coverage and Output with qualified people before relying on them. Product-release, disclosure, regulatory and risk-reducing VEX decisions remain with the Customer's named authorized reviewers. Actis does not automatically submit regulatory filings or notify downstream end users.
 
-## 3. Your Responsibilities
+Third-party package tools and intelligence feeds may be incomplete, unavailable or delayed. PandaX does not promise that every issue will be found or that every source statement is correct. The Customer should use its own testing and professional review alongside the Service.
 
-You are responsible for, and warrant that you will:
+## 4. Customer data and privacy
 
-(a) provide Input that is complete, accurate, current, and lawful, and maintain it;
-(b) independently review, verify, and validate all Output before relying on it, using it, or submitting it anywhere;
-(c) perform or obtain appropriate security testing, assessment, and legal review through qualified professionals;
-(d) make all compliance, product, release, disclosure, and filing decisions yourself;
-(e) obtain and maintain all rights, consents, and licenses necessary for the Input you provide; and
-(f) use the Service only in accordance with these Terms, the Documentation, and applicable law.
+As between the parties, the Customer retains its rights in Input and may export Output, subject to PandaX's rights in the underlying software and third-party materials. The Customer grants PandaX only the rights needed to receive, store, analyze, secure, support and return authorized Input and Output for the Service and to meet applicable legal obligations. These Terms do not grant PandaX a general right to publish Customer data or use it to train models.
 
-You acknowledge that the quality and usefulness of any Output depends on the Input and that "garbage in, garbage out" applies. We are not responsible for Output that is inaccurate, incomplete, or unfit as a result of Input or of your failure to review it.
+The hosted Service uses contracted infrastructure and may query external intelligence sources to analyze software identifiers. An optional integration may transmit information to a third party only when an authorized Customer user configures or approves that workflow. The Customer remains responsible for the third-party services it chooses to connect. Product-specific retention, export, deletion and legal-hold rules are described in the applicable privacy and data-processing documents and Customer settings; these Terms do not override those documents or mandatory law.
 
----
+The website privacy notice covers website visits only. A separate beta privacy/data-processing notice must be approved and provided before personal data is accepted in the hosted beta.
 
-## 4. Disclaimer of Warranties
+## 5. Intellectual property and permitted use
 
-4.1 **THE SERVICE AND ALL OUTPUT ARE PROVIDED "AS IS" AND "AS AVAILABLE," WITH ALL FAULTS AND WITHOUT WARRANTY OF ANY KIND.** To the maximum extent permitted by applicable law, PandaX expressly disclaims all warranties, conditions, representations, and terms of any kind, whether express, implied, statutory, or otherwise, including any implied warranties or conditions of merchantability, satisfactory quality, fitness for a particular purpose, accuracy, completeness, title, non-infringement, and any warranties arising from course of dealing, usage, or trade practice.
+PandaX and its licensors retain their rights in Actis, the Collector, the hosted application, the verifier and documentation. During authorized beta access, PandaX grants the Customer a limited, non-exclusive, non-transferable right to use the provided software and Service for its own internal evaluation and authorized product-security workflow, subject to any applicable open-source license or signed pilot agreement.
 
-4.2 Without limiting the foregoing, PandaX does **not** warrant that: (a) the Service or Output will be accurate, complete, reliable, current, or error-free; (b) the Service will detect, identify, or report any or all vulnerabilities, risks, defects, missing evidence, or non-conformities; (c) the Service or any Output will meet your requirements or achieve any regulatory, compliance, conformity, or business outcome; (d) the Service will be uninterrupted, secure, or available at any particular time; or (e) any errors or defects will be corrected.
+The Customer must not resell the Service, misrepresent an Actis result as certification, or attempt to bypass access controls. Restrictions on reverse engineering apply only to the extent permitted by applicable law and do not limit rights granted by an applicable open-source license. Feedback may be used to improve the product without disclosing the Customer's confidential information.
 
-4.3 Any advice or information, whether oral or written, obtained from PandaX or through the Service does not create any warranty not expressly stated in these Terms.
+## 6. Availability, changes and ending access
 
----
+The private beta may change, be interrupted or have features withdrawn. PandaX will use reasonable efforts to communicate material changes and planned discontinuation, but these Terms do not create an uptime, support-response or production-readiness guarantee. Material changes to these Terms require a new version and notice; continued access alone does not replace a required versioned acknowledgement.
 
-## 5. Limitation of Liability
+Either party may end beta participation under the signed pilot agreement or, if none applies, by giving written notice to the other party. PandaX may suspend access to address a security incident, unlawful use or a material breach, with notice when reasonably possible. After access ends, export and deletion are handled under the applicable retention and data-processing terms, including any mandatory retention or legal hold. The Customer should export needed Output before access ends.
 
-5.1 **Exclusion of certain damages.** To the maximum extent permitted by applicable law, PandaX and its affiliates, officers, directors, employees, agents, and suppliers will not be liable for any indirect, incidental, special, consequential, exemplary, or punitive damages, or for any loss of profits, revenue, business, goodwill, data, anticipated savings, or opportunity, or for any regulatory fines, penalties, sanctions, or enforcement costs, or for any liability to third parties, in each case however caused and under any theory of liability, whether in contract, tort (including negligence), strict liability, or otherwise, even if PandaX has been advised of the possibility of such damages.
+## 7. Warranties and liability — legal review required
 
-5.2 **Missed or unreported issues.** Without limiting Section 4, PandaX will have no liability whatsoever arising out of or relating to any vulnerability, defect, risk, issue, missing evidence, or non-conformity that the Service did not detect, identify, flag, report, or include in any Output, or that was inaccurately or incompletely reported, regardless of cause.
+The beta is supplied for evaluation. To the extent permitted by applicable law, PandaX does not promise uninterrupted operation, complete vulnerability detection, a particular regulatory outcome, or that Output will be suitable without Customer review. Nothing in these Terms excludes liability that cannot lawfully be excluded.
 
-5.3 **Aggregate cap.** To the maximum extent permitted by applicable law, the total aggregate liability of PandaX arising out of or relating to the Service or these Terms will not exceed the total fees actually paid by you to PandaX for the Service in the [SIX (6)] month period immediately preceding the event giving rise to the claim, or [€100], whichever is greater.
+**The parties' liability cap, any exclusions of loss, indemnities and any mandatory statutory rights must be settled in the signed pilot agreement or an approved final version of these Terms.**
 
-5.4 **Basis of the bargain.** You acknowledge that the disclaimers and limitations in these Terms reflect a reasonable allocation of risk, are a material and essential basis of the agreement between the parties, and that the Service would not be provided on the same terms without them. These limitations apply even if any remedy fails of its essential purpose.
+## 8. Governing law, notices and general terms
 
-5.5 **Non-excludable liability.** Nothing in these Terms excludes or limits any liability that cannot be excluded or limited under applicable law — for example, liability for death or personal injury caused by negligence, for fraud or fraudulent misrepresentation, for gross negligence or willful misconduct, or under mandatory statutory rights. Where liability cannot be excluded but can be limited, PandaX's liability is limited to the maximum extent permitted by law.
+**Governing law and courts:** [CONFIRM JURISDICTION AND COMPETENT COURTS WITH THE CONTRACTING ENTITY AND COUNSEL]. Mandatory rights that cannot be waived remain unaffected.
+
+Questions and contractual notices may be sent to **contact@pandax.online** until PandaX designates a verified legal-notice address in the approved Terms. If a provision is unenforceable, the remainder continues as far as the law allows. A failure to enforce a provision once is not a waiver. Neither party may assign these Terms without the other's consent, except to a successor in a genuine reorganization or sale that assumes the obligations. These Terms and any signed pilot agreement are the agreement for beta access; a signed pilot agreement controls on conflict.
 
 ---
 
-## 6. Indemnification
-
-To the maximum extent permitted by applicable law, you will defend, indemnify, and hold harmless PandaX and its affiliates, officers, directors, employees, and agents from and against any and all claims, demands, actions, proceedings, losses, liabilities, damages, fines, penalties, costs, and expenses (including reasonable legal fees) arising out of or relating to: (a) your Input; (b) your use of, or reliance on, the Service or any Output; (c) your products, releases, filings, disclosures, or compliance (or non-compliance) with the CRA or any other law, regulation, or standard; (d) your breach of these Terms or of any applicable law; or (e) any claim by a third party (including any customer, regulator, or authority of yours) arising from any of the foregoing.
-
----
-
-## 7. Intellectual Property; Your Data
-
-7.1 **PandaX IP.** PandaX and its licensors own all rights, title, and interest in and to the Service, including all software, technology, and Documentation. We grant you a limited, non-exclusive, non-transferable, revocable right to use the Service during the term, solely in accordance with these Terms.
-
-7.2 **Your Input and Output.** As between the parties, you retain ownership of your Input. You grant PandaX a non-exclusive license to host, process, and use your Input as necessary to provide and improve the Service. Subject to our rights in the underlying Service, the records and documents Actis produces from your Input are yours to export and use ("portable by default").
-
-7.3 **Feedback.** If you provide feedback or suggestions, we may use them without restriction or obligation to you.
-
----
-
-## 8. Acceptable Use
-
-You will not: (a) use the Service unlawfully or in violation of these Terms; (b) reverse engineer, decompile, or attempt to derive source code, except as permitted by mandatory law; (c) resell, sublicense, or provide the Service to third parties except as expressly permitted; (d) interfere with or disrupt the Service or its security; (e) misrepresent the nature, source, or status of any Output; or (f) present any Output as a certificate, conformity opinion, or verdict.
-
----
-
-## 9. Fees
-
-Fees, if any, are as set out in your order or subscription. PandaX does not charge based on, and its fees do not depend on, the outcome or result of any conformity assessment, audit, or regulatory decision. Except as required by mandatory law, fees are non-refundable.
-
----
-
-## 10. Term; Suspension; Termination
-
-10.1 These Terms apply while you access or use the Service. Either party may terminate as set out in the applicable order or, absent one, on [30] days' notice.
-
-10.2 We may suspend or terminate your access immediately if you breach these Terms, if required by law, or to protect the Service or others.
-
-10.3 Sections that by their nature should survive termination — including Sections 2, 4, 5, 6, 7, 11, 12, and 13 — survive.
-
----
-
-## 11. Changes to the Service and Terms
-
-We may modify the Service or these Terms at any time. If we make material changes to these Terms, we will provide reasonable notice (for example, by posting the updated Terms with a new "Last updated" date or by notifying you). Your continued use of the Service after the changes take effect constitutes acceptance.
-
----
-
-## 12. Governing Law and Jurisdiction
-
-These Terms are governed by the laws of **[COUNTRY / MEMBER STATE]**, without regard to its conflict-of-laws rules. The parties submit to the exclusive jurisdiction of the courts of **[CITY, COUNTRY]** for any dispute arising out of or relating to these Terms or the Service, without prejudice to any mandatory consumer protections that may apply.
-
----
-
-## 13. General
-
-13.1 **Severability.** If any provision is held unenforceable, it will be modified to the minimum extent necessary to make it enforceable, or if it cannot be, severed, and the remaining provisions remain in effect. In particular, the parties intend the disclaimers and limitations in Sections 4 and 5 to apply to the fullest extent permitted, and if any part is found overbroad, it should be read down rather than voided.
-
-13.2 **No waiver.** Failure to enforce a provision is not a waiver.
-
-13.3 **Assignment.** You may not assign these Terms without our consent; we may assign them to an affiliate or successor.
-
-13.4 **Entire agreement.** These Terms, together with any applicable order or subscription, are the entire agreement between the parties regarding the Service and supersede all prior agreements on that subject.
-
-13.5 **Force majeure.** Neither party is liable for delays or failures caused by events beyond its reasonable control.
-
-13.6 **Contact.** Questions about these Terms: **[CONTACT EMAIL / ADDRESS]**.
-
----
-
-*PandaX produces compliance documentation. It does not issue conformity opinions, certificates, or verdicts. This document is a template and not legal advice; have it reviewed by qualified counsel in your governing jurisdiction before use.*
+*This is a product-aligned working draft, not a published contract or legal advice. Qualified counsel and the contracting entity must approve the identity, jurisdiction, privacy/data-processing, and liability provisions before customer acceptance.*

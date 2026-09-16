@@ -29,18 +29,18 @@ decisions, exports a report, and verifies the copied package offline.
 
 ## Supported Collector matrix
 
-All inputs are processed locally. “Core” is required on native Windows, macOS,
-and Linux packages. The specialist path is supported only on a Linux host with
-Docker; Docker Desktop on Windows or macOS is outside the beta contract.
+All inputs are processed locally. The first customer Collector release is
+Windows x64 only. macOS, Linux, and specialist firmware/container extraction
+are later releases; their availability is not a beta acceptance requirement.
 
 | Input | Windows | macOS | Linux | Contract |
 |---|---|---|---|---|
-| Directory | Core | Core | Core | Safe recursive inventory; never execute contents. |
-| ZIP/TAR archive | Core | Core | Core | Reject traversal, links, duplicates, bombs, and limit violations. |
-| CycloneDX JSON 1.2/1.6 | Core | Core | Core | Normalize to the internal CycloneDX 1.6 component model. |
-| SPDX JSON 2.2/2.3 | Core | Core | Core | Normalize without inventing missing package identity. |
-| Container image | Not supported | Not supported | Linux/Docker | Local extraction/analysis; raw layers remain customer-side. |
-| SquashFS/UBIFS firmware | Not supported | Not supported | Linux/Docker | Sandboxed local extraction; unsupported formats fail closed. |
+| Directory | Windows x64 first | Later | Later | Safe recursive inventory; never execute contents. |
+| ZIP/TAR archive | Windows x64 first | Later | Later | Reject traversal, links, duplicates, bombs, and limit violations. |
+| CycloneDX JSON 1.2/1.6 | Windows x64 first | Later | Later | Normalize to the internal CycloneDX 1.6 component model. |
+| SPDX JSON 2.2/2.3 | Windows x64 first | Later | Later | Normalize without inventing missing package identity. |
+| Container image | Later | Later | Later | Raw layers stay customer-side. |
+| SquashFS/UBIFS firmware | Later | Later | Later | Sandboxed extraction needs a later specialist release. |
 
 Release packages require detached checksums/signatures and installation tests.
 Native OS code signing is not a beta promise. Public executable names are

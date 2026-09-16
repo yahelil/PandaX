@@ -22,6 +22,10 @@ uv run actis scan fixtures/smarthub-sh100-v2.3.1.zip
 
 Results and caches stay in the ignored `workspace/` folder. Install dashboard dependencies with `npm ci`, then run `uv run actis serve` to open the product workspace at http://127.0.0.1:4175.
 
+The customer-facing [Windows x64 Collector](docs/windows-collector.md) creates a
+minimized package signed by an explicitly configured customer key, previews the
+exact upload, and sends it only after approval.
+
 ## Find your way
 
 | Folder | Contents |

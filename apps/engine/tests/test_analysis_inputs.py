@@ -26,7 +26,8 @@ from pandax.analysis_storage import (
     LocalAnalysisInputStorage,
     MemoryAnalysisInputStorage,
 )
-from pandax.evidence import Ledger, write_manifest
+from pandax.evidence import Ledger, verify_bundle, write_manifest
+from pandax.collector import collect as collect_customer_package
 from pandax.organization_settings import create_trust_key_enrollment
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -170,6 +171,48 @@ def test_signed_collector_requires_active_customer_key_and_signed_binding(setup,
     settings.revoke_trust_key("org-1", key.id, reason="test", actor_id="admin")
     with pytest.raises(AnalysisJobValidationError, match="active enrolled"):
         create(repository, content, idempotency_key="signed-2")
+
+
+def test_customer_collector_package_is_independently_verified_and_analyzed(setup, tmp_path):
+    repository, _, settings = setup
+    key = Ed25519PrivateKey.generate()
+    public_pem = key.public_key().public_bytes(
+        serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+    ).decode("ascii")
+    challenge = settings.create_trust_key_challenge(
+        "org-1", key_name="customer-release", public_key_pem=public_pem, actor_id="admin"
+    )
+    settings.enroll_trust_key("org-1", **create_trust_key_enrollment(
+        key, "org-1", "customer-release", challenge
+    ), actor_id="admin")
+    private_path = tmp_path / "customer-private.pem"
+    private_path.write_bytes(key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ))
+    source = tmp_path / "customer-sbom.json"
+    source.write_bytes(sbom())
+    package = tmp_path / "customer-package.zip"
+    collect_customer_package(
+        source, package, organization_id="org-1", product_id="product-1",
+        release_id="release-1", signing_key=private_path,
+        workspace=tmp_path / "collector-work",
+    )
+    extracted = tmp_path / "independent-verification"
+    extracted.mkdir()
+    with zipfile.ZipFile(package) as archive:
+        for name in archive.namelist():
+            (extracted / name).write_bytes(archive.read(name))
+    verified = verify_bundle(extracted, key.public_key())
+    assert verified.integrity_ok and verified.signature_valid and verified.signer_trust == "trusted"
+    job = create(repository, package.read_bytes())
+    assert job.input_metadata["trust"]["status"] == "trusted"
+
+    def runner(path):
+        assert json.loads(path.read_text(encoding="utf-8"))["bomFormat"] == "CycloneDX"
+        yield ev.run_done("Complete", components=1, findings=0, kev=0, incidents=0)
+
+    assert repository.run("org-1", "product-1", "release-1", job.id, runner).status == "completed"
 
 
 @pytest.mark.parametrize("binding", ["product_id", "release_id"])

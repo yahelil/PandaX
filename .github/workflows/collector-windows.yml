@@ -1,0 +1,80 @@
+name: Windows Collector release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - collector-v*
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - run: uv sync --locked --extra dev
+      - run: uv run python -c "from tools.bootstrap import install_syft; install_syft()"
+      - run: uv run pytest apps/engine/tests/test_collector.py apps/engine/tests/test_analysis_inputs.py -q
+        env:
+          PYTHONPATH: apps/engine
+          PANDAX_COLLECTOR_WORKSPACE: workspace/collector-ci
+      - run: uv pip install --python .venv/Scripts/python.exe pyinstaller==6.16.0
+      - run: .venv/Scripts/pyinstaller.exe --clean --noconfirm --onedir --contents-directory . --name actis-collector --paths apps/engine --add-binary "workspace/tools/syft.exe;." apps/engine/pandax/collector_entry.py
+      - run: uv run python tools/collector_release.py package dist/actis-collector workspace/release/actis-collector-windows-x64.zip
+        env:
+          COLLECTOR_RELEASE_SIGNING_KEY_PEM: ${{ secrets.COLLECTOR_RELEASE_SIGNING_KEY_PEM }}
+      - run: uv run python tools/collector_release.py verify workspace/release/actis-collector-windows-x64.zip workspace/release/actis-collector-windows-x64.zip.release-pubkey.pem
+      - uses: actions/upload-artifact@v4
+        with:
+          name: actis-collector-windows-x64
+          path: |
+            workspace/release/actis-collector-windows-x64.zip
+            workspace/release/actis-collector-windows-x64.zip.sha256
+            workspace/release/actis-collector-windows-x64.zip.sha256.sig
+            workspace/release/actis-collector-windows-x64.zip.release-pubkey.pem
+          if-no-files-found: error
+
+  clean-windows-install:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      - run: uv sync --locked
+      - uses: actions/download-artifact@v4
+        with:
+          name: actis-collector-windows-x64
+          path: release
+      - run: uv run python tools/collector_release.py verify release/actis-collector-windows-x64.zip release/actis-collector-windows-x64.zip.release-pubkey.pem
+      - shell: pwsh
+        run: |
+          Expand-Archive -LiteralPath release/actis-collector-windows-x64.zip -DestinationPath installed
+          & installed/actis-collector/actis-collector.exe --help
+          & installed/actis-collector/syft.exe --version
+          @'
+          from pathlib import Path
+          from cryptography.hazmat.primitives import serialization
+          from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+          key = Ed25519PrivateKey.generate()
+          Path('workspace/collector-smoke-key.pem').parent.mkdir(parents=True, exist_ok=True)
+          Path('workspace/collector-smoke-key.pem').write_bytes(key.private_bytes(
+              serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+              serialization.NoEncryption()))
+          '@ | uv run python -
+          & installed/actis-collector/actis-collector.exe collect fixtures/example-sbom.cdx.json `
+            --output workspace/collector-smoke.zip --organization-id smoke-org `
+            --product-id smoke-product --release-id smoke-release `
+            --signing-key workspace/collector-smoke-key.pem `
+            --workspace workspace/collector-smoke-work
+          if ($LASTEXITCODE -ne 0) { throw 'clean Windows installation smoke failed' }

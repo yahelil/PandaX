@@ -24,6 +24,7 @@ dev = ["pytest>=8.0"]
 
 [project.scripts]
 actis = "pandax.cli:app"
+actis-collector = "pandax.collector_cli:app"
 
 [build-system]
 requires = ["hatchling"]

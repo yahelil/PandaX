@@ -2,6 +2,7 @@ import type { AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } 
 import { sanitizeAnalyticsEvent } from "./analytics";
 import { createDemoState, DEMO_IDS } from "./fixtures";
 import type { PrivacySafeAnalyticsEvent } from "./governanceApi";
+import type { AnalysisEvidenceFile } from "./releaseOperationsApi";
 import type {
   RegisterDocumentRevisionInput,
   AnalysisDraft,
@@ -513,12 +514,28 @@ export class FixtureAdapter implements DataAdapter {
         createdAt: now(),
       };
       state.releases.push(created);
-      product.activeReleaseId = created.id;
-      product.readiness = "incomplete_evidence";
-      product.monitoringHealth = "inactive";
       state.activities.unshift({ id: `activity-release-${state.activities.length + 1}`, type: "analysis", title: "Release registered", detail: `${product.name} ${created.version} is ready for evidence input.`, productId: product.id, releaseId: created.id, actorId: state.currentUserId, at: created.createdAt, targetUrl: `/products/${product.id}/releases/${created.id}` });
     });
     return structuredClone(created);
+  };
+
+  selectActiveRelease = async (productId: EntityId, releaseId: EntityId): Promise<Product> => {
+    this.mutate((state) => {
+      const product = state.products.find((item) => item.id === productId);
+      const release = state.releases.find((item) => item.id === releaseId && item.productId === productId);
+      if (!product || !release || release.status === "draft" || release.status === "end_of_support") throw new Error("Only a completed supported release can be active.");
+      const previous = state.releases.find((item) => item.id === product.activeReleaseId);
+      if (previous && previous.id !== releaseId && previous.status === "active") previous.status = "supported";
+      product.activeReleaseId = releaseId;
+      release.status = "active";
+    });
+    return structuredClone(this.state.products.find((item) => item.id === productId)!);
+  };
+
+  downloadReleaseReport = async (productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile> => {
+    const job = this.state.analysisJobs.find((item) => item.id === jobId && item.draft.productId === productId && item.draft.releaseId === releaseId && item.status === "completed");
+    if (!job) throw new Error("Completed release analysis not found.");
+    return { blob: new Blob([JSON.stringify(job.result, null, 2)], { type: "application/json" }), contentType: "application/json", filename: `actis-${releaseId}-report.json` };
   };
 
   previewAnalysis = async (draft: AnalysisDraft): Promise<AnalysisPreview> => {
@@ -785,7 +802,8 @@ export class FixtureAdapter implements DataAdapter {
         if (!job || !release) return;
         const completedAt = now();
         const limitations = job.draft.inputKind === "sbom" ? ["Runtime reachability was not measured from SBOM-only input."] : [];
-        release.status = "active";
+        const product = state.products.find((item) => item.id === release.productId);
+        release.status = !product?.activeReleaseId || product.activeReleaseId === release.id ? "active" : "supported";
         release.sbomStatus = limitations.length ? "partial" : "validated";
         release.monitoringHealth = "healthy";
         release.readiness = limitations.length ? "incomplete_evidence" : "ready";
@@ -793,11 +811,12 @@ export class FixtureAdapter implements DataAdapter {
         release.lastAnalysisAt = completedAt;
         release.lastMonitoringCheckAt = completedAt;
         release.artifacts.unshift({ id: `artifact-${job.id}`, kind: job.draft.inputKind, name: job.draft.fileName, sha256: preview.digest, receivedAt: completedAt, sizeLabel: `${Math.max(1, Math.round(job.draft.fileSize / 1024))} KB` });
-        const product = state.products.find((item) => item.id === release.productId);
         if (product) {
-          product.activeReleaseId = release.id;
-          product.readiness = release.readiness;
-          product.monitoringHealth = release.monitoringHealth;
+          if (!product.activeReleaseId) product.activeReleaseId = release.id;
+          if (product.activeReleaseId === release.id) {
+            product.readiness = release.readiness;
+            product.monitoringHealth = release.monitoringHealth;
+          }
         }
         job.status = "completed";
         job.progress = 100;

@@ -796,7 +796,7 @@ class AnalysisJobRepository:
                     if item.kind == pipeline_events.RUN_DONE:
                         summary = {
                             key: item.data.get(key, 0)
-                            for key in ("components", "findings", "kev", "incidents")
+                            for key in ("components", "matchable_components", "skipped_components", "findings", "kev", "incidents")
                         }
                         summary["coverage_summary"] = item.data.get("coverage_summary", {})
                     self._record_pipeline_event(
@@ -1266,6 +1266,29 @@ class AnalysisJobRepository:
                     result=_json_safe(result), completed_at=now, updated_at=now,
                 )
             )
+            # Commit the release lifecycle with the completed job. A later
+            # monitoring callback may fail, but the product still has a usable
+            # release and a stable active selection.
+            product = session.execute(select(products).where(
+                (products.c.id == product_id)
+                & (products.c.organization_id == organization_id)
+            ).with_for_update()).mappings().one()
+            release = session.execute(select(releases).where(
+                (releases.c.id == release_id)
+                & (releases.c.product_id == product_id)
+                & (releases.c.organization_id == organization_id)
+            ).with_for_update()).mappings().one()
+            if release["status"] == "draft":
+                session.execute(update(releases).where(releases.c.id == release_id).values(
+                    status="supported", updated_at=now,
+                ))
+            if product["active_release_id"] is None and release["status"] in {"draft", "supported", "active"}:
+                session.execute(update(products).where(products.c.id == product_id).values(
+                    active_release_id=release_id, updated_at=now,
+                ))
+                session.execute(update(releases).where(releases.c.id == release_id).values(
+                    status="active", updated_at=now,
+                ))
             self._append_event(
                 session, job_id, kind="analysis.completed", status="completed",
                 stage="Completed", progress=100, message="Analysis completed",

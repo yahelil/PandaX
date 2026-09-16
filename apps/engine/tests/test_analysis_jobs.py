@@ -211,7 +211,7 @@ def test_scope_is_exact_even_for_empty_collection(repositories, scope):
 def test_run_projects_progress_result_and_downloadable_evidence(
     repositories, scope, tmp_path: Path
 ):
-    _, repository = repositories
+    portfolio, repository = repositories
     job = create_job(repository, scope)
     evidence = tmp_path / "manifest.json"
     evidence.write_text('{"signed":true}', encoding="utf-8")
@@ -226,6 +226,8 @@ def test_run_projects_progress_result_and_downloadable_evidence(
             "Evidence bundle complete",
             run_dir=str(tmp_path),
             components=2,
+            matchable_components=1,
+            skipped_components=1,
             findings=3,
             kev=1,
             incidents=0,
@@ -237,6 +239,19 @@ def test_run_projects_progress_result_and_downloadable_evidence(
     assert completed.status == "completed"
     assert completed.progress == 100
     assert completed.result["findings"] == 3
+    assert completed.result["matchable_components"] == 1
+    assert portfolio.get_product(scope[0], scope[1]).active_release_id == scope[2]
+    assert portfolio.get_release(scope[0], scope[2]).status == "active"
+    next_release = portfolio.create_release(
+        scope[0], scope[1], version="1.9.0", channel="stable",
+        release_date=date(2026, 9, 3), support_start=date(2026, 9, 3),
+        support_end=date(2030, 12, 31), actor_id="admin",
+    )
+    next_scope = (scope[0], scope[1], next_release.id)
+    next_job = create_job(repository, next_scope, idempotency_key="next-release")
+    repository.run(*next_scope, next_job.id, lambda _: [ev.run_done("Complete", components=2)])
+    assert portfolio.get_product(scope[0], scope[1]).active_release_id == scope[2]
+    assert portfolio.get_release(scope[0], next_release.id).status == "supported"
     content, name = repository.evidence_content(*scope, job.id, digest)
     assert content == evidence.read_bytes()
     assert name == "manifest.json"

@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { usePermission } from "../auth";
 import { useDemo } from "../data/DemoProvider";
@@ -32,7 +32,7 @@ export function ProductWorkspacePage() {
     </section>
 
     {tab === "overview" ? <ProductOverview productId={product.id} /> : null}
-    {tab === "releases" ? <ReleasesTable productId={product.id} /> : null}
+    {tab === "releases" ? <><ActiveReleaseControl productId={product.id} /><ReleasesTable productId={product.id} /></> : null}
     {tab === "findings" ? <ProductFindings productId={product.id} /> : null}
     {tab === "compliance" ? <ProductCompliance productId={product.id} /> : null}
     {tab === "documents" ? <ProductDocuments productId={product.id} /> : null}
@@ -53,10 +53,33 @@ function ProductOverview({ productId }: { productId: string }) {
   </div>;
 }
 
+function ActiveReleaseControl({ productId }: { productId: string }) {
+  const demo = useDemo();
+  const canManagePortfolio = usePermission("manage_portfolio");
+  const product = demo.selectors.product(productId)!;
+  const eligible = demo.releases.filter((release) => release.productId === productId && (release.status === "active" || release.status === "supported"));
+  const [selection, setSelection] = useState(product.activeReleaseId ?? "");
+  useEffect(() => setSelection(product.activeReleaseId ?? ""), [product.activeReleaseId, productId]);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string>();
+  const select = async () => {
+    setPending(true); setError(undefined);
+    try { await demo.actions.selectActiveRelease(productId, selection); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not select the active release."); }
+    finally { setPending(false); }
+  };
+  return <section className="panel panel-pad active-release-control">
+    <div><h2>Active release</h2><p>Select the completed version shown as this product’s current release. Analyzing another version will not change this choice.</p></div>
+    {eligible.length ? <div className="inline-actions"><select className="select-field" aria-label="Active release" value={selection} disabled={!canManagePortfolio || pending} onChange={(event) => setSelection(event.target.value)}><option value="" disabled>Choose a release</option>{eligible.map((release) => <option value={release.id} key={release.id}>{release.version} · {release.channel}</option>)}</select>{canManagePortfolio ? <button className="button-primary" disabled={pending || !selection || selection === product.activeReleaseId} onClick={() => void select()}>{pending ? "Saving…" : "Set active release"}</button> : null}</div> : <p className="muted">Complete an analysis before selecting an active release.</p>}
+    {error ? <p className="danger-text" role="alert">{error}</p> : null}
+  </section>;
+}
+
 function ReleasesTable({ productId }: { productId: string }) {
+  const canManagePortfolio = usePermission("manage_portfolio");
   const demo = useDemo(); const navigate = useNavigate(); const releases = demo.releases.filter((item) => item.productId === productId); const [adding,setAdding]=useState(false); const [pending,setPending]=useState(false); const [error,setError]=useState<string>(); const product=demo.selectors.product(productId)!;
   const submit=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();setPending(true);setError(undefined);const form=new FormData(event.currentTarget);try{const created=await demo.actions.createRelease({productId,version:String(form.get("version")),channel:String(form.get("channel")) as "stable",releaseDate:String(form.get("releaseDate")),supportedUntil:String(form.get("supportedUntil"))});navigate(`/products/${productId}/releases/${created.id}/analyze`)}catch(reason){setError(reason instanceof Error?reason.message:"Release could not be registered.")}finally{setPending(false)}};
-  return <div className="page"><section className="panel"><SectionHeader title="Releases" description="Supported software baselines and their analysis coverage." action={<button className="button-primary" onClick={()=>setAdding((x)=>!x)}>Register release</button>} />{adding?<form className="form-grid panel-pad" onSubmit={submit}><div className="field"><label>Version</label><input className="input-field" name="version" required placeholder="2.5.0"/></div><div className="field"><label>Channel</label><select className="select-field" name="channel"><option value="stable">Stable</option><option value="lts">LTS</option><option value="beta">Beta</option></select></div><div className="field"><label>Release date</label><input className="input-field" name="releaseDate" type="date" required defaultValue={new Date().toISOString().slice(0,10)}/></div><div className="field"><label>Supported until</label><input className="input-field" name="supportedUntil" type="date" required defaultValue={product.supportUntil.slice(0,10)}/></div>{error?<p className="danger-text span-2" role="alert">{error}</p>:null}<div className="span-2 inline-actions"><button className="button-primary" disabled={pending}>{pending?"Registering release…":"Register and add evidence"}</button><button type="button" onClick={()=>setAdding(false)} disabled={pending}>Cancel</button></div></form>:null}<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Version</th><th>Channel</th><th>Status</th><th>Readiness</th><th>SBOM</th><th>Components</th><th>Last analysis</th><th /></tr></thead><tbody>{releases.map((release) => <tr key={release.id}><td><Link to={`/products/${productId}/releases/${release.id}`}>{release.version}</Link></td><td>{release.channel.toUpperCase()}</td><td><StatusPill value={release.status} /></td><td><StatusPill value={release.readiness} /></td><td><StatusPill value={release.sbomStatus} /></td><td><EvidenceMeter value={release.coverage.identifiedComponents} total={release.coverage.components} /></td><td>{formatDate(release.lastAnalysisAt)}</td><td><Link className="text-link" to={`/products/${productId}/releases/${release.id}/analyze`}>Analyze</Link></td></tr>)}</tbody></table></div></section></div>;
+  return <div className="page"><section className="panel"><SectionHeader title="Releases" description="Supported software baselines and their analysis coverage." action={<button className="button-primary" disabled={!canManagePortfolio} title={!canManagePortfolio ? "Org Admin or Compliance Operator permission required" : undefined} onClick={()=>setAdding((x)=>!x)}>Register release</button>} />{adding?<form className="form-grid panel-pad" onSubmit={submit}><div className="field"><label>Version</label><input className="input-field" name="version" required placeholder="2.5.0"/></div><div className="field"><label>Channel</label><select className="select-field" name="channel"><option value="stable">Stable</option><option value="lts">LTS</option><option value="beta">Beta</option></select></div><div className="field"><label>Release date</label><input className="input-field" name="releaseDate" type="date" required defaultValue={new Date().toISOString().slice(0,10)}/></div><div className="field"><label>Supported until</label><input className="input-field" name="supportedUntil" type="date" required defaultValue={product.supportUntil.slice(0,10)}/></div>{error?<p className="danger-text span-2" role="alert">{error}</p>:null}<div className="span-2 inline-actions"><button className="button-primary" disabled={pending}>{pending?"Registering release…":"Register and add evidence"}</button><button type="button" onClick={()=>setAdding(false)} disabled={pending}>Cancel</button></div></form>:null}<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Version</th><th>Channel</th><th>Status</th><th>Readiness</th><th>SBOM</th><th>Components</th><th>Last analysis</th><th /></tr></thead><tbody>{releases.map((release) => <tr key={release.id}><td><Link to={`/products/${productId}/releases/${release.id}`}>{release.version}</Link></td><td>{release.channel.toUpperCase()}</td><td><StatusPill value={release.status} /></td><td><StatusPill value={release.readiness} /></td><td><StatusPill value={release.sbomStatus} /></td><td><EvidenceMeter value={release.coverage.identifiedComponents} total={release.coverage.components} /></td><td>{formatDate(release.lastAnalysisAt)}</td><td><Link className="text-link" to={`/products/${productId}/releases/${release.id}/analyze`}>Analyze</Link></td></tr>)}</tbody></table></div></section></div>;
 }
 
 function ProductFindings({ productId }: { productId: string }) { const demo=useDemo(); const findings=demo.findings.filter((item)=>item.productId===productId); return <section className="panel"><SectionHeader title="Findings" description="Evidence-backed vulnerability decisions for this product." action={<Link className="text-link" to={`/findings?product=${productId}`}>Open full workspace</Link>} /><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Finding</th><th>Component</th><th>Severity</th><th>Evidence</th><th>Status</th><th>Owner</th></tr></thead><tbody>{findings.map((finding)=><tr key={finding.id}><td><div className="cell-primary"><Link to={`/findings/${finding.id}`}>{finding.reference}</Link><small>{finding.title}</small></div></td><td>{finding.component} {finding.componentVersion}</td><td><StatusPill value={finding.severity}/></td><td>{finding.kev?"KEV · ":""}{finding.reachability.replaceAll("_"," ")}</td><td><StatusPill value={finding.status}/></td><td>{memberName(demo.state.members,finding.assigneeId)}</td></tr>)}</tbody></table></div></section>; }

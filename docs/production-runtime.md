@@ -211,9 +211,10 @@ Memberships can be invited, active, disabled, revoked, removed, or time-limited;
 removed memberships cannot be restored. Admin audit events record the verified
 subject for every mutation in an append-only, per-organization SHA-256 chain.
 
-Apply `alembic upgrade head` before deploying this version. Rollback requires
-draining writes, deploying the prior application, then running
-`alembic downgrade 20260915_0013`.
+Apply `alembic upgrade head` before deploying this version. Current head
+`20260915_0015` is additive and remains compatible with the immediately prior
+application; normal application rollback therefore does not downgrade schema.
+Use [the beta release runbook](beta-release.md) for the exact rollback sequence.
 
 The identity adapter is provider-neutral. A later Entra or Okta OIDC/SAML bridge
 must return the same verified subject, session, and MFA timestamps; it must not

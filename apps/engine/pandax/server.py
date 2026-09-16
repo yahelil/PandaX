@@ -53,11 +53,11 @@ async def lifespan(app: FastAPI):
         get_analysis_repository,
         get_notification_delivery_worker,
         get_release_monitoring_repository,
+        get_release_monitoring_runner,
         get_storage_status,
         runtime_environment,
     )
     from .notification_delivery import NotificationDeliveryLoop
-    from .release_monitoring import monitoring_store_runner
     from .release_monitoring_worker import ReleaseMonitoringLoop
 
     database_settings()  # Managed environments fail before serving if PostgreSQL is absent.
@@ -74,15 +74,14 @@ async def lifespan(app: FastAPI):
         1,
         float(os.environ.get("PANDAX_RELEASE_MONITORING_SECONDS", "60")),
     )
-    release_loop = ReleaseMonitoringLoop(
-        get_release_monitoring_repository,
-        monitoring_store_runner(
-            _monitor_store(),
-            lambda _organization_id, _product_id, release_id: release_id,
-        ),
-        interval_seconds=release_interval,
-        growth_allowed=database_allows_background_growth,
-    )
+    release_loop = None
+    if runtime_environment() not in {"staging", "beta", "production"}:
+        release_loop = ReleaseMonitoringLoop(
+            get_release_monitoring_repository,
+            get_release_monitoring_runner(),
+            interval_seconds=release_interval,
+            growth_allowed=database_allows_background_growth,
+        )
     delivery_loop = NotificationDeliveryLoop(
         get_notification_delivery_worker,
         interval_seconds=max(
@@ -94,13 +93,15 @@ async def lifespan(app: FastAPI):
     app.state.release_monitoring = release_loop
     app.state.notification_delivery = delivery_loop
     loop.start()
-    release_loop.start()
+    if release_loop:
+        release_loop.start()
     delivery_loop.start()
     try:
         yield
     finally:
         delivery_loop.stop()
-        release_loop.stop()
+        if release_loop:
+            release_loop.stop()
         loop.stop()
 
 
@@ -1025,6 +1026,7 @@ from .findings_api import create_findings_router
 from .home_api import create_home_router
 from .portfolio_api import create_portfolio_router
 from .portfolio_runtime import (
+    database_allows_background_growth,
     get_analysis_repository,
     enroll_completed_analysis,
     get_compliance_repository,
@@ -1036,10 +1038,11 @@ from .portfolio_runtime import (
     get_portfolio_identity,
     get_portfolio_repository,
     get_release_monitoring_repository,
+    get_release_monitoring_runner,
     get_search_notification_repository,
 )
-from .release_monitoring import monitoring_store_runner
 from .release_monitoring_api import create_release_monitoring_router
+from .release_monitoring_scheduler_api import create_release_monitoring_scheduler_router
 from .search_notifications_api import create_search_notifications_router
 from .settings_api import create_settings_router
 
@@ -1057,11 +1060,15 @@ api.include_router(
 api.include_router(
     create_release_monitoring_router(
         get_release_monitoring_repository,
-        monitoring_store_runner(
-            _monitor_store(),
-            lambda _organization_id, _product_id, release_id: release_id,
-        ),
+        get_release_monitoring_runner(),
         get_portfolio_identity,
+    )
+)
+api.include_router(
+    create_release_monitoring_scheduler_router(
+        get_release_monitoring_repository,
+        get_release_monitoring_runner(),
+        database_allows_background_growth,
     )
 )
 api.include_router(

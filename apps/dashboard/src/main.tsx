@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { lazy, StrictMode, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { App } from './App'
@@ -7,8 +7,12 @@ import type { DataAdapter } from './data/adapter'
 import { DemoProvider } from './data/DemoProvider'
 import { createRuntimeDataAdapter } from './data/productionAdapter'
 import { ThemeProvider } from './components/ThemeProvider'
-import { SupabaseAuthorizationPage } from './auth/SupabaseAuthorizationPage'
 import './styles/global.css'
+
+const SupabaseAuthorizationPage = lazy(async () => {
+  const module = await import('./auth/SupabaseAuthorizationPage')
+  return { default: module.SupabaseAuthorizationPage }
+})
 
 if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual'
 
@@ -34,7 +38,7 @@ try {
 
 function RuntimeRoot({ config, authClient, dataAdapter }: { config: RuntimeConfig; authClient?: AuthClient; dataAdapter: DataAdapter }) {
   if (config.mode === 'production' && window.location.pathname === '/oauth/consent') {
-    return <StrictMode><SupabaseAuthorizationPage {...config.supabase} /></StrictMode>
+    return <StrictMode><Suspense fallback={<main className="auth-screen"><section className="auth-card"><h1>Preparing secure sign-in</h1><div className="auth-progress" /></section></main>}><SupabaseAuthorizationPage {...config.supabase} /></Suspense></StrictMode>
   }
   return <StrictMode>
     <BrowserRouter>

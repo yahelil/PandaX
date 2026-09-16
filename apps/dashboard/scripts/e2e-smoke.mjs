@@ -169,7 +169,14 @@ try {
   });
   await page.getByRole("button", { name: "Create and analyze" }).click();
   await assertVisible(page.getByRole("alert").filter({ hasText: "Unsupported CycloneDX version" }), "unsupported SBOM explanation");
-  await page.getByRole("button", { name: "Cancel" }).click();
+  await page.locator(".create-product-panel input[type=file]").setInputFiles({
+    name: "gateway.cdx.json", mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify({ bomFormat: "CycloneDX", specVersion: "1.6", version: 1, components: [{ type: "library", name: "sample", version: "1.0.0", purl: "pkg:npm/sample@1.0.0" }] })),
+  });
+  await page.getByRole("button", { name: "Create and analyze" }).click();
+  await waitForRoute(page, new RegExp(`^${escapedBaseUrl}/analyses/analysis-[^/]+$`), "New device analysis");
+  await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Products$/ }).click();
+  await waitForRoute(page, `${baseUrl}/products`, "Devices");
 
   await page.getByRole("link", { name: "Home Hub", exact: true }).first().click();
   await waitForRoute(page, `${baseUrl}/products/product-home-hub`, "Home Hub");

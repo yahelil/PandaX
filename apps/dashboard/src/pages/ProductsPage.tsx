@@ -182,6 +182,7 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawAr
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!assessment || assessment.scopeResult === "out_of_scope") return;
+    const data = new FormData(event.currentTarget);
     setValidationError(undefined);
     if (evidenceFile && evidenceKind === "sbom") {
       if (!evidenceFile.name.toLowerCase().endsWith(".json")) {
@@ -191,7 +192,6 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawAr
       try { await validateSbomFormatVersion(evidenceFile); }
       catch (cause) { setValidationError(cause instanceof Error ? cause.message : "SBOM format is unsupported."); return; }
     }
-    const data = new FormData(event.currentTarget);
     const input = {
       name: String(data.get("name")), identifier: String(data.get("identifier")), manufacturer: String(data.get("manufacturer")),
       description: String(data.get("description")), craClass: assessment.recommendedClass, classificationStatus: assessment.classificationStatus,

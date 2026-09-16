@@ -7,6 +7,7 @@ import type { CraClassificationAssessment, CreateProductInput, Product, ReleaseA
 import { CraAssessmentWizard } from "./CraAssessmentWizard";
 import { craClassLabel } from "./craAssessment";
 import { analysisInputAccept, analysisInputHint, validateSbomFormatVersion } from "./analysisInput";
+import { LocalSbomGuide } from "./LocalSbomGuide";
 import { formatDate, memberName } from "./PageKit";
 import "./pages.css";
 import "./devices.css";
@@ -217,14 +218,15 @@ function CreateProductPanel({ onCancel, onCreate, members, pending, error, rawAr
         <div className="field span-2"><label htmlFor="description">Description</label><textarea id="description" name="description" className="textarea-field" placeholder="Describe the product, intended purpose, connected functionality, and users." /><span className="field-hint">The description provides context; classification comes from structured assessment answers.</span></div>
         <fieldset className="supplemental-evidence span-2">
           <legend>Initial release evidence <span className="muted">(optional)</span></legend>
-          <p>Upload an SBOM or signed Collector ZIP to create the first release and start analysis. You can add evidence later.</p>
+          <p>Choose existing evidence, create a privacy-preserving SBOM locally, or upload a source/build archive for server-side analysis. You can also add evidence later.</p>
           {demoMode && evidenceKind !== "sbom" ? <div className="notice notice-warning">This option remains visible for the beta workflow, but analysis requires the production engine. Local demo mode will not invent archive results.</div> : null}
           <div className="supplemental-grid">
-            <div className="field"><span className="field-label">Upload type</span><div className="upload-type-toggle" role="group" aria-label="Upload type"><button type="button" aria-pressed={evidenceKind === "sbom"} onClick={() => { setEvidenceKind("sbom"); setEvidenceFile(null); setRawArtifactConsent(false); setValidationError(undefined); }}>SBOM</button><button type="button" aria-pressed={evidenceKind === "collector_package"} onClick={() => { setEvidenceKind("collector_package"); setEvidenceFile(null); setRawArtifactConsent(false); setValidationError(undefined); }}>ZIP</button>{rawArtifactsAllowed ? <button type="button" aria-pressed={evidenceKind === "raw_artifact"} onClick={() => { setEvidenceKind("raw_artifact"); setEvidenceFile(null); setValidationError(undefined); }}>Build archive</button> : null}</div></div>
+            <div className="field"><span className="field-label">Evidence type</span><div className="upload-type-toggle" role="group" aria-label="Upload type"><button type="button" aria-pressed={evidenceKind === "sbom"} onClick={() => { setEvidenceKind("sbom"); setEvidenceFile(null); setRawArtifactConsent(false); setValidationError(undefined); }}>Existing SBOM</button><button type="button" aria-pressed={evidenceKind === "collector_package"} onClick={() => { setEvidenceKind("collector_package"); setEvidenceFile(null); setRawArtifactConsent(false); setValidationError(undefined); }}>Signed Collector ZIP</button><button type="button" aria-pressed={evidenceKind === "raw_artifact"} disabled={!rawArtifactsAllowed} title={!rawArtifactsAllowed ? "Enable raw product artifacts in Security & Retention settings" : undefined} onClick={() => { setEvidenceKind("raw_artifact"); setEvidenceFile(null); setValidationError(undefined); }}>Source / build ZIP</button></div>{!rawArtifactsAllowed ? <small>Source/build uploads are disabled by organization policy. Enable raw product artifacts in Security & Retention settings.</small> : null}</div>
             <label><span>Product release version</span><input className="input-field" name="version" required={Boolean(evidenceFile)} placeholder="1.0.0" /><small>This names your product release. The SBOM format and version are detected automatically.</small></label>
           </div>
           <label className="upload-zone"><strong>{evidenceFile?.name ?? `Choose ${evidenceKind === "sbom" ? "SBOM" : evidenceKind === "collector_package" ? "ZIP" : "build archive"}`}</strong><input type="file" accept={analysisInputAccept(evidenceKind)} onChange={(event) => { setEvidenceFile(event.target.files?.[0] ?? null); setValidationError(undefined); }} /><p>{analysisInputHint(evidenceKind)}</p></label>
-          {evidenceKind === "raw_artifact" ? <label className="notice notice-warning"><input type="checkbox" checked={rawArtifactConsent} onChange={(event) => setRawArtifactConsent(event.target.checked)} /> I confirm this artifact may be processed to identify components and security evidence.</label> : null}
+          {evidenceKind === "raw_artifact" ? <label className="notice notice-warning"><input type="checkbox" checked={rawArtifactConsent} onChange={(event) => setRawArtifactConsent(event.target.checked)} /> I understand this archive may contain source code. I consent to uploading it to Actis for server-side component and security analysis.</label> : null}
+          <LocalSbomGuide compact />
         </fieldset>
         <div className="cra-assessment-launch span-2">
           <div className="cra-assessment-launch__icon" aria-hidden="true">{assessment ? <ShieldCheck size={22} /> : <ClipboardCheck size={22} />}</div>

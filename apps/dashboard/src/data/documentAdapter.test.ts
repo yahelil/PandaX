@@ -53,4 +53,46 @@ describe("document adapter workflow", () => {
 
     expect(mapDocument(detail)).toMatchObject({ completeness: "missing_inputs", revisions: [{ completeness: "missing_inputs" }] });
   });
+
+  it("generates valid PDF binary files for PDF/A-2b documents with positive size", async () => {
+    const adapter = new FixtureAdapter(createDemoState());
+    const docId = "document-lock-report";
+
+    const downloadMeta = await adapter.getDocumentDownload(docId);
+    expect(downloadMeta.format).toBe("PDF/A-2b");
+    expect(downloadMeta.contentType).toBe("application/pdf");
+    expect(downloadMeta.sizeBytes).toBeGreaterThan(0);
+    expect(downloadMeta.filename).toMatch(/\.pdf$/);
+
+    const downloaded = await adapter.downloadDocument(docId);
+    expect(downloaded.contentType).toBe("application/pdf");
+    expect(downloaded.filename).toMatch(/\.pdf$/);
+    expect(downloaded.blob.size).toBe(downloadMeta.sizeBytes);
+
+    const buffer = await downloaded.blob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    const header = new TextDecoder().decode(bytes.slice(0, 8));
+    expect(header).toBe("%PDF-1.4");
+  });
+
+  it("generates valid ZIP binary files for ZIP format documents with positive size", async () => {
+    const adapter = new FixtureAdapter(createDemoState());
+    const docId = "document-therm-evidence";
+
+    const downloadMeta = await adapter.getDocumentDownload(docId);
+    expect(downloadMeta.format).toBe("ZIP");
+    expect(downloadMeta.contentType).toBe("application/zip");
+    expect(downloadMeta.sizeBytes).toBeGreaterThan(0);
+    expect(downloadMeta.filename).toMatch(/\.zip$/);
+
+    const downloaded = await adapter.downloadDocument(docId);
+    expect(downloaded.contentType).toBe("application/zip");
+    expect(downloaded.filename).toMatch(/\.zip$/);
+    expect(downloaded.blob.size).toBe(downloadMeta.sizeBytes);
+
+    const buffer = await downloaded.blob.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    expect(bytes[0]).toBe(0x50); // 'P'
+    expect(bytes[1]).toBe(0x4b); // 'K'
+  });
 });

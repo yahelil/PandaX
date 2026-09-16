@@ -75,6 +75,74 @@ function loadInitialState(): DemoState {
   }
 }
 
+function escapePdfText(str: string): string {
+  const sanitized = str.replace(/[^\x20-\x7E]/g, " ");
+  return sanitized.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+export function createFixturePdf(title: string, lines: string[]): Uint8Array {
+  const enc = new TextEncoder();
+  const contentStream = [
+    "BT",
+    "/F1 16 Tf",
+    "20 TL",
+    "50 740 Td",
+    `(${escapePdfText(title)}) Tj`,
+    "T*",
+    "/F1 10 Tf",
+    "14 TL",
+    "T*",
+    ...lines.map((line) => `(${escapePdfText(line)}) Tj T*`),
+    "ET",
+  ].join("\n");
+
+  const streamBytes = enc.encode(contentStream);
+  const headerBytes = enc.encode("%PDF-1.4\n%\xFF\xFF\xFF\xFF\n");
+
+  const obj1 = enc.encode("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+  const obj2 = enc.encode("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
+  const obj3 = enc.encode("3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n");
+  const obj4 = enc.encode("4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n");
+  const obj5Prefix = enc.encode(`5 0 obj\n<< /Length ${streamBytes.length} >>\nstream\n`);
+  const obj5Suffix = enc.encode("\nendstream\nendobj\n");
+
+  const obj5 = new Uint8Array(obj5Prefix.length + streamBytes.length + obj5Suffix.length);
+  obj5.set(obj5Prefix, 0);
+  obj5.set(streamBytes, obj5Prefix.length);
+  obj5.set(obj5Suffix, obj5Prefix.length + streamBytes.length);
+
+  const objects = [obj1, obj2, obj3, obj4, obj5];
+  const offsets: number[] = [];
+  let currentOffset = headerBytes.length;
+  for (const obj of objects) {
+    offsets.push(currentOffset);
+    currentOffset += obj.length;
+  }
+
+  const xrefOffset = currentOffset;
+  let xref = "xref\n0 6\n0000000000 65535 f \n";
+  for (const offset of offsets) {
+    xref += `${offset.toString().padStart(10, "0")} 00000 n \n`;
+  }
+  const trailer = `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  const footerBytes = enc.encode(xref + trailer);
+
+  const totalLength = currentOffset + footerBytes.length;
+  const result = new Uint8Array(totalLength);
+  let pos = 0;
+  result.set(headerBytes, pos);
+  pos += headerBytes.length;
+  for (const obj of objects) {
+    result.set(obj, pos);
+    pos += obj.length;
+  }
+  result.set(footerBytes, pos);
+
+  return result;
+}
+
+export const FIXTURE_ZIP_BYTES = new Uint8Array([0x50, 0x4b, 0x05, 0x06, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
 export class FixtureAdapter implements DataAdapter {
   private state: DemoState;
   private readonly listeners = new Set<DemoListener>();
@@ -84,6 +152,11 @@ export class FixtureAdapter implements DataAdapter {
 
   constructor(initialState?: DemoState, private readonly persist = true, private readonly sbomAnalyzer: SbomAnalyzer = analyzeSbomWithOsv) {
     this.state = withAnalyticsSettings(initialState ? structuredClone(initialState) : loadInitialState());
+    for (const doc of this.state.documents) {
+      if (!doc.sizeBytes) {
+        doc.sizeBytes = this.generateDocumentBlob(doc, doc.version, doc.format).size;
+      }
+    }
   }
 
   getStatusSnapshot = (): AdapterStatus => this.status;
@@ -371,26 +444,71 @@ export class FixtureAdapter implements DataAdapter {
 
   rejectDocument = (documentId: EntityId, comment: string): DocumentRecord => this.decideDocument(documentId, "rejected", comment);
 
+  private generateDocumentBlob(document: DocumentRecord, version: number, format: DocumentRecord["format"]): Blob {
+    if (format === "PDF/A-2b") {
+      const findings = this.state.findings.filter((item) => item.productId === document.productId);
+      const lines = [
+        `Document ID: ${document.id}`,
+        `Revision: ${version}`,
+        `Product ID: ${document.productId}`,
+        `Status: ${document.status}`,
+        `Completeness: ${document.completeness}`,
+        `Generated: ${document.updatedAt || now()}`,
+        `Format: ${format}`,
+        "",
+        `Security Findings (${findings.length}):`,
+        ...(findings.length > 0
+          ? findings.slice(0, 8).map((f) => `- [${f.severity.toUpperCase()}] ${f.id}: ${f.title}`)
+          : ["None recorded."]),
+      ];
+      const pdfBytes = createFixturePdf(document.name, lines);
+      return new Blob([pdfBytes.buffer as ArrayBuffer], { type: "application/pdf" });
+    }
+
+    if (format === "ZIP") {
+      return new Blob([FIXTURE_ZIP_BYTES.buffer as ArrayBuffer], { type: "application/zip" });
+    }
+
+    const findings = this.state.findings.filter((item) => item.productId === document.productId);
+    const payload = JSON.stringify({
+      document_id: document.id,
+      name: document.name,
+      revision: version,
+      format,
+      generated_at: now(),
+      findings,
+    }, null, 2);
+    return new Blob([payload], { type: "application/json" });
+  }
+
   loadDocumentDetail = async (documentId: EntityId): Promise<DocumentRecord | undefined> => {
     const document = this.state.documents.find((item) => item.id === documentId);
-    return document ? structuredClone(document) : undefined;
+    if (!document) return undefined;
+    if (!document.sizeBytes) {
+      document.sizeBytes = this.generateDocumentBlob(document, document.version, document.format).size;
+    }
+    return structuredClone(document);
   };
 
   getDocumentDownload = async (documentId: EntityId, version?: number): Promise<DocumentDownloadMetadata> => {
     const document = this.state.documents.find((item) => item.id === documentId);
     if (!document) throw new Error(`Unknown document: ${documentId}`);
     const selected = document.revisions?.find((item) => item.version === (version ?? document.version));
+    const targetVersion = selected?.version ?? document.version;
     const format = selected?.format ?? document.format;
     const extension = format === "PDF/A-2b" ? "pdf" : format === "ZIP" ? "zip" : "json";
     const contentType = format === "PDF/A-2b" ? "application/pdf" : format === "ZIP" ? "application/zip" : "application/json";
+    const blob = this.generateDocumentBlob(document, targetVersion, format);
+    const sizeBytes = selected?.sizeBytes || blob.size;
+    document.sizeBytes = sizeBytes;
     return {
       documentId,
-      version: selected?.version ?? document.version,
-      filename: `${slugify(document.name)}-v${selected?.version ?? document.version}.${extension}`,
+      version: targetVersion,
+      filename: `${slugify(document.name)}-v${targetVersion}.${extension}`,
       format,
       contentHash: selected?.contentHash ?? document.contentHash ?? "fixture-metadata-not-persisted",
-      sizeBytes: selected?.sizeBytes ?? document.sizeBytes ?? 0,
-      storageLocator: selected?.storageLocator ?? document.storageLocator ?? `fixture://documents/${documentId}/revisions/${selected?.version ?? document.version}`,
+      sizeBytes,
+      storageLocator: selected?.storageLocator ?? document.storageLocator ?? `fixture://documents/${documentId}/revisions/${targetVersion}`,
       contentType,
       downloadType: "content_available",
     };
@@ -400,20 +518,17 @@ export class FixtureAdapter implements DataAdapter {
     const document = this.state.documents.find((item) => item.id === documentId);
     if (!document) throw new Error(`Unknown document: ${documentId}`);
     const selected = document.revisions?.find((item) => item.version === (version ?? document.version));
+    const targetVersion = selected?.version ?? document.version;
     const format = selected?.format ?? document.format;
     const extension = format === "PDF/A-2b" ? "pdf" : format === "ZIP" ? "zip" : "json";
     const contentType = format === "PDF/A-2b" ? "application/pdf" : format === "ZIP" ? "application/zip" : "application/json";
-    const filename = `${slugify(document.name)}-v${selected?.version ?? document.version}.${extension}`;
-    const payload = JSON.stringify({
-      document_id: document.id,
-      name: document.name,
-      revision: selected?.version ?? document.version,
-      format,
-      generated_at: now(),
-      findings: this.state.findings.filter((item) => item.productId === document.productId),
-    }, null, 2);
+    const filename = `${slugify(document.name)}-v${targetVersion}.${extension}`;
+    const blob = this.generateDocumentBlob(document, targetVersion, format);
+    if (!document.sizeBytes) {
+      document.sizeBytes = blob.size;
+    }
     return {
-      blob: new Blob([payload], { type: contentType }),
+      blob,
       contentType,
       filename,
     };

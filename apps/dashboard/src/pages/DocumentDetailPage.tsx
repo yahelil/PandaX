@@ -96,7 +96,7 @@ export function DocumentDetailPage() {
     completeness: document.completeness,
     contentHash: document.contentHash ?? "Metadata unavailable",
     storageLocator: document.storageLocator ?? "Metadata unavailable",
-    sizeBytes: document.sizeBytes ?? 0,
+    sizeBytes: document.sizeBytes ?? download?.sizeBytes ?? 0,
     createdBy: document.updatedBy, createdAt: document.updatedAt,
   }];
   const selectedRevision = revisions.find((item) => item.version === downloadVersion) ?? revisions[0];
@@ -237,7 +237,7 @@ export function DocumentDetailPage() {
                 </select>
               </div>
               <dl className="document-metadata">
-                <div><dt>Size</dt><dd>{readableBytes(selectedRevision.sizeBytes)}</dd></div>
+                <div><dt>Size</dt><dd>{readableBytes(selectedRevision.sizeBytes || (selectedRevision.version === download?.version ? (download?.sizeBytes ?? 0) : 0))}</dd></div>
                 <div><dt>SHA-256</dt><dd className="mono" title={selectedRevision.contentHash}>{selectedRevision.contentHash}</dd></div>
               </dl>
               <button type="button" onClick={() => void prepareDownload()} disabled={busy === "download"}>{busy === "download" ? "Verifying…" : "Verify download metadata"}</button>

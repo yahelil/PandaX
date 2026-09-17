@@ -1,6 +1,11 @@
 export type RuntimeConfig =
   | { mode: "demo" }
   | {
+      mode: "connected";
+      apiUrl: string;
+      organizationId: string;
+    }
+  | {
       mode: "production";
       apiUrl: string;
       organizationId: string;
@@ -24,7 +29,14 @@ type RuntimeEnvironment = Record<string, string | boolean | undefined>;
 export function readRuntimeConfig(env: RuntimeEnvironment, origin = globalThis.location?.origin): RuntimeConfig {
   const mode = stringValue(env.VITE_ACTIS_MODE);
   if (mode === "demo") return { mode };
-  if (mode !== "production") throw new Error("VITE_ACTIS_MODE must be explicitly set to demo or production.");
+  if (mode === "connected" || mode === "local") {
+    return {
+      mode: "connected",
+      apiUrl: stringValue(env.VITE_ACTIS_API_URL) || "http://127.0.0.1:8000",
+      organizationId: stringValue(env.VITE_ACTIS_ORGANIZATION_ID) || "org-acme-devices",
+    };
+  }
+  if (mode !== "production") throw new Error("VITE_ACTIS_MODE must be explicitly set to demo, connected, or production.");
   const apiUrl = required(env, "VITE_ACTIS_API_URL");
   const organizationId = required(env, "VITE_ACTIS_ORGANIZATION_ID");
   const supabaseUrl = required(env, "VITE_ACTIS_SUPABASE_URL");

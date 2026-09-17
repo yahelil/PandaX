@@ -250,4 +250,62 @@ describe("FixtureAdapter demo contract", () => {
     await vi.advanceTimersByTimeAsync(180);
     await expect(previewPromise).resolves.toMatchObject({ valid: false, componentCount: 0, warnings: [expect.stringContaining("require the production engine")] });
   });
+
+  it("automatically generates documents when an analysis completes and transitions to approval when remediated", async () => {
+    vi.useFakeTimers();
+    const analyzer = vi.fn(async () => ({ components: 1, matchableComponents: 1, findings: [] }));
+    const adapter = new FixtureAdapter(createDemoState(), false, analyzer);
+    const product = await adapter.createProduct({
+      name: "GuyTest",
+      identifier: "guy-test",
+      manufacturer: "Acme",
+      description: "Test device",
+      craClass: "default",
+      classificationStatus: "confirmed",
+      ownerId: DEMO_IDS.jane,
+    });
+    const release = await adapter.createRelease({
+      productId: product.id,
+      version: "1.0.0",
+      channel: "stable",
+      releaseDate: "2026-09-17",
+      supportedUntil: "2028-09-17",
+    });
+
+    const file = new File(
+      [
+        JSON.stringify({
+          bomFormat: "CycloneDX",
+          specVersion: "1.6",
+          components: [{ name: "test-lib", version: "1.0.0", purl: "pkg:npm/test-lib@1.0.0" }],
+        }),
+      ],
+      "bom.json",
+      { type: "application/json" }
+    );
+    const run = adapter.runAnalysis({
+      productId: product.id,
+      releaseId: release.id,
+      version: "1.0.0",
+      channel: "stable",
+      inputKind: "sbom",
+      fileName: "bom.json",
+      fileSize: file.size,
+      file,
+    });
+
+    await vi.advanceTimersByTimeAsync(180);
+    await run;
+    await vi.advanceTimersByTimeAsync(1_500);
+
+    const docs = adapter.getSnapshot().documents.filter((d) => d.productId === product.id);
+    expect(docs).toHaveLength(2);
+    expect(docs.map((d) => d.type).sort()).toEqual(["conformity", "cra_reporting_pack"].sort());
+    expect(docs.every((d) => d.status === "approval_required")).toBe(true);
+
+    const doc = docs.find((d) => d.type === "conformity")!;
+    const download = await adapter.downloadDocument(doc.id, doc.version);
+    expect(download.blob.size).toBeGreaterThan(0);
+    expect(download.filename).toContain("eu-declaration-of-conformity");
+  });
 });

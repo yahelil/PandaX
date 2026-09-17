@@ -44,6 +44,15 @@ def validator_command(executable: str | Path | None = None) -> list[str]:
     return [java, "-Dfile.encoding=UTF-8", "-jar", str(jar)]
 
 
+def is_available(executable: str | Path | None = None) -> bool:
+    """Return True if the pinned veraPDF validator is installed and runnable."""
+    try:
+        validator_command(executable)
+        return True
+    except (FileNotFoundError, ValueError):
+        return False
+
+
 def _read_report(raw: bytes, pdf: Path) -> str:
     if len(raw) > 16 * 1024 * 1024 or b"<!DOCTYPE" in raw or b"<!ENTITY" in raw:
         raise ValueError("unsafe or oversized veraPDF report")

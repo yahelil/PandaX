@@ -17,7 +17,7 @@ TEMPLATE = Path(__file__).resolve().parent / "templates" / "release_security_rep
 
 
 def render_release_report_pdf(
-    document: Mapping[str, Any], *, filename: str, validate: bool = True,
+    document: Mapping[str, Any], *, filename: str, validate: bool | None = None,
 ) -> ReleaseReport:
     import typst
 
@@ -30,7 +30,8 @@ def render_release_report_pdf(
         shutil.copyfile(TEMPLATE, template)
         output = root / "report.pdf"
         typst.compile(str(template), output=str(output), root=str(root), pdf_standards=["a-2b"])
-        if validate:
+        should_validate = pdfa.is_available() if validate is None else validate
+        if should_validate:
             validation = pdfa.validate_pdf(output, root / "validation")
             if not validation["compliant"]:
                 raise RuntimeError(f"release report PDF/A validation failed: {validation['error']}")

@@ -147,7 +147,8 @@ describe("application flow smoke contracts", () => {
       expect(detail).toContain(control);
     }
     expect(detail).toContain("Record decision");
-    expect(detail).toContain("Save remediation plan");
+    expect(detail).toContain("Submit fix description");
+    expect(detail).toContain("Accept fix and continue");
   });
 
   it("keeps Home operator-first and exposes the agreed first-run checklist", () => {

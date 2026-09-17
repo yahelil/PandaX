@@ -542,7 +542,11 @@ const analysisJobs: AnalysisJob[] = [
     stage: "Complete",
     createdAt: "2026-09-10T14:12:00Z",
     updatedAt: "2026-09-10T14:16:00Z",
-    result: { releaseId: DEMO_IDS.hubRelease, newFindings: 1, changedFindings: 1, componentCount: 247, coverage: { components: 247, identifiedComponents: 245, advisorySourcesChecked: 3, advisorySourcesExpected: 3, limitations: ["Two components could not be identified."] }, resultUrl: `/products/${DEMO_IDS.homeHub}/releases/${DEMO_IDS.hubRelease}` },
+    result: { releaseId: DEMO_IDS.hubRelease, newFindings: 1, changedFindings: 1, componentCount: 247, coverage: { components: 247, identifiedComponents: 245, advisorySourcesChecked: 3, advisorySourcesExpected: 3, limitations: ["Two components could not be identified."] }, resultUrl: `/products/${DEMO_IDS.homeHub}/releases/${DEMO_IDS.hubRelease}`, evidence: [
+      { name: "AnnexVII_Technical_Documentation.pdf", sha256: "a".repeat(64) },
+      { name: "EU_Declaration_of_Conformity.pdf", sha256: "b".repeat(64) },
+      { name: "Simplified_EU_Declaration_of_Conformity.pdf", sha256: "c".repeat(64) },
+    ] },
   },
 ];
 

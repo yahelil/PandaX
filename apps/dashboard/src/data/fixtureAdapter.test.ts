@@ -81,6 +81,20 @@ describe("FixtureAdapter demo contract", () => {
     expect(adapter.getSnapshot().actions.find((item) => item.targetUrl.endsWith(findingId))?.status).toBe("completed");
   });
 
+  it("exports a release findings report after a review decision", async () => {
+    const adapter = new FixtureAdapter(createDemoState());
+    const findingId = "finding-hub-cve-2026-27102";
+    const finding = adapter.recordFindingDecision({
+      findingId, decision: "affected", rationale: "Release image contains the vulnerable path.",
+    });
+    const file = await adapter.generateFindingsReport(finding.productId, finding.releaseId);
+    const report = JSON.parse(await file.blob.text());
+    expect(file.filename).toContain("findings-report.json");
+    expect(report.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ reference: finding.reference, decision: "affected", status: "action_required" }),
+    ]));
+  });
+
   it("approves a document and retains an immutable-looking audit entry", () => {
     const adapter = new FixtureAdapter(createDemoState());
     const document = adapter.approveDocument("document-lock-report", "Regulatory content and evidence verified.");

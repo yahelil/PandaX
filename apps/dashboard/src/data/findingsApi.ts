@@ -172,6 +172,10 @@ export interface BatchDecisionRequest {
   rationale: string;
 }
 
+export interface ReviewedBatchDecisionRequest extends BatchDecisionRequest {
+  decision: "affected" | "not_affected";
+}
+
 export interface VerificationEvidenceInput {
   [key: string]: unknown;
 }
@@ -191,6 +195,7 @@ export interface FindingsApi {
   assignFinding(organizationId: string, productId: string, releaseId: string, findingId: string, input: AssignmentRequest, options?: FindingRequestOptions): Promise<ManagedFinding>;
   recordDecision(organizationId: string, productId: string, releaseId: string, findingId: string, input: DecisionRequest, options?: FindingRequestOptions): Promise<FindingDetail>;
   approveRecommendations(organizationId: string, productId: string, releaseId: string, input: BatchDecisionRequest, options?: FindingRequestOptions): Promise<ManagedFinding[]>;
+  decideBatch(organizationId: string, productId: string, releaseId: string, input: ReviewedBatchDecisionRequest, options?: FindingRequestOptions): Promise<ManagedFinding[]>;
   updateRemediation(organizationId: string, productId: string, releaseId: string, findingId: string, input: RemediationRequest, options?: FindingRequestOptions): Promise<FindingDetail>;
   getDecisionHistory(organizationId: string, productId: string, releaseId: string, findingId: string, options?: FindingRequestOptions): Promise<FindingDecision[]>;
   getAuditHistory(organizationId: string, productId: string, releaseId: string, findingId: string, options?: FindingRequestOptions): Promise<FindingAuditEntry[]>;
@@ -416,7 +421,7 @@ export function mapFinding(dto: FindingDto, history?: FindingDecisionDto[]): Man
     status: findingStatus(dto),
     priority: priority(dto),
     kev: dto.kev,
-    activelyExploited: false,
+    activelyExploited: dto.kev && dto.current_decision === "affected",
     affectedness: dto.current_decision === "affected" ? "confirmed" : dto.current_decision === "not_affected" ? "not_affected" : "unknown",
     reachability: dto.reachability,
     reachabilityRecommendation: dto.recommendation_reachability ?? "review",
@@ -575,6 +580,15 @@ export function createFindingsApi(config: FindingApiConfig): FindingsApi {
         rationale: input.rationale,
       };
       const path = `${release(organizationId, productId, releaseId)}/recommendations/approve`;
+      return parseList(await request(path, { method: "POST", body: jsonBody(payload) }, options)).map((dto) => mapFinding(dto));
+    },
+    async decideBatch(organizationId, productId, releaseId, input, options) {
+      const payload = {
+        items: input.items.map((entry) => ({ finding_id: entry.findingId, expected_version: entry.expectedVersion })),
+        rationale: input.rationale,
+        decision: input.decision,
+      };
+      const path = `${release(organizationId, productId, releaseId)}/decisions/batch`;
       return parseList(await request(path, { method: "POST", body: jsonBody(payload) }, options)).map((dto) => mapFinding(dto));
     },
     async updateRemediation(organizationId, productId, releaseId, findingId, input, options) {

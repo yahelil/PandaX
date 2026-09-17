@@ -132,6 +132,19 @@ class RecommendationBatchApproval(ApiModel):
         return self
 
 
+class FindingBatchDecision(ApiModel):
+    decision: Literal["affected", "not_affected"]
+    rationale: str = Field(min_length=1, max_length=4000)
+    items: list[RecommendationApprovalItem] = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def validate_unique_findings(self) -> "FindingBatchDecision":
+        ids = [item.finding_id for item in self.items]
+        if len(ids) != len(set(ids)):
+            raise ValueError("items must contain unique finding ids")
+        return self
+
+
 class RemediationUpdate(ApiModel):
     plan: str | None = Field(default=None, max_length=4000)
     status: RemediationStatus
@@ -230,6 +243,26 @@ def create_findings_router(
             [item.model_dump() for item in body.items],
             rationale=body.rationale,
             actor_id=identity.actor_id,
+        ))
+
+    @router.post(
+        release_collection + "/decisions/batch",
+        response_model=list[FindingResponse],
+        status_code=status.HTTP_201_CREATED,
+    )
+    def decide_batch(
+        body: FindingBatchDecision,
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        repository: Annotated[FindingRepository, Depends(repository_dependency)],
+        identity: Annotated[PortfolioIdentity, Depends(identity_dependency)],
+    ):
+        _authorize(identity, organization_id, DECISION_ROLES, sensitive=True)
+        return _call(lambda: repository.decide_unreviewed_batch(
+            organization_id, product_id, release_id,
+            [item.model_dump() for item in body.items],
+            decision=body.decision, rationale=body.rationale, actor_id=identity.actor_id,
         ))
 
     @router.get(release_collection + "/vex")

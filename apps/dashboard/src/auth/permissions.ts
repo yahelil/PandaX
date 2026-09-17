@@ -7,6 +7,7 @@ export type Permission =
   | "run_monitoring"
   | "decide_findings"
   | "manage_remediation"
+  | "generate_findings_report"
   | "approve_documents"
   | "manage_settings";
 
@@ -16,6 +17,7 @@ const ALLOWED: Record<Permission, ReadonlySet<AuthRole>> = {
   run_monitoring: new Set(["org_admin", "compliance_operator"]),
   decide_findings: new Set(["org_admin", "security_reviewer"]),
   manage_remediation: new Set(["org_admin", "compliance_operator"]),
+  generate_findings_report: new Set(["org_admin", "compliance_operator", "security_reviewer"]),
   approve_documents: new Set(["authorized_approver"]),
   manage_settings: new Set(["org_admin"]),
 };

@@ -123,7 +123,7 @@ describe("findings API", () => {
       epss: 0.975,
       version: 4,
     });
-    expect(findings[0].activelyExploited).toBe(false);
+    expect(findings[0].activelyExploited).toBe(true);
   });
 
   it("serializes release filters as repeated, explicit query parameters", async () => {
@@ -223,6 +223,22 @@ describe("findings API", () => {
       rationale: "Signed build evidence excludes the vulnerable code path.",
     });
     expect(result[0]).toMatchObject({ affectedness: "not_affected", status: "resolved" });
+  });
+
+  it("sends a reviewed batch decision with versions and one rationale", async () => {
+    const fetcher = fetchSequence(json([{ ...findingDto, current_decision: "affected", status: "open" }]));
+    const api = createFindingsApi({ baseUrl: "/engine", fetch: fetcher });
+    await api.decideBatch("org/acme", "home hub", "release/1.4", {
+      items: [{ findingId: "finding/kev-1", expectedVersion: 4 }],
+      decision: "affected", rationale: "Verified against the release image.",
+    });
+    expect(fetcher.mock.calls[0][0]).toBe(
+      "/engine/v1/organizations/org%2Facme/products/home%20hub/releases/release%2F1.4/findings/decisions/batch",
+    );
+    expect(JSON.parse(String(fetcher.mock.calls[0][1]?.body))).toEqual({
+      items: [{ finding_id: "finding/kev-1", expected_version: 4 }],
+      decision: "affected", rationale: "Verified against the release image.",
+    });
   });
 
   it.each([

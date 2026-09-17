@@ -90,6 +90,7 @@ function releaseOperations(job: ReleaseAnalysisJob): ReleaseOperationsApi {
     listAnalysisEvents: vi.fn(async () => []),
     downloadEvidence: vi.fn(async () => ({ blob: new Blob(), contentType: "application/json" })),
     downloadEvidenceBundle: vi.fn(async () => ({ blob: new Blob(), contentType: "application/zip", filename: "evidence.zip" })),
+    generateFindingsReport: vi.fn(async () => ({ blob: new Blob(), contentType: "application/json", filename: "findings-report.json" })),
     getMonitoring: unsupported,
     configureMonitoring: unsupported,
     runMonitoring: unsupported,
@@ -145,6 +146,8 @@ describe("ProductionAdapter", () => {
     expect(portfolioApi.updateProduct).toHaveBeenCalledWith(organization.id, product.id, { activeReleaseId: release.id });
     await adapter.downloadReleaseReport(product.id, release.id, completed.id);
     expect(releaseApi.downloadEvidenceBundle).toHaveBeenCalledWith({ organizationId: organization.id, productId: product.id, releaseId: release.id }, completed.id);
+    await adapter.generateFindingsReport(product.id, release.id);
+    expect(releaseApi.generateFindingsReport).toHaveBeenCalledWith({ organizationId: organization.id, productId: product.id, releaseId: release.id });
   });
 
   it("retains the production Home counters and monitoring summary", async () => {
@@ -250,6 +253,7 @@ describe("ProductionAdapter", () => {
     await adapter.recordFindingBatchDecision({
       findingIds: [first.id, second.id],
       rationale: "Signed build evidence excludes both vulnerable paths.",
+      recommendationsOnly: true,
     });
 
     expect(approveRecommendations).toHaveBeenCalledTimes(2);
@@ -264,6 +268,29 @@ describe("ProductionAdapter", () => {
       second.productId,
       second.releaseId,
       { items: [{ findingId: second.id, expectedVersion: 1 }], rationale: "Signed build evidence excludes both vulnerable paths." },
+    );
+  });
+
+  it("sends a reviewed batch as one release-scoped decision", async () => {
+    const initial = createDemoState();
+    const first = initial.findings[0];
+    const second = initial.findings[1];
+    const decideBatch = vi.fn(async () => []);
+    const adapter = new ProductionAdapter({
+      organizationId: organization.id,
+      portfolioApi: api(),
+      findingsApi: { decideBatch } as unknown as FindingsApi,
+      fixtureAdapter: new FixtureAdapter(initial),
+    });
+    await adapter.recordFindingBatchDecision({
+      findingIds: [first.id, second.id], decision: "affected",
+      rationale: "Reviewed release evidence for both findings.",
+    });
+    expect(decideBatch).toHaveBeenCalledOnce();
+    expect(decideBatch).toHaveBeenCalledWith(
+      organization.id, first.productId, first.releaseId,
+      { items: [{ findingId: first.id, expectedVersion: 1 }, { findingId: second.id, expectedVersion: 1 }],
+        decision: "affected", rationale: "Reviewed release evidence for both findings." },
     );
   });
 

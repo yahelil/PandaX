@@ -230,6 +230,19 @@ describe("release operations API", () => {
     expect(Array.from(new Uint8Array(await evidence.blob.arrayBuffer()))).toEqual([1, 2, 3]);
   });
 
+  it("generates and downloads the reviewed findings report", async () => {
+    const fetcher = fetchSequence(new Response('{"findings":[]}', {
+      status: 200,
+      headers: { "content-type": "application/json", "content-disposition": 'attachment; filename="release-report-r1.json"' },
+    }));
+    const api = createReleaseOperationsApi({ baseUrl: "/engine", fetch: fetcher });
+    const report = await api.generateFindingsReport(scope);
+    expect(fetcher.mock.calls[0][0]).toBe(`/engine${encodedBase}/reports/findings`);
+    expect(fetcher.mock.calls[0][1]?.method).toBe("POST");
+    expect(report.filename).toBe("release-report-r1.json");
+    expect(await report.blob.text()).toBe('{"findings":[]}');
+  });
+
   it("gets, configures, runs, and lists monitoring history", async () => {
     const healthy = { ...monitoringDto, health: "healthy", limitations: [] };
     const fetcher = fetchSequence(json(monitoringDto), json(monitoringDto), json(healthy, 201), json([monitoringEvent]));

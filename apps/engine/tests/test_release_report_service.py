@@ -62,10 +62,11 @@ def scope(tmp_path):
             )[0]
 
         def generate(self, **kwargs):
+            kwargs.setdefault("now", NOW)
             return generate_release_report(
                 organization_id=ORG, product_id=PRODUCT, release_id=RELEASE,
                 findings=self.findings, documents=self.documents,
-                storage=self.storage, actor_id="operator", now=NOW, **kwargs,
+                storage=self.storage, actor_id="operator", **kwargs,
             )
 
     return Scope()
@@ -106,6 +107,15 @@ def test_regenerating_an_unchanged_release_adds_no_revision(scope):
     assert again.document_id == first.document_id
     detail = scope.documents.get_document(ORG, first.document_id)
     assert len(detail.revisions) == 1
+
+
+def test_regenerating_at_a_later_time_reuses_the_same_report(scope):
+    scope.ingest()
+    first = scope.generate()
+    later = scope.generate(now=NOW + timedelta(hours=2))
+    assert later.document_id == first.document_id
+    assert later.revision == 1
+    assert later.report.content_hash == first.report.content_hash
 
 
 def test_a_changed_finding_produces_a_second_revision(scope):

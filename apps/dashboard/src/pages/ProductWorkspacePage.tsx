@@ -2,8 +2,10 @@ import { type FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { usePermission } from "../auth";
 import { useDemo } from "../data/DemoProvider";
+import { createReleasePdf, type ReleasePdfKind } from "../data/releasePdf";
 import { Breadcrumbs, EmptyState, EvidenceMeter, FindingInsights, MetricCard, SectionHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
 import { craClassLabel } from "./craAssessment";
+import { downloadFile } from "./downloadFile";
 import "./pages.css";
 
 const tabs = ["overview", "releases", "findings", "compliance", "documents"] as const;
@@ -34,7 +36,7 @@ export function ProductWorkspacePage() {
     {tab === "overview" ? <ProductOverview productId={product.id} /> : null}
     {tab === "releases" ? <><ActiveReleaseControl productId={product.id} /><ReleasesTable productId={product.id} /></> : null}
     {tab === "findings" ? <ProductFindings productId={product.id} /> : null}
-    {tab === "compliance" ? <ProductCompliance productId={product.id} /> : null}
+    {tab === "compliance" ? <div className="page"><ProductCompliance productId={product.id} /><ProductDocuments productId={product.id} /></div> : null}
     {tab === "documents" ? <ProductDocuments productId={product.id} /> : null}
   </main>;
 }
@@ -86,4 +88,167 @@ function ProductFindings({ productId }: { productId: string }) { const demo=useD
 
 function ProductCompliance({ productId }: { productId:string }) { const demo=useDemo();const items=demo.complianceItems.filter((item)=>item.productId===productId);return <section className="panel"><SectionHeader title="CRA obligations" description="Readiness, reporting, evidence, and approvals." action={<Link className="text-link" to={`/compliance?product=${productId}`}>Open compliance center</Link>}/><ul className="priority-list">{items.map((item)=><li className="priority-item" key={item.id}><span className={`priority-marker ${item.priority}`}/><div className="item-main"><Link to={`/compliance?product=${productId}&item=${encodeURIComponent(item.id)}`}>{item.title}</Link><p>{item.requirement} · {item.reason}</p></div><div className="item-meta"><StatusPill value={item.lifecycleStatus ?? item.status}/><span>{relativeDate(item.dueAt)}</span></div></li>)}</ul></section>; }
 
-function ProductDocuments({ productId }: { productId:string }) {const demo=useDemo();const docs=demo.documents.filter((doc)=>doc.productId===productId);return <section className="panel"><SectionHeader title="Documents and proof" description="Versioned regulatory outputs and verification evidence."/><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Document</th><th>Type</th><th>Version</th><th>Status</th><th>Completeness</th><th>Updated</th></tr></thead><tbody>{docs.map((doc)=><tr key={doc.id}><td><Link to={`/documents/${doc.id}`}>{doc.name}</Link></td><td>{doc.type.replaceAll("_"," ")}</td><td>v{doc.version}</td><td><StatusPill value={doc.status}/></td><td><StatusPill value={doc.completeness}/></td><td>{formatDate(doc.updatedAt)}</td></tr>)}</tbody></table></div></section>;}
+function ProductDocuments({ productId }: { productId: string }) {
+  const demo = useDemo();
+  const canGenerateReport = usePermission("generate_findings_report");
+  const product = demo.selectors.product(productId);
+  const activeRelease = product?.activeReleaseId ? demo.selectors.release(product.activeReleaseId) : undefined;
+  const latestCompleted = activeRelease
+    ? demo.state.analysisJobs
+        .filter((job) => job.draft.productId === productId && job.draft.releaseId === activeRelease.id && job.status === "completed")
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]
+    : undefined;
+  const docs = demo.documents.filter((doc) => doc.productId === productId);
+  const pdfEvidence = latestCompleted?.result?.evidence?.filter((item) => item.name.toLowerCase().endsWith(".pdf")) ?? [];
+  const [busy, setBusy] = useState<string>();
+  const [error, setError] = useState<string>();
+
+  const download = async (key: string, operation: () => Promise<{ blob: Blob; filename?: string; contentType: string }>, fallback: string) => {
+    setBusy(key);
+    setError(undefined);
+    try {
+      downloadFile(await operation(), fallback);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Document could not be downloaded.");
+    } finally {
+      setBusy(undefined);
+    }
+  };
+
+  const demoDraft = (kind: ReleasePdfKind) => {
+    if (!product || !activeRelease) return Promise.reject(new Error("Active release required"));
+    const bytes = createReleasePdf(kind, product, activeRelease, demo.findings.filter((item) => item.releaseId === activeRelease.id));
+    return Promise.resolve({
+      blob: new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" }),
+      contentType: "application/pdf",
+      filename: `actis-${activeRelease.id}-${kind}-draft.pdf`,
+    });
+  };
+
+  const hasActiveReleasePdfs = Boolean(activeRelease && latestCompleted);
+
+  return (
+    <section className="panel">
+      <SectionHeader
+        title="Documents and proof"
+        description="Versioned regulatory outputs, downloadable PDFs, and verification evidence."
+      />
+      {error ? <p className="panel-pad danger-text" role="alert">{error}</p> : null}
+      <div className="data-table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Document</th>
+              <th>Format</th>
+              <th>Status / State</th>
+              <th>Updated</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {hasActiveReleasePdfs && activeRelease && latestCompleted ? (
+              <>
+                <tr>
+                  <td>
+                    <strong>Product release security report ({activeRelease.version})</strong>
+                    <br />
+                    <small>All findings, review decisions, remediation, and coverage for active release {activeRelease.version}.</small>
+                  </td>
+                  <td>PDF</td>
+                  <td>Generated on download</td>
+                  <td>{formatDate(latestCompleted.updatedAt)}</td>
+                  <td>
+                    {canGenerateReport ? (
+                      <button
+                        type="button"
+                        disabled={Boolean(busy)}
+                        onClick={() => void download("security", () => demo.actions.generateSecurityPdf(productId, activeRelease.id), `actis-${activeRelease.id}-security-report.pdf`)}
+                      >
+                        {busy === "security" ? "Generating…" : "Download PDF"}
+                      </button>
+                    ) : "—"}
+                  </td>
+                </tr>
+                {demo.adapterStatus.mode === "fixture" && !pdfEvidence.length
+                  ? ([
+                      ["technical", `Annex VII technical documentation draft (${activeRelease.version})`, "Manufacturer input required"],
+                      ["declaration", `EU Declaration of Conformity draft (${activeRelease.version})`, "Not issued - manufacturer approval required"],
+                    ] as const).map(([kind, name, state]) => (
+                      <tr key={kind}>
+                        <td>
+                          <strong>{name}</strong>
+                          <br />
+                          <small>Local demo draft for active release {activeRelease.version}.</small>
+                        </td>
+                        <td>PDF</td>
+                        <td>{state}</td>
+                        <td>{formatDate(latestCompleted.updatedAt)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            disabled={Boolean(busy)}
+                            onClick={() => void download(kind, () => demoDraft(kind), `actis-${activeRelease.id}-${kind}-draft.pdf`)}
+                          >
+                            {busy === kind ? "Preparing…" : "Download draft PDF"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  : null}
+                {pdfEvidence.map((item) => (
+                  <tr key={`${latestCompleted.id}-${item.sha256}`}>
+                    <td>
+                      <strong>{item.name.replaceAll("_", " ")} ({activeRelease.version})</strong>
+                      <br />
+                      <small>{demo.adapterStatus.mode === "fixture" ? "Local demo draft for active release." : "Generated by analysis pipeline."}</small>
+                    </td>
+                    <td>{demo.adapterStatus.mode === "fixture" ? "PDF" : "PDF/A-2b"}</td>
+                    <td>Draft evidence</td>
+                    <td>{formatDate(latestCompleted.updatedAt)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        disabled={Boolean(busy)}
+                        onClick={() => void download(item.sha256, () => demo.actions.downloadReleaseEvidenceFile(productId, activeRelease.id, latestCompleted.id, item.sha256), item.name)}
+                      >
+                        {busy === item.sha256 ? "Downloading…" : "Download PDF"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </>
+            ) : null}
+            {docs.map((doc) => (
+              <tr key={doc.id}>
+                <td>
+                  <Link to={`/documents/${doc.id}`}>{doc.name}</Link>
+                </td>
+                <td>{doc.format}</td>
+                <td>
+                  <StatusPill value={doc.status} /> · {doc.completeness.replaceAll("_", " ")}
+                </td>
+                <td>{formatDate(doc.updatedAt)}</td>
+                <td>
+                  <button
+                    type="button"
+                    disabled={Boolean(busy)}
+                    onClick={() => void download(doc.id, () => demo.actions.downloadDocument(doc.id), `actis-${doc.id}.${doc.format.toLowerCase().includes("pdf") ? "pdf" : "json"}`)}
+                  >
+                    {busy === doc.id ? "Downloading…" : "Download"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {!hasActiveReleasePdfs && !docs.length ? (
+              <tr>
+                <td colSpan={5} className="muted">
+                  No documents or completed release analyses found for this product.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}

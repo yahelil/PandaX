@@ -7,7 +7,9 @@ import json
 import os
 import random
 import shutil
+import socket
 import subprocess
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -647,12 +649,22 @@ def _dashboard_repository_root() -> Path:
     )
 
 
+def _is_port_in_use(host: str, port: int) -> bool:
+    try:
+        with socket.create_connection((host, port), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
 @app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", help="Bind address"),
     port: int = typer.Option(4175, min=1, max=65535, help="Port"),
+    api_host: str = typer.Option("127.0.0.1", help="Backend API host"),
+    api_port: int = typer.Option(8000, min=1, max=65535, help="Backend API port"),
 ) -> None:
-    """Run the Actis React dashboard with Vite hot reload."""
+    """Run the Actis React dashboard connected to the local PandaX engine."""
     npm = shutil.which("npm")
     if npm is None:
         typer.echo("npm was not found. Install Node.js and try again.", err=True)
@@ -663,14 +675,32 @@ def serve(
         typer.echo(str(exc), err=True)
         raise typer.Exit(1) from exc
 
+    backend_proc: subprocess.Popen | None = None
+    if _is_port_in_use(api_host, api_port):
+        typer.echo(f"Actis engine backend is already running on http://{api_host}:{api_port}")
+    else:
+        typer.echo(f"Starting Actis engine backend on http://{api_host}:{api_port}...")
+        backend_proc = subprocess.Popen(
+            [sys.executable, "-m", "uvicorn", "pandax.server:api", "--host", api_host, "--port", str(api_port)],
+            cwd=str(root),
+        )
+
     typer.echo(f"Actis dashboard: http://{host}:{port}")
-    result = subprocess.run(
-        [npm, "run", "dev", "--workspace", "@pandax/dashboard", "--", "--host", host, "--port", str(port)],
-        cwd=root,
-        check=False,
-    )
-    if result.returncode:
-        raise typer.Exit(result.returncode)
+    try:
+        result = subprocess.run(
+            [npm, "run", "dev", "--workspace", "@pandax/dashboard", "--", "--host", host, "--port", str(port)],
+            cwd=root,
+            check=False,
+        )
+        if result.returncode:
+            raise typer.Exit(result.returncode)
+    finally:
+        if backend_proc is not None:
+            backend_proc.terminate()
+            try:
+                backend_proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                backend_proc.kill()
 
 
 @app.command()

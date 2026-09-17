@@ -93,6 +93,19 @@ describe("application flow smoke contracts", () => {
     const workspace = source("./pages/ProductWorkspacePage.tsx");
     expect(workspace).toContain("`/products/${product.id}/releases/${release.id}`");
     expect(workspace).toContain("navigate(`/products/${productId}/releases/${created.id}/analyze`)");
+    expect(workspace).toContain('<ProductCompliance productId={product.id} /><ProductDocuments productId={product.id} />');
+    expect(workspace).toContain("Product release security report");
+    expect(workspace).toContain("generateSecurityPdf");
+
+    const releaseWorkspace = source("./pages/ReleaseWorkspacePage.tsx");
+    expect(releaseWorkspace).toContain("<ReleaseDocuments product={product} release={release} latestCompleted={latestCompleted} />");
+    expect(releaseWorkspace).toContain("Draft PDFs and regulatory outputs are available below for review and download.");
+
+    const compliancePage = source("./pages/CompliancePage.tsx");
+    expect(compliancePage).toContain('["documents", "Documents"]');
+    expect(compliancePage).toContain("<ComplianceDocumentsTable product={product} release={release} query={query} />");
+    expect(compliancePage).toContain("generateSecurityPdf");
+
     const products = source("./pages/ProductsPage.tsx");
     expect(products).toContain("Initial release evidence");
     expect(products).toContain('aria-label="Upload type"');

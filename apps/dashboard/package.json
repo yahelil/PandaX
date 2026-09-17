@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --mode demo --configLoader runner --host 0.0.0.0",
+    "dev": "vite --configLoader runner --host 0.0.0.0",
+    "dev:demo": "vite --mode demo --configLoader runner --host 0.0.0.0",
     "demo": "npm run build:demo && vite preview --configLoader runner --host 0.0.0.0",
     "build": "tsc -b && vite build --configLoader runner",
     "build:demo": "tsc -b && vite build --mode demo --configLoader runner",

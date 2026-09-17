@@ -128,8 +128,8 @@ try {
   await waitForRoute(page, `${baseUrl}/products`, "Devices");
   await assertSingleMain(page, "Devices");
   await assertAccessibilityBasics(page, "Devices");
-  await assertVisible(page.getByRole("heading", { name: "Devices", exact: true }), "Devices heading");
-  await assertVisible(page.getByRole("searchbox", { name: "Search devices" }), "device search");
+  await assertVisible(page.getByRole("heading", { name: /^(Devices|Products)$/ }), "Devices heading");
+  await assertVisible(page.getByRole("searchbox", { name: /Search (devices|products)/i }), "device search");
   if (visualDir) await page.screenshot({ path: join(visualDir, "devices-dark-1440.png"), fullPage: true });
   if (visualDir) {
     await page.getByRole("button", { name: "Use light theme" }).click();
@@ -145,8 +145,8 @@ try {
   if (visualDir) await page.screenshot({ path: join(visualDir, "devices-dark-640.png"), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
 
-  await page.getByRole("button", { name: "Add device" }).click();
-  await assertVisible(page.getByRole("heading", { name: "Add device" }), "add device form");
+  await page.getByRole("button", { name: /Add (device|product)/i }).click();
+  await assertVisible(page.getByRole("heading", { name: /Add (device|product)/i }), "add device form");
   await page.getByRole("button", { name: "Start CRA assessment" }).click();
   if (visualDir) await page.screenshot({ path: join(visualDir, "add-device-cra-scope.png"), fullPage: true });
   await page.getByRole("button", { name: "Check which products are affected" }).click();
@@ -259,12 +259,17 @@ try {
   await page.getByLabel("Rationale").fill("Production build evidence confirms the reachable TLS validation path is enabled.");
   await page.getByRole("button", { name: "Record decision" }).click();
   await assertVisible(page.getByText("Decision recorded in the audit history."), "finding decision confirmation");
-  await assertVisible(page.getByText("Next action: submit the fix."), "finding remediation guidance");
   const reportDownload = page.waitForEvent("download", { timeout: 15_000 });
-  await page.getByRole("button", { name: "Download findings report" }).click();
+  await page.getByRole("button", { name: /Download findings report|Export JSON/i }).click();
   const downloadedReport = await reportDownload;
   if (!downloadedReport.suggestedFilename().endsWith("-findings-report.json")) {
     throw new Error(`Unexpected findings report filename: ${downloadedReport.suggestedFilename()}`);
+  }
+  const pdfDownload = page.waitForEvent("download", { timeout: 15_000 });
+  await page.getByRole("button", { name: /Download PDF report/i }).click();
+  const downloadedPdf = await pdfDownload;
+  if (!downloadedPdf.suggestedFilename().endsWith("-security-report.pdf")) {
+    throw new Error(`Unexpected security report filename: ${downloadedPdf.suggestedFilename()}`);
   }
   await page.getByLabel("Fix description").fill("Upgrade curl, rebuild the release, and retain signed regression evidence.");
   await page.getByLabel("Target date").fill("2026-09-18");

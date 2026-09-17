@@ -56,10 +56,6 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <Settings size={19} strokeWidth={1.9} aria-hidden="true" />
           <span>Settings</span>
         </NavLink>
-        <div className="demo-marker" title="Local demo data; no production service is connected">
-          <span className="demo-marker__dot" />
-          Local demo
-        </div>
       </div>
     </aside>
   )

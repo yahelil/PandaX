@@ -10,6 +10,7 @@ export function AppShell() {
   const location = useLocation()
   const { adapterStatus, actions } = useDemo()
   const lastTrackedPath = useRef('')
+  const [bannerDismissed, setBannerDismissed] = useState(false)
   const mountedPath = useRef(false)
 
   useEffect(() => {
@@ -50,8 +51,11 @@ export function AppShell() {
               <button type="button" onClick={() => { void actions.refresh().catch(() => undefined) }}>Retry</button>
             </div>
           ) : null}
-          {adapterStatus.mode === 'fixture' ? (
-            <div className="adapter-status" role="status">Local demo: changes stay in this browser. Only uploaded JSON SBOMs are analyzed, using OSV.</div>
+          {adapterStatus.mode === 'fixture' && !bannerDismissed ? (
+            <div className="adapter-status" role="status">
+              <span>Local demo: changes stay in this browser. Only uploaded JSON SBOMs are analyzed, using OSV.</span>
+              <button type="button" className="text-button" onClick={() => setBannerDismissed(true)} aria-label="Dismiss demo notice" style={{ marginLeft: 'auto', padding: '0 4px' }}>✕</button>
+            </div>
           ) : null}
           <Suspense fallback={<div className="adapter-status" role="status" aria-live="polite">Loading workspace…</div>}>
             <Outlet />

@@ -497,3 +497,15 @@ fieldset.field { min-width:0; margin:0; padding:0; border:0; }
   outline-offset: 2px;
 }
 
+/* Priority indicators on table rows */
+.priority-border-urgent > td:first-child { border-left: 3.5px solid var(--danger); }
+.priority-border-high > td:first-child { border-left: 3.5px solid var(--warning); }
+.priority-border-normal > td:first-child { border-left: 3.5px solid var(--info); }
+.priority-border-low > td:first-child { border-left: 3.5px solid transparent; }
+
+/* Contextual batch review drawer */
+.batch-review-drawer {
+  border-top: 2px solid var(--accent) !important;
+  background: var(--surface-hover);
+}
+

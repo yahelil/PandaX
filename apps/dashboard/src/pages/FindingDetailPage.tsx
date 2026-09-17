@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
+import { Download, FileCode } from 'lucide-react'
 import { usePermission } from '../auth'
 import { useDemo } from '../data/DemoProvider'
 import type { DecisionKind } from '../data/types'
@@ -75,16 +76,22 @@ export function FindingDetailPage() {
       'Fix description submitted for acceptance.',
     )
   }
-  const generateReport = () => {
+  const generatePdfReport = () => {
+    void perform(async () => {
+      const file = await demo.actions.generateSecurityPdf(finding.productId, finding.releaseId)
+      downloadFile(file, `actis-${finding.releaseId}-security-report.pdf`)
+    }, 'Product release security report (PDF) generated and downloaded.')
+  }
+  const generateJsonReport = () => {
     void perform(async () => {
       const file = await demo.actions.generateFindingsReport(finding.productId, finding.releaseId)
       downloadFile(file, `actis-${finding.releaseId}-findings-report.json`)
-    }, 'Release findings report generated and downloaded.')
+    }, 'Release findings report (JSON) generated and downloaded.')
   }
 
   return <main className="page">
     <Breadcrumbs items={[{ label: 'Findings', to: '/findings' }, { label: finding.reference }]} />
-    <PageHeader eyebrow={`${product?.name} · ${release?.version}`} title={`${finding.reference}: ${finding.title}`} description={finding.summary} actions={<div className="inline-actions"><StatusPill value={finding.priority} /><StatusPill value={finding.status} label={finding.status === 'action_required' ? 'Fix required' : undefined} />{canGenerateReport ? <button type="button" className="button button-primary" disabled={busy} onClick={generateReport}>Download findings report</button> : null}</div>} />
+    <PageHeader eyebrow={`${product?.name} · ${release?.version}`} title={`${finding.reference}: ${finding.title}`} description={finding.summary} actions={<div className="inline-actions"><StatusPill value={finding.priority} /><StatusPill value={finding.status} label={finding.status === 'action_required' ? 'Fix required' : undefined} />{canGenerateReport ? <><button type="button" className="button button-primary" disabled={busy} onClick={generatePdfReport} title="Download formatted PDF security report"><Download size={14} /> Download PDF report</button><button type="button" className="button" disabled={busy} onClick={generateJsonReport} title="Export raw findings and decisions as machine-readable JSON"><FileCode size={14} /> Export JSON</button></> : null}</div>} />
     <section className="panel detail-hero">
       <div className="detail-badges"><StatusPill value={finding.severity} />{finding.kev ? <span className="status-pill status-urgent">CISA KEV</span> : null}{finding.activelyExploited ? <span className="status-pill status-urgent">Actively exploited</span> : null}<StatusPill value={finding.affectedness} /><StatusPill value={finding.reachability} /></div>
       <h2>Why this needs attention</h2><p>{finding.actionReason}</p>

@@ -82,11 +82,11 @@ export function ProductsPage() {
   return (
     <main className="page devices-page">
       <header className="devices-heading">
-        <div><h1>Devices</h1><p>Manage the devices and products in scope for your cybersecurity assessments.</p></div>
-        <button className="button button-primary" disabled={!canManagePortfolio} title={!canManagePortfolio ? "Org Admin or Compliance Operator permission required" : undefined} onClick={() => setAdding((value) => !value)}><Plus size={19} /> Add device</button>
+        <div><h1>Products</h1><p>Manage products and connected components in scope for your cybersecurity assessments.</p></div>
+        <button className="button button-primary" disabled={!canManagePortfolio} title={!canManagePortfolio ? "Org Admin or Compliance Operator permission required" : undefined} onClick={() => setAdding((value) => !value)}><Plus size={19} /> Add product</button>
       </header>
       <section className="devices-stats" aria-label="Device summary">
-        <div className="devices-stat"><span className="devices-stat__icon devices-stat__icon--total"><Laptop size={26} /></span><div><span>Total devices</span><strong>{demo.products.length}</strong></div></div>
+        <div className="devices-stat"><span className="devices-stat__icon devices-stat__icon--total"><Laptop size={26} /></span><div><span>Total products</span><strong>{demo.products.length}</strong></div></div>
         <div className="devices-stat"><span className="devices-stat__icon devices-stat__icon--scope"><span className="devices-stat__dot" /></span><div><span>In scope</span><strong>{demo.products.filter((product) => scopeStatus(product) === "in_scope").length}</strong></div></div>
         <div className="devices-stat"><span className="devices-stat__icon devices-stat__icon--out"><span className="devices-stat__dot" /></span><div><span>Out of scope</span><strong>{demo.products.filter((product) => scopeStatus(product) === "out_of_scope").length}</strong></div></div>
         <div className="devices-stat"><span className="devices-stat__icon devices-stat__icon--findings"><AlertTriangle size={25} /></span><div><span>With open findings</span><strong>{demo.products.filter((product) => (openFindings.get(product.id) ?? 0) > 0).length}</strong></div></div>
@@ -137,7 +137,7 @@ export function ProductsPage() {
         {selected.length > 0 ? <div className="devices-selection" role="status">{selected.length} selected <button type="button" onClick={() => setSelected([])}>Clear selection</button></div> : null}
         <div className="data-table-wrap">
           <table className="data-table devices-table">
-            <thead><tr><th><input type="checkbox" aria-label="Select devices on this page" checked={selectedOnPage} onChange={togglePage} /></th><th>Device name</th><th>Product / Version</th><th>CRA class</th><th>Status</th><th>Open findings</th><th>Most urgent deadline</th><th>Last assessment</th><th>Owner</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th><input type="checkbox" aria-label="Select devices on this page" checked={selectedOnPage} onChange={togglePage} /></th><th>Product</th><th>CRA class</th><th>Status</th><th>Open findings</th><th>Most urgent deadline</th><th>Last assessment</th><th>Owner</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{pageProducts.map((product) => {
               const release = productRelease(product);
               const status = scopeStatus(product);
@@ -145,8 +145,18 @@ export function ProductsPage() {
               const mostUrgentTimer = getProductMostUrgentTimer(product, demo.findings, demo.complianceItems);
               return <tr key={product.id}>
                 <td><input type="checkbox" aria-label={`Select ${product.name}`} checked={selected.includes(product.id)} onChange={() => toggleSelected(product.id)} /></td>
-                <td><Link className="devices-name" to={`/products/${product.id}`}>{product.name}</Link></td>
-                <td>{release ? <Link className="devices-version" to={`/products/${product.id}/releases/${release.id}`}>{product.name} v{release.version}</Link> : <span className="devices-muted">No release yet</span>}</td>
+                <td>
+                  <div className="cell-primary">
+                    <Link className="devices-name" to={`/products/${product.id}`}>{product.name}</Link>
+                    {release ? (
+                      <Link className="devices-version" to={`/products/${product.id}/releases/${release.id}`}>
+                        <small>v{release.version} ({release.channel})</small>
+                      </Link>
+                    ) : (
+                      <small className="devices-muted">No release yet</small>
+                    )}
+                  </div>
+                </td>
                 <td><span className={`devices-class devices-class--${product.craClass}`}>{craClassLabel(product.craClass)}</span></td>
                 <td><button type="button" className={`devices-scope devices-scope-button devices-scope--${status}`} onClick={() => setReviewProduct(product)} title="Click to open window to review CRA scope, classification, or upload evidence" aria-label={`Review CRA scope for ${product.name}: ${scopeLabel(status)}`}><span />{scopeLabel(status)}</button></td>
                 <td><Link className={findings ? "devices-finding-count devices-finding-count--open" : "devices-finding-count"} to={`/findings?product=${encodeURIComponent(product.id)}`}>{findings}</Link></td>
@@ -155,7 +165,7 @@ export function ProductsPage() {
                 <td>{memberName(demo.state.members, product.ownerId)}</td>
                 <td><details className="devices-row-menu"><summary aria-label={`Actions for ${product.name}`}><MoreVertical size={18} /></summary><div><Link to={`/products/${product.id}`}>Open device</Link>{release ? <Link to={`/products/${product.id}/releases/${release.id}`}>Open release</Link> : null}<Link to={`/findings?product=${encodeURIComponent(product.id)}`}>View findings</Link><button type="button" onClick={() => setReviewProduct(product)} style={{ textAlign: "left", background: "none", border: "none", padding: "8px", borderRadius: "5px", cursor: "pointer", font: "inherit", fontSize: "12px", color: "inherit" }}>Review CRA scope</button></div></details></td>
               </tr>;
-            })}{pageProducts.length === 0 ? <tr><td colSpan={10} className="devices-empty">No devices match these filters.</td></tr> : null}</tbody>
+            })}{pageProducts.length === 0 ? <tr><td colSpan={9} className="devices-empty">No products match these filters.</td></tr> : null}</tbody>
           </table>
         </div>
         <div className="mobile-card-list">{pageProducts.map((product) => {

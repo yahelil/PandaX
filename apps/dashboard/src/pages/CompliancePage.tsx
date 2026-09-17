@@ -50,6 +50,15 @@ export function CompliancePage() {
   const [direction, setDirection] = useState<"asc" | "desc">("asc");
   const [actionModalItem, setActionModalItem] = useState<ComplianceItem | null>(null);
 
+  const toggleSort = (key: Sort) => {
+    if (sort === key) {
+      setDirection((val) => val === "asc" ? "desc" : "asc");
+    } else {
+      setSort(key);
+      setDirection("asc");
+    }
+  };
+
   const scoped = useMemo(() => demo.complianceItems
     .filter((item) => product === "all" || item.productId === product)
     .filter((item) => release === "all" || item.releaseId === release), [demo.complianceItems, product, release]);
@@ -96,8 +105,6 @@ export function CompliancePage() {
           <>
             <select className="select-field" value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Lifecycle status"><option value="all">All statuses</option>{lifecycleStatuses.map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}</select>
             <select className="select-field" value={priority} onChange={(event) => setPriority(event.target.value)} aria-label="Priority"><option value="all">All priorities</option><option value="urgent">Critical</option><option value="high">High</option><option value="normal">Medium</option><option value="low">Low</option></select>
-            <select className="select-field" value={sort} onChange={(event) => setSort(event.target.value as Sort)} aria-label="Sort compliance work"><option value="priority">Sort by priority</option><option value="due">Sort by deadline</option><option value="updated">Sort by last update</option><option value="status">Sort by status</option></select>
-            <button className="button-small" onClick={() => setDirection((value) => value === "asc" ? "desc" : "asc")} aria-label={`Sort ${direction === "asc" ? "descending" : "ascending"}`}>{direction === "asc" ? "Ascending" : "Descending"}</button>
           </>
         ) : null}
       </div>
@@ -105,7 +112,22 @@ export function CompliancePage() {
         <ComplianceDocumentsTable product={product} release={release} query={query} />
       ) : (
         <>
-          <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Priority</th><th>Obligation</th><th>Scope</th><th>Requirement</th><th>Status</th><th>Owner</th><th>Due</th></tr></thead><tbody>{items.map((item) => { const itemProduct = demo.selectors.product(item.productId); const itemRelease = demo.selectors.release(item.releaseId); return <tr key={item.id} className={selectedId === item.id ? "selected-row" : undefined}><td><StatusPill value={item.priority} /></td><td><div className="cell-primary"><Link to={itemUrl(params, item.id)}>{item.title}</Link><small>{item.reason}</small></div></td><td><ScopeCell item={item} productName={itemProduct?.name} releaseVersion={itemRelease?.version} /></td><td>{item.requirement}</td><td><button type="button" className="status-pill-button" onClick={() => setActionModalItem(item)} title="Click to open window to upload/write what's needed" aria-label={`Open action window for ${item.title}: ${titleCase(lifecycleStatus(item))}`}><StatusPill value={lifecycleStatus(item)} /></button></td><td>{memberName(demo.state.members, item.ownerId)}</td><td className={item.priority === "urgent" && !isComplianceResolved(item) ? "danger-text" : ""}>{relativeDate(item.dueAt)}</td></tr>; })}</tbody></table></div>
+          <div className="data-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ cursor: "pointer", userSelect: "none" }} onClick={() => toggleSort("priority")} title="Click to sort by priority">Priority {sort === "priority" ? (direction === "asc" ? "↑" : "↓") : ""}</th>
+                  <th>Obligation</th>
+                  <th>Scope</th>
+                  <th>Requirement</th>
+                  <th style={{ cursor: "pointer", userSelect: "none" }} onClick={() => toggleSort("status")} title="Click to sort by status">Status {sort === "status" ? (direction === "asc" ? "↑" : "↓") : ""}</th>
+                  <th>Owner</th>
+                  <th style={{ cursor: "pointer", userSelect: "none" }} onClick={() => toggleSort("due")} title="Click to sort by deadline">Due {sort === "due" ? (direction === "asc" ? "↑" : "↓") : ""}</th>
+                </tr>
+              </thead>
+              <tbody>{items.map((item) => { const itemProduct = demo.selectors.product(item.productId); const itemRelease = demo.selectors.release(item.releaseId); return <tr key={item.id} className={selectedId === item.id ? "selected-row" : undefined}><td><StatusPill value={item.priority} /></td><td><div className="cell-primary"><Link to={itemUrl(params, item.id)}>{item.title}</Link><small>{item.reason}</small></div></td><td><ScopeCell item={item} productName={itemProduct?.name} releaseVersion={itemRelease?.version} /></td><td>{item.requirement}</td><td><button type="button" className="status-pill-button" onClick={() => setActionModalItem(item)} title="Click to open window to upload/write what's needed" aria-label={`Open action window for ${item.title}: ${titleCase(lifecycleStatus(item))}`}><StatusPill value={lifecycleStatus(item)} /></button></td><td>{memberName(demo.state.members, item.ownerId)}</td><td className={item.priority === "urgent" && !isComplianceResolved(item) ? "danger-text" : ""}>{relativeDate(item.dueAt)}</td></tr>; })}</tbody>
+            </table>
+          </div>
           <div className="mobile-card-list">{items.map((item) => <article className="mobile-card" key={item.id}><div className="inline-actions"><StatusPill value={item.priority} /><button type="button" className="status-pill-button" onClick={() => setActionModalItem(item)} title="Click to open window to upload/write what's needed" aria-label={`Open action window for ${item.title}`}><StatusPill value={lifecycleStatus(item)} /></button></div><div className="cell-primary"><Link to={itemUrl(params, item.id)}>{item.title}</Link><small>{demo.selectors.product(item.productId)?.name ?? "Organization-wide"} · {item.requirement}</small></div></article>)}</div>
           {!items.length ? <EmptyState title="No matching compliance work" body="Change the scope or filters to include other obligations." /> : null}
         </>

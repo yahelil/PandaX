@@ -20,6 +20,7 @@ export function ExactTimerBadge({
 
   const isUrgent = timer.urgency === "urgent";
   const isHigh = timer.urgency === "high";
+  const tooltipTitle = `Exact deadline: ${timer.exactDateText}${timer.sourceLabel ? ` (${timer.sourceLabel})` : ""}`;
 
   return (
     <div
@@ -30,7 +31,7 @@ export function ExactTimerBadge({
           ? "exact-timer-badge--high"
           : "exact-timer-badge--normal"
       } ${compact ? "exact-timer-badge--compact" : ""}`}
-      title={`Exact deadline: ${timer.exactDateText}`}
+      title={tooltipTitle}
     >
       <div className="exact-timer-badge__top">
         {timer.isOverdue ? (
@@ -41,7 +42,7 @@ export function ExactTimerBadge({
         <span className="exact-timer-countdown mono">{timer.countdownText}</span>
       </div>
 
-      {(showLabel && timer.sourceLabel) || showDate ? (
+      {!compact && ((showLabel && timer.sourceLabel) || showDate) ? (
         <div className="exact-timer-badge__sub">
           {showLabel && timer.sourceLabel ? (
             <span className="exact-timer-label">{timer.sourceLabel}</span>

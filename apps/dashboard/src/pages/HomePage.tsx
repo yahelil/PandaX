@@ -63,7 +63,6 @@ export function HomePage() {
               : `${monitoring.healthy} of ${monitoring.supportedReleases} supported releases have current coverage.`
             : `${degraded.map((item) => "version" in item ? item.version : item.name).join(", ")} ${degraded.length === 1 ? "has" : "have"} incomplete source coverage.`}
           {" "}<Link className="text-link" to={scopedPath("/compliance", scope, { view: "monitoring" })}>Review monitoring</Link>
-          {monitoring ? <div className="monitoring-detail"><dl><div><dt>Cadence</dt><dd>{cadenceLabel(monitoring.cadenceMinutes)}</dd></div><div><dt>Last successful check</dt><dd>{monitoring.lastSuccessAt ? formatDate(monitoring.lastSuccessAt, true) : "No successful check"}</dd></div><div><dt>Next check</dt><dd>{monitoring.nextCheckAt ? formatDate(monitoring.nextCheckAt, true) : "Not scheduled"}</dd></div></dl>{monitoring.sources.length ? <ul aria-label="Monitoring source health">{monitoring.sources.map((source)=><li key={source.source}><span>{sourceName(source.source)} · {source.releaseCount} {source.releaseCount===1?"release":"releases"}</span><StatusPill value={source.state}/></li>)}</ul>:<p>No monitoring sources configured.</p>}</div> : null}
         </section>
       ) : null}
 
@@ -89,7 +88,6 @@ export function HomePage() {
                     <p>{product?.name}{release ? ` · ${release.version}` : ""} · {memberName(demo.state.members, item.ownerId)}</p>
                   </div>
                   <div className="item-meta">
-                    <StatusPill value={item.priority} />
                     <span className={item.priority === "urgent" ? "danger-text" : ""}>{relativeDate(item.dueAt)}</span>
                   </div>
                 </li>

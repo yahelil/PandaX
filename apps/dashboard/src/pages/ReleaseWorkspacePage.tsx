@@ -16,6 +16,7 @@ export function ReleaseWorkspacePage() {
   const demo = useDemo();
   const canGenerateReport = usePermission("generate_findings_report");
   const [downloading, setDownloading] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState<string>();
   const [generatingReport, setGeneratingReport] = useState(false);
   const [downloadError, setDownloadError] = useState<string>();
   const release = demo.selectors.release(releaseId);
@@ -26,6 +27,7 @@ export function ReleaseWorkspacePage() {
   const unreviewedCount = findings.filter((item) => item.status === "needs_review").length;
   const latestCompleted = demo.state.analysisJobs.filter((job) => job.draft.productId === product.id && job.draft.releaseId === release.id && job.status === "completed")
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  const pdfReports = latestCompleted?.result?.evidence?.filter((item) => item.name.toLowerCase().endsWith(".pdf")) ?? [];
   const downloadReport = async () => {
     if (!latestCompleted) return;
     setDownloading(true); setDownloadError(undefined);
@@ -43,6 +45,15 @@ export function ReleaseWorkspacePage() {
     } catch (cause) { setDownloadError(cause instanceof Error ? cause.message : "Could not generate the security report PDF."); }
     finally { setGeneratingReport(false); }
   };
+  const downloadPdfReport = async (report: { name: string; sha256: string }) => {
+    if (!latestCompleted) return;
+    setDownloadingPdf(report.sha256); setDownloadError(undefined);
+    try {
+      const file = await demo.actions.downloadAnalysisEvidence(product.id, release.id, latestCompleted.id, report.sha256);
+      downloadFile(file, report.name);
+    } catch (cause) { setDownloadError(cause instanceof Error ? cause.message : "Could not download the PDF report."); }
+    finally { setDownloadingPdf(undefined); }
+  };
 
   return <main className="page">
     <Breadcrumbs items={[{ label: "Products", to: "/products" }, { label: product.name, to: `/products/${product.id}?tab=releases` }, { label: release.version }]} />
@@ -57,7 +68,7 @@ export function ReleaseWorkspacePage() {
       <section className="panel"><SectionHeader title="Analysis coverage" description="Latest known software composition and source coverage." /><dl className="definition-grid"><div><dt>SBOM status</dt><dd><StatusPill value={release.sbomStatus} /></dd></div><div><dt>Component identity</dt><dd><EvidenceMeter value={release.coverage.identifiedComponents} total={release.coverage.components} /></dd></div><div><dt>Advisory sources</dt><dd><EvidenceMeter value={release.coverage.advisorySourcesChecked} total={release.coverage.advisorySourcesExpected} /></dd></div><div><dt>Last analysis</dt><dd>{formatDate(release.lastAnalysisAt, true)}</dd></div></dl>{release.coverage.limitations.length ? <div className="panel-pad"><div className="coverage-callout"><strong>Coverage limitations</strong><br />{release.coverage.limitations.join(" ")}</div></div> : null}</section>
       <MonitoringPanel productId={product.id} releaseId={release.id} fallbackHealth={release.monitoringHealth} fallbackLastCheck={release.lastMonitoringCheckAt} />
       <FindingInsights findings={findings} analyses={demo.state.analysisJobs.filter((item) => item.draft.releaseId === release.id)}/>
-      <section className="panel wide"><SectionHeader title="Received artifacts" description="Traceable evidence and generated reports for this release." action={latestCompleted ? <button type="button" disabled={downloading} onClick={() => void downloadReport()}>{downloading ? "Preparing…" : "Download analysis evidence"}</button> : null} />{unreviewedCount ? <p className="panel-pad notice">{unreviewedCount} finding{unreviewedCount === 1 ? "" : "s"} still need a decision. The findings report will identify them as awaiting review. <Link to={`/findings?product=${encodeURIComponent(product.id)}&release=${encodeURIComponent(release.id)}&view=unreviewed`}>Review findings</Link></p> : null}<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Artifact</th><th>Kind</th><th>Size</th><th>Received</th><th>SHA-256</th></tr></thead><tbody>{release.artifacts.map((artifact) => <tr key={artifact.id}><td className="cell-strong">{artifact.name}</td><td>{artifact.kind.replaceAll("_", " ")}</td><td>{artifact.sizeLabel}</td><td>{formatDate(artifact.receivedAt, true)}</td><td className="mono">{artifact.sha256.slice(0, 16)}…</td></tr>)}</tbody></table></div></section>
+      <section className="panel wide"><SectionHeader title="Received artifacts" description="Traceable evidence and generated reports for this release." action={latestCompleted ? <button type="button" disabled={downloading} onClick={() => void downloadReport()}>{downloading ? "Preparing…" : "Download analysis evidence"}</button> : null} />{unreviewedCount ? <p className="panel-pad notice">{unreviewedCount} finding{unreviewedCount === 1 ? "" : "s"} still need a decision. The findings report will identify them as awaiting review. <Link to={`/findings?product=${encodeURIComponent(product.id)}&release=${encodeURIComponent(release.id)}&view=unreviewed`}>Review findings</Link></p> : null}{pdfReports.length ? <div className="data-table-wrap"><table className="data-table"><caption>Release PDF documents</caption><thead><tr><th>Document</th><th>Format</th><th>Action</th></tr></thead><tbody>{pdfReports.map((report) => <tr key={report.sha256}><td className="cell-strong">{report.name.replaceAll("_", " ").replace(/\.pdf$/i, "")}</td><td>{demo.adapterStatus.mode === "fixture" ? "PDF draft" : "PDF/A-2b"}</td><td><button type="button" className="button" disabled={Boolean(downloadingPdf)} onClick={() => void downloadPdfReport(report)}>{downloadingPdf === report.sha256 ? "Downloading…" : "Download PDF"}</button></td></tr>)}</tbody></table></div> : null}<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Artifact</th><th>Kind</th><th>Size</th><th>Received</th><th>SHA-256</th></tr></thead><tbody>{release.artifacts.map((artifact) => <tr key={artifact.id}><td className="cell-strong">{artifact.name}</td><td>{artifact.kind.replaceAll("_", " ")}</td><td>{artifact.sizeLabel}</td><td>{formatDate(artifact.receivedAt, true)}</td><td className="mono">{artifact.sha256.slice(0, 16)}…</td></tr>)}</tbody></table></div></section>
     </div> : null}
     {tab === "findings" ? <ReleaseFindings releaseId={release.id} /> : null}
     {tab === "compliance" ? <ReleaseCompliance product={product} release={release} latestCompleted={latestCompleted} /> : null}
@@ -147,11 +158,11 @@ function ReleaseDocuments({ product, release, latestCompleted }: { product: Prod
     {!latestCompleted ? <div className="panel-pad notice">Analyze this release before generating its documents. <Link to={`/products/${product.id}/releases/${release.id}/analyze`}>Add an SBOM</Link>.</div> : null}
     <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Document</th><th>Format</th><th>State</th><th>Action</th></tr></thead><tbody>
       <tr><td><strong>Product release security report</strong><br /><small>All findings, review decisions, remediation, and coverage.</small></td><td>PDF</td><td>{latestCompleted ? "Generated on download" : "Waiting for analysis"}</td><td>{latestCompleted && canGenerateReport ? <button type="button" disabled={Boolean(busy)} onClick={() => void download("security", () => demo.actions.generateSecurityPdf(product.id, release.id), `actis-${release.id}-security-report.pdf`)}>{busy === "security" ? "Generating…" : "Download PDF"}</button> : "—"}</td></tr>
-      {demo.adapterStatus.mode === "fixture" && latestCompleted ? ([
+      {demo.adapterStatus.mode === "fixture" && latestCompleted && !pdfEvidence.length ? ([
         ["technical", "Annex VII technical documentation draft", "Manufacturer input required"],
         ["declaration", "EU Declaration of Conformity draft", "Not issued - manufacturer approval required"],
       ] as const).map(([kind, name, state]) => <tr key={kind}><td><strong>{name}</strong><br /><small>Local demo draft for this release.</small></td><td>PDF</td><td>{state}</td><td><button type="button" disabled={Boolean(busy)} onClick={() => void download(kind, () => demoDraft(kind), `actis-${release.id}-${kind}-draft.pdf`)}>{busy === kind ? "Preparing…" : "Download draft PDF"}</button></td></tr>) : null}
-      {pdfEvidence.map((item) => <tr key={`${latestCompleted?.id}-${item.sha256}`}><td><strong>{item.name.replaceAll("_", " ")}</strong><br /><small>Generated by the analysis pipeline; review required before legal use.</small></td><td>PDF/A-2b</td><td>Draft evidence</td><td><button type="button" disabled={Boolean(busy)} onClick={() => void download(item.sha256, () => demo.actions.downloadReleaseEvidenceFile(product.id, release.id, latestCompleted!.id, item.sha256), item.name)}>{busy === item.sha256 ? "Downloading…" : "Download PDF"}</button></td></tr>)}
+      {pdfEvidence.map((item) => <tr key={`${latestCompleted?.id}-${item.sha256}`}><td><strong>{item.name.replaceAll("_", " ")}</strong><br /><small>{demo.adapterStatus.mode === "fixture" ? "Local demo draft for this release." : "Generated by the analysis pipeline; review required before legal use."}</small></td><td>{demo.adapterStatus.mode === "fixture" ? "PDF" : "PDF/A-2b"}</td><td>Draft evidence</td><td><button type="button" disabled={Boolean(busy)} onClick={() => void download(item.sha256, () => demo.actions.downloadReleaseEvidenceFile(product.id, release.id, latestCompleted!.id, item.sha256), item.name)}>{busy === item.sha256 ? "Downloading…" : "Download PDF"}</button></td></tr>)}
       {items.filter((item) => !["Release report", "Product release security report"].includes(item.name)).map((item) => <tr key={item.id}><td><Link to={`/documents/${item.id}`}>{item.name}</Link></td><td>{item.format}</td><td>{item.status} · {item.completeness.replaceAll("_", " ")}</td><td><button type="button" disabled={Boolean(busy)} onClick={() => void download(item.id, () => demo.actions.downloadDocument(item.id), `actis-${item.id}.pdf`)}>{busy === item.id ? "Downloading…" : "Download"}</button></td></tr>)}
     </tbody></table></div>
   </section>;

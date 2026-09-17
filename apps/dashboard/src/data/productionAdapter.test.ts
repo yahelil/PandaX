@@ -129,7 +129,7 @@ describe("ProductionAdapter", () => {
       inputType: "raw_artifact", filename: "gateway.zip", mediaType: "application/zip", sizeBytes: 1024, sha256: "a".repeat(64),
       preview: { format: "archive", version: "", components: 0, matchableComponents: 0, skippedComponents: 0, product: {} },
       inputMetadata: {}, status: "completed", stage: "Completed", progress: 100,
-      result: { components: 12, matchableComponents: 11, skippedComponents: 1, findings: 2, kev: 0, incidents: 0, inputFormat: "CycloneDX", inputVersion: "1.6", coverageSummary: { completed: 3, failed: 1 }, evidence: [] },
+      result: { components: 12, matchableComponents: 11, skippedComponents: 1, findings: 2, kev: 0, incidents: 0, inputFormat: "CycloneDX", inputVersion: "1.6", coverageSummary: { completed: 3, failed: 1 }, evidence: [{ name: "EU_Declaration_of_Conformity.pdf", sha256: "b".repeat(64), href: "/evidence/b" }] },
       createdAt: "2026-09-14T08:00:00Z", updatedAt: "2026-09-14T08:01:00Z", completedAt: "2026-09-14T08:01:00Z",
     };
     const releaseApi = releaseOperations(completed);
@@ -147,6 +147,8 @@ describe("ProductionAdapter", () => {
     expect(portfolioApi.updateProduct).toHaveBeenCalledWith(organization.id, product.id, { activeReleaseId: release.id });
     await adapter.downloadReleaseReport(product.id, release.id, completed.id);
     expect(releaseApi.downloadEvidenceBundle).toHaveBeenCalledWith({ organizationId: organization.id, productId: product.id, releaseId: release.id }, completed.id);
+    await adapter.downloadAnalysisEvidence(product.id, release.id, completed.id, "b".repeat(64));
+    expect(releaseApi.downloadEvidence).toHaveBeenCalledWith({ organizationId: organization.id, productId: product.id, releaseId: release.id }, completed.id, "b".repeat(64));
     await adapter.generateFindingsReport(product.id, release.id);
     expect(releaseApi.generateFindingsReport).toHaveBeenCalledWith({ organizationId: organization.id, productId: product.id, releaseId: release.id });
   });

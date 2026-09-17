@@ -2,7 +2,7 @@ import { type FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { usePermission } from '../auth'
 import { useDemo } from '../data/DemoProvider'
-import type { DecisionKind, Remediation } from '../data/types'
+import type { DecisionKind } from '../data/types'
 import { Breadcrumbs, EmptyState, PageHeader, SectionHeader, StatusPill, formatDate, memberName, relativeDate, titleCase } from './PageKit'
 import { craReportingWindows, remediationDue } from './findingDeadlines'
 import { downloadFile } from './downloadFile'
@@ -68,8 +68,8 @@ export function FindingDetailPage() {
   const saveRemediation = (event: FormEvent) => {
     event.preventDefault()
     void perform(
-      () => demo.actions.updateRemediation({ findingId: finding.id, status: 'planned', plan, targetDate: targetDate || undefined }),
-      'Remediation plan updated.',
+      () => demo.actions.updateRemediation({ findingId: finding.id, status: 'verification_pending', plan, targetDate: targetDate || undefined }),
+      'Fix description submitted for acceptance.',
     )
   }
   const generateReport = () => {
@@ -93,7 +93,7 @@ export function FindingDetailPage() {
       </dl>
       {reporting ? <div className="panel-pad notice"><strong>CRA reporting assessment</strong><p>Potentially reportable active exploitation. Confirm when the manufacturer became aware; the dates below use first detection as a provisional starting point.</p><p>Early warning (24h): {formatDate(reporting.early, true)} · Full notification (72h): {formatDate(reporting.full, true)}</p><p>For an actively exploited vulnerability, the final report is due within 14 days after a corrective or mitigating measure is available. A severe incident has a separate one-month final-report window after its 72-hour notification.</p></div> : null}
     </section>
-    {finding.status === 'action_required' ? <div className="notice"><strong>Next action: plan the fix.</strong> This finding was confirmed as affecting the release. <a href="#remediation">Set the remediation plan and target date</a>. If active exploitation is confirmed, assess the CRA notification deadlines above. The downloadable findings report records this decision and remediation status; it is not a CRA notification.</div> : null}
+    {finding.status === 'action_required' ? <div className="notice"><strong>Next action: submit the fix.</strong> This finding was confirmed as affecting the release. <a href="#remediation">Describe the fix and submit it for acceptance</a>. If active exploitation is confirmed, assess the CRA notification deadlines above. The downloadable findings report records this decision and remediation status; it is not a CRA notification.</div> : null}
     {message ? <div className="notice" role="status">{message}</div> : null}
     <div className="split-layout">
       <div className="page">
@@ -108,12 +108,12 @@ export function FindingDetailPage() {
           <ul className="timeline">{finding.decisions.map((item) => <li key={item.id}><strong>{titleCase(item.decision)} · {memberName(demo.state.members, item.decidedBy)}</strong><span>{formatDate(item.decidedAt, true)}</span><p>{item.rationale}</p></li>)}</ul>
         </section>
         <section className="panel" id="remediation">
-          <SectionHeader title="Remediation" description="Define accountable work without turning Actis into a ticketing system." />
+          <SectionHeader title="Fix submission" description="Record the implemented fix as text, then explicitly accept it to continue." />
           <form className="setting-section" onSubmit={saveRemediation}>
             {!canRemediate ? <div className="notice">Your role can review this remediation plan but cannot change it.</div> : null}
-            <div className="field"><label htmlFor="plan">Plan</label><textarea id="plan" className="textarea-field" required value={plan} disabled={!canRemediate} onChange={(event) => setPlan(event.target.value)} placeholder="Describe the update, mitigation, and verification evidence required." /></div>
+            <div className="field"><label htmlFor="plan">Fix description</label><textarea id="plan" className="textarea-field" required minLength={12} value={plan} disabled={!canRemediate} onChange={(event) => setPlan(event.target.value)} placeholder="Describe the update or mitigation that was applied and how it was verified." /></div>
             <div className="field"><label htmlFor="target">Target date</label><input id="target" className="input-field" type="date" value={targetDate} disabled={!canRemediate} onChange={(event) => setTargetDate(event.target.value)} /></div>
-            <div className="inline-actions"><button className="button-primary" disabled={busy || !canRemediate}>Save remediation plan</button>{finding.remediation.status !== 'verified' ? <button type="button" disabled={busy || !canRemediate} onClick={() => { void perform(() => demo.actions.updateRemediation({ findingId: finding.id, status: nextStatus(finding.remediation.status), plan, targetDate: targetDate || undefined }), 'Remediation status advanced.') }}>Advance status</button> : null}</div>
+            <div className="inline-actions"><button className="button-primary" disabled={busy || !canRemediate}>Submit fix description</button>{finding.remediation.status === 'verification_pending' ? <button type="button" disabled={busy || !canRemediate} onClick={() => { void perform(() => demo.actions.updateRemediation({ findingId: finding.id, status: 'verified', plan, targetDate: targetDate || undefined }), 'Fix accepted. The workflow can continue to reports and document approval.') }}>Accept fix and continue</button> : null}</div>
           </form>
         </section>
       </div>
@@ -123,8 +123,4 @@ export function FindingDetailPage() {
       </aside>
     </div>
   </main>
-}
-
-function nextStatus(status: Remediation['status']): Remediation['status'] {
-  return ({ not_started: 'planned', planned: 'in_progress', in_progress: 'verification_pending', verification_pending: 'verified', verified: 'verified' } as const)[status]
 }

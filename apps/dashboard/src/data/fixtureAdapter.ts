@@ -908,6 +908,19 @@ export class FixtureAdapter implements DataAdapter {
     return { blob: new Blob([JSON.stringify(job.result, null, 2)], { type: "application/json" }), contentType: "application/json", filename: `actis-${releaseId}-analysis-result.json` };
   };
 
+  downloadAnalysisEvidence = async (productId: EntityId, releaseId: EntityId, jobId: EntityId, digest: string): Promise<AnalysisEvidenceFile> => {
+    const job = this.state.analysisJobs.find((item) => item.id === jobId && item.draft.productId === productId && item.draft.releaseId === releaseId && item.status === "completed");
+    const evidence = job?.result?.evidence?.find((item) => item.sha256 === digest);
+    if (!job || !evidence) throw new Error("Generated analysis document not found.");
+    const product = this.state.products.find((item) => item.id === productId);
+    const release = this.state.releases.find((item) => item.id === releaseId && item.productId === productId);
+    if (!product || !release || !evidence.name.toLowerCase().endsWith(".pdf")) throw new Error("Generated analysis document not found.");
+    const kind = evidence.name.startsWith("AnnexVII") ? "technical" : "declaration";
+    const findings = this.state.findings.filter((item) => item.productId === productId && item.releaseId === releaseId);
+    const content = createReleasePdf(kind, product, release, findings);
+    return { blob: new Blob([content.buffer as ArrayBuffer], { type: "application/pdf" }), contentType: "application/pdf", filename: evidence.name.replace(/\.pdf$/i, "-draft.pdf") };
+  };
+
   generateFindingsReport = async (productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile> => {
     const release = this.state.releases.find((item) => item.id === releaseId && item.productId === productId);
     const product = this.state.products.find((item) => item.id === productId);
@@ -936,9 +949,8 @@ export class FixtureAdapter implements DataAdapter {
       contentType: "application/pdf", filename: `actis-${slugify(product.name)}-${slugify(release.version)}-security-report.pdf` };
   };
 
-  downloadReleaseEvidenceFile = async (): Promise<AnalysisEvidenceFile> => {
-    throw new Error("Individual analysis evidence files are available from the production engine.");
-  };
+  downloadReleaseEvidenceFile = (productId: EntityId, releaseId: EntityId, jobId: EntityId, digest: string): Promise<AnalysisEvidenceFile> =>
+    this.downloadAnalysisEvidence(productId, releaseId, jobId, digest);
 
   previewAnalysis = async (draft: AnalysisDraft): Promise<AnalysisPreview> => {
     await new Promise((resolve) => setTimeout(resolve, 180));

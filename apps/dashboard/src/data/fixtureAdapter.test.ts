@@ -108,6 +108,17 @@ describe("FixtureAdapter demo contract", () => {
     ]));
   });
 
+  it("downloads a generated analysis PDF", async () => {
+    const adapter = new FixtureAdapter(createDemoState());
+    const job = adapter.getSnapshot().analysisJobs.find((item) => item.result?.evidence?.length);
+    const evidence = job?.result?.evidence?.[0];
+    expect(job && evidence).toBeTruthy();
+
+    const file = await adapter.downloadAnalysisEvidence(job!.draft.productId!, job!.draft.releaseId!, job!.id, evidence!.sha256);
+    expect(file).toMatchObject({ contentType: "application/pdf", filename: evidence!.name.replace(/\.pdf$/i, "-draft.pdf") });
+    expect(await file.blob.slice(0, 5).text()).toBe("%PDF-");
+  });
+
   it("approves a document and retains an immutable-looking audit entry", () => {
     const adapter = new FixtureAdapter(createDemoState());
     const document = adapter.approveDocument("document-lock-report", "Regulatory content and evidence verified.");

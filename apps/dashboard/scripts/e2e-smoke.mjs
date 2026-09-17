@@ -206,10 +206,16 @@ try {
   await page.getByRole("navigation", { name: "Release workspace" }).getByRole("link", { name: "Documents" }).click();
   await assertVisible(page.getByRole("heading", { name: "Documents for Home Hub 1.8.0" }), "release documents");
   const securityPdfDownload = page.waitForEvent("download", { timeout: 15_000 });
-  await page.getByRole("button", { name: "Download PDF", exact: true }).click();
+  await page.getByRole("button", { name: "Download PDF", exact: true }).first().click();
   const securityPdf = await securityPdfDownload;
   if (!securityPdf.suggestedFilename().endsWith(".pdf")) throw new Error("Security report download is not a PDF.");
   if (!(await readFile(await securityPdf.path())).subarray(0, 5).equals(Buffer.from("%PDF-"))) throw new Error("Security report is not a valid PDF file.");
+  const technicalPdfDownload = page.waitForEvent("download", { timeout: 15_000 });
+  await page.getByRole("row").filter({ hasText: "AnnexVII Technical Documentation" }).getByRole("button", { name: "Download PDF" }).click();
+  const technicalPdf = await technicalPdfDownload;
+  if (!technicalPdf.suggestedFilename().endsWith("-draft.pdf")) throw new Error("Technical document is missing its draft label.");
+  if (!(await readFile(await technicalPdf.path())).subarray(0, 5).equals(Buffer.from("%PDF-"))) throw new Error("Technical document is not a PDF file.");
+  if (visualDir) await page.screenshot({ path: join(visualDir, "release-pdf-reports-1440.png"), fullPage: true });
   await page.getByRole("navigation", { name: "Release workspace" }).getByRole("link", { name: "Compliance" }).click();
   await assertVisible(page.getByRole("heading", { name: "Compliance evidence for Home Hub 1.8.0" }), "release compliance evidence");
   await assertVisible(page.getByText("Finding decisions", { exact: true }), "finding review evidence");
@@ -248,21 +254,24 @@ try {
   await page.getByRole("link", { name: "CVE-2026-27102", exact: true }).first().click();
   await waitForRoute(page, `${baseUrl}/findings/finding-hub-cve-2026-27102`, "Finding detail");
   await assertSingleMain(page, "Finding detail");
+  await assertVisible(page.getByRole("heading", { name: /CVE-2026-27102: Improper certificate validation/ }), "finding detail heading");
   await page.getByLabel("Decision", { exact: true }).selectOption("affected");
   await page.getByLabel("Rationale").fill("Production build evidence confirms the reachable TLS validation path is enabled.");
   await page.getByRole("button", { name: "Record decision" }).click();
   await assertVisible(page.getByText("Decision recorded in the audit history."), "finding decision confirmation");
-  await assertVisible(page.getByText("Next action: plan the fix."), "finding remediation guidance");
+  await assertVisible(page.getByText("Next action: submit the fix."), "finding remediation guidance");
   const reportDownload = page.waitForEvent("download", { timeout: 15_000 });
   await page.getByRole("button", { name: "Download findings report" }).click();
   const downloadedReport = await reportDownload;
   if (!downloadedReport.suggestedFilename().endsWith("-findings-report.json")) {
     throw new Error(`Unexpected findings report filename: ${downloadedReport.suggestedFilename()}`);
   }
-  await page.getByLabel("Plan").fill("Upgrade curl, rebuild the release, and retain signed regression evidence.");
+  await page.getByLabel("Fix description").fill("Upgrade curl, rebuild the release, and retain signed regression evidence.");
   await page.getByLabel("Target date").fill("2026-09-18");
-  await page.getByRole("button", { name: "Save remediation plan" }).click();
-  await assertVisible(page.getByText("Remediation plan updated."), "remediation confirmation");
+  await page.getByRole("button", { name: "Submit fix description" }).click();
+  await assertVisible(page.getByText("Fix description submitted for acceptance."), "fix submission confirmation");
+  await page.getByRole("button", { name: "Accept fix and continue" }).click();
+  await assertVisible(page.getByText("Fix accepted. The workflow can continue to reports and document approval."), "fix acceptance confirmation");
 
   await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Compliance / }).click();
   await waitForRoute(page, `${baseUrl}/compliance`, "Compliance");

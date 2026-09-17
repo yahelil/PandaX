@@ -49,7 +49,7 @@ and optional build timestamp.
    ```
 
    The guard refuses non-beta, missing mandatory configuration, non-PostgreSQL,
-   absent backup reference, or a final schema other than `20260915_0015`.
+   absent backup reference, or a final schema other than `20260917_0016`.
 5. Manually deploy that exact Git commit in Render. Do not enable branch auto-deploy.
 6. Wait for `/health/ready`, then run HTTPS authentication, database, storage,
    scan, document, restart-persistence, and secret-redaction smoke tests.

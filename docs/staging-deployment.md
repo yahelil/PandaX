@@ -19,7 +19,7 @@ service or enable a paid pre-deploy command.
 4. From the exact candidate checkout or image, enter the staging database secret
    directly into the process environment and run `uv run alembic upgrade head`.
    Do not put the value in command history, chat, logs, Git, or documentation.
-5. Confirm the database is at schema `20260915_0015`.
+5. Confirm the database is at schema `20260917_0016`.
 6. Manually deploy the exact commit to `actis-api-staging`. Keep auto-deploy off.
 7. Verify `/health/live`, `/health/build`, and `/health/ready`. Readiness must show
    PostgreSQL, private Supabase Storage, signing, schema, and capacity ready.
@@ -70,7 +70,7 @@ until every staging check passes.
 ## Rollback
 
 Stop staging writes and scheduled monitoring, record the failed deploy and schema,
-then restore the previous successful Render deploy. Schema `20260915_0015` is
+then restore the previous successful Render deploy. Schema `20260917_0016` is
 additive and compatible with the immediately prior application; do not downgrade
 only to roll back that application revision. If a later migration is incompatible,
 restore matched database and storage backups into a fresh isolated staging project

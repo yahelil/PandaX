@@ -35,6 +35,7 @@ export const nav = {
     { label: "About", href: "#about" },
   ],
   action: { label: "Book a walkthrough", href: "#contact" },
+  tryNow: { label: "Try now", href: "https://actis.pandax.online" },
 };
 
 /* 0 ------------------------------------------------------------- boot --- */
@@ -60,8 +61,9 @@ export const hero = {
   highlight: "Automate",
   subhead: "PandaX turns each release into a record a reviewer can read. What shipped, what was found, what you decided, and the documents to prove it.",
   body: "Every vulnerability decision needs traceable evidence. PandaX builds the record.",
-  primary: { label: "Book a 30-minute walkthrough", href: "#contact" },
-  secondary: { label: "See Actis", href: "/actis/" },
+  primary: { label: "Try now", href: "https://actis.pandax.online" },
+  secondary: { label: "Book a 30-minute walkthrough", href: "#contact" },
+  tertiary: { label: "See Actis", href: "/actis/" },
   /** The machine cycles through these. Each is a complete, consistent example. */
   records: [
     {
@@ -286,6 +288,7 @@ export const action = {
   tail: "in action?",
   body: "One run against one release, and the record it seals. Every component, every finding, the fix that shipped, and the proof somebody signed it off.",
   cta: { label: "See Actis", href: "/actis/" },
+  tryNow: { label: "Try now", href: "https://actis.pandax.online" },
 };
 
 export const contact = {
@@ -304,6 +307,7 @@ export const footer = {
     {
       title: "Product",
       links: [
+        { label: "Try now", href: "https://actis.pandax.online" },
         { label: "Actis", href: "/actis/" },
         { label: "All products", href: "/products/" },
       ],
@@ -370,7 +374,8 @@ export const actis = {
     nowLabel: "Working today",
     buildingLabel: "Being built",
   },
-  action: { label: "Book a 30-minute walkthrough", href: "/#contact" },
+  action: { label: "Try now", href: "https://actis.pandax.online" },
+  secondaryAction: { label: "Book a 30-minute walkthrough", href: "/#contact" },
 };
 
 /* ------------------------------------------------------------- legal --- */

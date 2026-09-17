@@ -105,7 +105,8 @@ function header(depth, slug) {
         ${links}
     </nav>
     ${productsMenu(depth, slug)}
-    <a class="btn btn-sm" href="${depth ? `${r}index.html#contact` : C.nav.action.href}">${esc(C.nav.action.label)}</a>
+    <a class="btn btn-sm btn-q" href="${depth ? `${r}index.html#contact` : C.nav.action.href}">${esc(C.nav.action.label)}</a>
+    <a class="btn btn-sm" href="${C.nav.tryNow.href}" target="_blank" rel="noopener">${esc(C.nav.tryNow.label)}</a>
   </div>
 </header>`;
 }
@@ -348,8 +349,9 @@ function heroSection() {
       <p class="lede">${esc(h.subhead)}</p>
       <p class="lede lede-sm">${esc(h.body)}</p>
       <div class="acts">
-        <a class="btn" href="${h.primary.href}">${esc(h.primary.label)}</a>
+        <a class="btn" href="${h.primary.href}" target="_blank" rel="noopener">${esc(h.primary.label)}</a>
         <a class="btn btn-q" href="${h.secondary.href}">${esc(h.secondary.label)}</a>
+        <a class="lnk" href="${h.tertiary.href}">${esc(h.tertiary.label)} &rarr;</a>
       </div>
     </div>
     <div class="hero-stage">
@@ -801,8 +803,9 @@ function actionStage() {
       <h2 class="act-head">${esc(a.lead)} <span class="hl hl-accent">${esc(a.highlight)}</span> ${esc(a.tail)}</h2>
       <p class="act-sub">${esc(a.body)}</p>
       ${recordStage(0)}
-      <div class="act-act">
-        <a class="btn" href="${C.action.cta.href}">${esc(C.action.cta.label)}</a>
+      <div class="act-act" style="gap: 12px; flex-wrap: wrap;">
+        <a class="btn" href="${C.action.tryNow.href}" target="_blank" rel="noopener">${esc(C.action.tryNow.label)}</a>
+        <a class="btn btn-q" href="${C.action.cta.href}">${esc(C.action.cta.label)}</a>
       </div>
     </div>`;
 }
@@ -848,7 +851,10 @@ function actisPage() {
         </div>
         <p class="lede">${esc(a.lede)}</p>
         <p class="lede lede-sm">${esc(a.body)}</p>
-        <div class="acts"><a class="btn" href="${a.action.href}">${esc(a.action.label)}</a></div>
+        <div class="acts">
+          <a class="btn" href="${a.action.href}" target="_blank" rel="noopener">${esc(a.action.label)}</a>
+          <a class="btn btn-q" href="../index.html#contact">${esc(a.secondaryAction.label)}</a>
+        </div>
       </div>
       <div class="hero-stage">
         <div class="laptop laptop-cycling">

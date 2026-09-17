@@ -122,6 +122,32 @@ def test_assignment_decision_remediation_workflow(repository):
     assert remediated.json()["verification_evidence"][0]["id"] == "run-42"
 
 
+def test_batch_review_records_decisions_atomically(repository):
+    api = client(repository)
+    second = recommended_finding(repository)
+    first = next(item for item in api.get(BASE).json() if item["id"] != second.id)
+    items = [{"finding_id": item["id"], "expected_version": item["version"]}
+             for item in (first, api.get(BASE + f"/{second.id}").json())]
+    stale = api.post(BASE + "/decisions/batch", json={
+        "decision": "not_affected", "rationale": "Reviewed component evidence for both findings.",
+        "items": [items[0], {**items[1], "expected_version": 999}],
+    })
+    assert stale.status_code == 409
+    assert api.get(BASE + f"/{first['id']}").json()["decision_history"] == []
+
+    approved = api.post(BASE + "/decisions/batch", json={
+        "decision": "not_affected", "rationale": "Reviewed component evidence for both findings.",
+        "items": items,
+    })
+    assert approved.status_code == 201
+    assert {item["status"] for item in approved.json()} == {"resolved"}
+    assert all(len(api.get(BASE + f"/{item['id']}").json()["decision_history"]) == 1
+               for item in approved.json())
+    assert client(repository, roles={"viewer"}).post(BASE + "/decisions/batch", json={
+        "decision": "affected", "rationale": "Reviewed", "items": items,
+    }).status_code == 403
+
+
 def test_optimistic_conflict_scope_and_rbac(repository):
     reviewer = client(repository)
     found = reviewer.get(BASE).json()[0]

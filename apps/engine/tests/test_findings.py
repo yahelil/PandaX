@@ -92,6 +92,7 @@ def recommendation(reachability="not_reachable", confidence="high"):
 
 def test_analysis_upsert_is_scoped_and_preserves_human_decision(repository):
     created = ingest(repository)
+    assert created.remediation_due_date == date(2026, 9, 28)
     reviewed = repository.decide(
         "org-acme", "product-hub", "release-14", created.id,
         decision="affected", rationale="Reachable from unauthenticated input",
@@ -106,6 +107,7 @@ def test_analysis_upsert_is_scoped_and_preserves_human_decision(repository):
 
     assert refreshed.id == created.id
     assert refreshed.first_seen_at == NOW
+    assert refreshed.remediation_due_date == created.remediation_due_date
     assert refreshed.last_seen_at == NOW + timedelta(hours=1)
     assert refreshed.cvss == 9.8
     assert refreshed.current_decision == "affected"
@@ -161,6 +163,7 @@ def test_default_queue_filters_and_priority(repository):
             severity="medium", cvss=6.5, kev=False, reachability="unknown",
         )], actor_id="analyzer", seen_at=NOW,
     )[0]
+    assert medium.remediation_due_date == date(2026, 10, 14)
     repository.decide(
         "org-acme", "product-hub", "release-14", medium.id,
         decision="not_affected", rationale="Vulnerable code is excluded from build",

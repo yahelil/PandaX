@@ -384,12 +384,18 @@ export class ProductionAdapter implements DataAdapter {
       group.items.push({ findingId, expectedVersion: scope.version });
       groups.set(key, group);
     });
+    if (!input.recommendationsOnly && groups.size > 1) throw new Error("Select findings from one release for an atomic batch decision.");
     return this.mutation("batch_decide_findings", async () => {
-      const updated = (await Promise.all([...groups.values()].map((group) => this.config.findingsApi!.approveRecommendations(
+      const updated = (await Promise.all([...groups.values()].map((group) => input.recommendationsOnly ? this.config.findingsApi!.approveRecommendations(
         this.config.organizationId,
         group.productId,
         group.releaseId,
         { items: group.items, rationale: input.rationale },
+      ) : this.config.findingsApi!.decideBatch(
+        this.config.organizationId,
+        group.productId,
+        group.releaseId,
+        { items: group.items, rationale: input.rationale, decision: input.decision ?? "not_affected" },
       )))).flat();
       updated.forEach((finding) => {
         this.findingDetails.delete(finding.id);
@@ -550,6 +556,13 @@ export class ProductionAdapter implements DataAdapter {
   downloadReleaseReport = async (productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile> => {
     if (!this.config.releaseOperationsApi) throw new Error("Production evidence export is unavailable.");
     return this.config.releaseOperationsApi.downloadEvidenceBundle({ organizationId: this.config.organizationId, productId, releaseId }, jobId);
+  };
+
+  generateFindingsReport = async (productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile> => {
+    if (!this.config.releaseOperationsApi) throw new Error("Production report generation is unavailable.");
+    return this.config.releaseOperationsApi.generateFindingsReport({
+      organizationId: this.config.organizationId, productId, releaseId,
+    });
   };
 
   previewAnalysis = async (draft: AnalysisDraft): Promise<AnalysisPreview> => {

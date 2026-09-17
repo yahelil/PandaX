@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useDemo } from "../data/DemoProvider";
+import { usePermission } from "../auth";
 import type { ReleaseMonitoringView } from "../data/types";
 import { Breadcrumbs, EmptyState, EvidenceMeter, FindingInsights, MetricCard, SectionHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
+import { downloadFile } from "./downloadFile";
 import "./pages.css";
 
 const releaseTabs = ["overview", "findings", "compliance", "documents"] as const;
@@ -11,13 +13,16 @@ export function ReleaseWorkspacePage() {
   const { productId = "", releaseId = "" } = useParams();
   const [params] = useSearchParams();
   const demo = useDemo();
+  const canGenerateReport = usePermission("generate_findings_report");
   const [downloading, setDownloading] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
   const [downloadError, setDownloadError] = useState<string>();
   const release = demo.selectors.release(releaseId);
   const product = demo.selectors.product(productId);
   const tab = releaseTabs.includes(params.get("tab") as typeof releaseTabs[number]) ? params.get("tab") as typeof releaseTabs[number] : "overview";
   if (!release || !product || release.productId !== product.id) return <EmptyState title="Release not found" body="This release is unavailable in the selected product." action={<Link className="button" to="/products">Back to products</Link>} />;
   const findings = demo.findings.filter((item) => item.releaseId === release.id);
+  const unreviewedCount = findings.filter((item) => item.status === "needs_review").length;
   const latestCompleted = demo.state.analysisJobs.filter((job) => job.draft.productId === product.id && job.draft.releaseId === release.id && job.status === "completed")
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
   const downloadReport = async () => {
@@ -25,27 +30,33 @@ export function ReleaseWorkspacePage() {
     setDownloading(true); setDownloadError(undefined);
     try {
       const file = await demo.actions.downloadReleaseReport(product.id, release.id, latestCompleted.id);
-      const url = URL.createObjectURL(file.blob);
-      const link = document.createElement("a");
-      link.href = url; link.download = file.filename ?? `actis-${release.id}-evidence.zip`;
-      document.body.appendChild(link); link.click(); link.remove();
-      URL.revokeObjectURL(url);
+      downloadFile(file, `actis-${release.id}-evidence.zip`);
     } catch (cause) { setDownloadError(cause instanceof Error ? cause.message : "Could not download release evidence."); }
     finally { setDownloading(false); }
+  };
+  const generateReport = async () => {
+    setGeneratingReport(true); setDownloadError(undefined);
+    try {
+      const file = await demo.actions.generateFindingsReport(product.id, release.id);
+      downloadFile(file, `actis-${release.id}-findings-report.json`);
+    } catch (cause) { setDownloadError(cause instanceof Error ? cause.message : "Could not generate the findings report."); }
+    finally { setGeneratingReport(false); }
   };
 
   return <main className="page">
     <Breadcrumbs items={[{ label: "Products", to: "/products" }, { label: product.name, to: `/products/${product.id}?tab=releases` }, { label: release.version }]} />
     <section className="panel">
-      <div className="workspace-hero"><div className="workspace-title"><span className="product-avatar">{release.channel[0].toUpperCase()}</span><div><p className="eyebrow">{product.name} release</p><h1>{release.version}</h1><p>Released {formatDate(release.releaseDate)} · Supported until {formatDate(release.supportedUntil)}</p></div></div><div className="inline-actions"><StatusPill value={release.readiness} /><StatusPill value={release.monitoringHealth} /><Link className="button button-primary" to={`/products/${product.id}/releases/${release.id}/analyze`}>Analyze release</Link></div></div>
+      <div className="workspace-hero"><div className="workspace-title"><span className="product-avatar">{release.channel[0].toUpperCase()}</span><div><p className="eyebrow">{product.name} release</p><h1>{release.version}</h1><p>Released {formatDate(release.releaseDate)} · Supported until {formatDate(release.supportedUntil)}</p></div></div><div className="inline-actions"><StatusPill value={release.readiness} /><StatusPill value={release.monitoringHealth} />{canGenerateReport ? <button type="button" className="button button-primary" disabled={generatingReport} onClick={() => void generateReport()}>{generatingReport ? "Generating…" : "Download findings report"}</button> : null}<Link className="button" to={`/products/${product.id}/releases/${release.id}/analyze`}>Analyze release</Link></div></div>
       <nav className="tabs" aria-label="Release workspace">{releaseTabs.map((name) => <Link className={tab === name ? "active" : ""} key={name} to={`/products/${product.id}/releases/${release.id}?tab=${name}`}>{name[0].toUpperCase() + name.slice(1)}</Link>)}</nav>
     </section>
+    <p className="muted">The findings report records release findings, decisions, and remediation. It is not a CRA notification or submission.</p>
+    {downloadError ? <p className="danger-text panel-pad" role="alert">{downloadError}</p> : null}
     {tab === "overview" ? <div className="overview-grid">
       <section className="metrics-grid wide"><MetricCard label="Open findings" value={findings.filter((item) => item.status !== "resolved").length} detail={`${findings.filter((item) => item.kev).length} listed in KEV`} tone={findings.some((item) => item.priority === "urgent") ? "urgent" : "good"} /><MetricCard label="Identified components" value={`${release.coverage.identifiedComponents}/${release.coverage.components}`} detail="From latest evidence" /><MetricCard label="Next deadline" value={relativeDate(product.nextDeadline)} detail={formatDate(product.nextDeadline)} tone={product.nextDeadline ? "high" : "good"} /></section>
       <section className="panel"><SectionHeader title="Analysis coverage" description="Latest known software composition and source coverage." /><dl className="definition-grid"><div><dt>SBOM status</dt><dd><StatusPill value={release.sbomStatus} /></dd></div><div><dt>Component identity</dt><dd><EvidenceMeter value={release.coverage.identifiedComponents} total={release.coverage.components} /></dd></div><div><dt>Advisory sources</dt><dd><EvidenceMeter value={release.coverage.advisorySourcesChecked} total={release.coverage.advisorySourcesExpected} /></dd></div><div><dt>Last analysis</dt><dd>{formatDate(release.lastAnalysisAt, true)}</dd></div></dl>{release.coverage.limitations.length ? <div className="panel-pad"><div className="coverage-callout"><strong>Coverage limitations</strong><br />{release.coverage.limitations.join(" ")}</div></div> : null}</section>
       <MonitoringPanel productId={product.id} releaseId={release.id} fallbackHealth={release.monitoringHealth} fallbackLastCheck={release.lastMonitoringCheckAt} />
       <FindingInsights findings={findings} analyses={demo.state.analysisJobs.filter((item) => item.draft.releaseId === release.id)}/>
-      <section className="panel wide"><SectionHeader title="Received artifacts" description="Traceable evidence and generated reports for this release." action={latestCompleted ? <button type="button" disabled={downloading} onClick={() => void downloadReport()}>{downloading ? "Preparing…" : demo.adapterStatus.mode === "fixture" ? "Export analysis result JSON" : "Download evidence & reports"}</button> : null} />{downloadError ? <p className="danger-text panel-pad" role="alert">{downloadError}</p> : null}<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Artifact</th><th>Kind</th><th>Size</th><th>Received</th><th>SHA-256</th></tr></thead><tbody>{release.artifacts.map((artifact) => <tr key={artifact.id}><td className="cell-strong">{artifact.name}</td><td>{artifact.kind.replaceAll("_", " ")}</td><td>{artifact.sizeLabel}</td><td>{formatDate(artifact.receivedAt, true)}</td><td className="mono">{artifact.sha256.slice(0, 16)}…</td></tr>)}</tbody></table></div></section>
+      <section className="panel wide"><SectionHeader title="Received artifacts" description="Traceable evidence and generated reports for this release." action={latestCompleted ? <button type="button" disabled={downloading} onClick={() => void downloadReport()}>{downloading ? "Preparing…" : "Download analysis evidence"}</button> : null} />{unreviewedCount ? <p className="panel-pad notice">{unreviewedCount} finding{unreviewedCount === 1 ? "" : "s"} still need a decision. The findings report will identify them as awaiting review. <Link to={`/findings?product=${encodeURIComponent(product.id)}&release=${encodeURIComponent(release.id)}&view=unreviewed`}>Review findings</Link></p> : null}<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Artifact</th><th>Kind</th><th>Size</th><th>Received</th><th>SHA-256</th></tr></thead><tbody>{release.artifacts.map((artifact) => <tr key={artifact.id}><td className="cell-strong">{artifact.name}</td><td>{artifact.kind.replaceAll("_", " ")}</td><td>{artifact.sizeLabel}</td><td>{formatDate(artifact.receivedAt, true)}</td><td className="mono">{artifact.sha256.slice(0, 16)}…</td></tr>)}</tbody></table></div></section>
     </div> : null}
     {tab === "findings" ? <ReleaseFindings releaseId={release.id} /> : null}
     {tab === "compliance" ? <ReleaseCompliance releaseId={release.id} /> : null}
@@ -89,6 +100,6 @@ function MonitoringPanel({ productId, releaseId, fallbackHealth, fallbackLastChe
   </section>;
 }
 
-function ReleaseFindings({ releaseId }: { releaseId: string }) { const demo = useDemo(); const items = demo.findings.filter((item) => item.releaseId === releaseId); return <section className="panel"><SectionHeader title="Release findings" description="Prioritized by required action, not severity alone." /><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Reference</th><th>Finding</th><th>Severity</th><th>Actionability</th><th>Status</th><th>Owner</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><Link to={`/findings/${item.id}`}>{item.reference}</Link></td><td>{item.title}</td><td><StatusPill value={item.severity} /></td><td>{[item.kev && "KEV", item.reachability === "reachable" && "Reachable", item.affectedness === "confirmed" && "Affected"].filter(Boolean).join(" · ") || "Review evidence"}</td><td><StatusPill value={item.status} /></td><td>{memberName(demo.state.members, item.assigneeId)}</td></tr>)}</tbody></table></div></section>; }
+function ReleaseFindings({ releaseId }: { releaseId: string }) { const demo = useDemo(); const items = demo.findings.filter((item) => item.releaseId === releaseId); return <section className="panel"><SectionHeader title="Release findings" description="Prioritized by required action, not severity alone." /><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Reference</th><th>Finding</th><th>Severity</th><th>Actionability</th><th>Status</th><th>Owner</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><Link to={`/findings/${item.id}`}>{item.reference}</Link></td><td>{item.title}</td><td><StatusPill value={item.severity} /></td><td>{[item.kev && "KEV", item.reachability === "reachable" && "Reachable", item.affectedness === "confirmed" && "Affected"].filter(Boolean).join(" · ") || "Review evidence"}</td><td>{item.status === "needs_review" ? <Link to={`/findings/${item.id}#risk-decision`}>Needs review</Link> : <StatusPill value={item.status} label={item.status === "action_required" ? "Fix required" : undefined} />}</td><td>{memberName(demo.state.members, item.assigneeId)}</td></tr>)}</tbody></table></div></section>; }
 function ReleaseCompliance({ releaseId }: { releaseId: string }) { const demo = useDemo(); const items = demo.complianceItems.filter((item) => item.releaseId === releaseId); const release = demo.selectors.release(releaseId); return <section className="panel"><SectionHeader title="Release compliance" description="CRA obligations attributable to this release." /><ul className="priority-list">{items.map((item) => <li className="priority-item" key={item.id}><span className={`priority-marker ${item.priority}`} /><div className="item-main"><Link to={`/compliance?product=${encodeURIComponent(item.productId ?? release?.productId ?? "")}&release=${encodeURIComponent(releaseId)}&item=${encodeURIComponent(item.id)}`}>{item.title}</Link><p>{item.requirement} · {item.reason}</p></div><div className="item-meta"><StatusPill value={item.lifecycleStatus ?? item.status} /><span>{relativeDate(item.dueAt)}</span></div></li>)}</ul>{!items.length ? <EmptyState title="No release obligations" body="No open compliance work is linked to this release." /> : null}</section>; }
 function ReleaseDocuments({ releaseId }: { releaseId: string }) { const demo = useDemo(); const items = demo.documents.filter((item) => item.releaseId === releaseId); return <section className="panel"><SectionHeader title="Release documents" description="Generated outputs and traceable evidence." /><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Document</th><th>Format</th><th>Version</th><th>Status</th><th>Completeness</th><th>Updated</th></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><Link to={`/documents/${item.id}`}>{item.name}</Link></td><td>{item.format}</td><td>v{item.version}</td><td><StatusPill value={item.status} /></td><td><StatusPill value={item.completeness} /></td><td>{formatDate(item.updatedAt)}</td></tr>)}</tbody></table></div></section>; }

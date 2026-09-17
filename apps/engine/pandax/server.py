@@ -1098,6 +1098,7 @@ from .portfolio_runtime import (
     get_search_notification_repository,
 )
 from .release_monitoring_api import create_release_monitoring_router
+from .release_report_api import create_release_report_router
 from .release_monitoring_scheduler_api import create_release_monitoring_scheduler_router
 from .search_notifications_api import create_search_notifications_router
 from .settings_api import create_settings_router
@@ -1143,6 +1144,16 @@ api.include_router(
 )
 api.include_router(
     create_findings_router(get_finding_repository, get_portfolio_identity)
+)
+api.include_router(
+    create_release_report_router(
+        get_portfolio_repository,
+        get_finding_repository,
+        get_document_repository,
+        lambda: get_analysis_repository().storage,
+        get_authenticated_principal,
+        get_release_monitoring_repository,
+    )
 )
 api.include_router(
     create_compliance_v1_router(get_compliance_repository, get_portfolio_identity)

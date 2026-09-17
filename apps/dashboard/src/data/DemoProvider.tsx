@@ -89,6 +89,7 @@ export interface DemoActions {
   createRelease(input: CreateReleaseInput): Promise<Release>;
   selectActiveRelease(productId: EntityId, releaseId: EntityId): Promise<Product>;
   downloadReleaseReport(productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile>;
+  generateFindingsReport(productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile>;
   previewAnalysis(draft: AnalysisDraft): Promise<AnalysisPreview>;
   runAnalysis(draft: AnalysisDraft): Promise<AnalysisJob>;
   loadReleaseMonitoring(productId: EntityId, releaseId: EntityId, options?: { signal?: AbortSignal }): Promise<ReleaseMonitoringView>;
@@ -180,6 +181,7 @@ export function DemoProvider({ adapter: providedAdapter, currentUserOverride, ch
     createRelease: adapter.createRelease,
     selectActiveRelease: adapter.selectActiveRelease,
     downloadReleaseReport: adapter.downloadReleaseReport,
+    generateFindingsReport: adapter.generateFindingsReport,
     previewAnalysis: adapter.previewAnalysis,
     runAnalysis: adapter.runAnalysis,
     loadReleaseMonitoring: adapter.loadReleaseMonitoring,

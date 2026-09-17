@@ -84,6 +84,15 @@ def generate_release_report(
         release_id=release_id,
         action_required=False,          # a report covers the release, not a worklist
     )
+    existing = _existing_report(documents, organization_id, product_id, release_id)
+    previous_generated_at = None
+    if existing is not None:
+        value = existing.current.provenance.get("generated_at")
+        if isinstance(value, str):
+            try:
+                previous_generated_at = datetime.fromisoformat(value)
+            except ValueError:
+                pass
     document = build_release_report(
         organization_id=organization_id,
         product_id=product_id,
@@ -95,8 +104,26 @@ def generate_release_report(
         release_version=release_version,
     )
 
-    existing = _existing_report(documents, organization_id, product_id, release_id)
     next_revision = 1 if existing is None else existing.current_revision + 1
+    if existing is not None and previous_generated_at is not None:
+        previous_document = build_release_report(
+            organization_id=organization_id,
+            product_id=product_id,
+            release_id=release_id,
+            findings=records,
+            monitoring=_monitoring_for(monitoring, organization_id, product_id, release_id),
+            generated_at=previous_generated_at,
+            product_name=product_name,
+            release_version=release_version,
+        )
+        previous_rendered = render_release_report(
+            previous_document, filename=report_filename(release_id, revision=existing.current_revision)
+        )
+        if previous_rendered.content_hash == existing.current.content_hash:
+            return GeneratedReleaseReport(
+                existing.id, existing.current_revision, previous_rendered,
+                existing.current.storage_locator, created=False,
+            )
     rendered = render_release_report(
         document, filename=report_filename(release_id, revision=next_revision)
     )

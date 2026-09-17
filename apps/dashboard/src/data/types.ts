@@ -615,6 +615,8 @@ export interface FindingDecisionInput {
 
 export interface FindingBatchDecisionInput {
   findingIds: EntityId[];
+  decision?: "affected" | "not_affected";
+  recommendationsOnly?: boolean;
   rationale: string;
 }
 

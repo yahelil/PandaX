@@ -183,6 +183,7 @@ export interface ReleaseOperationsApi {
   listAnalysisEvents(scope: ReleaseScope, jobId: string, options?: ReleaseOperationsRequestOptions): Promise<AnalysisJobEvent[]>;
   downloadEvidence(scope: ReleaseScope, jobId: string, digest: string, options?: ReleaseOperationsRequestOptions): Promise<AnalysisEvidenceFile>;
   downloadEvidenceBundle(scope: ReleaseScope, jobId: string, options?: ReleaseOperationsRequestOptions): Promise<AnalysisEvidenceFile>;
+  generateFindingsReport(scope: ReleaseScope, options?: ReleaseOperationsRequestOptions): Promise<AnalysisEvidenceFile>;
   getMonitoring(scope: ReleaseScope, options?: ReleaseOperationsRequestOptions): Promise<ReleaseMonitoringStatus>;
   configureMonitoring(scope: ReleaseScope, input: MonitoringConfigurationInput, options?: ReleaseOperationsRequestOptions): Promise<ReleaseMonitoringStatus>;
   runMonitoring(scope: ReleaseScope, options?: ReleaseOperationsRequestOptions): Promise<ReleaseMonitoringStatus>;
@@ -470,8 +471,9 @@ export function createReleaseOperationsApi(config: ReleaseOperationsApiConfig): 
   async function evidenceRequest(
     path: string,
     options?: ReleaseOperationsRequestOptions,
+    method: "GET" | "POST" = "GET",
   ): Promise<AnalysisEvidenceFile> {
-    const response = await send(path, { method: "GET" }, options);
+    const response = await send(path, { method }, options);
     if (!response.ok) {
       const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
       let body: unknown;
@@ -534,6 +536,9 @@ export function createReleaseOperationsApi(config: ReleaseOperationsApiConfig): 
     },
     async downloadEvidenceBundle(scope, jobId, options) {
       return evidenceRequest(`${jobsPath(scope)}/${id(jobId)}/evidence/export`, options);
+    },
+    async generateFindingsReport(scope, options) {
+      return evidenceRequest(`${releasePath(scope)}/reports/findings`, options, "POST");
     },
     async getMonitoring(scope, options) {
       return parseMonitoringStatus(await jsonRequest(monitoringPath(scope), { method: "GET" }, options));

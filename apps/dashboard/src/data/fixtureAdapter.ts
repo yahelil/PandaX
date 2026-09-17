@@ -572,9 +572,18 @@ export class FixtureAdapter implements DataAdapter {
   recordFindingBatchDecision = (input: FindingBatchDecisionInput): Finding[] => {
     const rationale = input.rationale.trim();
     if (!rationale) throw new Error("A rationale is required for batch approval.");
+    if (!input.findingIds.length || new Set(input.findingIds).size !== input.findingIds.length) {
+      throw new Error("Select distinct findings to review.");
+    }
+    for (const findingId of input.findingIds) {
+      const finding = this.state.findings.find((item) => item.id === findingId);
+      if (!finding || finding.status !== "needs_review" || finding.decisions.length) {
+        throw new Error("Only unreviewed findings can be decided in a batch.");
+      }
+    }
     return input.findingIds.map((findingId) => this.recordFindingDecision({
       findingId,
-      decision: "not_affected",
+      decision: input.decision ?? "not_affected",
       rationale,
     }));
   };
@@ -589,6 +598,7 @@ export class FixtureAdapter implements DataAdapter {
         targetDate: input.targetDate || finding.remediation.targetDate,
         completedAt: input.status === "verified" ? now() : finding.remediation.completedAt,
       };
+      if (input.targetDate) finding.dueAt = input.targetDate;
       finding.status = input.status === "verified" ? "resolved" : input.status === "not_started" ? finding.status : "in_remediation";
       finding.updatedAt = now();
       if (input.status === "verified") {
@@ -895,6 +905,24 @@ export class FixtureAdapter implements DataAdapter {
     const job = this.state.analysisJobs.find((item) => item.id === jobId && item.draft.productId === productId && item.draft.releaseId === releaseId && item.status === "completed");
     if (!job) throw new Error("Completed release analysis not found.");
     return { blob: new Blob([JSON.stringify(job.result, null, 2)], { type: "application/json" }), contentType: "application/json", filename: `actis-${releaseId}-analysis-result.json` };
+  };
+
+  generateFindingsReport = async (productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile> => {
+    const release = this.state.releases.find((item) => item.id === releaseId && item.productId === productId);
+    const product = this.state.products.find((item) => item.id === productId);
+    if (!release || !product) throw new Error("Release not found.");
+    const findings = this.state.findings.filter((item) => item.productId === productId && item.releaseId === releaseId);
+    const content = JSON.stringify({
+      subject: { product: product.name, release: release.version },
+      generatedAt: now(),
+      summary: { total: findings.length, awaitingDecision: findings.filter((item) => item.status === "needs_review").length },
+      findings: findings.map((item) => ({ reference: item.reference, title: item.title, severity: item.severity,
+        status: item.status, decision: item.decisions.at(-1)?.decision ?? null,
+        rationale: item.decisions.at(-1)?.rationale ?? null, remediation: item.remediation })),
+      notice: "This report records findings and decisions; it is not a CRA filing or conformity assessment.",
+    }, null, 2);
+    return { blob: new Blob([content], { type: "application/json" }), contentType: "application/json",
+      filename: `actis-${releaseId}-findings-report.json` };
   };
 
   previewAnalysis = async (draft: AnalysisDraft): Promise<AnalysisPreview> => {

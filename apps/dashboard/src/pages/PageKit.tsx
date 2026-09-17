@@ -66,8 +66,8 @@ export function memberName(members: TeamMember[], id?: string) {
   return members.find((member) => member.id === id)?.name ?? "Unassigned";
 }
 
-export function StatusPill({ value }: { value: ReadinessStatus | MonitoringHealth | PriorityBand | string }) {
-  return <span className={`status-pill status-${value}`}>{titleCase(value)}</span>;
+export function StatusPill({ value, label }: { value: ReadinessStatus | MonitoringHealth | PriorityBand | string; label?: string }) {
+  return <span className={`status-pill status-${value}`}>{label ?? titleCase(value)}</span>;
 }
 
 export function PageHeader({

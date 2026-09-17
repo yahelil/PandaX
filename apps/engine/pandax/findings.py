@@ -10,7 +10,7 @@ import hashlib
 from collections.abc import Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Iterator
 from uuid import uuid4
 
@@ -62,6 +62,12 @@ FINDING_STATUSES = frozenset({"needs_review", "open", "in_progress", "resolved"}
 DECISIONS = frozenset({"affected", "not_affected", "accepted_risk", "deferred"})
 REMEDIATION_STATUSES = frozenset({"not_planned", "planned", "in_progress", "completed", "verified"})
 ACTION_STATUSES = frozenset({"needs_review", "open", "in_progress"})
+
+
+def remediation_target(first_seen: datetime, *, severity: str, kev: bool) -> date:
+    """Internal response target, separate from CRA notification deadlines."""
+    days = 14 if kev or severity in {"critical", "high"} else 30
+    return (first_seen + timedelta(days=days)).date()
 RECOMMENDED_REACHABILITY = frozenset({"reachable", "not_reachable", "review"})
 RECOMMENDATION_CONFIDENCE = frozenset({"high", "medium", "low"})
 RECOMMENDED_VEX_STATES = frozenset({"exploitable", "not_affected", "in_triage"})
@@ -395,7 +401,9 @@ class FindingRepository:
                         "decided_at": None,
                         "remediation_plan": None,
                         "remediation_status": "not_planned",
-                        "remediation_due_date": None,
+                        "remediation_due_date": remediation_target(
+                            now, severity=observation.severity, kev=observation.kev,
+                        ),
                         "verification_evidence": [],
                         "version": 1,
                         "created_at": now,
@@ -604,6 +612,56 @@ class FindingRepository:
             for finding_id, _ in normalized
         ]
 
+    def decide_unreviewed_batch(
+        self, organization_id: str, product_id: str, release_id: str,
+        items: Sequence[Mapping[str, Any]], *, decision: str,
+        rationale: str, actor_id: str,
+    ) -> list[FindingRecord]:
+        """Record one human decision for several unreviewed findings atomically."""
+        clean_decision = _choice(decision, frozenset({"affected", "not_affected"}), "decision")
+        clean_rationale = _required(rationale, "rationale", 4000)
+        clean_actor = _required(actor_id, "actor_id", 128)
+        if not 1 <= len(items) <= 100:
+            raise FindingValidationError("select between 1 and 100 findings")
+        normalized = []
+        for item in items:
+            finding_id = _required(item.get("finding_id"), "finding_id", 36)
+            version = item.get("expected_version")
+            if isinstance(version, bool) or not isinstance(version, int) or version < 1:
+                raise FindingValidationError("expected_version must be a positive integer")
+            normalized.append((finding_id, version))
+        if len({finding_id for finding_id, _ in normalized}) != len(normalized):
+            raise FindingValidationError("batch contains duplicate finding ids")
+
+        now = _utc_now()
+        with self._transaction() as session:
+            rows = [self._required_finding(session, organization_id, product_id, release_id, finding_id)
+                    for finding_id, _ in normalized]
+            for current, (_, version) in zip(rows, normalized, strict=True):
+                if current["version"] != version:
+                    raise FindingConflict("finding was modified; refresh and retry")
+                if current["status"] != "needs_review" or current["current_decision"] is not None:
+                    raise FindingConflict("only unreviewed findings can be decided in a batch")
+            for current, (finding_id, version) in zip(rows, normalized, strict=True):
+                new_version = self._update_versioned(session, current, version, {
+                    "current_decision": clean_decision,
+                    "decision_rationale": clean_rationale,
+                    "decision_by": clean_actor,
+                    "decided_at": now,
+                    "status": "open" if clean_decision == "affected" else "resolved",
+                    "updated_at": now,
+                })
+                session.execute(insert(finding_decisions).values(
+                    id=str(uuid4()), finding_id=finding_id, organization_id=organization_id,
+                    decision=clean_decision, rationale=clean_rationale,
+                    actor_id=clean_actor, occurred_at=now, finding_version=new_version,
+                ))
+                self._audit(session, finding_id, organization_id, "finding.decision_recorded", clean_actor, {
+                    "decision": clean_decision, "rationale": clean_rationale, "version": new_version,
+                }, now)
+        return [self.get(organization_id, product_id, release_id, finding_id)
+                for finding_id, _ in normalized]
+
     def update_remediation(
         self, organization_id: str, product_id: str, release_id: str, finding_id: str,
         *, plan: str | None, status: str, due_date: date | None,
@@ -620,9 +678,10 @@ class FindingRepository:
         values: dict[str, Any] = {
             "remediation_plan": clean_plan,
             "remediation_status": clean_status,
-            "remediation_due_date": due_date,
             "verification_evidence": evidence,
         }
+        if due_date is not None:
+            values["remediation_due_date"] = due_date
         if finding_status:
             values["status"] = finding_status
         return self._mutate(

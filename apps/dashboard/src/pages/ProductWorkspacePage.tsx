@@ -6,6 +6,9 @@ import { createReleasePdf, type ReleasePdfKind } from "../data/releasePdf";
 import { Breadcrumbs, EmptyState, EvidenceMeter, FindingInsights, MetricCard, SectionHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
 import { craClassLabel } from "./craAssessment";
 import { downloadFile } from "./downloadFile";
+import { ExactTimerBadge } from "../components/ExactTimerBadge";
+import { ProductScopeModal } from "../components/ProductScopeModal";
+import { getProductMostUrgentTimer, getFindingTimers, computeExactTimer } from "./exactTimers";
 import "./pages.css";
 
 const tabs = ["overview", "releases", "findings", "compliance", "documents"] as const;
@@ -20,13 +23,14 @@ export function ProductWorkspacePage() {
   if (!product) return <EmptyState title="Product not found" body="The product may have been removed or is outside your organization." action={<Link className="button" to="/products">Back to products</Link>} />;
   const findings = demo.findings.filter((finding) => finding.productId === product.id);
   const activeRelease = demo.selectors.release(product.activeReleaseId);
+  const mostUrgentTimer = getProductMostUrgentTimer(product, demo.findings, demo.complianceItems);
 
   return <main className="page">
     <Breadcrumbs items={[{ label: "Products", to: "/products" }, { label: product.name }]} />
     <section className="panel">
       <div className="workspace-hero">
         <div className="workspace-title"><span className="product-avatar" aria-hidden="true">{product.name.split(" ").map((word) => word[0]).join("")}</span><div><h1>{product.name}</h1><p>{product.identifier} · {product.manufacturer}</p></div></div>
-        <div className="inline-actions"><StatusPill value={product.readiness} /><StatusPill value={product.monitoringHealth} />{activeRelease && canRunAnalysis ? <Link className="button button-primary" to={`/products/${product.id}/releases/${activeRelease.id}/analyze`}>Analyze release</Link> : activeRelease ? <span className="button button-primary button-disabled" aria-disabled="true" title="Compliance Operator or Organization Admin permission required">Analyze release</span> : null}</div>
+        <div className="inline-actions"><ExactTimerBadge timer={mostUrgentTimer} compact /><StatusPill value={product.readiness} /><StatusPill value={product.monitoringHealth} />{activeRelease && canRunAnalysis ? <Link className="button button-primary" to={`/products/${product.id}/releases/${activeRelease.id}/analyze`}>Analyze release</Link> : activeRelease ? <span className="button button-primary button-disabled" aria-disabled="true" title="Compliance Operator or Organization Admin permission required">Analyze release</span> : null}</div>
       </div>
       <nav className="tabs" aria-label="Product workspace">
         {tabs.map((name) => <Link className={tab === name ? "active" : ""} key={name} to={`/products/${product.id}?tab=${name}`}>{name[0].toUpperCase() + name.slice(1)}{name === "findings" && findings.length ? ` (${findings.length})` : ""}</Link>)}
@@ -46,12 +50,15 @@ function ProductOverview({ productId }: { productId: string }) {
   const findings = demo.findings.filter((item) => item.productId === productId && item.status !== "resolved");
   const actions = demo.actionItems.filter((item) => item.productId === productId && item.status === "open");
   const analyses = demo.state.analysisJobs.filter((item) => item.draft.productId === productId);
+  const mostUrgentTimer = getProductMostUrgentTimer(product, demo.findings, demo.complianceItems);
+  const [reviewOpen, setReviewOpen] = useState(false);
   return <div className="overview-grid">
-    <section className="metrics-grid wide"><MetricCard label="Open actions" value={actions.length} detail={actions.filter((item) => item.priority === "urgent").length ? `${actions.filter((item) => item.priority === "urgent").length} urgent` : "No urgent actions"} tone={actions.some((item) => item.priority === "urgent") ? "urgent" : "good"} /><MetricCard label="Active findings" value={findings.length} detail={`${findings.filter((item) => item.kev).length} in KEV`} /><MetricCard label="Next obligation" value={relativeDate(product.nextDeadline)} detail={formatDate(product.nextDeadline)} tone={product.nextDeadline ? "high" : "good"} /></section>
-    <section className="panel"><SectionHeader title="Product scope" description="Manufacturer and CRA classification." /><dl className="definition-grid"><div><dt>Product identifier</dt><dd className="mono">{product.identifier}</dd></div><div><dt>CRA class</dt><dd>{craClassLabel(product.craClass)}</dd></div><div><dt>Support until</dt><dd>{formatDate(product.supportUntil)}</dd></div><div><dt>Default owner</dt><dd>{memberName(demo.state.members, product.ownerId)}</dd></div><div><dt>Classification</dt><dd>{product.classificationStatus.replaceAll("_", " ")}</dd></div><div><dt>Tags</dt><dd>{product.tags.join(", ")}</dd></div></dl>{product.classificationAssessment ? <div className="classification-record"><div><span className="eyebrow">Assessment record</span><strong>{product.classificationAssessment.categoryLabel ?? "Standard product route"}</strong><p>{product.classificationAssessment.rationale}</p></div><dl><div><dt>Ruleset</dt><dd className="mono">{product.classificationAssessment.rulesetVersion}</dd></div><div><dt>Answers retained</dt><dd>{product.classificationAssessment.answers.length}</dd></div><div><dt>Completed</dt><dd>{formatDate(product.classificationAssessment.completedAt, true)}</dd></div></dl></div> : null}</section>
+    <section className="metrics-grid wide"><MetricCard label="Open actions" value={actions.length} detail={actions.filter((item) => item.priority === "urgent").length ? `${actions.filter((item) => item.priority === "urgent").length} urgent` : "No urgent actions"} tone={actions.some((item) => item.priority === "urgent") ? "urgent" : "good"} /><MetricCard label="Active findings" value={findings.length} detail={`${findings.filter((item) => item.kev).length} in KEV`} /><MetricCard label="Most urgent deadline" value={mostUrgentTimer ? mostUrgentTimer.countdownText : "No deadline"} detail={mostUrgentTimer ? `${mostUrgentTimer.sourceLabel ? `${mostUrgentTimer.sourceLabel} · ` : ""}${mostUrgentTimer.exactDateText}` : "All obligations met"} tone={mostUrgentTimer ? (mostUrgentTimer.urgency === "urgent" ? "urgent" : mostUrgentTimer.urgency === "high" ? "high" : "good") : "good"} /></section>
+    <section className="panel"><SectionHeader title="Product scope" description="Manufacturer and CRA classification." action={<button type="button" className="button button-small" onClick={() => setReviewOpen(true)}>Review CRA classification</button>} /><dl className="definition-grid"><div><dt>Product identifier</dt><dd className="mono">{product.identifier}</dd></div><div><dt>CRA class</dt><dd><button type="button" className="status-pill-button" onClick={() => setReviewOpen(true)} title="Click to review CRA scope and classification">{craClassLabel(product.craClass)}</button></dd></div><div><dt>Support until</dt><dd>{formatDate(product.supportUntil)}</dd></div><div><dt>Default owner</dt><dd>{memberName(demo.state.members, product.ownerId)}</dd></div><div><dt>Classification</dt><dd><button type="button" className="status-pill-button" onClick={() => setReviewOpen(true)} title="Click to review CRA scope and classification"><StatusPill value={product.classificationStatus} /></button></dd></div><div><dt>Tags</dt><dd>{product.tags.join(", ")}</dd></div></dl>{product.classificationAssessment ? <div className="classification-record"><div><span className="eyebrow">Assessment record</span><strong>{product.classificationAssessment.categoryLabel ?? "Standard product route"}</strong><p>{product.classificationAssessment.rationale}</p></div><dl><div><dt>Ruleset</dt><dd className="mono">{product.classificationAssessment.rulesetVersion}</dd></div><div><dt>Answers retained</dt><dd>{product.classificationAssessment.answers.length}</dd></div><div><dt>Completed</dt><dd>{formatDate(product.classificationAssessment.completedAt, true)}</dd></div></dl></div> : null}</section>
     <section className="panel"><SectionHeader title="Active release" description="Current supported production release." action={release ? <Link className="text-link" to={`/products/${product.id}/releases/${release.id}`}>Open release</Link> : null} />{release ? <dl className="definition-grid"><div><dt>Version</dt><dd>{release.version}</dd></div><div><dt>SBOM</dt><dd><StatusPill value={release.sbomStatus} /></dd></div><div><dt>Released</dt><dd>{formatDate(release.releaseDate)}</dd></div><div><dt>Coverage</dt><dd><EvidenceMeter value={release.coverage.identifiedComponents} total={release.coverage.components} /></dd></div><div><dt>Last analysis</dt><dd>{formatDate(release.lastAnalysisAt, true)}</dd></div><div><dt>Monitoring</dt><dd><StatusPill value={release.monitoringHealth} /></dd></div></dl> : <EmptyState title="No active release" body="Register a release to begin analysis and monitoring." />}</section>
     <FindingInsights findings={findings} analyses={analyses}/>
     <section className="panel wide"><SectionHeader title="Priority drivers" description="Why this product has its current readiness status." /><ul className="priority-list">{actions.slice(0,5).map((item) => <li className="priority-item" key={item.id}><span className={`priority-marker ${item.priority}`} /><div className="item-main"><Link to={item.targetUrl}>{item.title}</Link><p>{item.reason}</p></div><StatusPill value={item.priority} /></li>)}</ul>{!actions.length ? <EmptyState title="No open actions" body="This product has no outstanding compliance work." /> : null}</section>
+    {reviewOpen ? <ProductScopeModal product={product} onClose={() => setReviewOpen(false)} /> : null}
   </div>;
 }
 
@@ -84,9 +91,107 @@ function ReleasesTable({ productId }: { productId: string }) {
   return <div className="page"><section className="panel"><SectionHeader title="Releases" description="Supported software baselines and their analysis coverage." action={<button className="button-primary" disabled={!canManagePortfolio} title={!canManagePortfolio ? "Org Admin or Compliance Operator permission required" : undefined} onClick={()=>setAdding((x)=>!x)}>Register release</button>} />{adding?<form className="form-grid panel-pad" onSubmit={submit}><div className="field"><label>Version</label><input className="input-field" name="version" required placeholder="2.5.0"/></div><div className="field"><label>Channel</label><select className="select-field" name="channel"><option value="stable">Stable</option><option value="lts">LTS</option><option value="beta">Beta</option></select></div><div className="field"><label>Release date</label><input className="input-field" name="releaseDate" type="date" required defaultValue={new Date().toISOString().slice(0,10)}/></div><div className="field"><label>Supported until</label><input className="input-field" name="supportedUntil" type="date" required defaultValue={product.supportUntil.slice(0,10)}/></div>{error?<p className="danger-text span-2" role="alert">{error}</p>:null}<div className="span-2 inline-actions"><button className="button-primary" disabled={pending}>{pending?"Registering release…":"Register and add evidence"}</button><button type="button" onClick={()=>setAdding(false)} disabled={pending}>Cancel</button></div></form>:null}<div className="data-table-wrap"><table className="data-table"><thead><tr><th>Version</th><th>Channel</th><th>Status</th><th>Readiness</th><th>SBOM</th><th>Components</th><th>Last analysis</th><th /></tr></thead><tbody>{releases.map((release) => <tr key={release.id}><td><Link to={`/products/${productId}/releases/${release.id}`}>{release.version}</Link></td><td>{release.channel.toUpperCase()}</td><td><StatusPill value={release.status} /></td><td><StatusPill value={release.readiness} /></td><td><StatusPill value={release.sbomStatus} /></td><td><EvidenceMeter value={release.coverage.identifiedComponents} total={release.coverage.components} /></td><td>{formatDate(release.lastAnalysisAt)}</td><td><Link className="text-link" to={`/products/${productId}/releases/${release.id}/analyze`}>Analyze</Link></td></tr>)}</tbody></table></div></section></div>;
 }
 
-function ProductFindings({ productId }: { productId: string }) { const demo=useDemo(); const findings=demo.findings.filter((item)=>item.productId===productId); return <section className="panel"><SectionHeader title="Findings" description="Evidence-backed vulnerability decisions for this product." action={<Link className="text-link" to={`/findings?product=${productId}`}>Open full workspace</Link>} /><div className="data-table-wrap"><table className="data-table"><thead><tr><th>Finding</th><th>Component</th><th>Severity</th><th>Evidence</th><th>Status</th><th>Owner</th></tr></thead><tbody>{findings.map((finding)=><tr key={finding.id}><td><div className="cell-primary"><Link to={`/findings/${finding.id}`}>{finding.reference}</Link><small>{finding.title}</small></div></td><td>{finding.component} {finding.componentVersion}</td><td><StatusPill value={finding.severity}/></td><td>{finding.kev?"KEV · ":""}{finding.reachability.replaceAll("_"," ")}</td><td><StatusPill value={finding.status}/></td><td>{memberName(demo.state.members,finding.assigneeId)}</td></tr>)}</tbody></table></div></section>; }
+function ProductFindings({ productId }: { productId: string }) {
+  const demo = useDemo();
+  const findings = demo.findings.filter((item) => item.productId === productId);
+  return (
+    <section className="panel">
+      <SectionHeader
+        title="Findings"
+        description="Evidence-backed vulnerability decisions for this product."
+        action={<Link className="text-link" to={`/findings?product=${productId}`}>Open full workspace</Link>}
+      />
+      <div className="data-table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Finding</th>
+              <th>Component</th>
+              <th>Severity</th>
+              <th>Evidence</th>
+              <th>Status</th>
+              <th>Deadline</th>
+              <th>Owner</th>
+            </tr>
+          </thead>
+          <tbody>
+            {findings.map((finding) => {
+              const timers = getFindingTimers(finding);
+              return (
+                <tr key={finding.id}>
+                  <td>
+                    <div className="cell-primary">
+                      <Link to={`/findings/${finding.id}`}>{finding.reference}</Link>
+                      <small>{finding.title}</small>
+                    </div>
+                  </td>
+                  <td>{finding.component} {finding.componentVersion}</td>
+                  <td><StatusPill value={finding.severity} /></td>
+                  <td>{finding.kev ? "KEV · " : ""}{finding.reachability.replaceAll("_", " ")}</td>
+                  <td>
+                    <Link
+                      to={`/findings/${finding.id}${finding.status === "needs_review" ? "#risk-decision" : finding.status === "action_required" ? "#remediation" : ""}`}
+                      className="status-pill-link"
+                      title="Click to review or plan fix"
+                    >
+                      <StatusPill value={finding.status} label={finding.status === "action_required" ? "Fix required" : undefined} />
+                    </Link>
+                  </td>
+                  <td>
+                    {timers.earlyWarning ? (
+                      <ExactTimerBadge timer={timers.earlyWarning} compact />
+                    ) : (
+                      <ExactTimerBadge timer={timers.remediation} compact />
+                    )}
+                  </td>
+                  <td>{memberName(demo.state.members, finding.assigneeId)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
 
-function ProductCompliance({ productId }: { productId:string }) { const demo=useDemo();const items=demo.complianceItems.filter((item)=>item.productId===productId);return <section className="panel"><SectionHeader title="CRA obligations" description="Readiness, reporting, evidence, and approvals." action={<Link className="text-link" to={`/compliance?product=${productId}`}>Open compliance center</Link>}/><ul className="priority-list">{items.map((item)=><li className="priority-item" key={item.id}><span className={`priority-marker ${item.priority}`}/><div className="item-main"><Link to={`/compliance?product=${productId}&item=${encodeURIComponent(item.id)}`}>{item.title}</Link><p>{item.requirement} · {item.reason}</p></div><div className="item-meta"><StatusPill value={item.lifecycleStatus ?? item.status}/><span>{relativeDate(item.dueAt)}</span></div></li>)}</ul></section>; }
+function ProductCompliance({ productId }: { productId: string }) {
+  const demo = useDemo();
+  const items = demo.complianceItems.filter((item) => item.productId === productId);
+  return (
+    <section className="panel">
+      <SectionHeader
+        title="CRA obligations"
+        description="Readiness, reporting, evidence, and approvals."
+        action={<Link className="text-link" to={`/compliance?product=${productId}`}>Open compliance center</Link>}
+      />
+      <ul className="priority-list">
+        {items.map((item) => {
+          const timer = computeExactTimer(item.dueAt, item.title);
+          return (
+            <li className="priority-item" key={item.id}>
+              <span className={`priority-marker ${item.priority}`} />
+              <div className="item-main">
+                <Link to={`/compliance?product=${productId}&item=${encodeURIComponent(item.id)}`}>{item.title}</Link>
+                <p>{item.requirement} · {item.reason}</p>
+              </div>
+              <div className="item-meta">
+                <Link
+                  to={`/compliance?product=${productId}&item=${encodeURIComponent(item.id)}`}
+                  className="status-pill-link"
+                  title="Click to open window to upload/write what's needed"
+                >
+                  <StatusPill value={item.lifecycleStatus ?? item.status} />
+                </Link>
+                {timer ? <ExactTimerBadge timer={timer} compact /> : <span>{relativeDate(item.dueAt)}</span>}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
 function ProductDocuments({ productId }: { productId: string }) {
   const demo = useDemo();

@@ -6,6 +6,8 @@ import type { DecisionKind } from '../data/types'
 import { Breadcrumbs, EmptyState, PageHeader, SectionHeader, StatusPill, formatDate, memberName, relativeDate, titleCase } from './PageKit'
 import { craReportingWindows, remediationDue } from './findingDeadlines'
 import { downloadFile } from './downloadFile'
+import { ExactTimerBadge } from '../components/ExactTimerBadge'
+import { getFindingTimers } from './exactTimers'
 import './pages.css'
 
 export function FindingDetailPage() {
@@ -44,6 +46,7 @@ export function FindingDetailPage() {
   const release = demo.selectors.release(finding.releaseId)
   const evidence = demo.state.evidence.filter((item) => finding.evidenceIds.includes(item.id))
   const reporting = craReportingWindows(finding)
+  const findingTimers = getFindingTimers(finding)
   const perform = async (operation: () => unknown | Promise<unknown>, success: string): Promise<boolean> => {
     setBusy(true)
     setMessage('')
@@ -89,9 +92,30 @@ export function FindingDetailPage() {
         <div><dt>Component</dt><dd>{finding.component} {finding.componentVersion}</dd></div>
         <div><dt>CVSS</dt><dd>{finding.cvss.toFixed(1)} · {titleCase(finding.severity)}</dd></div>
         <div><dt>Owner</dt><dd><select className="select-field" value={finding.assigneeId ?? ''} disabled={busy || !canRemediate} title={!canRemediate ? 'Compliance Operator or Organization Admin permission required' : undefined} onChange={(event) => { void perform(() => demo.actions.assignFinding(finding.id, event.target.value || undefined), 'Owner updated.') }}><option value="">Unassigned</option>{demo.state.members.filter((member) => member.status === 'active').map((member) => <option value={member.id} key={member.id}>{member.name}</option>)}</select></dd></div>
-        <div><dt>Remediation target (internal)</dt><dd className={finding.priority === 'urgent' ? 'danger-text' : ''}>{relativeDate(remediationDue(finding))} · {formatDate(remediationDue(finding), true)}</dd></div>
+        <div>
+          <dt>Remediation target (internal)</dt>
+          <dd>
+            <div style={{ display: 'inline-flex', marginBottom: '4px' }}>
+              <ExactTimerBadge timer={findingTimers.remediation} />
+            </div>
+            <span className={`muted ${finding.priority === 'urgent' ? 'danger-text' : ''}`} style={{ display: 'block', fontSize: '11.5px' }}>
+              {relativeDate(remediationDue(finding))} · {formatDate(remediationDue(finding), true)}
+            </span>
+          </dd>
+        </div>
       </dl>
-      {reporting ? <div className="panel-pad notice"><strong>CRA reporting assessment</strong><p>Potentially reportable active exploitation. Confirm when the manufacturer became aware; the dates below use first detection as a provisional starting point.</p><p>Early warning (24h): {formatDate(reporting.early, true)} · Full notification (72h): {formatDate(reporting.full, true)}</p><p>For an actively exploited vulnerability, the final report is due within 14 days after a corrective or mitigating measure is available. A severe incident has a separate one-month final-report window after its 72-hour notification.</p></div> : null}
+      {reporting ? (
+        <div className="panel-pad notice">
+          <strong>CRA reporting assessment</strong>
+          <p>Potentially reportable active exploitation. Confirm when the manufacturer became aware; the dates below use first detection as a provisional starting point.</p>
+          <div style={{ display: 'flex', gap: '12px', margin: '10px 0', flexWrap: 'wrap' }}>
+            {findingTimers.earlyWarning ? <ExactTimerBadge timer={findingTimers.earlyWarning} /> : null}
+            {findingTimers.fullNotification ? <ExactTimerBadge timer={findingTimers.fullNotification} /> : null}
+          </div>
+          <p>Early warning (24h): {formatDate(reporting.early, true)} · Full notification (72h): {formatDate(reporting.full, true)}</p>
+          <p>For an actively exploited vulnerability, the final report is due within 14 days after a corrective or mitigating measure is available. A severe incident has a separate one-month final-report window after its 72-hour notification.</p>
+        </div>
+      ) : null}
     </section>
     {finding.status === 'action_required' ? <div className="notice"><strong>Next action: submit the fix.</strong> This finding was confirmed as affecting the release. <a href="#remediation">Describe the fix and submit it for acceptance</a>. If active exploitation is confirmed, assess the CRA notification deadlines above. The downloadable findings report records this decision and remediation status; it is not a CRA notification.</div> : null}
     {message ? <div className="notice" role="status">{message}</div> : null}

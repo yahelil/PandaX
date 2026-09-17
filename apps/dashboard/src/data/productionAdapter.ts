@@ -1,4 +1,4 @@
-import type { AdapterFailure, AdapterOperation, AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } from "./adapter";
+import type { AdapterFailure, AdapterOperation, AdapterStatus, DataAdapter, DemoListener, UpdateProductInput, WorkspaceSearchResult } from "./adapter";
 import { sanitizeAnalyticsEvent } from "./analytics";
 import { createFindingsApi, FindingApiError, type FindingsApi, type ManagedFinding } from "./findingsApi";
 import { createGovernanceApi, GovernanceApiError, mapCompliance, mapGovernanceSettings, mapIntegration, mapTeamMember, type ComplianceDto, type DocumentDetailDto, type DocumentFormat, type DocumentRevisionDto, type GovernanceApi, type PrivacySafeAnalyticsEvent } from "./governanceApi";
@@ -539,6 +539,22 @@ export class ProductionAdapter implements DataAdapter {
   createProduct = async (input: CreateProductInput): Promise<Product> => this.mutation("create_product", async () => {
     const created = await this.config.portfolioApi.createProduct(this.config.organizationId, { name: input.name, identifier: input.identifier, manufacturer: input.manufacturer, description: input.description, craClass: input.craClass, classificationStatus: input.classificationStatus, classificationAssessment: input.classificationAssessment, supportStart: new Date().toISOString().slice(0, 10), supportEnd: input.supportUntil, ownerId: input.ownerId });
     this.fixture.upsertProduct(created); return created;
+  });
+
+  updateProduct = async (input: UpdateProductInput): Promise<Product> => this.mutation("update_product", async () => {
+    const updated = await this.config.portfolioApi.updateProduct(this.config.organizationId, input.productId, {
+      name: input.name,
+      identifier: input.identifier,
+      manufacturer: input.manufacturer,
+      description: input.description,
+      craClass: input.craClass,
+      classificationStatus: input.classificationStatus,
+      classificationAssessment: input.classificationAssessment,
+      ownerId: input.ownerId,
+      supportEnd: input.supportUntil,
+    });
+    this.fixture.upsertProduct(updated);
+    return updated;
   });
 
   createRelease = async (input: CreateReleaseInput): Promise<Release> => this.mutation("create_release", async () => {

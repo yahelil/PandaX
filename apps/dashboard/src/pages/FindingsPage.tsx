@@ -6,6 +6,8 @@ import type { Finding } from "../data/types";
 import { PageHeader, StatusPill, memberName, relativeDate, titleCase } from "./PageKit";
 import { craReportingWindows, remediationDue } from "./findingDeadlines";
 import { downloadFile } from "./downloadFile";
+import { ExactTimerBadge } from "../components/ExactTimerBadge";
+import { getFindingTimers } from "./exactTimers";
 import "./pages.css";
 
 type FindingView = "needs_action" | "all" | "critical_high" | "kev" | "reachable" | "low_noise" | "unreviewed" | "remediation";
@@ -206,6 +208,7 @@ export function FindingsPage() {
           <tbody>{rows.map((finding) => {
             const product = demo.selectors.product(finding.productId);
             const release = demo.selectors.release(finding.releaseId);
+            const timers = getFindingTimers(finding);
             return <tr key={finding.id}>
               <td><input type="checkbox" aria-label={`Select ${finding.reference}`} disabled={!reviewableRows.includes(finding)} checked={selected.includes(finding.id)} onChange={() => toggle(finding.id)} /></td>
               <td><StatusPill value={finding.priority} /></td>
@@ -213,18 +216,33 @@ export function FindingsPage() {
               <td><div className="cell-primary"><Link to={`/products/${finding.productId}`}>{product?.name}</Link><small>{release?.version}</small></div></td>
               <td><StatusPill value={finding.severity} /></td>
               <td>{riskEvidence(finding)}</td>
-              <td>{finding.status === "needs_review" ? <Link to={`/findings/${finding.id}#risk-decision`} aria-label={`Review ${finding.reference}`}><StatusPill value={finding.status} /></Link> : <StatusPill value={finding.status} label={finding.status === "action_required" ? "Fix required" : undefined} />}</td>
+              <td>{finding.status === "needs_review" ? <Link to={`/findings/${finding.id}#risk-decision`} aria-label={`Review ${finding.reference}`} className="status-pill-link" title="Click to write review decision and rationale"><StatusPill value={finding.status} /></Link> : finding.status === "action_required" || finding.status === "in_remediation" ? <Link to={`/findings/${finding.id}#remediation`} aria-label={`Plan fix for ${finding.reference}`} className="status-pill-link" title="Click to plan and write fix details"><StatusPill value={finding.status} label={finding.status === "action_required" ? "Fix required" : undefined} /></Link> : <Link to={`/findings/${finding.id}`} className="status-pill-link" title="Click to view finding details"><StatusPill value={finding.status} /></Link>}</td>
               <td>{finding.status === "needs_review" ? <Link to={`/findings/${finding.id}#risk-decision`}>Review finding</Link> : finding.status === "action_required" || finding.status === "in_remediation" ? <div className="inline-actions">{finding.status === "action_required" ? <Link to={`/findings/${finding.id}#remediation`}>Plan fix</Link> : null}{canGenerateReport ? <button type="button" disabled={Boolean(generatingReleaseId)} onClick={() => void generateReport(finding)}>{generatingReleaseId === finding.releaseId ? "Generating…" : "Download findings report"}</button> : null}</div> : "—"}</td>
               <td>{memberName(demo.state.members, finding.assigneeId)}</td>
-              <td className={finding.priority === "urgent" ? "danger-text" : ""}>{craReportingWindows(finding) ? <small>CRA assessment: 24h {relativeDate(craReportingWindows(finding)?.early)} · 72h {relativeDate(craReportingWindows(finding)?.full)}<br /></small> : null}Internal fix: {relativeDate(remediationDue(finding))}</td>
+              <td>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  {timers.earlyWarning ? <ExactTimerBadge timer={timers.earlyWarning} compact /> : null}
+                  <ExactTimerBadge timer={timers.remediation} compact />
+                </div>
+              </td>
             </tr>;
           })}</tbody>
         </table>
       </div>
-      <div className="mobile-card-list">{rows.map((finding) => <article className="mobile-card" key={finding.id}>
-        <div className="inline-actions"><label><input type="checkbox" disabled={!reviewableRows.includes(finding)} checked={selected.includes(finding.id)} onChange={() => toggle(finding.id)} /> Select {finding.reference}</label><StatusPill value={finding.priority} />{finding.status === "needs_review" ? <Link to={`/findings/${finding.id}#risk-decision`}>Needs review</Link> : <StatusPill value={finding.status} label={finding.status === "action_required" ? "Fix required" : undefined} />}</div>
-        <div className="cell-primary"><Link to={`/findings/${finding.id}`}>{finding.reference} · {finding.title}</Link><small>{demo.selectors.product(finding.productId)?.name} · {finding.component}</small><small>{riskEvidence(finding)}</small>{finding.status === "action_required" ? <Link to={`/findings/${finding.id}#remediation`}>Plan fix</Link> : null}{(finding.status === "action_required" || finding.status === "in_remediation") && canGenerateReport ? <button type="button" disabled={Boolean(generatingReleaseId)} onClick={() => void generateReport(finding)}>{generatingReleaseId === finding.releaseId ? "Generating…" : "Download findings report"}</button> : null}</div>
-      </article>)}</div>
+      <div className="mobile-card-list">{rows.map((finding) => {
+        const timers = getFindingTimers(finding);
+        return <article className="mobile-card" key={finding.id}>
+          <div className="inline-actions"><label><input type="checkbox" disabled={!reviewableRows.includes(finding)} checked={selected.includes(finding.id)} onChange={() => toggle(finding.id)} /> Select {finding.reference}</label><StatusPill value={finding.priority} />{finding.status === "needs_review" ? <Link to={`/findings/${finding.id}#risk-decision`} className="status-pill-link" title="Click to write review decision"><StatusPill value={finding.status} /></Link> : finding.status === "action_required" || finding.status === "in_remediation" ? <Link to={`/findings/${finding.id}#remediation`} className="status-pill-link" title="Click to plan fix"><StatusPill value={finding.status} label={finding.status === "action_required" ? "Fix required" : undefined} /></Link> : <StatusPill value={finding.status} />}</div>
+          <div className="cell-primary">
+            <Link to={`/findings/${finding.id}`}>{finding.reference} · {finding.title}</Link>
+            <small>{demo.selectors.product(finding.productId)?.name} · {finding.component}</small>
+            <small>{riskEvidence(finding)}</small>
+            {timers.mostUrgent ? <div style={{ marginTop: "4px" }}><ExactTimerBadge timer={timers.mostUrgent} compact /></div> : null}
+            {finding.status === "action_required" ? <Link to={`/findings/${finding.id}#remediation`}>Plan fix</Link> : null}
+            {(finding.status === "action_required" || finding.status === "in_remediation") && canGenerateReport ? <button type="button" disabled={Boolean(generatingReleaseId)} onClick={() => void generateReport(finding)}>{generatingReleaseId === finding.releaseId ? "Generating…" : "Download findings report"}</button> : null}
+          </div>
+        </article>;
+      })}</div>
       {reviewableRows.length > 0 || selected.length > 0 ? <form className="setting-section panel-pad" onSubmit={approve}>
         <h2>Review selected findings</h2>
         <p className="muted">Select findings from one release that you have reviewed together. Record whether they affect it; a not-affected decision closes a false alarm.</p>

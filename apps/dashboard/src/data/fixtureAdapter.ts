@@ -1,4 +1,4 @@
-import type { AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } from "./adapter";
+import type { AdapterStatus, DataAdapter, DemoListener, UpdateProductInput, WorkspaceSearchResult } from "./adapter";
 import { sanitizeAnalyticsEvent } from "./analytics";
 import { createDemoState, DEMO_IDS } from "./fixtures";
 import { analyzeSbomWithOsv, inspectSbom, type SbomAnalysis, type SbomAnalyzer } from "./osvSbom";
@@ -861,6 +861,35 @@ export class FixtureAdapter implements DataAdapter {
       state.activities.unshift({ id: `activity-product-${suffix}`, type: "analysis", title: "Product registered", detail: `${created.name} is ready for its first release.`, productId: created.id, actorId: state.currentUserId, at: created.createdAt, targetUrl: `/products/${created.id}` });
     });
     return structuredClone(created);
+  };
+
+  updateProduct = async (input: UpdateProductInput): Promise<Product> => {
+    let updated!: Product;
+    this.mutate((state) => {
+      const product = state.products.find((item) => item.id === input.productId);
+      if (!product) throw new Error(`Unknown product: ${input.productId}`);
+      if (input.name !== undefined) product.name = input.name.trim();
+      if (input.identifier !== undefined) product.identifier = input.identifier.trim();
+      if (input.manufacturer !== undefined) product.manufacturer = input.manufacturer.trim();
+      if (input.description !== undefined) product.description = input.description.trim();
+      if (input.craClass !== undefined) product.craClass = input.craClass;
+      if (input.classificationStatus !== undefined) product.classificationStatus = input.classificationStatus;
+      if (input.classificationAssessment !== undefined) product.classificationAssessment = input.classificationAssessment;
+      if (input.ownerId !== undefined) product.ownerId = input.ownerId || undefined;
+      if (input.supportUntil !== undefined) product.supportUntil = input.supportUntil;
+      state.activities.unshift({
+        id: `activity-product-update-${state.activities.length + 1}`,
+        type: "analysis",
+        title: "Product CRA assessment updated",
+        detail: `${product.name} scope and CRA classification updated to ${product.craClass}.`,
+        productId: product.id,
+        actorId: state.currentUserId,
+        at: now(),
+        targetUrl: `/products/${product.id}`,
+      });
+      updated = structuredClone(product);
+    });
+    return updated;
   };
 
   createRelease = async (input: CreateReleaseInput): Promise<Release> => {

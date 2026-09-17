@@ -9,6 +9,9 @@ import { craClassLabel } from "./craAssessment";
 import { analysisInputAccept, analysisInputHint, validateSbomFormatVersion } from "./analysisInput";
 import { LocalSbomGuide } from "./LocalSbomGuide";
 import { formatDate, memberName } from "./PageKit";
+import { ExactTimerBadge } from "../components/ExactTimerBadge";
+import { ProductScopeModal } from "../components/ProductScopeModal";
+import { getProductMostUrgentTimer } from "./exactTimers";
 import "./pages.css";
 import "./devices.css";
 
@@ -16,11 +19,11 @@ type SortKey = "name" | "findings" | "assessment";
 type ScopeStatus = "in_scope" | "out_of_scope" | "needs_review";
 const pageSize = 10;
 
-function scopeStatus(product: Product): ScopeStatus {
+export function scopeStatus(product: Product): ScopeStatus {
   return product.classificationAssessment?.scopeResult ?? "needs_review";
 }
 
-function scopeLabel(status: ScopeStatus): string {
+export function scopeLabel(status: ScopeStatus): string {
   return status === "in_scope" ? "In scope" : status === "out_of_scope" ? "Out of scope" : "Needs review";
 }
 
@@ -29,6 +32,7 @@ export function ProductsPage() {
   const canManagePortfolio = usePermission("manage_portfolio");
   const navigate = useNavigate();
   const [adding, setAdding] = useState(false);
+  const [reviewProduct, setReviewProduct] = useState<Product | null>(null);
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState("all");
   const [productClass, setProductClass] = useState("all");
@@ -133,32 +137,39 @@ export function ProductsPage() {
         {selected.length > 0 ? <div className="devices-selection" role="status">{selected.length} selected <button type="button" onClick={() => setSelected([])}>Clear selection</button></div> : null}
         <div className="data-table-wrap">
           <table className="data-table devices-table">
-            <thead><tr><th><input type="checkbox" aria-label="Select devices on this page" checked={selectedOnPage} onChange={togglePage} /></th><th>Device name</th><th>Product / Version</th><th>CRA class</th><th>Status</th><th>Open findings</th><th>Last assessment</th><th>Owner</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th><input type="checkbox" aria-label="Select devices on this page" checked={selectedOnPage} onChange={togglePage} /></th><th>Device name</th><th>Product / Version</th><th>CRA class</th><th>Status</th><th>Open findings</th><th>Most urgent deadline</th><th>Last assessment</th><th>Owner</th><th><span className="sr-only">Actions</span></th></tr></thead>
             <tbody>{pageProducts.map((product) => {
               const release = productRelease(product);
               const status = scopeStatus(product);
               const findings = openFindings.get(product.id) ?? 0;
+              const mostUrgentTimer = getProductMostUrgentTimer(product, demo.findings, demo.complianceItems);
               return <tr key={product.id}>
                 <td><input type="checkbox" aria-label={`Select ${product.name}`} checked={selected.includes(product.id)} onChange={() => toggleSelected(product.id)} /></td>
                 <td><Link className="devices-name" to={`/products/${product.id}`}>{product.name}</Link></td>
                 <td>{release ? <Link className="devices-version" to={`/products/${product.id}/releases/${release.id}`}>{product.name} v{release.version}</Link> : <span className="devices-muted">No release yet</span>}</td>
                 <td><span className={`devices-class devices-class--${product.craClass}`}>{craClassLabel(product.craClass)}</span></td>
-                <td><span className={`devices-scope devices-scope--${status}`}><span />{scopeLabel(status)}</span></td>
+                <td><button type="button" className={`devices-scope devices-scope-button devices-scope--${status}`} onClick={() => setReviewProduct(product)} title="Click to open window to review CRA scope, classification, or upload evidence" aria-label={`Review CRA scope for ${product.name}: ${scopeLabel(status)}`}><span />{scopeLabel(status)}</button></td>
                 <td><Link className={findings ? "devices-finding-count devices-finding-count--open" : "devices-finding-count"} to={`/findings?product=${encodeURIComponent(product.id)}`}>{findings}</Link></td>
+                <td><ExactTimerBadge timer={mostUrgentTimer} compact /></td>
                 <td>{formatDate(latestAssessment(product))}</td>
                 <td>{memberName(demo.state.members, product.ownerId)}</td>
-                <td><details className="devices-row-menu"><summary aria-label={`Actions for ${product.name}`}><MoreVertical size={18} /></summary><div><Link to={`/products/${product.id}`}>Open device</Link>{release ? <Link to={`/products/${product.id}/releases/${release.id}`}>Open release</Link> : null}<Link to={`/findings?product=${encodeURIComponent(product.id)}`}>View findings</Link></div></details></td>
+                <td><details className="devices-row-menu"><summary aria-label={`Actions for ${product.name}`}><MoreVertical size={18} /></summary><div><Link to={`/products/${product.id}`}>Open device</Link>{release ? <Link to={`/products/${product.id}/releases/${release.id}`}>Open release</Link> : null}<Link to={`/findings?product=${encodeURIComponent(product.id)}`}>View findings</Link><button type="button" onClick={() => setReviewProduct(product)} style={{ textAlign: "left", background: "none", border: "none", padding: "8px", borderRadius: "5px", cursor: "pointer", font: "inherit", fontSize: "12px", color: "inherit" }}>Review CRA scope</button></div></details></td>
               </tr>;
-            })}{pageProducts.length === 0 ? <tr><td colSpan={9} className="devices-empty">No devices match these filters.</td></tr> : null}</tbody>
+            })}{pageProducts.length === 0 ? <tr><td colSpan={10} className="devices-empty">No devices match these filters.</td></tr> : null}</tbody>
           </table>
         </div>
-        <div className="mobile-card-list">{pageProducts.map((product) => <article className="mobile-card devices-mobile-card" key={product.id}>
-          <div className="cell-primary"><Link to={`/products/${product.id}`}>{product.name}</Link><small>{product.identifier}</small></div>
-          <span className={`devices-scope devices-scope--${scopeStatus(product)}`}><span />{scopeLabel(scopeStatus(product))}</span>
-          <span>{openFindings.get(product.id) ?? 0} open findings · {formatDate(latestAssessment(product))}</span>
-        </article>)}</div>
+        <div className="mobile-card-list">{pageProducts.map((product) => {
+          const mostUrgentTimer = getProductMostUrgentTimer(product, demo.findings, demo.complianceItems);
+          return <article className="mobile-card devices-mobile-card" key={product.id}>
+            <div className="cell-primary"><Link to={`/products/${product.id}`}>{product.name}</Link><small>{product.identifier}</small></div>
+            <button type="button" className={`devices-scope devices-scope-button devices-scope--${scopeStatus(product)}`} onClick={() => setReviewProduct(product)} title="Click to open window to review CRA scope, classification, or upload evidence" aria-label={`Review CRA scope for ${product.name}: ${scopeLabel(scopeStatus(product))}`}><span />{scopeLabel(scopeStatus(product))}</button>
+            <ExactTimerBadge timer={mostUrgentTimer} compact />
+            <span>{openFindings.get(product.id) ?? 0} open findings · {formatDate(latestAssessment(product))}</span>
+          </article>;
+        })}</div>
         <footer className="devices-footer"><span>Showing {pageProducts.length ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, visible.length)} of {visible.length} devices</span><nav aria-label="Device pages"><button type="button" aria-label="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}><ChevronLeft size={18} /></button>{Array.from({ length: pageCount }, (_, index) => <button type="button" key={index} aria-label={`Page ${index + 1}`} aria-current={currentPage === index + 1 ? "page" : undefined} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button type="button" aria-label="Next page" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}><ChevronRight size={18} /></button></nav></footer>
       </section>
+      {reviewProduct ? <ProductScopeModal product={reviewProduct} onClose={() => setReviewProduct(null)} /> : null}
     </main>
   );
 }

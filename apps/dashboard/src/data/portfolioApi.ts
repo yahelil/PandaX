@@ -152,6 +152,7 @@ export interface UpdatePortfolioProductRequest {
   description?: string;
   craClass?: Product["craClass"];
   classificationStatus?: Product["classificationStatus"];
+  classificationAssessment?: CraClassificationAssessment;
   supportStart?: string;
   supportEnd?: string;
   ownerId?: string;
@@ -486,7 +487,7 @@ export function createPortfolioApi(config: PortfolioApiConfig): PortfolioApi {
       return mapProduct(parseProduct(await request(`${productPath(organizationId)}/${id(productId)}`, { method: "GET" }, options)));
     },
     async updateProduct(organizationId, productId, input, options) {
-      const payload = { slug: input.slug, identifier: input.identifier, name: input.name, manufacturer: input.manufacturer, description: input.description, cra_class: input.craClass, classification_status: input.classificationStatus, support_start: input.supportStart, support_end: input.supportEnd, owner_id: input.ownerId, clear_owner: input.clearOwner, readiness: input.readiness, monitoring_health: input.monitoringHealth, active_release_id: input.activeReleaseId };
+      const payload = { slug: input.slug, identifier: input.identifier, name: input.name, manufacturer: input.manufacturer, description: input.description, cra_class: input.craClass, classification_status: input.classificationStatus, classification_assessment: input.classificationAssessment ? assessmentPayload(input.classificationAssessment) : undefined, support_start: input.supportStart, support_end: input.supportEnd, owner_id: input.ownerId, clear_owner: input.clearOwner, readiness: input.readiness, monitoring_health: input.monitoringHealth, active_release_id: input.activeReleaseId };
       return mapProduct(parseProduct(await request(`${productPath(organizationId)}/${id(productId)}`, { method: "PATCH", body: body(payload) }, options)));
     },
     async listReleases(organizationId, productId, options) {

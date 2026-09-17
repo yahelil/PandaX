@@ -20,6 +20,7 @@ export function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<HomePage />} />
+        <Route path="pipeline" element={<Navigate replace to="/compliance" />} />
         <Route path="products" element={<ProductsPage />} />
         <Route path="products/:productId" element={<ProductWorkspacePage />} />
         <Route path="products/:productId/releases/:releaseId" element={<ReleaseWorkspacePage />} />

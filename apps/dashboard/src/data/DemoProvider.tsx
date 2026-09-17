@@ -8,7 +8,7 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import type { AdapterStatus, DataAdapter, MaybePromise, WorkspaceSearchResult } from "./adapter";
+import type { AdapterStatus, DataAdapter, MaybePromise, UpdateProductInput, WorkspaceSearchResult } from "./adapter";
 import type { PrivacySafeAnalyticsEvent } from "./governanceApi";
 import type { AnalysisEvidenceFile } from "./releaseOperationsApi";
 import { createFixtureAdapter } from "./fixtureAdapter";
@@ -86,6 +86,7 @@ export interface DemoActions {
   addDocumentRevision(input: RegisterDocumentRevisionInput): MaybePromise<DocumentRecord>;
   recordDocumentSelfFiling(input: RecordDocumentSelfFilingInput): MaybePromise<DocumentRecord>;
   createProduct(input: CreateProductInput): Promise<Product>;
+  updateProduct(input: UpdateProductInput): Promise<Product>;
   createRelease(input: CreateReleaseInput): Promise<Release>;
   selectActiveRelease(productId: EntityId, releaseId: EntityId): Promise<Product>;
   downloadReleaseReport(productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile>;
@@ -181,6 +182,7 @@ export function DemoProvider({ adapter: providedAdapter, currentUserOverride, ch
     addDocumentRevision: adapter.addDocumentRevision,
     recordDocumentSelfFiling: adapter.recordDocumentSelfFiling,
     createProduct: adapter.createProduct,
+    updateProduct: adapter.updateProduct,
     createRelease: adapter.createRelease,
     selectActiveRelease: adapter.selectActiveRelease,
     downloadReleaseReport: adapter.downloadReleaseReport,

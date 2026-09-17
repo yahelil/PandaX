@@ -6,6 +6,7 @@ import type {
   RegisterDocumentRevisionInput,
   AppSettings,
   Approval,
+  CraClassificationAssessment,
   CreateProductInput,
   CreateReleaseInput,
   DemoState,
@@ -36,13 +37,26 @@ import type { AnalysisEvidenceFile } from "./releaseOperationsApi";
 export type DemoListener = () => void;
 
 export type AdapterOperation =
-  | "initialize" | "refresh" | "search" | "create_product" | "create_release"
+  | "initialize" | "refresh" | "search" | "create_product" | "update_product" | "create_release"
   | "mark_notification_read" | "acknowledge_notification" | "ingest_analytics" | "assign_finding" | "decide_finding" | "batch_decide_findings"
   | "update_remediation" | "load_finding" | "approve_document"
   | "reject_document" | "load_document" | "download_document" | "download_document_content" | "request_document_approval"
   | "add_document_revision" | "self_file_document" | "update_settings" | "preview_analysis" | "run_analysis" | "run_monitoring"
   | "load_compliance" | "update_compliance" | "approve_compliance"
   | "update_organization" | "update_team_member" | "update_integration" | "select_active_release" | "download_release_report";
+
+export interface UpdateProductInput {
+  productId: EntityId;
+  name?: string;
+  identifier?: string;
+  manufacturer?: string;
+  description?: string;
+  craClass?: Product["craClass"];
+  classificationStatus?: Product["classificationStatus"];
+  classificationAssessment?: CraClassificationAssessment;
+  ownerId?: string;
+  supportUntil?: string;
+}
 
 export type MaybePromise<T> = T | Promise<T>;
 
@@ -103,6 +117,7 @@ export interface DataAdapter {
   addDocumentRevision(input: RegisterDocumentRevisionInput): MaybePromise<DocumentRecord>;
   recordDocumentSelfFiling(input: RecordDocumentSelfFilingInput): MaybePromise<DocumentRecord>;
   createProduct(input: CreateProductInput): Promise<Product>;
+  updateProduct(input: UpdateProductInput): Promise<Product>;
   createRelease(input: CreateReleaseInput): Promise<Release>;
   selectActiveRelease(productId: EntityId, releaseId: EntityId): Promise<Product>;
   downloadReleaseReport(productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile>;

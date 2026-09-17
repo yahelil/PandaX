@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { CheckCircle2, Download, FileCheck, FileCode, Scale, ShieldCheck, Upload, X } from "lucide-react";
 
 import { usePermission } from "../auth";
 import { useDemo } from "../data/DemoProvider";
@@ -47,6 +48,7 @@ export function CompliancePage() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("priority");
   const [direction, setDirection] = useState<"asc" | "desc">("asc");
+  const [actionModalItem, setActionModalItem] = useState<ComplianceItem | null>(null);
 
   const scoped = useMemo(() => demo.complianceItems
     .filter((item) => product === "all" || item.productId === product)
@@ -103,8 +105,8 @@ export function CompliancePage() {
         <ComplianceDocumentsTable product={product} release={release} query={query} />
       ) : (
         <>
-          <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Priority</th><th>Obligation</th><th>Scope</th><th>Requirement</th><th>Status</th><th>Owner</th><th>Due</th></tr></thead><tbody>{items.map((item) => { const itemProduct = demo.selectors.product(item.productId); const itemRelease = demo.selectors.release(item.releaseId); return <tr key={item.id} className={selectedId === item.id ? "selected-row" : undefined}><td><StatusPill value={item.priority} /></td><td><div className="cell-primary"><Link to={itemUrl(params, item.id)}>{item.title}</Link><small>{item.reason}</small></div></td><td><ScopeCell item={item} productName={itemProduct?.name} releaseVersion={itemRelease?.version} /></td><td>{item.requirement}</td><td><StatusPill value={lifecycleStatus(item)} /></td><td>{memberName(demo.state.members, item.ownerId)}</td><td className={item.priority === "urgent" && !isComplianceResolved(item) ? "danger-text" : ""}>{relativeDate(item.dueAt)}</td></tr>; })}</tbody></table></div>
-          <div className="mobile-card-list">{items.map((item) => <article className="mobile-card" key={item.id}><div className="inline-actions"><StatusPill value={item.priority} /><StatusPill value={lifecycleStatus(item)} /></div><div className="cell-primary"><Link to={itemUrl(params, item.id)}>{item.title}</Link><small>{demo.selectors.product(item.productId)?.name ?? "Organization-wide"} · {item.requirement}</small></div></article>)}</div>
+          <div className="data-table-wrap"><table className="data-table"><thead><tr><th>Priority</th><th>Obligation</th><th>Scope</th><th>Requirement</th><th>Status</th><th>Owner</th><th>Due</th></tr></thead><tbody>{items.map((item) => { const itemProduct = demo.selectors.product(item.productId); const itemRelease = demo.selectors.release(item.releaseId); return <tr key={item.id} className={selectedId === item.id ? "selected-row" : undefined}><td><StatusPill value={item.priority} /></td><td><div className="cell-primary"><Link to={itemUrl(params, item.id)}>{item.title}</Link><small>{item.reason}</small></div></td><td><ScopeCell item={item} productName={itemProduct?.name} releaseVersion={itemRelease?.version} /></td><td>{item.requirement}</td><td><button type="button" className="status-pill-button" onClick={() => setActionModalItem(item)} title="Click to open window to upload/write what's needed" aria-label={`Open action window for ${item.title}: ${titleCase(lifecycleStatus(item))}`}><StatusPill value={lifecycleStatus(item)} /></button></td><td>{memberName(demo.state.members, item.ownerId)}</td><td className={item.priority === "urgent" && !isComplianceResolved(item) ? "danger-text" : ""}>{relativeDate(item.dueAt)}</td></tr>; })}</tbody></table></div>
+          <div className="mobile-card-list">{items.map((item) => <article className="mobile-card" key={item.id}><div className="inline-actions"><StatusPill value={item.priority} /><button type="button" className="status-pill-button" onClick={() => setActionModalItem(item)} title="Click to open window to upload/write what's needed" aria-label={`Open action window for ${item.title}`}><StatusPill value={lifecycleStatus(item)} /></button></div><div className="cell-primary"><Link to={itemUrl(params, item.id)}>{item.title}</Link><small>{demo.selectors.product(item.productId)?.name ?? "Organization-wide"} · {item.requirement}</small></div></article>)}</div>
           {!items.length ? <EmptyState title="No matching compliance work" body="Change the scope or filters to include other obligations." /> : null}
         </>
       )}
@@ -114,8 +116,321 @@ export function CompliancePage() {
     ) : (
       <p className="muted">Showing {items.length} compliance items. Organization-wide obligations remain visible in the cross-product view.</p>
     )}
+    {actionModalItem ? <ComplianceActionModal item={actionModalItem} onClose={() => setActionModalItem(null)} /> : null}
     {selectedId ? <ComplianceDetail key={selectedId} itemId={selectedId} onClose={() => updateParams({ item: undefined, case: undefined })} /> : null}
   </main>;
+}
+
+function ComplianceActionModal({ item, onClose }: { item: ComplianceItem; onClose: () => void }) {
+  const demo = useDemo();
+  const permissions = compliancePermissions(demo.currentUser.roles, item);
+  const product = demo.selectors.product(item.productId);
+  const release = demo.selectors.release(item.releaseId);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [notes, setNotes] = useState(item.reason ?? "");
+  const [nextStatus, setNextStatus] = useState<ComplianceLifecycleStatus>(lifecycleStatus(item));
+  const [ownerId, setOwnerId] = useState(item.ownerId ?? "");
+  const [dueAt, setDueAt] = useState(item.dueAt?.slice(0, 10) ?? "");
+  const [filingId, setFilingId] = useState(item.selfFilingRecordId ?? "");
+  const [filingUrl, setFilingUrl] = useState(item.selfFilingRecordUrl ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  const [success, setSuccess] = useState<string>();
+  const modalRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  useEffect(() => {
+    modalRef.current?.focus();
+  }, []);
+
+  const handleSave = async (e?: FormEvent) => {
+    if (e) e.preventDefault();
+    if (!permissions.canEdit) return;
+    setBusy(true);
+    setError(undefined);
+    setSuccess(undefined);
+    try {
+      let finalDescription = notes.trim();
+      if (selectedFile) {
+        const fileInfo = `[Attached Evidence: ${selectedFile.name} (${Math.round(selectedFile.size / 1024)} KB, ${new Date().toISOString().slice(0, 10)})]`;
+        finalDescription = finalDescription ? `${finalDescription}\n\n${fileInfo}` : fileInfo;
+      }
+      await demo.actions.updateCompliance({
+        itemId: item.id,
+        title: item.title,
+        description: finalDescription,
+        status: nextStatus !== lifecycleStatus(item) ? nextStatus : undefined,
+        ownerId: ownerId || undefined,
+        clearOwner: !ownerId && Boolean(item.ownerId),
+        dueAt: dueAt ? new Date(`${dueAt}T00:00:00Z`).toISOString() : undefined,
+        clearDueAt: !dueAt && Boolean(item.dueAt),
+        selfFilingRecordId: filingId.trim() || undefined,
+        selfFilingRecordUrl: filingUrl.trim() || undefined,
+      });
+      setSuccess("Obligation updated with your changes and evidence.");
+      setTimeout(() => {
+        onClose();
+      }, 750);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save compliance action.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!permissions.canApprove) return;
+    setBusy(true);
+    setError(undefined);
+    setSuccess(undefined);
+    try {
+      await demo.actions.approveCompliance({
+        itemId: item.id,
+        selfFilingRecordId: filingId.trim() || item.selfFilingRecordId,
+        selfFilingRecordUrl: filingUrl.trim() || item.selfFilingRecordUrl,
+      });
+      setSuccess("Approval recorded in the audit history.");
+      setTimeout(() => {
+        onClose();
+      }, 750);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to approve compliance case.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      className="compliance-modal-overlay"
+      role="presentation"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={modalRef}
+        className="compliance-modal-window"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`compliance-modal-title-${item.id}`}
+        tabIndex={-1}
+      >
+        <header className="compliance-modal-header">
+          <div>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" }}>
+              <StatusPill value={lifecycleStatus(item)} />
+              <StatusPill value={item.priority} />
+              <span className="muted" style={{ fontSize: "12px" }}>
+                {product ? `${product.name}${release ? ` ${release.version}` : ""}` : "Organization-wide"} · {item.requirement}
+              </span>
+            </div>
+            <h2 id={`compliance-modal-title-${item.id}`} style={{ margin: 0, fontSize: "19px", fontWeight: 700 }}>
+              {item.title}
+            </h2>
+          </div>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onClose}
+            aria-label="Close window"
+          >
+            <X size={20} />
+          </button>
+        </header>
+
+        {error ? <div className="notice compliance-error" role="alert">{error}</div> : null}
+        {success ? <div className="notice compliance-success" role="status">{success}</div> : null}
+
+        <div className="action-modal-callout">
+          <strong>Obligation context & requirement</strong>
+          <p style={{ margin: "4px 0 0", fontSize: "13px", color: "var(--text-muted)", lineHeight: 1.45 }}>{item.reason}</p>
+        </div>
+
+        {lifecycleStatus(item) === "pending_approval" ? (
+          <div className="compliance-approval-bar" style={{ borderRadius: "8px" }}>
+            <div>
+              <strong>Independent approval required</strong>
+              <p>
+                {permissions.canApprove
+                  ? "Your authorized role can approve this compliance case and commit it to the audit log."
+                  : "Only an organization admin or authorized approver can sign off on this step."}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="button button-primary"
+              disabled={busy || !permissions.canApprove}
+              onClick={handleApprove}
+            >
+              {busy ? "Saving…" : "Approve case"}
+            </button>
+          </div>
+        ) : null}
+
+        <form onSubmit={handleSave} className="form-grid" style={{ gap: "14px" }}>
+          {/* Section 1: Upload what's needed */}
+          <div className="span-2">
+            <label className="field-label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+              <strong>Upload evidence / documentation</strong>
+              <span className="muted" style={{ fontSize: "11px" }}>PDF, JSON, SBOM, ZIP, report or certificate</span>
+            </label>
+            <div
+              className="compliance-upload-dropzone"
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                const f = e.dataTransfer.files?.[0];
+                if (f) setSelectedFile(f);
+              }}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setSelectedFile(f);
+                }}
+              />
+              {selectedFile ? (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+                  <CheckCircle2 size={22} className="success-text" />
+                  <div style={{ textAlign: "left" }}>
+                    <strong style={{ display: "block", fontSize: "13px" }}>{selectedFile.name}</strong>
+                    <span className="muted" style={{ fontSize: "11px" }}>
+                      {(selectedFile.size / 1024).toFixed(1)} KB · Ready to record as evidence
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="button-small"
+                    style={{ marginLeft: "12px" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFile(null);
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                  <Upload size={24} className="muted" />
+                  <span style={{ fontSize: "13.5px", fontWeight: 650 }}>Click to browse or drag file here to attach proof</span>
+                  <span className="muted" style={{ fontSize: "12px" }}>Upload test results, SBOM scan, vendor security advisory, or verification certificate</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Section 2: Write what's needed */}
+          <div className="span-2 field">
+            <label htmlFor={`modal-notes-${item.id}`}>
+              <strong>Write justification, action taken, or explanation</strong>
+            </label>
+            <textarea
+              id={`modal-notes-${item.id}`}
+              className="textarea-field"
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              disabled={busy || !permissions.canEdit}
+              placeholder="Explain how this obligation was addressed, test findings, or actions taken..."
+            />
+          </div>
+
+          {/* Section 3: Status & Owner */}
+          <div className="field">
+            <label htmlFor={`modal-status-${item.id}`}>Next lifecycle state</label>
+            <select
+              id={`modal-status-${item.id}`}
+              className="select-field"
+              value={nextStatus}
+              disabled={busy || !permissions.canEdit}
+              onChange={(e) => setNextStatus(e.target.value as ComplianceLifecycleStatus)}
+            >
+              {allowedComplianceStatuses(item).map((val) => (
+                <option key={val} value={val}>
+                  {titleCase(val)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label htmlFor={`modal-owner-${item.id}`}>Owner</label>
+            <select
+              id={`modal-owner-${item.id}`}
+              className="select-field"
+              value={ownerId}
+              disabled={busy || !permissions.canEdit}
+              onChange={(e) => setOwnerId(e.target.value)}
+            >
+              <option value="">Unassigned</option>
+              {demo.state.members
+                .filter((m) => m.status === "active")
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+
+          {item.type === "reporting_case" ? (
+            <>
+              <div className="field">
+                <label htmlFor={`modal-filing-${item.id}`}>Filing record ID</label>
+                <input
+                  id={`modal-filing-${item.id}`}
+                  className="input-field"
+                  value={filingId}
+                  disabled={busy || !permissions.canEdit}
+                  onChange={(e) => setFilingId(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor={`modal-filing-url-${item.id}`}>Filing evidence URL</label>
+                <input
+                  id={`modal-filing-url-${item.id}`}
+                  className="input-field"
+                  type="url"
+                  value={filingUrl}
+                  disabled={busy || !permissions.canEdit}
+                  onChange={(e) => setFilingUrl(e.target.value)}
+                />
+              </div>
+            </>
+          ) : null}
+
+          <div className="span-2 inline-actions" style={{ marginTop: "12px", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="submit"
+                className="button-primary"
+                disabled={busy || !permissions.canEdit}
+              >
+                {busy ? "Saving…" : "Save & record action"}
+              </button>
+              <button type="button" onClick={onClose} disabled={busy}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 function ScopeCell({ item, productName, releaseVersion }: { item: ComplianceItem; productName?: string; releaseVersion?: string }) {
@@ -268,14 +583,19 @@ function ComplianceDocumentsTable({ product, release, query }: { product: string
   };
 
   const targetRelease = release !== "all" ? demo.selectors.release(release) : undefined;
+  const fallbackProduct = demo.products[0];
   const targetProduct = targetRelease
     ? demo.selectors.product(targetRelease.productId)
     : product !== "all"
     ? demo.selectors.product(product)
-    : undefined;
+    : fallbackProduct;
 
   const activeRelease =
-    !targetRelease && targetProduct?.activeReleaseId ? demo.selectors.release(targetProduct.activeReleaseId) : undefined;
+    !targetRelease && targetProduct?.activeReleaseId
+      ? demo.selectors.release(targetProduct.activeReleaseId)
+      : targetProduct
+      ? demo.releases.find((r) => r.productId === targetProduct.id)
+      : undefined;
   const effectiveRelease = targetRelease ?? activeRelease;
 
   const latestCompleted =
@@ -317,6 +637,150 @@ function ComplianceDocumentsTable({ product, release, query }: { product: string
   return (
     <div>
       {error ? <p className="panel-pad danger-text" role="alert">{error}</p> : null}
+      {targetProduct && effectiveRelease && latestCompleted ? (
+        <div style={{ padding: "16px 20px 24px" }}>
+          <div className="pipeline-stage-intro" style={{ marginBottom: 16 }}>
+            <div className="pipeline-stage-badge pipeline-stage-badge--highlight">
+              <FileCheck size={24} />
+            </div>
+            <div>
+              <div className="inline-actions" style={{ marginBottom: 4 }}>
+                <h3 style={{ margin: 0 }}>Official Legal & Conformity Documents</h3>
+                <span className="status-pill status-ready">Ready for Download</span>
+              </div>
+              <p className="muted" style={{ margin: 0 }}>
+                The pipeline compiles your verified SBOM, advisory scan, triage decisions, and technical evidence into official EU CRA regulatory documents and signed records for {targetProduct.name} v{effectiveRelease.version}. Download them immediately below:
+              </p>
+            </div>
+          </div>
+
+          <div className="pipeline-docs-grid">
+            <div className="pipeline-doc-card">
+              <div className="pipeline-doc-card__header">
+                <div className="pipeline-doc-icon"><Scale size={20} /></div>
+                <div>
+                  <strong>EU Declaration of Conformity</strong>
+                  <span className="pipeline-doc-badge">Article 24 CRA · PDF</span>
+                </div>
+              </div>
+              <p className="pipeline-doc-desc">
+                Official declaration attesting fulfillment of essential cybersecurity requirements specified in Annex I. Ready for manufacturer signature.
+              </p>
+              <div className="pipeline-doc-footer">
+                <button
+                  type="button"
+                  className="button button-primary button-small"
+                  disabled={Boolean(busy)}
+                  onClick={() =>
+                    void download(
+                      "declaration",
+                      () => demoDraft("declaration", targetProduct, effectiveRelease),
+                      `actis-${effectiveRelease.id}-declaration-of-conformity-draft.pdf`
+                    )
+                  }
+                >
+                  <Download size={14} />
+                  {busy === "declaration" ? "Generating…" : "Download PDF"}
+                </button>
+                <span className="muted" style={{ fontSize: 11 }}>Draft PDF</span>
+              </div>
+            </div>
+
+            <div className="pipeline-doc-card">
+              <div className="pipeline-doc-card__header">
+                <div className="pipeline-doc-icon"><FileCheck size={20} /></div>
+                <div>
+                  <strong>Annex VII Technical Documentation</strong>
+                  <span className="pipeline-doc-badge">Annex VII CRA · PDF</span>
+                </div>
+              </div>
+              <p className="pipeline-doc-desc">
+                Comprehensive technical documentation dossier containing design specs, SBOM baseline, vulnerability handling, and testing evidence.
+              </p>
+              <div className="pipeline-doc-footer">
+                <button
+                  type="button"
+                  className="button button-primary button-small"
+                  disabled={Boolean(busy)}
+                  onClick={() =>
+                    void download(
+                      "technical",
+                      () => demoDraft("technical", targetProduct, effectiveRelease),
+                      `actis-${effectiveRelease.id}-annex-vii-technical-draft.pdf`
+                    )
+                  }
+                >
+                  <Download size={14} />
+                  {busy === "technical" ? "Generating…" : "Download PDF"}
+                </button>
+                <span className="muted" style={{ fontSize: 11 }}>Draft PDF</span>
+              </div>
+            </div>
+
+            <div className="pipeline-doc-card">
+              <div className="pipeline-doc-card__header">
+                <div className="pipeline-doc-icon"><ShieldCheck size={20} /></div>
+                <div>
+                  <strong>Product Release Security Report</strong>
+                  <span className="pipeline-doc-badge">Audit Record · PDF</span>
+                </div>
+              </div>
+              <p className="pipeline-doc-desc">
+                Complete audit log of all identified components, CVE vulnerability findings, reachability analysis, and human triage decisions.
+              </p>
+              <div className="pipeline-doc-footer">
+                <button
+                  type="button"
+                  className="button button-primary button-small"
+                  disabled={Boolean(busy) || !canGenerateReport}
+                  onClick={() =>
+                    void download(
+                      "security",
+                      () => demo.actions.generateSecurityPdf(targetProduct.id, effectiveRelease.id),
+                      `actis-${effectiveRelease.id}-security-report.pdf`
+                    )
+                  }
+                >
+                  <Download size={14} />
+                  {busy === "security" ? "Generating…" : "Download PDF"}
+                </button>
+                <span className="muted" style={{ fontSize: 11 }}>Generated PDF</span>
+              </div>
+            </div>
+
+            <div className="pipeline-doc-card">
+              <div className="pipeline-doc-card__header">
+                <div className="pipeline-doc-icon"><FileCode size={20} /></div>
+                <div>
+                  <strong>Traceable Evidence Package</strong>
+                  <span className="pipeline-doc-badge">Audit Package · ZIP</span>
+                </div>
+              </div>
+              <p className="pipeline-doc-desc">
+                Cryptographically hashed bundle containing raw SBOM, machine-readable VEX, analyzer logs, and SHA-256 signatures for auditor review.
+              </p>
+              <div className="pipeline-doc-footer">
+                <button
+                  type="button"
+                  className="button button-small"
+                  disabled={Boolean(busy)}
+                  onClick={() =>
+                    void download(
+                      "evidence-zip",
+                      () => demo.actions.downloadReleaseReport(targetProduct.id, effectiveRelease.id, latestCompleted.id),
+                      `actis-${effectiveRelease.id}-evidence.zip`
+                    )
+                  }
+                >
+                  <Download size={14} />
+                  {busy === "evidence-zip" ? "Preparing…" : "Download ZIP"}
+                </button>
+                <span className="muted" style={{ fontSize: 11 }}>Evidence Bundle</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <div className="data-table-wrap">
         <table className="data-table">
           <thead>

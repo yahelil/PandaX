@@ -195,6 +195,7 @@ function mapAnalysisJob(job: ReleaseAnalysisJob, draft: AnalysisDraft): Analysis
         limitations,
       },
       resultUrl: `/products/${job.productId}/releases/${job.releaseId}`,
+      evidence: job.result.evidence.map(({ name, sha256 }) => ({ name, sha256 })),
     } : undefined,
   };
 }
@@ -556,6 +557,11 @@ export class ProductionAdapter implements DataAdapter {
   downloadReleaseReport = async (productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile> => {
     if (!this.config.releaseOperationsApi) throw new Error("Production evidence export is unavailable.");
     return this.config.releaseOperationsApi.downloadEvidenceBundle({ organizationId: this.config.organizationId, productId, releaseId }, jobId);
+  };
+
+  downloadAnalysisEvidence = async (productId: EntityId, releaseId: EntityId, jobId: EntityId, digest: string): Promise<AnalysisEvidenceFile> => {
+    if (!this.config.releaseOperationsApi) throw new Error("Production evidence download is unavailable.");
+    return this.config.releaseOperationsApi.downloadEvidence({ organizationId: this.config.organizationId, productId, releaseId }, jobId, digest);
   };
 
   generateFindingsReport = async (productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile> => {

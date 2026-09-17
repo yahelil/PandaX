@@ -58,9 +58,9 @@ and optional build timestamp.
 
 ## Rollback
 
-Migration `20260915_0015` adds only the isolated
-`organization_trust_key_challenges` table, so the immediately previous
-application revision remains schema-compatible. For rollback:
+Migration `20260917_0016` backfills finding remediation targets without changing
+table structure, so the immediately previous application revision remains
+schema-compatible. For rollback:
 
 1. Stop beta mutations and scheduled monitoring.
 2. Record current deploy ID and schema revision.

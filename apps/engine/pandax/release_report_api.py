@@ -8,7 +8,7 @@ from .document_content import content_disposition
 from .documents import DocumentConflict, DocumentRepository
 from .findings import FindingRepository
 from .portfolio import PortfolioNotFound, PortfolioRepository
-from .release_report_service import ReportStorage, generate_release_report
+from .release_report_service import ReportStorage, generate_release_pdf, generate_release_report
 from .release_monitoring import ReleaseMonitoringRepository
 
 
@@ -55,6 +55,9 @@ def create_release_report_router(
                 monitoring=monitoring_dependency() if monitoring_dependency else None,
                 product_name=product.name,
                 release_version=release.version,
+                product_identifier=product.identifier,
+                manufacturer=product.manufacturer,
+                cra_class=product.cra_class,
             )
         except PortfolioNotFound as exc:
             raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
@@ -67,6 +70,53 @@ def create_release_report_router(
         return Response(
             content=report.content,
             media_type=report.content_type,
+            headers={
+                "content-disposition": content_disposition(report.filename),
+                "content-length": str(report.size_bytes),
+                "x-content-sha256": report.content_hash,
+                "x-document-id": generated.document_id,
+                "x-document-revision": str(generated.revision),
+                "cache-control": "private, no-store",
+            },
+        )
+
+    @router.post(
+        "/organizations/{organization_id}/products/{product_id}/releases/{release_id}/reports/security.pdf",
+    )
+    def download_security_pdf(
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        portfolio: PortfolioRepository = Depends(portfolio_dependency),
+        findings: FindingRepository = Depends(findings_dependency),
+        documents: DocumentRepository = Depends(documents_dependency),
+        storage: ReportStorage = Depends(storage_dependency),
+        principal: Principal = Depends(identity_dependency),
+    ) -> Response:
+        authorize_request(principal, organization_id, REPORT_ROLES, sensitive=True)
+        try:
+            product = portfolio.get_product(organization_id, product_id)
+            release = portfolio.get_release(organization_id, release_id)
+            if release.product_id != product_id:
+                raise PortfolioNotFound("release not found in product")
+            generated = generate_release_pdf(
+                organization_id=organization_id, product_id=product_id, release_id=release_id,
+                findings=findings, documents=documents, storage=storage,
+                actor_id=principal.subject,
+                monitoring=monitoring_dependency() if monitoring_dependency else None,
+                product_name=product.name, release_version=release.version,
+                product_identifier=product.identifier, manufacturer=product.manufacturer,
+                cra_class=product.cra_class,
+            )
+        except PortfolioNotFound as exc:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+        except DocumentConflict as exc:
+            raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "security report PDF could not be generated") from exc
+        report = generated.report
+        return Response(
+            content=report.content, media_type=report.content_type,
             headers={
                 "content-disposition": content_disposition(report.filename),
                 "content-length": str(report.size_bytes),

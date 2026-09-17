@@ -195,7 +195,7 @@ function mapAnalysisJob(job: ReleaseAnalysisJob, draft: AnalysisDraft): Analysis
         limitations,
       },
       resultUrl: `/products/${job.productId}/releases/${job.releaseId}`,
-      evidence: job.result.evidence.map(({ name, sha256 }) => ({ name, sha256 })),
+      evidence: job.result.evidence.map((item) => ({ name: item.name, sha256: item.sha256 })),
     } : undefined,
   };
 }
@@ -569,6 +569,17 @@ export class ProductionAdapter implements DataAdapter {
     return this.config.releaseOperationsApi.generateFindingsReport({
       organizationId: this.config.organizationId, productId, releaseId,
     });
+  };
+
+  generateSecurityPdf = async (productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile> => {
+    if (!this.config.releaseOperationsApi) throw new Error("Production PDF generation is unavailable.");
+    return this.config.releaseOperationsApi.generateSecurityPdf({
+      organizationId: this.config.organizationId, productId, releaseId,
+    });
+  };
+
+  downloadReleaseEvidenceFile = async (productId: EntityId, releaseId: EntityId, jobId: EntityId, digest: string): Promise<AnalysisEvidenceFile> => {
+    return this.downloadAnalysisEvidence(productId, releaseId, jobId, digest);
   };
 
   previewAnalysis = async (draft: AnalysisDraft): Promise<AnalysisPreview> => {

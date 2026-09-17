@@ -184,6 +184,7 @@ export interface ReleaseOperationsApi {
   downloadEvidence(scope: ReleaseScope, jobId: string, digest: string, options?: ReleaseOperationsRequestOptions): Promise<AnalysisEvidenceFile>;
   downloadEvidenceBundle(scope: ReleaseScope, jobId: string, options?: ReleaseOperationsRequestOptions): Promise<AnalysisEvidenceFile>;
   generateFindingsReport(scope: ReleaseScope, options?: ReleaseOperationsRequestOptions): Promise<AnalysisEvidenceFile>;
+  generateSecurityPdf(scope: ReleaseScope, options?: ReleaseOperationsRequestOptions): Promise<AnalysisEvidenceFile>;
   getMonitoring(scope: ReleaseScope, options?: ReleaseOperationsRequestOptions): Promise<ReleaseMonitoringStatus>;
   configureMonitoring(scope: ReleaseScope, input: MonitoringConfigurationInput, options?: ReleaseOperationsRequestOptions): Promise<ReleaseMonitoringStatus>;
   runMonitoring(scope: ReleaseScope, options?: ReleaseOperationsRequestOptions): Promise<ReleaseMonitoringStatus>;
@@ -539,6 +540,9 @@ export function createReleaseOperationsApi(config: ReleaseOperationsApiConfig): 
     },
     async generateFindingsReport(scope, options) {
       return evidenceRequest(`${releasePath(scope)}/reports/findings`, options, "POST");
+    },
+    async generateSecurityPdf(scope, options) {
+      return evidenceRequest(`${releasePath(scope)}/reports/security.pdf`, options, "POST");
     },
     async getMonitoring(scope, options) {
       return parseMonitoringStatus(await jsonRequest(monitoringPath(scope), { method: "GET" }, options));

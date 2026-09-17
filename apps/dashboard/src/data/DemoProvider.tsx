@@ -91,6 +91,8 @@ export interface DemoActions {
   downloadReleaseReport(productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile>;
   downloadAnalysisEvidence(productId: EntityId, releaseId: EntityId, jobId: EntityId, digest: string): Promise<AnalysisEvidenceFile>;
   generateFindingsReport(productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile>;
+  generateSecurityPdf(productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile>;
+  downloadReleaseEvidenceFile(productId: EntityId, releaseId: EntityId, jobId: EntityId, digest: string): Promise<AnalysisEvidenceFile>;
   previewAnalysis(draft: AnalysisDraft): Promise<AnalysisPreview>;
   runAnalysis(draft: AnalysisDraft): Promise<AnalysisJob>;
   loadReleaseMonitoring(productId: EntityId, releaseId: EntityId, options?: { signal?: AbortSignal }): Promise<ReleaseMonitoringView>;
@@ -184,6 +186,8 @@ export function DemoProvider({ adapter: providedAdapter, currentUserOverride, ch
     downloadReleaseReport: adapter.downloadReleaseReport,
     downloadAnalysisEvidence: adapter.downloadAnalysisEvidence,
     generateFindingsReport: adapter.generateFindingsReport,
+    generateSecurityPdf: adapter.generateSecurityPdf,
+    downloadReleaseEvidenceFile: adapter.downloadReleaseEvidenceFile,
     previewAnalysis: adapter.previewAnalysis,
     runAnalysis: adapter.runAnalysis,
     loadReleaseMonitoring: adapter.loadReleaseMonitoring,

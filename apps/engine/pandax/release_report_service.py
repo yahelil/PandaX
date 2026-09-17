@@ -20,17 +20,21 @@ from .documents import DocumentRepository
 from .release_report import (
     ReleaseReport, build_release_report, render_release_report, report_filename,
 )
+from .release_report_pdf import render_release_report_pdf
 
 REPORT_KIND = "evidence"
 REPORT_FORMAT = "json"
 REPORT_SUFFIX = ".json"
 REPORT_NAME = "Release report"
+PDF_REPORT_NAME = "Product release security report"
 
 
 class ReportStorage(Protocol):
     def put_document(
         self, organization_id: str, document_id: str, content: bytes, suffix: str
     ) -> Any: ...
+
+    def get(self, object_key: str, expected_sha256: str) -> bytes: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +80,9 @@ def generate_release_report(
     now: datetime | None = None,
     product_name: str | None = None,
     release_version: str | None = None,
+    product_identifier: str | None = None,
+    manufacturer: str | None = None,
+    cra_class: str | None = None,
 ) -> GeneratedReleaseReport:
     generated_at = now or datetime.now(timezone.utc)
     records = findings.list(
@@ -102,6 +109,9 @@ def generate_release_report(
         generated_at=generated_at,
         product_name=product_name,
         release_version=release_version,
+        product_identifier=product_identifier,
+        manufacturer=manufacturer,
+        cra_class=cra_class,
     )
 
     next_revision = 1 if existing is None else existing.current_revision + 1
@@ -115,6 +125,9 @@ def generate_release_report(
             generated_at=previous_generated_at,
             product_name=product_name,
             release_version=release_version,
+            product_identifier=product_identifier,
+            manufacturer=manufacturer,
+            cra_class=cra_class,
         )
         previous_rendered = render_release_report(
             previous_document, filename=report_filename(release_id, revision=existing.current_revision)
@@ -169,3 +182,68 @@ def generate_release_report(
 def _scope(existing: Any, release_id: str) -> str:
     """Object keys are content-addressed; this only groups them somewhere sensible."""
     return existing.id if existing is not None else release_id
+
+
+def generate_release_pdf(
+    *,
+    organization_id: str,
+    product_id: str,
+    release_id: str,
+    findings: Any,
+    documents: DocumentRepository,
+    storage: ReportStorage,
+    actor_id: str,
+    monitoring: Any | None = None,
+    product_name: str | None = None,
+    release_version: str | None = None,
+    product_identifier: str | None = None,
+    manufacturer: str | None = None,
+    cra_class: str | None = None,
+) -> GeneratedReleaseReport:
+    """Snapshot reviewed findings, then retain a PDF tied to that snapshot."""
+    source = generate_release_report(
+        organization_id=organization_id, product_id=product_id, release_id=release_id,
+        findings=findings, documents=documents, storage=storage, actor_id=actor_id,
+        monitoring=monitoring, product_name=product_name, release_version=release_version,
+        product_identifier=product_identifier, manufacturer=manufacturer, cra_class=cra_class,
+    )
+    existing = next((record for record in documents.list_documents(
+        organization_id, product_id=product_id, release_id=release_id, kind=REPORT_KIND,
+    ) if record.name == PDF_REPORT_NAME), None)
+    revision = 1 if existing is None else existing.current_revision + 1
+    filename = f"release-security-report-{release_id}-r{revision}.pdf"
+    if existing is not None and existing.current.provenance.get("source_report_hash") == source.report.content_hash:
+        current = existing.current
+        content = storage.get(current.storage_locator, current.content_hash)
+        report = ReleaseReport(
+            document=source.report.document, content=content,
+            content_hash=current.content_hash, size_bytes=len(content),
+            filename=f"release-security-report-{release_id}-r{current.revision}.pdf",
+            content_type="application/pdf",
+        )
+        return GeneratedReleaseReport(existing.id, current.revision, report, current.storage_locator, False)
+
+    report = render_release_report_pdf(source.report.document, filename=filename)
+    stored = storage.put_document(organization_id, _scope(existing, release_id), report.content, ".pdf")
+    provenance = {
+        "generator": "release_report_pdf", "source_report_hash": source.report.content_hash,
+        "source_document_id": source.document_id, "source_revision": source.revision,
+        "generated_at": source.report.document["generated_at"],
+        "finding_count": source.report.document["summary"]["total"],
+        "incomplete": source.report.document["summary"]["awaiting_decision"] > 0,
+    }
+    if existing is None:
+        detail = documents.create_document(
+            organization_id, product_id, name=PDF_REPORT_NAME, kind=REPORT_KIND,
+            format="pdf_a_2b", content_hash=report.content_hash,
+            storage_locator=stored.object_key, size_bytes=report.size_bytes,
+            provenance=provenance, actor_id=actor_id, release_id=release_id,
+        )
+        return GeneratedReleaseReport(detail.document.id, 1, report, stored.object_key, True)
+    saved = documents.add_revision(
+        organization_id, existing.id, expected_current_revision=existing.current_revision,
+        format="pdf_a_2b", content_hash=report.content_hash,
+        storage_locator=stored.object_key, size_bytes=report.size_bytes,
+        provenance=provenance, actor_id=actor_id,
+    )
+    return GeneratedReleaseReport(existing.id, saved.revision, report, stored.object_key, True)

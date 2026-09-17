@@ -71,7 +71,7 @@ until every staging check passes.
 
 Stop staging writes and scheduled monitoring, record the failed deploy and schema,
 then restore the previous successful Render deploy. Schema `20260917_0016` is
-additive and compatible with the immediately prior application; do not downgrade
+compatible with the immediately prior application; do not downgrade
 only to roll back that application revision. If a later migration is incompatible,
 restore matched database and storage backups into a fresh isolated staging project
 before switching credentials.

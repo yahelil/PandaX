@@ -2,6 +2,7 @@ import type { AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } 
 import { sanitizeAnalyticsEvent } from "./analytics";
 import { createDemoState, DEMO_IDS } from "./fixtures";
 import { analyzeSbomWithOsv, inspectSbom, type SbomAnalysis, type SbomAnalyzer } from "./osvSbom";
+import { createReleasePdf } from "./releasePdf";
 import type { PrivacySafeAnalyticsEvent } from "./governanceApi";
 import type { AnalysisEvidenceFile } from "./releaseOperationsApi";
 import type {
@@ -914,9 +915,12 @@ export class FixtureAdapter implements DataAdapter {
     const evidence = job?.result?.evidence?.find((item) => item.sha256 === digest);
     if (!job || !evidence) throw new Error("Generated analysis document not found.");
     const product = this.state.products.find((item) => item.id === productId);
-    const findings = this.state.findings.filter((item) => item.releaseId === releaseId);
-    const content = createFixturePdf({ title: evidence.name.replaceAll("_", " ").replace(/\.pdf$/i, ""), documentId: job.id, productId, productName: product?.name, version: 1, status: "generated", completeness: "complete", format: "PDF/A-2b", generatedAt: job.updatedAt, findings });
-    return { blob: new Blob([content.buffer as ArrayBuffer], { type: "application/pdf" }), contentType: "application/pdf", filename: evidence.name };
+    const release = this.state.releases.find((item) => item.id === releaseId && item.productId === productId);
+    if (!product || !release || !evidence.name.toLowerCase().endsWith(".pdf")) throw new Error("Generated analysis document not found.");
+    const kind = evidence.name.startsWith("AnnexVII") ? "technical" : "declaration";
+    const findings = this.state.findings.filter((item) => item.productId === productId && item.releaseId === releaseId);
+    const content = createReleasePdf(kind, product, release, findings);
+    return { blob: new Blob([content.buffer as ArrayBuffer], { type: "application/pdf" }), contentType: "application/pdf", filename: evidence.name.replace(/\.pdf$/i, "-draft.pdf") };
   };
 
   generateFindingsReport = async (productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile> => {
@@ -936,6 +940,19 @@ export class FixtureAdapter implements DataAdapter {
     return { blob: new Blob([content], { type: "application/json" }), contentType: "application/json",
       filename: `actis-${releaseId}-findings-report.json` };
   };
+
+  generateSecurityPdf = async (productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile> => {
+    const release = this.state.releases.find((item) => item.id === releaseId && item.productId === productId);
+    const product = this.state.products.find((item) => item.id === productId);
+    if (!release || !product) throw new Error("Release not found.");
+    const findings = this.state.findings.filter((item) => item.productId === productId && item.releaseId === releaseId);
+    const bytes = createReleasePdf("security", product, release, findings);
+    return { blob: new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" }),
+      contentType: "application/pdf", filename: `actis-${slugify(product.name)}-${slugify(release.version)}-security-report.pdf` };
+  };
+
+  downloadReleaseEvidenceFile = (productId: EntityId, releaseId: EntityId, jobId: EntityId, digest: string): Promise<AnalysisEvidenceFile> =>
+    this.downloadAnalysisEvidence(productId, releaseId, jobId, digest);
 
   previewAnalysis = async (draft: AnalysisDraft): Promise<AnalysisPreview> => {
     await new Promise((resolve) => setTimeout(resolve, 180));

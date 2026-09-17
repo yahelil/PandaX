@@ -5,6 +5,8 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 
+from pandax.findings import findings
+
 
 def test_production_migrations_form_one_ordered_head():
     root = Path(__file__).resolve().parents[3]
@@ -81,6 +83,7 @@ def test_tenant_authorization_migration_upgrades_existing_rows(tmp_path):
                 size_bytes INTEGER NOT NULL
             )
         """))
+        findings.create(connection)
         connection.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) PRIMARY KEY)"))
         connection.execute(text("INSERT INTO alembic_version VALUES ('20260915_0010')"))
         connection.execute(text("INSERT INTO portfolio_organizations VALUES ('org-a')"))

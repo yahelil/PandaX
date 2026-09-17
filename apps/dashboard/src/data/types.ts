@@ -500,7 +500,7 @@ export interface AnalysisResult {
   componentCount: number;
   coverage: ReleaseCoverage;
   resultUrl: string;
-  evidence?: { name: string; sha256: string }[];
+  evidence?: Array<{ name: string; sha256: string }>;
 }
 
 export interface AnalysisJob {

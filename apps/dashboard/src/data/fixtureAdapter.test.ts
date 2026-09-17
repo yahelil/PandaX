@@ -46,6 +46,19 @@ describe("FixtureAdapter demo contract", () => {
     expect(state.products.find((item) => item.id === DEMO_IDS.edgeGateway)).toMatchObject({ monitoringHealth: "degraded" });
   });
 
+  it("generates a release-specific security PDF in the local demo", async () => {
+    const adapter = new FixtureAdapter(createDemoState());
+    const release = adapter.getSnapshot().releases.find((item) => item.productId === DEMO_IDS.homeHub)!;
+    const file = await adapter.generateSecurityPdf(DEMO_IDS.homeHub, release.id);
+    const content = await file.blob.text();
+    expect(file.contentType).toBe("application/pdf");
+    expect(content.startsWith("%PDF-1.4")).toBe(true);
+    expect(content).toContain("/Type /Pages");
+    expect(content).toContain("Home Hub");
+    expect(content).toContain(release.version);
+    await expect(adapter.generateSecurityPdf(DEMO_IDS.homeHub, DEMO_IDS.cameraRelease)).rejects.toThrow("Release not found");
+  });
+
   it("persists mutations and resets to deterministic fixtures", () => {
     const adapter = new FixtureAdapter(createDemoState());
     adapter.updateSettings("appearance", { theme: "dark", density: "compact" });
@@ -102,7 +115,7 @@ describe("FixtureAdapter demo contract", () => {
     expect(job && evidence).toBeTruthy();
 
     const file = await adapter.downloadAnalysisEvidence(job!.draft.productId!, job!.draft.releaseId!, job!.id, evidence!.sha256);
-    expect(file).toMatchObject({ contentType: "application/pdf", filename: evidence!.name });
+    expect(file).toMatchObject({ contentType: "application/pdf", filename: evidence!.name.replace(/\.pdf$/i, "-draft.pdf") });
     expect(await file.blob.slice(0, 5).text()).toBe("%PDF-");
   });
 

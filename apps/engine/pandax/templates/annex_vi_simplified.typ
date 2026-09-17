@@ -31,6 +31,12 @@
 
 #v(4pt)
 #line(length: 100%, stroke: 1pt + ink)
+#v(10pt)
+#block(width: 100%, fill: rgb("#fff7ed"), inset: 8pt, radius: 3pt)[
+  #text(size: 9pt, weight: "bold", fill: rgb("#9a3412"))[
+    DRAFT — NOT ISSUED. Manufacturer review and approved full declaration required.
+  ]
+]
 #v(22pt)
 
 // --- the prescribed sentence, verbatim from Annex VI ------------------------

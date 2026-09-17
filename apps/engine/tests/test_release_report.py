@@ -21,6 +21,7 @@ class Finding:
     reference_id: str = "PX-1"
     cve: str | None = "CVE-2024-0001"
     title: str = "Heap overflow"
+    description: str = "A vulnerable component is present in the release."
     component: str = "curl"
     component_version: str = "8.3.0"
     purl: str | None = "pkg:generic/curl@8.3.0"

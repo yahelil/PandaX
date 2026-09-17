@@ -91,6 +91,7 @@ function releaseOperations(job: ReleaseAnalysisJob): ReleaseOperationsApi {
     downloadEvidence: vi.fn(async () => ({ blob: new Blob(), contentType: "application/json" })),
     downloadEvidenceBundle: vi.fn(async () => ({ blob: new Blob(), contentType: "application/zip", filename: "evidence.zip" })),
     generateFindingsReport: vi.fn(async () => ({ blob: new Blob(), contentType: "application/json", filename: "findings-report.json" })),
+    generateSecurityPdf: vi.fn(async () => ({ blob: new Blob(["%PDF-1.4"], { type: "application/pdf" }), contentType: "application/pdf", filename: "security-report.pdf" })),
     getMonitoring: unsupported,
     configureMonitoring: unsupported,
     runMonitoring: unsupported,

@@ -54,6 +54,13 @@
 #line(length: 100%, stroke: 1pt + ink)
 #v(12pt)
 
+#block(width: 100%, fill: rgb("#fff7ed"), inset: 8pt, radius: 3pt)[
+  #text(size: 9pt, weight: "bold", fill: rgb("#9a3412"))[
+    DRAFT — NOT ISSUED. Manufacturer review, conformity assessment, and signature required.
+  ]
+]
+#v(10pt)
+
 #if blocked [
   #block(
     width: 100%,

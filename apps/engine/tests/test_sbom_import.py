@@ -226,13 +226,21 @@ def test_run_from_sbom_skips_syft_and_seals_original(monkeypatch, tmp_path: Path
         "compliant": True, "validator_version": dossier.pdfa.VERSION,
     })
 
-    events = list(pipeline.run_sbom(source, out_base=tmp_path / "out"))
+    events = list(pipeline.run_sbom(source, out_base=tmp_path / "out", product_metadata={
+        "product": {"name": "Industrial Sensor", "version": "2.1", "unique_id": "sensor-21", "risk_tier": "default"},
+        "manufacturer": {"legal_name": "Acme Devices"},
+    }))
     summary = next(event.data for event in events if event.kind == ev.RUN_DONE)
     run_dir = Path(summary["run_dir"])
 
     assert any(event.kind == ev.STAGE_SKIPPED and event.stage == "S1 INGEST" for event in events)
     assert (run_dir / "input" / "uploaded.json").exists()
     assert (run_dir / "sbom.cdx.json").exists()
+    dossier_data = json.loads((run_dir / "dossier.json").read_text(encoding="utf-8"))
+    assert dossier_data["product"]["name"] == "Industrial Sensor"
+    assert dossier_data["product"]["version"] == "2.1"
+    assert dossier_data["product"]["unique_id"] == "sensor-21"
+    assert dossier_data["manufacturer"]["legal_name"] == "Acme Devices"
     assert "syft" not in json.loads((run_dir / "manifest.json").read_text())["tool_versions"]
     assert summary["coverage_summary"] == {
         "completed": 1,

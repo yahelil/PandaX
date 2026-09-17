@@ -243,6 +243,20 @@ describe("release operations API", () => {
     expect(await report.blob.text()).toBe('{"findings":[]}');
   });
 
+  it("downloads the product release security PDF for the selected release", async () => {
+    const fetcher = fetchSequence(new Response("%PDF-1.7\n", {
+      status: 200,
+      headers: { "content-type": "application/pdf", "content-disposition": 'attachment; filename="security-report.pdf"' },
+    }));
+    const api = createReleaseOperationsApi({ baseUrl: "/engine", fetch: fetcher });
+    const report = await api.generateSecurityPdf(scope);
+    expect(fetcher.mock.calls[0][0]).toBe(`/engine${encodedBase}/reports/security.pdf`);
+    expect(fetcher.mock.calls[0][1]?.method).toBe("POST");
+    expect(report.filename).toBe("security-report.pdf");
+    expect(report.contentType).toBe("application/pdf");
+    expect(await report.blob.text()).toContain("%PDF-1.7");
+  });
+
   it("gets, configures, runs, and lists monitoring history", async () => {
     const healthy = { ...monitoringDto, health: "healthy", limitations: [] };
     const fetcher = fetchSequence(json(monitoringDto), json(monitoringDto), json(healthy, 201), json([monitoringEvent]));

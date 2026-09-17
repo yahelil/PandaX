@@ -2,6 +2,7 @@ import type { AdapterStatus, DataAdapter, DemoListener, WorkspaceSearchResult } 
 import { sanitizeAnalyticsEvent } from "./analytics";
 import { createDemoState, DEMO_IDS } from "./fixtures";
 import { analyzeSbomWithOsv, inspectSbom, type SbomAnalysis, type SbomAnalyzer } from "./osvSbom";
+import { createReleasePdf } from "./releasePdf";
 import type { PrivacySafeAnalyticsEvent } from "./governanceApi";
 import type { AnalysisEvidenceFile } from "./releaseOperationsApi";
 import type {
@@ -923,6 +924,20 @@ export class FixtureAdapter implements DataAdapter {
     }, null, 2);
     return { blob: new Blob([content], { type: "application/json" }), contentType: "application/json",
       filename: `actis-${releaseId}-findings-report.json` };
+  };
+
+  generateSecurityPdf = async (productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile> => {
+    const release = this.state.releases.find((item) => item.id === releaseId && item.productId === productId);
+    const product = this.state.products.find((item) => item.id === productId);
+    if (!release || !product) throw new Error("Release not found.");
+    const findings = this.state.findings.filter((item) => item.productId === productId && item.releaseId === releaseId);
+    const bytes = createReleasePdf("security", product, release, findings);
+    return { blob: new Blob([bytes.buffer as ArrayBuffer], { type: "application/pdf" }),
+      contentType: "application/pdf", filename: `actis-${slugify(product.name)}-${slugify(release.version)}-security-report.pdf` };
+  };
+
+  downloadReleaseEvidenceFile = async (): Promise<AnalysisEvidenceFile> => {
+    throw new Error("Individual analysis evidence files are available from the production engine.");
   };
 
   previewAnalysis = async (draft: AnalysisDraft): Promise<AnalysisPreview> => {

@@ -50,7 +50,7 @@ from sqlalchemy.orm import Session
 from . import events as pipeline_events
 from . import exposure, pipeline, telemetry
 from .analysis_storage import AnalysisInputStorage, AnalysisInputStorageError, MemoryAnalysisInputStorage
-from .portfolio import portfolio_metadata, products, releases
+from .portfolio import PortfolioRepository, portfolio_metadata, products, releases
 from .stages import ingest as artifact_ingest
 from .stages.sbom import SbomError, inspect_sbom
 from .organization_settings import OrganizationSettingsRepository, SettingsValidationError
@@ -311,12 +311,14 @@ def pipeline_runner(
     *,
     telemetry_path: Path | None = None,
     exposure_context_path: Path | None = None,
+    product_metadata: dict[str, Any] | None = None,
 ) -> Iterable[pipeline_events.Event]:
     """Production adapter for the existing PandaX SBOM pipeline."""
     return pipeline.run_sbom(
         path,
         telemetry_path=telemetry_path,
         exposure_context_path=exposure_context_path,
+        product_metadata=product_metadata,
     )
 
 
@@ -763,6 +765,20 @@ class AnalysisJobRepository:
                 supplemental = job.input_metadata.get("supplemental_evidence", {})
                 runtime_path = self._supplemental_path(stack, supplemental, "runtime_telemetry")
                 exposure_path = self._supplemental_path(stack, supplemental, "exposure_context")
+                runner_options: dict[str, Any] = {}
+                if runner is pipeline_runner and job.input_type != "raw_artifact":
+                    portfolio = PortfolioRepository(self.engine)
+                    product = portfolio.get_product(organization_id, product_id)
+                    release = portfolio.get_release(organization_id, release_id)
+                    runner_options["product_metadata"] = {
+                        "product": {
+                            "name": product.name,
+                            "version": release.version,
+                            "unique_id": product.identifier,
+                            "risk_tier": product.cra_class,
+                        },
+                        "manufacturer": {"legal_name": product.manufacturer},
+                    }
                 if job.input_type == "raw_artifact" and (runtime_path is not None or exposure_path is not None):
                     stream = pipeline.run(
                         input_path,
@@ -777,9 +793,10 @@ class AnalysisJobRepository:
                         input_path,
                         telemetry_path=runtime_path,
                         exposure_context_path=exposure_path,
+                        **runner_options,
                     )
                 else:
-                    stream = runner(input_path)
+                    stream = runner(input_path, **runner_options)
                 for item in stream:
                     progress = _event_progress(item, default=self.get(
                         organization_id, product_id, release_id, job_id

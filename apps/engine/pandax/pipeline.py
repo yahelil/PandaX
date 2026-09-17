@@ -75,6 +75,7 @@ def run_sbom(
     offline: bool = False,
     telemetry_path: Path | None = None,
     exposure_context_path: Path | None = None,
+    product_metadata: dict[str, Any] | None = None,
 ) -> ev.Stream:
     """Run from a supplied JSON SBOM, skipping artifact ingest and Syft."""
     yield from _run(
@@ -85,6 +86,7 @@ def run_sbom(
         offline=offline,
         telemetry_path=telemetry_path,
         exposure_context_path=exposure_context_path,
+        product_metadata=product_metadata,
     )
 
 
@@ -96,6 +98,7 @@ def _run(
     offline: bool,
     telemetry_path: Path | None,
     exposure_context_path: Path | None,
+    product_metadata: dict[str, Any] | None = None,
 ) -> ev.Stream:
     artifact = Path(artifact).resolve()
     if not artifact.exists():
@@ -142,6 +145,13 @@ def _run(
                 params={"reason": reason, "input_type": "sbom"},
             )
             yield from sbom.import_run(ctx)
+            if product_metadata:
+                ctx.product = {
+                    **ctx.product,
+                    "product": {**ctx.product.get("product", {}), **product_metadata.get("product", {})},
+                    "manufacturer": {**ctx.product.get("manufacturer", {}), **product_metadata.get("manufacturer", {})},
+                }
+                yield ev.log("RUN", "product and release identity linked from portfolio record", ev.GOOD)
 
         product = ctx.product.get("product", {})
         if product:

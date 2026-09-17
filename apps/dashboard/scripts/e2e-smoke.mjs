@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -202,6 +203,16 @@ try {
   await waitForRoute(page, `${baseUrl}/products/product-home-hub/releases/release-hub-1-8-0`, "Home Hub release");
   await assertSingleMain(page, "Release workspace");
   await assertVisible(page.getByRole("link", { name: "Analyze release" }), "release analysis action");
+  await page.getByRole("navigation", { name: "Release workspace" }).getByRole("link", { name: "Documents" }).click();
+  await assertVisible(page.getByRole("heading", { name: "Documents for Home Hub 1.8.0" }), "release documents");
+  const securityPdfDownload = page.waitForEvent("download", { timeout: 15_000 });
+  await page.getByRole("button", { name: "Download PDF", exact: true }).click();
+  const securityPdf = await securityPdfDownload;
+  if (!securityPdf.suggestedFilename().endsWith(".pdf")) throw new Error("Security report download is not a PDF.");
+  if (!(await readFile(await securityPdf.path())).subarray(0, 5).equals(Buffer.from("%PDF-"))) throw new Error("Security report is not a valid PDF file.");
+  await page.getByRole("navigation", { name: "Release workspace" }).getByRole("link", { name: "Compliance" }).click();
+  await assertVisible(page.getByRole("heading", { name: "Compliance evidence for Home Hub 1.8.0" }), "release compliance evidence");
+  await assertVisible(page.getByText("Finding decisions", { exact: true }), "finding review evidence");
   await page.getByRole("link", { name: "Analyze release" }).click();
   await waitForRoute(page, `${baseUrl}/products/product-home-hub/releases/release-hub-1-8-0/analyze`, "Analysis input");
   await assertSingleMain(page, "Analysis input");
@@ -237,7 +248,7 @@ try {
   await page.getByRole("link", { name: "CVE-2026-27102", exact: true }).first().click();
   await waitForRoute(page, `${baseUrl}/findings/finding-hub-cve-2026-27102`, "Finding detail");
   await assertSingleMain(page, "Finding detail");
-  await page.getByLabel("Decision").selectOption("affected");
+  await page.getByLabel("Decision", { exact: true }).selectOption("affected");
   await page.getByLabel("Rationale").fill("Production build evidence confirms the reachable TLS validation path is enabled.");
   await page.getByRole("button", { name: "Record decision" }).click();
   await assertVisible(page.getByText("Decision recorded in the audit history."), "finding decision confirmation");

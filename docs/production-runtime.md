@@ -212,7 +212,7 @@ removed memberships cannot be restored. Admin audit events record the verified
 subject for every mutation in an append-only, per-organization SHA-256 chain.
 
 Apply `alembic upgrade head` before deploying this version. Current head
-`20260915_0015` is additive and remains compatible with the immediately prior
+`20260917_0016` backfills finding targets and remains compatible with the immediately prior
 application; normal application rollback therefore does not downgrade schema.
 Use [the beta release runbook](beta-release.md) for the exact rollback sequence.
 

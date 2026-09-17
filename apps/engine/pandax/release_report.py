@@ -72,6 +72,7 @@ def _finding(record: Any) -> dict[str, Any]:
         "reference_id": record.reference_id,
         "cve": record.cve,
         "title": record.title,
+        "description": record.description,
         "component": record.component,
         "component_version": record.component_version,
         "purl": record.purl,
@@ -159,6 +160,9 @@ def build_release_report(
     generated_at: datetime,
     product_name: str | None = None,
     release_version: str | None = None,
+    product_identifier: str | None = None,
+    manufacturer: str | None = None,
+    cra_class: str | None = None,
 ) -> Mapping[str, Any]:
     """Assemble the report. The clock is an argument so two callers agree."""
     entries = sorted((_finding(item) for item in findings), key=_ordering)
@@ -172,6 +176,9 @@ def build_release_report(
             "product_name": product_name,
             "release_id": release_id,
             "release_version": release_version,
+            "product_identifier": product_identifier,
+            "manufacturer": manufacturer,
+            "cra_class": cra_class,
         },
         "coverage": _coverage(monitoring),
         "summary": _summary(entries),

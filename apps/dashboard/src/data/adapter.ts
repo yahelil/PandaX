@@ -107,6 +107,8 @@ export interface DataAdapter {
   selectActiveRelease(productId: EntityId, releaseId: EntityId): Promise<Product>;
   downloadReleaseReport(productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile>;
   generateFindingsReport(productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile>;
+  generateSecurityPdf(productId: EntityId, releaseId: EntityId): Promise<AnalysisEvidenceFile>;
+  downloadReleaseEvidenceFile(productId: EntityId, releaseId: EntityId, jobId: EntityId, digest: string): Promise<AnalysisEvidenceFile>;
   previewAnalysis(draft: AnalysisDraft): Promise<AnalysisPreview>;
   runAnalysis(draft: AnalysisDraft): Promise<AnalysisJob>;
   getAnalysisJob(jobId: EntityId): AnalysisJob | undefined;

@@ -55,6 +55,16 @@ def test_report_action_downloads_stored_reviewed_release_report():
     assert storage.get(revision.storage_locator, revision.content_hash) == result.content
     assert client.post(PATH).headers["x-document-revision"] == "1"
 
+    pdf_path = PATH.replace("/reports/findings", "/reports/security.pdf")
+    pdf = client.post(pdf_path)
+    assert pdf.status_code == 200, pdf.text if pdf.status_code != 200 else ""
+    assert pdf.headers["content-type"].startswith("application/pdf")
+    assert pdf.content.startswith(b"%PDF-")
+    pdf_revision = documents.get_revision("org-acme", pdf.headers["x-document-id"], 1)
+    assert pdf_revision.format == "pdf_a_2b"
+    assert storage.get(pdf_revision.storage_locator, pdf_revision.content_hash) == pdf.content
+    assert client.post(pdf_path).headers["x-document-revision"] == "1"
+
     identity["value"] = Principal("viewer", "org-acme", frozenset({Role.VIEWER}))
     assert client.post(PATH).status_code == 403
     identity["value"] = Principal("reviewer", "org-acme", frozenset({Role.SECURITY_REVIEWER}))

@@ -116,8 +116,13 @@ async def lifespan(app: FastAPI):
 
 
 def _allowed_cors_origins(value: str | None = None) -> list[str]:
+    from .portfolio_runtime import MANAGED_ENVIRONMENTS, runtime_environment
+
+    raw = value if value is not None else os.environ.get("PANDAX_CORS_ORIGINS", "")
+    if value is None and not raw and runtime_environment() not in MANAGED_ENVIRONMENTS:
+        raw = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173,http://localhost:4175,http://127.0.0.1:4175,http://localhost:3000,http://127.0.0.1:3000"
     origins: list[str] = []
-    for raw_origin in (value if value is not None else os.environ.get("PANDAX_CORS_ORIGINS", "")).split(","):
+    for raw_origin in raw.split(","):
         origin = raw_origin.strip().rstrip("/")
         if not origin:
             continue

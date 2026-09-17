@@ -564,6 +564,7 @@ export class FixtureAdapter implements DataAdapter {
       });
       if (input.decision === "not_affected") {
         state.actions.filter((item) => item.targetUrl.endsWith(finding.id)).forEach((item) => { item.status = "completed"; });
+        this.syncDocumentStatusAfterResolution(state, finding.productId, finding.releaseId);
       }
       updated = structuredClone(finding);
     });
@@ -604,6 +605,7 @@ export class FixtureAdapter implements DataAdapter {
       finding.updatedAt = now();
       if (input.status === "verified") {
         state.actions.filter((item) => item.targetUrl.endsWith(finding.id)).forEach((item) => { item.status = "completed"; });
+        this.syncDocumentStatusAfterResolution(state, finding.productId, finding.releaseId);
       }
       updated = structuredClone(finding);
     });
@@ -1261,11 +1263,154 @@ export class FixtureAdapter implements DataAdapter {
           state.findings = state.findings.filter((finding) => finding.releaseId !== releaseId || !finding.id.startsWith(`finding-${releaseId}-`));
           state.findings.push(...analyzed.findings);
         }
+
+        const findingsForRelease = state.findings.filter((item) => item.releaseId === releaseId);
+        const unresolved = findingsForRelease.filter((item) => item.status !== "resolved");
+        const docStatus: DocumentRecord["status"] = unresolved.length === 0 ? "approval_required" : "draft";
+
+        const docId = `document-${release.id}-doc`;
+        const annexId = `document-${release.id}-annex-vii`;
+        const hasDoc = state.documents.some((item) => item.id === docId || (item.releaseId === release.id && item.type === "conformity"));
+        const hasAnnex = state.documents.some((item) => item.id === annexId || (item.releaseId === release.id && item.type === "cra_reporting_pack"));
+
+        if (!hasDoc) {
+          const docRecord: DocumentRecord = {
+            id: docId,
+            productId: release.productId,
+            releaseId: release.id,
+            name: `EU Declaration of Conformity — ${product?.name || "Product"} ${release.version}`,
+            type: "conformity",
+            format: "PDF/A-2b",
+            version: 1,
+            status: docStatus,
+            completeness: "complete",
+            updatedAt: completedAt,
+            updatedBy: state.currentUserId,
+            audit: [
+              {
+                id: `audit-${release.id}-doc-1`,
+                action: "generated",
+                actorId: state.currentUserId,
+                at: completedAt,
+                detail: "Generated automatically from completed SBOM analysis.",
+              },
+            ],
+            revisions: [
+              {
+                version: 1,
+                format: "PDF/A-2b",
+                status: docStatus,
+                completeness: "complete",
+                updatedAt: completedAt,
+                updatedBy: state.currentUserId,
+                sizeBytes: 15420,
+              },
+            ],
+          };
+          docRecord.sizeBytes = this.generateDocumentBlob(docRecord, 1, "PDF/A-2b").size;
+          if (docRecord.revisions?.[0]) docRecord.revisions[0].sizeBytes = docRecord.sizeBytes;
+          state.documents.push(docRecord);
+        }
+
+        if (!hasAnnex) {
+          const annexRecord: DocumentRecord = {
+            id: annexId,
+            productId: release.productId,
+            releaseId: release.id,
+            name: `Annex VII Technical Documentation — ${product?.name || "Product"} ${release.version}`,
+            type: "cra_reporting_pack",
+            format: "PDF/A-2b",
+            version: 1,
+            status: docStatus,
+            completeness: "complete",
+            updatedAt: completedAt,
+            updatedBy: state.currentUserId,
+            audit: [
+              {
+                id: `audit-${release.id}-annex-vii-1`,
+                action: "generated",
+                actorId: state.currentUserId,
+                at: completedAt,
+                detail: "Generated automatically from completed SBOM analysis.",
+              },
+            ],
+            revisions: [
+              {
+                version: 1,
+                format: "PDF/A-2b",
+                status: docStatus,
+                completeness: "complete",
+                updatedAt: completedAt,
+                updatedBy: state.currentUserId,
+                sizeBytes: 24800,
+              },
+            ],
+          };
+          annexRecord.sizeBytes = this.generateDocumentBlob(annexRecord, 1, "PDF/A-2b").size;
+          if (annexRecord.revisions?.[0]) annexRecord.revisions[0].sizeBytes = annexRecord.sizeBytes;
+          state.documents.push(annexRecord);
+        }
+
+        if (!hasDoc || !hasAnnex) {
+          state.activities.unshift({
+            id: `activity-doc-${release.id}`,
+            type: "document",
+            title: "Documents generated",
+            detail: `EU Declaration of Conformity and Annex VII Technical Documentation generated for ${release.version}.`,
+            productId: release.productId,
+            releaseId: release.id,
+            actorId: state.currentUserId,
+            at: completedAt,
+            targetUrl: `/documents/${docId}`,
+          });
+        }
+
         job.result = { releaseId, newFindings: analyzed?.findings.length ?? 0, changedFindings: 0, componentCount, coverage: release.coverage, resultUrl: `/products/${release.productId}/releases/${release.id}` };
         state.activities.unshift({ id: `activity-${job.id}`, type: "analysis", title: job.stage, detail: `${componentCount} components analyzed for release ${release.version}.`, productId: release.productId, releaseId: release.id, actorId: state.currentUserId, at: completedAt, targetUrl: job.result.resultUrl });
       });
     }, delay);
     this.timers.add(timer);
+  }
+
+  private syncDocumentStatusAfterResolution(state: DemoState, productId: string, releaseId?: string): void {
+    const findings = state.findings.filter((f) => f.productId === productId && (!releaseId || f.releaseId === releaseId));
+    const hasUnresolved = findings.some((f) => f.status !== "resolved");
+    if (hasUnresolved) return;
+
+    const targetDocs = state.documents.filter(
+      (d) => d.productId === productId && (!releaseId || d.releaseId === releaseId) && d.status === "draft"
+    );
+    for (const doc of targetDocs) {
+      doc.status = "approval_required";
+      if (doc.revisions) {
+        const rev = doc.revisions.find((r) => r.version === doc.version);
+        if (rev) rev.status = "approval_required";
+      }
+      doc.audit.unshift({
+        id: `audit-${doc.id}-approved-${now()}`,
+        action: "approval_requested",
+        actorId: state.currentUserId,
+        at: now(),
+        detail: "All security findings remediated; ready for conformity approval.",
+      });
+      const actionId = `action-approval-${doc.id}`;
+      if (!state.actions.some((a) => a.id === actionId)) {
+        state.actions.unshift({
+          id: actionId,
+          type: "approval",
+          priority: "urgent",
+          title: `Approve ${doc.name}`,
+          reason: "Security findings remediated; document is ready for authorized approval.",
+          productId: doc.productId,
+          releaseId: doc.releaseId,
+          dueAt: new Date(Date.now() + 86400000).toISOString(),
+          ownerId: state.currentUserId,
+          status: "open",
+          targetUrl: `/documents/${doc.id}`,
+          updatedAt: now(),
+        });
+      }
+    }
   }
 
   private requireFinding(state: DemoState, findingId: string): Finding {

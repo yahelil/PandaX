@@ -20,7 +20,8 @@ const root = createRoot(document.getElementById('root')!)
 
 try {
   const config = readRuntimeConfig(import.meta.env)
-  const authClient = config.mode === 'production' ? new BrowserOidcClient({
+  const isProd = config.mode === 'production'
+  const authClient = isProd ? new BrowserOidcClient({
     ...config.oidc,
     apiUrl: config.apiUrl,
     organizationId: config.organizationId,
@@ -29,7 +30,7 @@ try {
     mode: 'production',
     apiUrl: config.apiUrl,
     organizationId: config.organizationId,
-    getBearerToken: () => authClient!.getAccessToken(),
+    getBearerToken: () => isProd ? authClient!.getAccessToken() : Promise.resolve('dev-token'),
   })
   root.render(<RuntimeRoot config={config} authClient={authClient} dataAdapter={dataAdapter} />)
 } catch (error) {

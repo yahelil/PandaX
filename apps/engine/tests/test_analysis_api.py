@@ -341,6 +341,64 @@ def test_completed_analysis_projects_reachability_recommendations(monkeypatch):
     assert projected.provenance["bom_ref"] == "component-example"
 
 
+def test_completed_analysis_enrolls_regulatory_documents(monkeypatch):
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as bundle:
+        bundle.writestr("findings.json", json.dumps([]))
+        bundle.writestr("EU_Declaration_of_Conformity.pdf", b"%PDF-1.4 mock DoC")
+        bundle.writestr("AnnexVII_Technical_Documentation.pdf", b"%PDF-1.4 mock Annex VII")
+        bundle.writestr(
+            "dossier.json",
+            json.dumps({"summary": {"derived": 5, "attested": 3, "required_input": 0}}),
+        )
+
+    storage = Mock()
+    storage.put_document.side_effect = lambda org_id, scope_id, content, suffix: SimpleNamespace(
+        key=f"documents/{org_id}/{scope_id}{suffix}",
+        digest=hashlib.sha256(content).hexdigest(),
+        size_bytes=len(content),
+    )
+    analysis = Mock()
+    analysis.export_evidence.return_value = (output.getvalue(), "evidence.zip")
+    analysis.storage = storage
+
+    doc_repo = Mock()
+    doc_repo.list_documents.return_value = []
+    finding_repo = Mock()
+    portfolio = Mock()
+    portfolio.get_release.return_value = SimpleNamespace(status="retired")
+
+    monkeypatch.setattr(portfolio_runtime, "get_analysis_repository", lambda: analysis)
+    monkeypatch.setattr(portfolio_runtime, "get_document_repository", lambda: doc_repo)
+    monkeypatch.setattr(portfolio_runtime, "get_finding_repository", lambda: finding_repo)
+    monkeypatch.setattr(portfolio_runtime, "get_portfolio_repository", lambda: portfolio)
+
+    job = SimpleNamespace(
+        id="analysis-doc-test",
+        organization_id="org-acme",
+        product_id="product-device",
+        release_id="release-1",
+        actor_id="operator-1",
+        completed_at=None,
+        result={"bundle": {"id": "bundle-1"}},
+    )
+
+    enroll_completed_analysis(job)
+
+    assert doc_repo.create_document.call_count == 2
+    calls = doc_repo.create_document.call_args_list
+
+    created_names = {call.kwargs["name"] for call in calls}
+    assert created_names == {"EU Declaration of Conformity", "Annex VII Technical Documentation"}
+
+    doc_call = next(call for call in calls if call.kwargs["name"] == "EU Declaration of Conformity")
+    assert doc_call.kwargs["kind"] == "conformity"
+    assert doc_call.kwargs["format"] == "pdf_a_2b"
+    assert doc_call.kwargs["size_bytes"] == len(b"%PDF-1.4 mock DoC")
+    assert doc_call.kwargs["provenance"]["completeness"] == "complete"
+    assert doc_call.kwargs["provenance"]["analysis_job_id"] == "analysis-doc-test"
+
+
 def test_monitoring_enrollment_failure_keeps_analysis_complete_and_records_follow_up(setup):
     def unavailable_monitoring(_job):
         raise RuntimeError("monitoring database unavailable")

@@ -20,6 +20,11 @@ const jwt = (claims: Record<string, unknown>) => [
 describe("runtime authentication", () => {
   it("requires an explicit runtime mode and fails closed in production", () => {
     expect(readRuntimeConfig({ VITE_ACTIS_MODE: "demo" }, "https://actis.example")).toEqual({ mode: "demo" });
+    expect(readRuntimeConfig({ VITE_ACTIS_MODE: "connected" }, "https://actis.example")).toEqual({
+      mode: "connected",
+      apiUrl: "http://127.0.0.1:8000",
+      organizationId: "org-acme-devices",
+    });
     expect(() => readRuntimeConfig({}, "https://actis.example")).toThrow(/explicitly set/);
     expect(() => readRuntimeConfig({ VITE_ACTIS_MODE: "production" }, "https://actis.example")).toThrow(/VITE_ACTIS_API_URL/);
     expect(readRuntimeConfig({

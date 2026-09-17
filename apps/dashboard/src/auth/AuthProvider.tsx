@@ -4,7 +4,7 @@ import type { AuthClient, AuthSession, AuthUser } from "./oidcClient";
 type AuthStatus = "loading" | "authenticated" | "unauthenticated" | "error";
 
 interface AuthContextValue {
-  mode: "demo" | "production";
+  mode: "demo" | "connected" | "production";
   status: AuthStatus;
   user?: AuthUser;
   error?: string;
@@ -12,15 +12,33 @@ interface AuthContextValue {
   logout(): Promise<void>;
 }
 
+const LOCAL_DEV_USER: AuthUser = {
+  subject: "member-jane-doe",
+  email: "jane@example.com",
+  name: "Jane Doe",
+  initials: "JD",
+  roles: ["org_admin", "compliance_operator", "authorized_approver", "auditor"],
+  organizationId: "org-acme-devices",
+};
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ mode, client, children }: PropsWithChildren<{ mode: "demo" | "production"; client?: AuthClient }>) {
-  const [session, setSession] = useState<AuthSession | null>(null);
-  const [status, setStatus] = useState<AuthStatus>(mode === "demo" ? "authenticated" : "loading");
+export function AuthProvider({ mode, client, children }: PropsWithChildren<{ mode: "demo" | "connected" | "production"; client?: AuthClient }>) {
+  const isLocalOrDemo = mode === "demo" || mode === "connected";
+  const [session, setSession] = useState<AuthSession | null>(
+    mode === "connected"
+      ? {
+          user: LOCAL_DEV_USER,
+          accessToken: "dev-token",
+          expiresAt: Date.now() + 86400000,
+        }
+      : null
+  );
+  const [status, setStatus] = useState<AuthStatus>(isLocalOrDemo ? "authenticated" : "loading");
   const [error, setError] = useState<string>();
 
   useEffect(() => {
-    if (mode === "demo") return;
+    if (mode === "demo" || mode === "connected") return;
     if (!client) {
       setStatus("error");
       setError("Production authentication is not configured.");

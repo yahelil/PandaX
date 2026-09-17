@@ -17,7 +17,7 @@ const LOCAL_DEV_USER: AuthUser = {
   email: "jane@example.com",
   name: "Jane Doe",
   initials: "JD",
-  roles: ["org_admin", "compliance_operator", "authorized_approver", "auditor"],
+  roles: ["org_admin", "compliance_operator", "authorized_approver", "read_only_auditor"],
   organizationId: "org-acme-devices",
 };
 

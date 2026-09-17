@@ -275,6 +275,7 @@ describe("FixtureAdapter demo contract", () => {
       description: "Test device",
       craClass: "default",
       classificationStatus: "confirmed",
+      supportUntil: "2028-09-17",
       ownerId: DEMO_IDS.jane,
     });
     const release = await adapter.createRelease({

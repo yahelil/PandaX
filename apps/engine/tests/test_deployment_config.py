@@ -33,7 +33,7 @@ def test_render_blueprint_defines_isolated_free_services():
         assert service["runtime"] == "docker"
         assert service["plan"] == "free"
         assert service["region"] == "frankfurt"
-        assert service["healthCheckPath"] == "/health/ready"
+        assert service["healthCheckPath"] == "/health/live"
         assert service["autoDeployTrigger"] == "off"
         assert "disk" not in service
 

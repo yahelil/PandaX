@@ -7,8 +7,9 @@ signing material, or credentials in beta.
 
 `render.yaml` is the only Render service definition. It declares the isolated
 staging and beta services, disables automatic deploys, uses Frankfurt Free Docker
-instances without disks, and checks `/health/ready`. Do not create a manual
-service or enable a paid pre-deploy command.
+instances without disks, and uses `/health/live` for Render restarts. Startup
+checks the required dependencies; the release gate still verifies `/health/ready`.
+Do not create a manual service or enable a paid pre-deploy command.
 
 ## Controlled staging release
 

@@ -815,17 +815,20 @@ export class ProductionAdapter implements DataAdapter {
     return job.status === "completed" || job.status === "failed" || job.status === "unsupported";
   }
 
-  private pollAnalysis(scope: ReleaseScope, draft: AnalysisDraft, jobId: string): void {
+  private pollAnalysis(scope: ReleaseScope, draft: AnalysisDraft, jobId: string, failures = 0): void {
+    const delay = failures === 0 ? 800 : Math.min(30_000, 1_000 * 2 ** Math.min(failures - 1, 5));
     this.analysisTimers.set(jobId, setTimeout(() => {
       void this.config.releaseOperationsApi!.getAnalysisJob(scope, jobId).then((job) => {
         this.fixture.upsertAnalysisJob(mapAnalysisJob(job, draft));
+        if (this.status.failure?.operation === "run_analysis") this.markReady();
         if (this.isTerminalAnalysis(job)) { this.analysisTimers.delete(jobId); setTimeout(() => { void this.refresh(); }, 250); }
         else this.pollAnalysis(scope, draft, jobId);
       }).catch((error) => {
         this.analysisTimers.delete(jobId);
         this.markFailed("run_analysis", error);
+        this.pollAnalysis(scope, draft, jobId, failures + 1);
       });
-    }, 800));
+    }, delay));
   }
 
   private async decideDocument(documentId: string, decision: "approve" | "reject", comment?: string): Promise<DocumentRecord> {

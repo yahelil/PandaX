@@ -493,6 +493,39 @@ describe("ProductionAdapter", () => {
     }
   });
 
+  it("retries a temporary status outage and shows the job's actual failure", async () => {
+    vi.useFakeTimers();
+    try {
+      const running: ReleaseAnalysisJob = {
+        id: "analysis-interrupted", organizationId: organization.id, productId: product.id, releaseId: release.id, inputType: "sbom",
+        filename: "live.cdx.json", mediaType: "application/json", sizeBytes: 2, sha256: "d".repeat(64),
+        preview: { format: "CycloneDX", version: "1.6", components: 1, matchableComponents: 1, skippedComponents: 0, product: {} },
+        inputMetadata: {}, status: "running", stage: "S6 DOSSIER", progress: 70,
+        createdAt: "2026-09-14T08:00:00Z", updatedAt: "2026-09-14T08:00:30Z", startedAt: "2026-09-14T08:00:01Z",
+      };
+      const failed: ReleaseAnalysisJob = { ...running, status: "failed", error: "Dossier not sealed: PDF validation failed", updatedAt: "2026-09-14T08:01:00Z" };
+      const releaseApi = releaseOperations(running);
+      let latest = running;
+      releaseApi.listAnalysisJobs = vi.fn(async () => [latest]);
+      releaseApi.getAnalysisJob = vi.fn()
+        .mockRejectedValueOnce(new ReleaseOperationsApiError("Operations service unavailable", "network"))
+        .mockImplementationOnce(async () => { latest = failed; return failed; });
+      const adapter = new ProductionAdapter({ organizationId: organization.id, portfolioApi: api(), releaseOperationsApi: releaseApi, fixtureAdapter: new FixtureAdapter(createDemoState()) });
+
+      await adapter.initialize();
+      await vi.advanceTimersByTimeAsync(801);
+      expect(adapter.getStatusSnapshot()).toMatchObject({ phase: "error", failure: { operation: "run_analysis" } });
+      expect(adapter.getAnalysisJob(running.id)).toMatchObject({ status: "analyzing", progress: 70 });
+
+      await vi.advanceTimersByTimeAsync(1001);
+      expect(adapter.getAnalysisJob(running.id)).toMatchObject({ status: "failed", error: failed.error });
+      expect(adapter.getStatusSnapshot()).toMatchObject({ phase: "ready" });
+      expect(releaseApi.getAnalysisJob).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("loads and runs persisted release monitoring with event history", async () => {
     const monitoring: ReleaseMonitoringStatus = {
       organizationId: organization.id, productId: product.id, releaseId: release.id,

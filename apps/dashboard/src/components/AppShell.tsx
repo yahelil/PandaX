@@ -9,6 +9,7 @@ export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const location = useLocation()
   const { adapterStatus, actions } = useDemo()
+  const awaitingFirstLoad = adapterStatus.mode === 'production' && !adapterStatus.lastSyncedAt
   const lastTrackedPath = useRef('')
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const mountedPath = useRef(false)
@@ -57,9 +58,13 @@ export function AppShell() {
               <button type="button" className="text-button" onClick={() => setBannerDismissed(true)} aria-label="Dismiss demo notice" style={{ marginLeft: 'auto', padding: '0 4px' }}>✕</button>
             </div>
           ) : null}
-          <Suspense fallback={<div className="adapter-status" role="status" aria-live="polite">Loading workspace…</div>}>
-            <Outlet />
-          </Suspense>
+          {awaitingFirstLoad && adapterStatus.phase === 'loading' ? (
+            <div className="adapter-status" role="status">Loading your workspace…</div>
+          ) : awaitingFirstLoad && adapterStatus.phase === 'error' ? null : (
+            <Suspense fallback={<div className="adapter-status" role="status" aria-live="polite">Loading workspace…</div>}>
+              <Outlet />
+            </Suspense>
+          )}
         </div>
       </div>
     </div>

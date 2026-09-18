@@ -41,6 +41,13 @@ The dashboard uses OIDC Authorization Code with PKCE, restores and refreshes the
 browser session, and signs out through the provider's discovery metadata. No bearer
 token belongs in a `VITE_*` variable: Vite embeds those values in public browser
 assets. Missing production configuration fails closed and never loads fixture data.
+Builds without an explicit mode show a configuration error instead of silently
+connecting to a local API. For a deployed dashboard, verify the host builds the
+intended branch with the production variables above; a browser build cannot pick
+up changed `VITE_*` values until it is rebuilt and published. If products vanish
+after an update, compare the dashboard's organization ID and API URL with the
+API's product list for that organization. The dashboard now keeps previously
+loaded products visible and reports an unexpected missing product response.
 
 The production adapter hydrates organization, products, releases, Home operations,
 findings, compliance, documents, team, integrations, and settings from `/v1`.

@@ -4,9 +4,10 @@ import { createFindingsApi, FindingApiError, type FindingsApi, type ManagedFindi
 import { createGovernanceApi, GovernanceApiError, mapCompliance, mapGovernanceSettings, mapIntegration, mapTeamMember, type ComplianceDto, type DocumentDetailDto, type DocumentFormat, type DocumentRevisionDto, type GovernanceApi, type PrivacySafeAnalyticsEvent } from "./governanceApi";
 import { createOperationsApi, OperationsApiError, type OperationsApi, type OperationsHome, type OperationsNotification, type OperationsSearchResult } from "./operationsApi";
 import { FixtureAdapter } from "./fixtureAdapter";
+import { createDemoState } from "./fixtures";
 import { createPortfolioApi, PortfolioApiError, type PortfolioApi } from "./portfolioApi";
 import { createReleaseOperationsApi, ReleaseOperationsApiError, type AnalysisEvidenceFile, type MonitoringRunEvent, type ReleaseAnalysisJob, type ReleaseMonitoringStatus, type ReleaseOperationsApi, type ReleaseScope } from "./releaseOperationsApi";
-import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, ComplianceApprovalCommand, ComplianceItem, ComplianceUpdateCommand, CreateProductInput, CreateReleaseInput, DocumentAuditEntry, DocumentDownloadFile, DocumentDownloadMetadata, DocumentRecord, DocumentRevision, EntityId, Finding, FindingBatchDecisionInput, FindingDecisionInput, Integration, IntegrationUpdate, Notification, Organization, OrganizationProfileUpdate, Product, RecordDocumentSelfFilingInput, RegisterDocumentRevisionInput, Release, ReleaseMonitoringView, Remediation, RemediationInput, TeamMember, TeamMemberUpdate } from "./types";
+import type { Activity, AnalysisDraft, AnalysisJob, AnalysisPreview, AppSettings, Approval, ComplianceApprovalCommand, ComplianceItem, ComplianceUpdateCommand, CreateProductInput, CreateReleaseInput, DemoState, DocumentAuditEntry, DocumentDownloadFile, DocumentDownloadMetadata, DocumentRecord, DocumentRevision, EntityId, Finding, FindingBatchDecisionInput, FindingDecisionInput, Integration, IntegrationUpdate, Notification, Organization, OrganizationProfileUpdate, Product, RecordDocumentSelfFilingInput, RegisterDocumentRevisionInput, Release, ReleaseMonitoringView, Remediation, RemediationInput, TeamMember, TeamMemberUpdate } from "./types";
 
 export type BearerTokenProvider = () => string | undefined | Promise<string | undefined>;
 
@@ -26,6 +27,18 @@ export interface RuntimePortfolioConfig {
   organizationId?: string;
   getBearerToken?: BearerTokenProvider;
   fetch?: typeof globalThis.fetch;
+}
+
+function emptyProductionState(organizationId: string): DemoState {
+  const defaults = createDemoState();
+  return {
+    ...defaults,
+    organization: { id: organizationId, name: "Workspace", legalName: "", country: "", registrationNumber: "", defaultTimezone: "UTC" },
+    currentUserId: "",
+    members: [], integrations: [], products: [], releases: [], findings: [], evidence: [], actions: [],
+    complianceItems: [], cases: [], approvals: [], documents: [], activities: [], notifications: [], analysisJobs: [],
+    settings: { ...defaults.settings, analytics: { ...defaults.settings.analytics, enabled: false } },
+  };
 }
 
 function failure(operation: AdapterOperation, error: unknown): AdapterFailure {
@@ -248,9 +261,10 @@ export class ProductionAdapter implements DataAdapter {
   private analyticsConsent?: boolean;
   private status: AdapterStatus = { mode: "production", phase: "loading" };
   private refreshRevision = 0;
+  private portfolioHydrated = false;
 
   constructor(private readonly config: ProductionAdapterConfig) {
-    this.fixture = config.fixtureAdapter ?? new FixtureAdapter(undefined, false);
+    this.fixture = config.fixtureAdapter ?? new FixtureAdapter(emptyProductionState(config.organizationId), false);
     this.fixture.subscribe(() => this.dataListeners.forEach((listener) => listener()));
   }
 
@@ -260,7 +274,7 @@ export class ProductionAdapter implements DataAdapter {
   subscribeStatus = (listener: DemoListener) => { this.statusListeners.add(listener); return () => this.statusListeners.delete(listener); };
   initialize = async (options?: { signal?: AbortSignal }) => this.load("initialize", options);
   refresh = async (options?: { signal?: AbortSignal }) => this.load("refresh", options);
-  reset = () => { this.analysisTimers.forEach(clearTimeout); this.analysisTimers.clear(); this.uploadedAnalysis.clear(); this.analysisIdempotencyKeys.clear(); this.analyticsConsent = undefined; this.fixture.reset(); void this.refresh(); };
+  reset = () => { this.analysisTimers.forEach(clearTimeout); this.analysisTimers.clear(); this.uploadedAnalysis.clear(); this.analysisIdempotencyKeys.clear(); this.analyticsConsent = undefined; void this.refresh(); };
 
   search = async (query: string, options?: { signal?: AbortSignal }): Promise<WorkspaceSearchResult[]> => {
     if (!this.config.operationsApi) return this.fixture.search(query);
@@ -664,9 +678,19 @@ export class ProductionAdapter implements DataAdapter {
       const operations = this.config.operationsApi ? Promise.all([this.config.operationsApi.getHome(this.config.organizationId, { signal: options?.signal }), this.config.operationsApi.listNotifications(this.config.organizationId, { view: "unread_action", signal: options?.signal })]) : undefined;
       const findingList = this.config.findingsApi ? this.config.findingsApi.listFindings(this.config.organizationId, { view: "all" }, options) : undefined;
       const governance = this.config.governanceApi ? Promise.all([this.config.governanceApi.listCompliance(this.config.organizationId, { view: "all" }, options), this.config.governanceApi.listDocuments(this.config.organizationId, {}, options), this.config.governanceApi.getSettings(this.config.organizationId, options), this.config.governanceApi.listTeam(this.config.organizationId, options), this.config.governanceApi.listIntegrations(this.config.organizationId, options)]).then(async ([compliance, documents, settings, members, integrations]) => ({ compliance, settings, members, integrations, documentDetails: await Promise.all(documents.map((document) => this.config.governanceApi!.getDocument(this.config.organizationId, document.id, options))) })) : undefined;
-      const [portfolioState, operationsState, findingsState, governanceState] = await Promise.all([portfolio, operations, findingList, governance]);
+      const ancillary = Promise.allSettled([operations, findingList, governance]);
+      const portfolioState = await portfolio;
       if (revision !== this.refreshRevision) return;
+      const receivedProductIds = new Set(portfolioState.products.map((item) => item.id));
+      const missingProducts = this.portfolioHydrated
+        ? this.getSnapshot().products.filter((item) => !receivedProductIds.has(item.id))
+        : [];
+      if (missingProducts.length) {
+        throw new PortfolioApiError(`The product service omitted ${missingProducts.length} existing product${missingProducts.length === 1 ? "" : "s"}. Existing data remains visible; check the deployment's API and organization settings before retrying.`, "invalid_response");
+      }
       this.fixture.replacePortfolio(portfolioState.organization, portfolioState.products, portfolioState.releases);
+      this.portfolioHydrated = true;
+      this.setStatus({ mode: "production", phase: "loading", lastSyncedAt: new Date().toISOString() });
       if (this.config.releaseOperationsApi) {
         const jobs = portfolioState.analysisJobs.map((job) => mapAnalysisJob(job, this.draftForJob(job, portfolioState.releases)));
         this.fixture.replaceAnalysisJobs(jobs);
@@ -674,7 +698,10 @@ export class ProductionAdapter implements DataAdapter {
           if (!this.analysisTimers.has(job.id)) this.pollAnalysis(this.analysisScope(this.draftForJob(job, portfolioState.releases) as AnalysisDraft & { releaseId: string }), this.draftForJob(job, portfolioState.releases), job.id);
         });
       }
-      if (operationsState) {
+      const [operationsResult, findingsResult, governanceResult] = await ancillary;
+      if (revision !== this.refreshRevision) return;
+      if (operationsResult.status === "fulfilled" && operationsResult.value) {
+        const operationsState = operationsResult.value;
         const [home, notifications] = operationsState;
         this.fixture.replaceOperationalState(
           home.actionQueue.map(mapAction),
@@ -683,11 +710,13 @@ export class ProductionAdapter implements DataAdapter {
           { generatedAt: home.generatedAt, monitoring: home.monitoring, counters: home.counters, dataWarnings: home.dataWarnings },
         );
       }
-      if (findingsState) {
+      if (findingsResult.status === "fulfilled" && findingsResult.value) {
+        const findingsState = findingsResult.value;
         findingsState.forEach((finding) => this.findingDetails.set(finding.id, finding));
         this.fixture.replaceFindings(findingsState);
       }
-      if (governanceState) {
+      if (governanceResult.status === "fulfilled" && governanceResult.value) {
+        const governanceState = governanceResult.value;
         this.settingsVersion = governanceState.settings.version;
         this.analyticsConsent = governanceState.settings.analytics.enabled;
         governanceState.documentDetails.forEach((detail) => this.documentDetails.set(detail.document.id, detail));
@@ -700,7 +729,9 @@ export class ProductionAdapter implements DataAdapter {
         );
         this.fixture.replaceOrganization(mapGovernanceSettings(governanceState.settings).organization);
       }
-      this.markReady();
+      const rejected = [operationsResult, findingsResult, governanceResult].find((result) => result.status === "rejected");
+      if (rejected?.status === "rejected") this.markFailed(operation, rejected.reason);
+      else this.markReady();
     } catch (error) {
       if (revision === this.refreshRevision) this.markFailed(operation, error);
     }

@@ -302,6 +302,11 @@ try {
   await assertSingleMain(page, "Settings");
   await assertAccessibilityBasics(page, "Settings");
   await assertVisible(page.getByRole("heading", { name: "Appearance" }), "appearance settings");
+  await page.getByRole("complementary", { name: "Primary navigation" }).getByRole("link", { name: /^Products$/ }).click();
+  await waitForRoute(page, `${baseUrl}/products`, "Products after finding changes");
+  await assertVisible(page.getByRole("link", { name: "Unsupported SBOM example", exact: true }), "new product after finding changes");
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await assertVisible(page.getByRole("link", { name: "Unsupported SBOM example", exact: true }), "new product after reload");
   if (browserErrors.length) {
     throw new Error(`Browser emitted errors:\n${browserErrors.join("\n")}`);
   }

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createDemoState } from "./fixtures";
 import { FixtureAdapter } from "./fixtureAdapter";
-import type { FindingsApi } from "./findingsApi";
+import type { FindingsApi, ManagedFinding } from "./findingsApi";
 import type { PortfolioApi } from "./portfolioApi";
 import { PortfolioApiError } from "./portfolioApi";
 import type { OperationsApi } from "./operationsApi";
@@ -103,6 +103,73 @@ describe("ProductionAdapter", () => {
   it("keeps identical fixture mode unless every runtime setting exists", () => {
     expect(createRuntimeDataAdapter({ mode: "demo" }).getStatusSnapshot()).toEqual({ mode: "fixture", phase: "ready" });
     expect(() => createRuntimeDataAdapter({ mode: "production", apiUrl: "/api", organizationId: "organization-live" })).toThrow(/authenticated token provider/);
+  });
+
+  it("does not show demo products or browser-persisted demo data while the live workspace loads", async () => {
+    const pending = deferred<Product[]>();
+    const adapter = new ProductionAdapter({ organizationId: organization.id, portfolioApi: api({ listProducts: vi.fn(() => pending.promise) }) });
+    expect(adapter.getSnapshot()).toMatchObject({ products: [], releases: [], findings: [], documents: [] });
+    expect(adapter.getSnapshot().organization.id).toBe(organization.id);
+
+    const loading = adapter.initialize();
+    expect(adapter.getStatusSnapshot()).toMatchObject({ mode: "production", phase: "loading" });
+    pending.resolve([product]);
+    await loading;
+
+    expect(adapter.getSnapshot()).toMatchObject({ organization, products: [product], releases: [release] });
+    expect(adapter.getStatusSnapshot()).toMatchObject({ phase: "ready" });
+  });
+
+  it("shows a load error without exposing demo products when the live API is unavailable", async () => {
+    const adapter = new ProductionAdapter({
+      organizationId: organization.id,
+      portfolioApi: api({ listProducts: vi.fn(async () => { throw new PortfolioApiError("Portfolio unavailable", "network"); }) }),
+    });
+
+    await adapter.initialize();
+
+    expect(adapter.getSnapshot().products).toEqual([]);
+    expect(adapter.getStatusSnapshot()).toMatchObject({ phase: "error", failure: { message: "Portfolio unavailable" } });
+  });
+
+  it("keeps real products visible if another dashboard service fails", async () => {
+    const findingsApi = { listFindings: vi.fn(async () => { throw new Error("Findings service unavailable"); }) } as unknown as FindingsApi;
+    const adapter = new ProductionAdapter({ organizationId: organization.id, portfolioApi: api(), findingsApi });
+
+    await adapter.initialize();
+
+    expect(adapter.getSnapshot().products).toEqual([product]);
+    expect(adapter.getSnapshot().releases).toEqual([release]);
+    expect(adapter.getStatusSnapshot()).toMatchObject({ phase: "error", failure: { message: "Findings service unavailable" } });
+  });
+
+  it("preserves loaded products when a refresh unexpectedly returns no products", async () => {
+    const listProducts = vi.fn().mockResolvedValueOnce([product]).mockResolvedValueOnce([]);
+    const adapter = new ProductionAdapter({ organizationId: organization.id, portfolioApi: api({ listProducts }) });
+    await adapter.initialize();
+
+    await adapter.refresh();
+
+    expect(adapter.getSnapshot().products).toEqual([product]);
+    expect(adapter.getSnapshot().releases).toEqual([release]);
+    expect(adapter.getStatusSnapshot()).toMatchObject({ phase: "error", failure: { operation: "refresh", message: expect.stringContaining("omitted 1 existing product") } });
+  });
+
+  it("keeps the portfolio while a finding decision is saved", async () => {
+    const finding = { ...createDemoState().findings[0], productId: product.id, releaseId: release.id, version: 1 } as ManagedFinding;
+    const updated = { ...finding, status: "action_required" as const, version: 2 };
+    const findingsApi = {
+      listFindings: vi.fn(async () => [finding]),
+      recordDecision: vi.fn(async () => updated),
+    } as unknown as FindingsApi;
+    const adapter = new ProductionAdapter({ organizationId: organization.id, portfolioApi: api(), findingsApi });
+    await adapter.initialize();
+
+    await adapter.recordFindingDecision({ findingId: finding.id, decision: "affected", rationale: "Confirmed from release evidence." });
+
+    expect(adapter.getSnapshot().products).toEqual([product]);
+    expect(adapter.getSnapshot().findings).toMatchObject([{ id: finding.id, status: "action_required" }]);
+    expect(adapter.getStatusSnapshot()).toMatchObject({ phase: "ready" });
   });
 
   it("hydrates portfolio atomically while preserving not-yet-migrated domains", async () => {

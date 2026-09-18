@@ -1,41 +1,66 @@
-# Actis by PandaX
+# 🐼 Actis by PandaX
+### Automated, Verifiable EU Cyber Resilience Act (CRA) Compliance
 
-Actis turns a product artifact or JSON SBOM into a signed, independently verifiable EU Cyber Resilience Act evidence bundle. It inventories software, checks vulnerability sources, records triage and reporting clocks, and produces reviewable documents. It does not submit reports on a manufacturer’s behalf.
+Actis turns your software builds and SBOMs into **signed, tamper-evident CRA evidence bundles**—ready for auditors, regulators, and customers.
 
-Private-beta behavior is bounded by the [scope and acceptance gates](docs/private-beta-scope.md). Provider ownership, access, and billing follow the [zero-cost delivery policy](docs/private-beta-delivery.md).
+[**Explore the Website (pandax.online)**](https://pandax.online) · [**Launch Live Cloud Dashboard (actis.pandax.online)**](https://actis.pandax.online) · [**Read the Tech Guide**](docs/technical-guide.md)
 
-## Get started
+---
 
-Run these commands from the repository root:
+## ⚡ What it Does
 
+- 🔍 **Identifies Real Risk:** Matches exact package URLs against OSV.dev and CISA KEV (Known Exploited Vulnerabilities).
+- ⏱️ **Statutory Reporting Clocks:** Automatically tracks mandatory CRA Article 14 deadlines (24h early warning, 72h notification, 14d report).
+- 📄 **Generates Technical Dossiers:** Produces Annex VII technical files and Annex V Declarations of Conformity.
+- 🔒 **Cryptographically Sealed:** Records every step into a SHA-256 ledger signed with Ed25519 so anyone can verify it offline.
+
+---
+
+## 🖥️ The Dashboard
+
+You can explore the live multi-product workspace at [**actis.pandax.online**](https://actis.pandax.online), or fire up the full local UI in two commands:
+
+```bash
+npm ci
+uv run actis serve
+```
+👉 Open **[http://127.0.0.1:4175](http://127.0.0.1:4175)**
+
+**What you can do in the UI:**
+- **Live Pipeline:** Drop in an artifact or SBOM and watch the scan, triage, and cryptographic sealing stream in real time.
+- **CRA Assessment Wizard:** Walk through a guided flow to classify your product’s CRA risk tier and requirements.
+- **Active Clocks:** Monitor live countdown timers for reportable vulnerabilities.
+- **One-Click Audit:** Visually inspect the Merkle hash chain and test tamper detection with a single click.
+
+---
+
+## 🚀 Quickstart (CLI)
+
+Need quick terminal results or CI integration? Actis works with whatever you have:
+
+### If you already have an SBOM:
 ```bash
 uv sync --extra dev
 uv run actis scan-sbom fixtures/example-sbom.cdx.json
 ```
 
-To scan the SmartHub demo artifact, install the pinned Syft scanner first:
-
+### If you have a binary, JAR, or firmware ZIP:
 ```bash
-uv run python tools/bootstrap.py
+uv sync --extra dev
+uv run python tools/bootstrap.py           # First-time: downloads pinned Syft
 uv run actis scan fixtures/smarthub-sh100-v2.3.1.zip
 ```
 
-Results and caches stay in the ignored `workspace/` folder. Install dashboard dependencies with `npm ci`, then run `uv run actis serve` to open the product workspace at http://127.0.0.1:4175.
+### Check your EU market readiness:
+```bash
+uv run actis verdict
+```
+*Gives you a clean, one-screen summary of current blockers and package upgrade recommendations.*
 
-The customer-facing [Windows x64 Collector](docs/windows-collector.md) creates a
-minimized package signed by an explicitly configured customer key, previews the
-exact upload, and sends it only after approval.
+---
 
-## Find your way
+## 🛡️ Zero Compliance Theater
 
-| Folder | Contents |
-|---|---|
-| `apps/` | Engine, dashboard, verifier, and demos |
-| `docs/` | Product context, specifications, guides, and [published results](docs/published/README.md) |
-| `fixtures/` | Reproducible sample inputs and evidence fixtures |
-| `tools/` | Setup, evaluation, and review helpers |
-| `alembic/` | Database migrations |
-
-The root configuration files remain here because package managers, migrations, and the [GitHub Action](docs/github-action.md) use them directly.
-
-Read the [full technical guide](docs/technical-guide.md) for pipeline checks, limits, and architecture. The [release scenario guide](docs/release-scenarios.md), [verifier](apps/verifier/README.md), and [dashboard handoff](docs/actis-dashboard-handoff/README.md) cover their respective workflows.
+- **No Hallucinations:** Architecture diagrams, hardware photos, and test results are never fabricated. Missing items are honestly marked `MANUFACTURER INPUT REQUIRED`.
+- **No Secret Submissions:** Article 14 reports are drafted with legal citations, but never submitted to ENISA without your sign-off.
+- **Standalone Verification:** Anyone (including regulators) can verify bundles using the zero-dependency [`apps/verifier`](apps/verifier/README.md) without installing Actis.

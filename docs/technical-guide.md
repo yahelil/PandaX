@@ -52,13 +52,13 @@ uv run python tools/bootstrap.py
 uv run actis scan fixtures/smarthub-sh100-v2.3.1.zip
 ```
 
-### The Demo Fixture
-The included *SmartHub SH-100 v2.3.1* fixture includes real, known-exploited CVEs across three ecosystems:
+### SmartHub SH-100 Sample Package
+The included *SmartHub SH-100 v2.3.1* package contains real, known-exploited CVEs across three ecosystems:
 - **npm**: `jquery 3.4.0` (CVE-2020-11023)
 - **PyPI**: `pillow 8.1.0` (CVE-2023-4863)
 - **Maven**: `log4j-core 2.14.1` (CVE-2021-44228 / Log4Shell)
 
-A demo run produces 11 components, ~102 vulnerabilities, 4 KEV findings, 4 active Article 14 clocks, 2 PDF files, and a signed bundle in `workspace/runs/`.
+A test scan produces 11 components, ~102 vulnerabilities, 4 KEV findings, 4 active Article 14 clocks, 2 PDF files, and a signed bundle in `workspace/runs/`.
 
 ---
 
@@ -174,25 +174,7 @@ To remain legally sound, Actis sets clear boundaries:
 
 ---
 
-## 9. Codebase Map
-
-```text
-apps/engine/pandax/
-  ├── cli.py                     # CLI commands (scan, verify, clock, verdict)
-  ├── pipeline.py                # Sequential pipeline execution
-  ├── evidence.py                # Hash ledger and Ed25519 signing
-  ├── feeds.py                   # OSV.dev, KEV, and EPSS feed client
-  ├── stages/                    # Ingest, SBOM, Match, Triage, Clock, Dossier
-  └── templates/                 # Typst templates for Annex VII and Annex V
-apps/dashboard/                  # React + Vite web workspace
-apps/verifier/                   # Standalone offline verification tool
-fixtures/                        # Demo package and reference SBOMs
-tools/                           # Bootstrap, evaluation, and review scripts
-```
-
----
-
-## 10. Related Guides
+## 9. Related Guides
 
 - [Release Scenarios Guide](release-scenarios.md) — Pre- and post-patch comparisons
 - [Windows Collector Guide](windows-collector.md) — Minimal customer-side artifact collection

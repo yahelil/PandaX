@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    resolve: { dedupe: ['react', 'react-dom'] },
     define: {
       'import.meta.env.VITE_ACTIS_MODE': JSON.stringify(actisMode),
       'import.meta.env.VITE_ACTIS_API_URL': JSON.stringify(apiUrl),

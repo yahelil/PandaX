@@ -86,8 +86,6 @@ pnpm-debug.log*
 .worktrees/
 .local-test/
 .uv-plan-cache/
-.codex-build/
-.codex-finalizer/
 tmp/
 
 # PandaX POC
@@ -102,14 +100,12 @@ fixtures/*.zip
 evaluation/corpus/
 evaluation/results/
 
-# Presentation artifacts (kept local)
+# Presentation and video artifacts (kept local only)
 .presentation-build/
 presentation-assets/
 presentation-output/
 *.pptx
 !docs/reference/PandaX.pptx
-!docs/published/video/*.mp4
 !docs/published/presentations/*.pptx
-
-# Local neural voice model cache
-apps/showcase-video/.models/
+apps/showcase-video/
+docs/published/video/

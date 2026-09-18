@@ -101,12 +101,12 @@ question or authorize issuing either declaration.
   failed during startup because its secrets-engine socket was inaccessible;
   those tests remain unverified in this run. No factory reset was attempted.
 - Local evidence: `workspace/cache/card13-reviewed`, `workspace/cache/card13-full.xml`,
-  `workspace/cache/card13-visual-final`, `workspace/cache/card13-corpus-validation` and
-  `workspace/cache/card13-claude`. Generated PDFs and review output are kept outside Git.
+  `workspace/cache/card13-visual-final`, and `workspace/cache/card13-corpus-validation`.
+  Generated PDFs and review output are kept outside Git.
 
-- Claude Opus independently reviewed the changes twice. Addressed failure-record
-  consistency, short report paths, provenance, real junction coverage and input
-  immutability assertions; the follow-up reported **no blockers**. Existing
-  pipeline tests already cover refusing to seal on validation failure. The link
-  policy also rejects OneDrive reparse placeholders; use a regular local export
-  directory for validation.
+- Addressed failure-record consistency, short report paths, provenance, real
+  junction coverage and input immutability assertions. Existing pipeline tests
+  already cover refusing to seal on validation failure. The link policy also
+  rejects OneDrive reparse placeholders; use a regular local export directory
+  for validation.
+

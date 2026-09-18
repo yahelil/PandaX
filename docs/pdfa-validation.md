@@ -78,12 +78,3 @@ The setup script was also run against a fresh local installation directory;
 the archive digest and installed version both matched. Linux/macOS setup has
 not been exercised in this check.
 
-Claude Opus independently reviewed the implementation and reported no blockers.
-Its binary-provenance suggestion led to the runtime jar digest check above;
-executable-discovery tests, stable failure fields and an exact setup version
-check were also added. Its ledger warning was inapplicable: compiled PDFs are
-already added to outputs before validation. Its suggested PDF-mutation,
-report-size/DTD and mismatched-file checks were already covered. Raw upstream
-reports retain local paths by design, so command paths are retained as provenance
-too. The configured Fable model required credits and Sonnet timed out; the Opus
-review completed successfully.

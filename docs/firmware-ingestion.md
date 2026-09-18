@@ -159,7 +159,7 @@ References: [Docker tmpfs limits](https://docs.docker.com/engine/storage/tmpfs/)
 
 ## QA corrections — 2026-09-09
 
-Accepted Opus review findings: candidate gating without rejecting the tested
+Accepted QA review findings: candidate gating without rejecting the tested
 gzip wrapper, deprecated Windows-name API removal, explicit memory/disk
 requirements and disk preflight, both scratch filesystems checked with margins,
 retained carved chunks, UBIFS ENOSPC propagation, bounded report diagnostics,
@@ -179,6 +179,3 @@ Correction validation: **232 passed, 10 pre-existing slow tests excluded**, with
 real-container tests passed. The UBIFS quota raw report confirms the wrapper
 returned exit 1 for an original exit-zero ENOSPC diagnostic.
 
-Opus 5 correction re-review was attempted but returned a session-limit error
-before model execution (reset reported 13:50 Asia/Jerusalem on September 9).
-A clean independent correction verdict is pending; no pass is claimed.

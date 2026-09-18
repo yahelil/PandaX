@@ -1,8 +1,0 @@
-One real SmartHub artifact. Seven files. One decisive action. Analyze.
-PandaX safely unpacks it. Syft reads the bundled jar and builds a CycloneDX one point six SBOM: eleven components across Maven, NPM, and Python.
-OSV correlation returns one hundred two known vulnerabilities. CISA confirms four are actively exploited, including Log4Shell, discovered inside the jar.
-Presence is proven by exact package identity. Reachability is not assessed. Actis keeps that limitation visible instead of guessing.
-The same run generates the SBOM, VEX, twelve Article Fourteen filing drafts, Annex Seven dossier, and declarations. Conformity stays blocked until the exploited issues are fixed.
-Fifty outputs are sealed into a six-link ledger and signed with Ed twenty-five five nineteen. Independent verification passes.
-Change one byte. The JSON still looks valid, but verification names the altered SBOM and fails. Restore the byte, and trust returns.
-Actis by PandaX. From product artifact to verifiable C R A evidence.

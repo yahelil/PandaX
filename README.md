@@ -1,9 +1,12 @@
-# 🐼 Actis by PandaX
+# Actis by PandaX
 ### Automated, Verifiable EU Cyber Resilience Act (CRA) Compliance
 
 Actis turns your software builds and SBOMs into **signed, tamper-evident CRA evidence bundles**—ready for auditors, regulators, and customers.
 
-[**Explore the Website (pandax.online)**](https://pandax.online) · [**Launch Live Cloud Dashboard (actis.pandax.online)**](https://actis.pandax.online) · [**Read the Tech Guide**](docs/technical-guide.md)
+[![Live Dashboard](https://img.shields.io/badge/Live_Dashboard-actis.pandax.online-7c3aed?style=for-the-badge&logo=rocket&logoColor=white)](https://actis.pandax.online)
+[![Website](https://img.shields.io/badge/Website-pandax.online-0284c7?style=for-the-badge&logo=googlechrome&logoColor=white)](https://pandax.online)
+[![Technical Guide](https://img.shields.io/badge/Docs-Technical_Guide-10b981?style=for-the-badge&logo=bookstack&logoColor=white)](docs/technical-guide.md)
+
 
 ---
 

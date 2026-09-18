@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import logging
 import os
 import stat
 import tarfile
@@ -55,6 +56,8 @@ from .stages import ingest as artifact_ingest
 from .stages.sbom import SbomError, inspect_sbom
 from .organization_settings import OrganizationSettingsRepository, SettingsValidationError
 from .settings_api import _bundle_directory
+
+logger = logging.getLogger(__name__)
 
 MAX_SBOM_BYTES = 10 * 1024 * 1024
 MAX_COLLECTOR_BYTES = 25_000_000
@@ -309,6 +312,7 @@ Index("ix_evidence_bundles_retention", evidence_bundles.c.retained_until)
 def pipeline_runner(
     path: Path,
     *,
+    out_base: Path | None = None,
     telemetry_path: Path | None = None,
     exposure_context_path: Path | None = None,
     product_metadata: dict[str, Any] | None = None,
@@ -316,6 +320,7 @@ def pipeline_runner(
     """Production adapter for the existing PandaX SBOM pipeline."""
     return pipeline.run_sbom(
         path,
+        out_base=out_base,
         telemetry_path=telemetry_path,
         exposure_context_path=exposure_context_path,
         product_metadata=product_metadata,
@@ -738,6 +743,7 @@ class AnalysisJobRepository:
                 organization_id, product_id, release_id, job_id
             )
         except Exception as exc:
+            logger.exception("Analysis job %s failed before input retrieval", job_id)
             self._fail(organization_id, product_id, release_id, job_id, str(exc))
             return self.get(organization_id, product_id, release_id, job_id)
         run_dir: str | None = None
@@ -758,8 +764,7 @@ class AnalysisJobRepository:
         )
 
         try:
-            if job.input_type == "raw_artifact":
-                scratch = tempfile.TemporaryDirectory(prefix="actis-analysis-")
+            scratch = tempfile.TemporaryDirectory(prefix="actis-analysis-")
             with ExitStack() as stack:
                 input_path = stack.enter_context(_temporary_sbom(content, suffix))
                 supplemental = job.input_metadata.get("supplemental_evidence", {})
@@ -767,6 +772,7 @@ class AnalysisJobRepository:
                 exposure_path = self._supplemental_path(stack, supplemental, "exposure_context")
                 runner_options: dict[str, Any] = {}
                 if runner is pipeline_runner and job.input_type != "raw_artifact":
+                    runner_options["out_base"] = Path(scratch.name)
                     portfolio = PortfolioRepository(self.engine)
                     product = portfolio.get_product(organization_id, product_id)
                     release = portfolio.get_release(organization_id, release_id)
@@ -836,6 +842,7 @@ class AnalysisJobRepository:
                 }
             self._finish(organization_id, product_id, release_id, job_id, result)
         except Exception as exc:
+            logger.exception("Analysis job %s failed while processing %s", job_id, job.input_type)
             self._fail(organization_id, product_id, release_id, job_id, str(exc))
         finally:
             if scratch is not None:

@@ -19,6 +19,7 @@ from pandax.analysis_jobs import (
     AnalysisJobRepository,
     AnalysisJobValidationError,
     analysis_job_events,
+    pipeline_runner,
 )
 from pandax.portfolio import PortfolioRepository, create_portfolio_engine
 
@@ -277,6 +278,30 @@ def test_runner_failure_is_persisted_not_raised(repositories, scope):
     assert failed.status == "failed"
     assert failed.error == "advisory source unavailable"
     assert repository.events(*scope, job.id)[-1].kind == "analysis.failed"
+
+
+@pytest.mark.parametrize("fails", [False, True])
+def test_sbom_pipeline_uses_and_cleans_bounded_workspace(repositories, scope, monkeypatch, fails):
+    _, repository = repositories
+    job = create_job(repository, scope)
+    workspace = None
+
+    def fake_pipeline(path: Path, *, out_base: Path, **_kwargs):
+        nonlocal workspace
+        assert path.read_bytes() == cyclonedx()
+        workspace = out_base
+        assert workspace.is_dir()
+        (workspace / "temporary-output").write_text("scratch", encoding="utf-8")
+        if fails:
+            raise RuntimeError("dossier failed")
+        yield ev.run_done("Complete", components=2)
+
+    monkeypatch.setattr("pandax.analysis_jobs.pipeline.run_sbom", fake_pipeline)
+    completed = repository.run(*scope, job.id, pipeline_runner)
+
+    assert completed.status == ("failed" if fails else "completed")
+    assert workspace is not None
+    assert not workspace.exists()
 
 
 def test_changed_release_digest_requires_and_records_confirmation(repositories, scope):

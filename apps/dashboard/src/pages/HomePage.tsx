@@ -43,7 +43,7 @@ export function HomePage() {
     { label: "Assign an authorized approver and configure notifications", done: hasApprover && notificationsConfigured, to: hasApprover ? "/settings/notifications" : "/settings/team" },
   ];
 
-  if (setupMode === "replace") return <main className="page"><PageHeader title="Set up Actis" description="Complete these steps to establish release evidence and continuous CRA monitoring."/><SetupChecklist steps={setupSteps}/></main>;
+  if (setupMode === "replace") return <main className="page"><SetupHero steps={setupSteps}/></main>;
 
   return (
     <main className="page">
@@ -128,5 +128,87 @@ function sourceName(source: string): string {
 }
 
 function SetupChecklist({ steps }: { steps: Array<{ label: string; done: boolean; to: string }> }) {
-  return <section className="panel setup-panel" aria-labelledby="setup-heading"><SectionHeader title="Finish setting up Actis" description="Complete the remaining steps without losing visibility of active compliance work."/><h2 className="sr-only" id="setup-heading">Setup checklist</h2><ol className="setup-list">{steps.map((item, index)=><li className={item.done ? "done" : ""} key={item.label}><span aria-hidden="true">{item.done ? "✓" : index + 1}</span><div><strong>{item.label}</strong><small>{item.done ? "Complete" : "Not started"}</small></div>{!item.done && steps.slice(0,index).every((step)=>step.done) ? <Link className="button button-primary" to={item.to}>Continue setup</Link> : null}</li>)}</ol></section>;
+  return (
+    <section className="panel setup-panel" aria-labelledby="setup-heading">
+      <SectionHeader title="Finish setting up Actis" description="Complete the remaining steps without losing visibility of active compliance work." />
+      <h2 className="sr-only" id="setup-heading">Setup checklist</h2>
+      <ol className="setup-list">
+        {steps.map((item, index) => {
+          const isActive = !item.done && steps.slice(0, index).every((step) => step.done);
+          return (
+            <li className={item.done ? "done" : isActive ? "active-step" : ""} key={item.label}>
+              <span aria-hidden="true">{item.done ? "✓" : index + 1}</span>
+              <div>
+                <strong>{item.label}</strong>
+                <small>{item.done ? "Complete" : "Not started"}</small>
+              </div>
+              {isActive ? <Link className="button button-primary" to={item.to}>Continue setup</Link> : null}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+function SetupHero({ steps }: { steps: Array<{ label: string; done: boolean; to: string }> }) {
+  const doneCount = steps.filter((s) => s.done).length;
+  const nextStep = steps.find((s) => !s.done);
+  const percent = Math.round((doneCount / steps.length) * 100);
+
+  return (
+    <section className="setup-hero" aria-label="Welcome">
+      <div className="setup-hero-illustration" aria-hidden="true">
+        <svg viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="shieldGrad" x1="70" y1="10" x2="70" y2="130" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity=".18" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity=".06" />
+            </linearGradient>
+            <linearGradient id="shieldStroke" x1="70" y1="10" x2="70" y2="130" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity=".5" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity=".2" />
+            </linearGradient>
+          </defs>
+          <path d="M70 8 L125 30 C125 30 128 85 70 128 C12 85 15 30 15 30 Z" fill="url(#shieldGrad)" stroke="url(#shieldStroke)" strokeWidth="2.5" strokeLinejoin="round" />
+          <path d="M70 22 L115 40 C115 40 117 82 70 118 C23 82 25 40 25 40 Z" fill="none" stroke="var(--accent)" strokeWidth="1.2" strokeOpacity=".12" strokeLinejoin="round" />
+          <circle cx="70" cy="68" r="26" fill="var(--accent)" fillOpacity=".12" />
+          <path d="M56 68 L65 77 L84 58" fill="none" stroke="var(--accent)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+
+      <h1>Welcome to Actis</h1>
+      <p>Set up your workspace to establish release evidence and continuous CRA monitoring.</p>
+
+      <div className="panel setup-card">
+        <div className="setup-progress">
+          <div className="setup-progress-track">
+            <span style={{ width: `${percent}%` }} />
+          </div>
+          <span className="setup-progress-label">{doneCount} of {steps.length}</span>
+        </div>
+        <ol className="setup-list">
+          {steps.map((item, index) => {
+            const isActive = !item.done && steps.slice(0, index).every((step) => step.done);
+            return (
+              <li className={item.done ? "done" : isActive ? "active-step" : ""} key={item.label}>
+                <span aria-hidden="true">{item.done ? "✓" : index + 1}</span>
+                <div>
+                  <strong>{item.label}</strong>
+                  <small>{item.done ? "Complete" : "Not started"}</small>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+        <div className="setup-cta">
+          {nextStep ? (
+            <Link className="button button-primary" to={nextStep.to}>
+              {doneCount === 0 ? "Get started" : "Continue setup"}
+            </Link>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
 }

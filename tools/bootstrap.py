@@ -38,6 +38,11 @@ SYFT_BUILDS = {
         "8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
         "syft",
     ),
+    ("Linux", "aarch64"): (
+        f"syft_{SYFT_VERSION}_linux_arm64.tar.gz",
+        "a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f",
+        "syft",
+    ),
     ("Darwin", "arm64"): (
         f"syft_{SYFT_VERSION}_darwin_arm64.tar.gz",
         "ac063af3b9874769deb7ea1e6d76841e68f9e3bb50cd654226fc977de65532c1",

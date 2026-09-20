@@ -152,12 +152,23 @@ def main():
         if job["status"] != "completed":
             raise RuntimeError(f"Sample analysis did not complete for {sample_name}: {job['status']}")
 
-        # Also repairs an earlier completed job whose automatic projection failed.
-        api.call("POST", job_path + f"/{quote(job['id'])}/enroll")
-        findings = api.call("GET", "/findings?view=all")
-        documents = api.call("GET", "/documents")
-        finding_count = sum(item["release_id"] == release["id"] for item in findings)
-        document_count = sum(item["release_id"] == release["id"] for item in documents)
+        # The job reaches "completed" before its automatic enrollment callback finishes.
+        for attempt in range(13):
+            findings = api.call("GET", "/findings?view=all")
+            documents = api.call("GET", "/documents")
+            finding_count = sum(item["release_id"] == release["id"] for item in findings)
+            document_count = sum(item["release_id"] == release["id"] for item in documents)
+            if finding_count >= 1 and document_count >= 3:
+                break
+            if attempt < 12:
+                time.sleep(5)
+        else:
+            # Repairs an earlier completed job whose automatic projection failed.
+            api.call("POST", job_path + f"/{quote(job['id'])}/enroll")
+            findings = api.call("GET", "/findings?view=all")
+            documents = api.call("GET", "/documents")
+            finding_count = sum(item["release_id"] == release["id"] for item in findings)
+            document_count = sum(item["release_id"] == release["id"] for item in documents)
         if finding_count < 1 or document_count < 3:
             raise RuntimeError(
                 f"Incomplete enrollment for {sample_name}: {finding_count} findings, {document_count} documents"

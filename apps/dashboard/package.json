@@ -11,7 +11,7 @@
     "build:demo": "tsc -b && vite build --mode demo --configLoader runner",
     "preview": "vite preview --configLoader runner --host 0.0.0.0",
     "typecheck": "tsc -b --pretty false",
-    "test": "vitest run --root ../.. apps/dashboard/src",
+    "test": "vitest run --config apps/dashboard/vite.config.ts --root ../.. apps/dashboard/src",
     "test:e2e": "npm run build:demo && node scripts/e2e-smoke.mjs"
   },
   "dependencies": {

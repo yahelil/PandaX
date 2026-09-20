@@ -1,7 +1,7 @@
 import type { AdapterFailure, AdapterOperation, AdapterStatus, DataAdapter, DemoListener, UpdateProductInput, WorkspaceSearchResult } from "./adapter";
 import { sanitizeAnalyticsEvent } from "./analytics";
 import { createFindingsApi, FindingApiError, type FindingsApi, type ManagedFinding } from "./findingsApi";
-import { createGovernanceApi, GovernanceApiError, mapCompliance, mapGovernanceSettings, mapIntegration, mapTeamMember, type ComplianceDto, type DocumentDetailDto, type DocumentFormat, type DocumentRevisionDto, type GovernanceApi, type PrivacySafeAnalyticsEvent } from "./governanceApi";
+import { createGovernanceApi, GovernanceApiError, mapCompliance, mapGovernanceSettings, mapIntegration, mapTeamMember, type ComplianceDto, type DocumentDetailDto, type DocumentFormat, type DocumentRevisionDto, type GovernanceApi, type GovernanceDocumentDto, type PrivacySafeAnalyticsEvent } from "./governanceApi";
 import { createOperationsApi, OperationsApiError, type OperationsApi, type OperationsHome, type OperationsNotification, type OperationsSearchResult } from "./operationsApi";
 import { FixtureAdapter } from "./fixtureAdapter";
 import { createDemoState } from "./fixtures";
@@ -152,6 +152,21 @@ export function mapDocument(detail: DocumentDetailDto): DocumentRecord {
     revisions: detail.revisions.map(mapDocumentRevision),
     approvalHistory: detail.approvalHistory.map(mapDocumentAudit),
     selfFilings: detail.selfFilings.map((filing) => ({ id: filing.id, version: filing.revision, externalSubmissionReference: filing.externalSubmissionReference, submittedAt: filing.submittedAt, receiptEvidenceLocator: filing.receiptEvidenceLocator, receiptContentHash: filing.receiptContentHash, recordedBy: filing.recordedBy, recordedAt: filing.recordedAt })),
+    contentHash: item.current.contentHash, storageLocator: item.current.storageLocator, sizeBytes: item.current.sizeBytes,
+  };
+}
+
+export function mapDocumentSummary(item: GovernanceDocumentDto): DocumentRecord {
+  const format = documentFormat(item.current.format);
+  const status: DocumentRecord["status"] = ({ draft: "draft", pending: "approval_required", approved: "approved", rejected: "draft", superseded: "superseded" } as const)[item.status];
+  return {
+    id: item.id, productId: item.productId, releaseId: item.releaseId, caseId: item.caseId,
+    name: item.name, type: item.kind, format, version: item.currentRevision, status,
+    completeness: documentCompleteness(item.current.provenance), updatedAt: item.updatedAt,
+    updatedBy: item.current.createdBy, audit: [],
+    revisions: [mapDocumentRevision(item.current)],
+    approvalHistory: [],
+    selfFilings: [],
     contentHash: item.current.contentHash, storageLocator: item.current.storageLocator, sizeBytes: item.current.sizeBytes,
   };
 }
@@ -491,7 +506,7 @@ export class ProductionAdapter implements DataAdapter {
 
   getDocumentDownload = async (documentId: EntityId, version?: number): Promise<DocumentDownloadMetadata> => {
     if (!this.config.governanceApi) return this.fixture.getDocumentDownload(documentId, version);
-    const detail = this.requireDocumentDetail(documentId);
+    const detail = await this.requireDocumentDetail(documentId);
     return this.mutation("download_document", async () => {
       const metadata = await this.config.governanceApi!.getDownloadMetadata(this.config.organizationId, documentId, version ?? detail.document.currentRevision);
       return { documentId: metadata.documentId, version: metadata.revision, filename: metadata.filename, format: documentFormat(metadata.format), contentHash: metadata.contentHash, sizeBytes: metadata.sizeBytes, storageLocator: metadata.storageLocator, contentType: metadata.contentType, downloadType: metadata.downloadType };
@@ -500,7 +515,7 @@ export class ProductionAdapter implements DataAdapter {
 
   downloadDocument = async (documentId: EntityId, version?: number): Promise<DocumentDownloadFile> => {
     if (!this.config.governanceApi) return this.fixture.downloadDocument(documentId, version);
-    const detail = this.requireDocumentDetail(documentId);
+    const detail = await this.requireDocumentDetail(documentId);
     return this.mutation("download_document_content", async () => {
       return this.config.governanceApi!.downloadDocumentContent(
         this.config.organizationId,
@@ -512,7 +527,7 @@ export class ProductionAdapter implements DataAdapter {
 
   requestDocumentApproval = async (documentId: EntityId, comment?: string): Promise<DocumentRecord> => {
     if (!this.config.governanceApi) return this.fixture.requestDocumentApproval(documentId, comment);
-    const detail = this.requireDocumentDetail(documentId);
+    const detail = await this.requireDocumentDetail(documentId);
     return this.mutation("request_document_approval", async () => {
       const current = detail.document.current;
       await this.config.governanceApi!.requestDocumentApproval(this.config.organizationId, documentId, current.revision, current.status, comment);
@@ -522,7 +537,7 @@ export class ProductionAdapter implements DataAdapter {
 
   addDocumentRevision = async (input: RegisterDocumentRevisionInput): Promise<DocumentRecord> => {
     if (!this.config.governanceApi) return this.fixture.addDocumentRevision(input);
-    const detail = this.requireDocumentDetail(input.documentId);
+    const detail = await this.requireDocumentDetail(input.documentId);
     return this.mutation("add_document_revision", async () => {
       await this.config.governanceApi!.addDocumentRevision(this.config.organizationId, input.documentId, {
         expectedCurrentRevision: detail.document.currentRevision,
@@ -538,7 +553,7 @@ export class ProductionAdapter implements DataAdapter {
 
   recordDocumentSelfFiling = async (input: RecordDocumentSelfFilingInput): Promise<DocumentRecord> => {
     if (!this.config.governanceApi) return this.fixture.recordDocumentSelfFiling(input);
-    const detail = this.requireDocumentDetail(input.documentId);
+    const detail = await this.requireDocumentDetail(input.documentId);
     return this.mutation("self_file_document", async () => {
       await this.config.governanceApi!.recordSelfFiling(this.config.organizationId, input.documentId, detail.document.currentRevision, {
         externalSubmissionReference: input.externalSubmissionReference,
@@ -659,78 +674,106 @@ export class ProductionAdapter implements DataAdapter {
     const revision = ++this.refreshRevision;
     this.setStatus({ mode: "production", phase: "loading", lastSyncedAt: this.status.lastSyncedAt });
     try {
-      const portfolio = Promise.all([this.config.portfolioApi.getOrganization(this.config.organizationId, options), this.config.portfolioApi.listProducts(this.config.organizationId, options)]).then(async ([organization, products]) => {
-        const releases = (await Promise.all(products.map((product) => this.config.portfolioApi.listReleases(this.config.organizationId, product.id, options)))).flat();
-        const scopedJobs = this.config.releaseOperationsApi
-          ? await Promise.all(releases.map(async (release) => {
-              const scope = { organizationId: this.config.organizationId, productId: release.productId, releaseId: release.id };
-              const jobs = await this.config.releaseOperationsApi!.listAnalysisJobs(scope, options);
-              let monitoring: ReleaseMonitoringStatus | undefined;
-              if (jobs.some((job) => job.status === "completed")) {
-                try { monitoring = await this.config.releaseOperationsApi!.getMonitoring(scope, options); }
-                catch (error) { if (!(error instanceof ReleaseOperationsApiError && error.code === "not_found")) throw error; }
-              }
-              return { release, jobs, monitoring };
-            }))
-          : releases.map((release) => ({ release, jobs: [] as ReleaseAnalysisJob[], monitoring: undefined }));
-        return { organization, products, releases: scopedJobs.map(({ release, jobs, monitoring }) => projectRelease(release, jobs, monitoring)), analysisJobs: scopedJobs.flatMap(({ jobs }) => jobs) };
-      });
-      const operations = this.config.operationsApi ? Promise.all([this.config.operationsApi.getHome(this.config.organizationId, { signal: options?.signal }), this.config.operationsApi.listNotifications(this.config.organizationId, { view: "unread_action", signal: options?.signal })]) : undefined;
-      const findingList = this.config.findingsApi ? this.config.findingsApi.listFindings(this.config.organizationId, { view: "all" }, options) : undefined;
-      const governance = this.config.governanceApi ? Promise.all([this.config.governanceApi.listCompliance(this.config.organizationId, { view: "all" }, options), this.config.governanceApi.listDocuments(this.config.organizationId, {}, options), this.config.governanceApi.getSettings(this.config.organizationId, options), this.config.governanceApi.listTeam(this.config.organizationId, options), this.config.governanceApi.listIntegrations(this.config.organizationId, options)]).then(async ([compliance, documents, settings, members, integrations]) => ({ compliance, settings, members, integrations, documentDetails: await Promise.all(documents.map((document) => this.config.governanceApi!.getDocument(this.config.organizationId, document.id, options))) })) : undefined;
-      const ancillary = Promise.allSettled([operations, findingList, governance]);
-      const portfolioState = await portfolio;
-      if (revision !== this.refreshRevision) return;
-      const receivedProductIds = new Set(portfolioState.products.map((item) => item.id));
-      const missingProducts = this.portfolioHydrated
-        ? this.getSnapshot().products.filter((item) => !receivedProductIds.has(item.id))
-        : [];
-      if (missingProducts.length) {
-        throw new PortfolioApiError(`The product service omitted ${missingProducts.length} existing product${missingProducts.length === 1 ? "" : "s"}. Existing data remains visible; check the deployment's API and organization settings before retrying.`, "invalid_response");
-      }
-      this.fixture.replacePortfolio(portfolioState.organization, portfolioState.products, portfolioState.releases);
-      this.portfolioHydrated = true;
-      this.setStatus({ mode: "production", phase: "loading", lastSyncedAt: new Date().toISOString() });
-      if (this.config.releaseOperationsApi) {
-        const jobs = portfolioState.analysisJobs.map((job) => mapAnalysisJob(job, this.draftForJob(job, portfolioState.releases)));
-        this.fixture.replaceAnalysisJobs(jobs);
-        portfolioState.analysisJobs.filter((job) => !this.isTerminalAnalysis(job) && job.status === "running").forEach((job) => {
-          if (!this.analysisTimers.has(job.id)) this.pollAnalysis(this.analysisScope(this.draftForJob(job, portfolioState.releases) as AnalysisDraft & { releaseId: string }), this.draftForJob(job, portfolioState.releases), job.id);
-        });
-      }
-      const [operationsResult, findingsResult, governanceResult] = await ancillary;
-      if (revision !== this.refreshRevision) return;
-      if (operationsResult.status === "fulfilled" && operationsResult.value) {
-        const operationsState = operationsResult.value;
-        const [home, notifications] = operationsState;
+      const operationsPromise = this.config.operationsApi ? (async () => {
+        const [home, notifications] = await Promise.all([
+          this.config.operationsApi!.getHome(this.config.organizationId, { signal: options?.signal }),
+          this.config.operationsApi!.listNotifications(this.config.organizationId, { view: "unread_action", signal: options?.signal }),
+        ]);
+        if (revision !== this.refreshRevision) return;
         this.fixture.replaceOperationalState(
           home.actionQueue.map(mapAction),
           home.recentChanges.map(mapActivity),
           notifications.map(mapNotification),
           { generatedAt: home.generatedAt, monitoring: home.monitoring, counters: home.counters, dataWarnings: home.dataWarnings },
         );
-      }
-      if (findingsResult.status === "fulfilled" && findingsResult.value) {
-        const findingsState = findingsResult.value;
+      })() : undefined;
+
+      const findingsPromise = this.config.findingsApi ? (async () => {
+        const findingsState = await this.config.findingsApi!.listFindings(this.config.organizationId, { view: "all" }, options);
+        if (revision !== this.refreshRevision) return;
         findingsState.forEach((finding) => this.findingDetails.set(finding.id, finding));
         this.fixture.replaceFindings(findingsState);
-      }
-      if (governanceResult.status === "fulfilled" && governanceResult.value) {
-        const governanceState = governanceResult.value;
-        this.settingsVersion = governanceState.settings.version;
-        this.analyticsConsent = governanceState.settings.analytics.enabled;
-        governanceState.documentDetails.forEach((detail) => this.documentDetails.set(detail.document.id, detail));
-        governanceState.compliance.forEach((item) => this.complianceDetails.set(item.id, item));
+      })() : undefined;
+
+      const governancePromise = this.config.governanceApi ? (async () => {
+        const [compliance, documents, settings, members, integrations] = await Promise.all([
+          this.config.governanceApi!.listCompliance(this.config.organizationId, { view: "all" }, options),
+          this.config.governanceApi!.listDocuments(this.config.organizationId, {}, options),
+          this.config.governanceApi!.getSettings(this.config.organizationId, options),
+          this.config.governanceApi!.listTeam(this.config.organizationId, options),
+          this.config.governanceApi!.listIntegrations(this.config.organizationId, options),
+        ]);
+        if (revision !== this.refreshRevision) return;
+        this.settingsVersion = settings.version;
+        this.analyticsConsent = settings.analytics.enabled;
+        compliance.forEach((item) => this.complianceDetails.set(item.id, item));
         this.fixture.replaceGovernanceState(
-          governanceState.compliance.map((item) => mapCompliance(item)),
-          governanceState.documentDetails.map(mapDocument), mapGovernanceSettings(governanceState.settings).settings,
-          governanceState.members.flatMap((item) => { const mapped = mapTeamMember(item); return mapped ? [mapped] : []; }),
-          governanceState.integrations.map(mapIntegration),
+          compliance.map((item) => mapCompliance(item)),
+          documents.map((doc) => {
+            const detail = this.documentDetails.get(doc.id);
+            return detail ? mapDocument(detail) : mapDocumentSummary(doc);
+          }),
+          mapGovernanceSettings(settings).settings,
+          members.flatMap((item) => { const mapped = mapTeamMember(item); return mapped ? [mapped] : []; }),
+          integrations.map(mapIntegration),
         );
-        this.fixture.replaceOrganization(mapGovernanceSettings(governanceState.settings).organization);
+        this.fixture.replaceOrganization(mapGovernanceSettings(settings).organization);
+      })() : undefined;
+
+      const basePortfolioPromise = Promise.all([
+        this.config.portfolioApi.getOrganization(this.config.organizationId, options),
+        this.config.portfolioApi.listProducts(this.config.organizationId, options),
+      ]).then(async ([organization, products]) => {
+        const releases = (await Promise.all(products.map((product) => this.config.portfolioApi.listReleases(this.config.organizationId, product.id, options)))).flat();
+        return { organization, products, releases };
+      });
+
+      const basePortfolio = await basePortfolioPromise;
+      if (revision !== this.refreshRevision) return;
+      const receivedProductIds = new Set(basePortfolio.products.map((item) => item.id));
+      const missingProducts = this.portfolioHydrated
+        ? this.getSnapshot().products.filter((item) => !receivedProductIds.has(item.id))
+        : [];
+      if (missingProducts.length) {
+        throw new PortfolioApiError(`The product service omitted ${missingProducts.length} existing product${missingProducts.length === 1 ? "" : "s"}. Existing data remains visible; check the deployment's API and organization settings before retrying.`, "invalid_response");
       }
-      const rejected = [operationsResult, findingsResult, governanceResult].find((result) => result.status === "rejected");
-      if (rejected?.status === "rejected") this.markFailed(operation, rejected.reason);
+      this.fixture.replacePortfolio(basePortfolio.organization, basePortfolio.products, basePortfolio.releases);
+      this.portfolioHydrated = true;
+      this.setStatus({ mode: "production", phase: "loading", lastSyncedAt: new Date().toISOString() });
+
+      const releaseOperationsPromise = (async () => {
+        if (!this.config.releaseOperationsApi) return;
+        const releases = basePortfolio.releases;
+        const scopedJobs = await Promise.all(releases.map(async (release) => {
+          const scope = { organizationId: this.config.organizationId, productId: release.productId, releaseId: release.id };
+          const jobs = await this.config.releaseOperationsApi!.listAnalysisJobs(scope, options);
+          let monitoring: ReleaseMonitoringStatus | undefined;
+          if (jobs.some((job) => job.status === "completed")) {
+            try { monitoring = await this.config.releaseOperationsApi!.getMonitoring(scope, options); }
+            catch (error) { if (!(error instanceof ReleaseOperationsApiError && error.code === "not_found")) throw error; }
+          }
+          return { release, jobs, monitoring };
+        }));
+        if (revision !== this.refreshRevision) return;
+        const projectedReleases = scopedJobs.map(({ release, jobs, monitoring }) => projectRelease(release, jobs, monitoring));
+        this.fixture.replacePortfolio(basePortfolio.organization, basePortfolio.products, projectedReleases);
+        const analysisJobs = scopedJobs.flatMap(({ jobs }) => jobs);
+        const jobs = analysisJobs.map((job) => mapAnalysisJob(job, this.draftForJob(job, projectedReleases)));
+        this.fixture.replaceAnalysisJobs(jobs);
+        analysisJobs.filter((job) => !this.isTerminalAnalysis(job) && job.status === "running").forEach((job) => {
+          if (!this.analysisTimers.has(job.id)) this.pollAnalysis(this.analysisScope(this.draftForJob(job, projectedReleases) as AnalysisDraft & { releaseId: string }), this.draftForJob(job, projectedReleases), job.id);
+        });
+      })();
+
+      const ancillary = await Promise.allSettled([
+        operationsPromise,
+        findingsPromise,
+        governancePromise,
+        releaseOperationsPromise,
+      ]);
+      if (revision !== this.refreshRevision) return;
+      const rejected = ancillary.find((result) => result.status === "rejected");
+      if (rejected?.status === "rejected") this.markFailed(operation, (rejected as PromiseRejectedResult).reason);
       else this.markReady();
     } catch (error) {
       if (revision === this.refreshRevision) this.markFailed(operation, error);
@@ -832,8 +875,7 @@ export class ProductionAdapter implements DataAdapter {
   }
 
   private async decideDocument(documentId: string, decision: "approve" | "reject", comment?: string): Promise<DocumentRecord> {
-    const detail = this.documentDetails.get(documentId);
-    if (!detail) throw new Error(`Unknown production document: ${documentId}`);
+    const detail = await this.requireDocumentDetail(documentId);
     const current = detail.document.current;
     return this.mutation(decision === "approve" ? "approve_document" : "reject_document", async () => {
       if (decision === "approve") await this.config.governanceApi!.approveDocument(this.config.organizationId, documentId, current.revision, current.status, comment);
@@ -842,8 +884,12 @@ export class ProductionAdapter implements DataAdapter {
     });
   }
 
-  private requireDocumentDetail(documentId: string): DocumentDetailDto {
-    const detail = this.documentDetails.get(documentId);
+  private async requireDocumentDetail(documentId: string): Promise<DocumentDetailDto> {
+    let detail = this.documentDetails.get(documentId);
+    if (!detail && this.config.governanceApi) {
+      detail = await this.config.governanceApi.getDocument(this.config.organizationId, documentId);
+      this.documentDetails.set(documentId, detail);
+    }
     if (!detail) throw new Error(`Unknown production document: ${documentId}`);
     return detail;
   }

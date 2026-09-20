@@ -417,6 +417,27 @@ def test_monitoring_enrollment_failure_keeps_analysis_complete_and_records_follo
     assert "database" not in events[-1]["message"]
 
 
+def test_completed_analysis_enrollment_can_be_retried(setup):
+    attempts = []
+
+    def enroll(job):
+        attempts.append(job.id)
+        if len(attempts) == 1:
+            raise RuntimeError("temporary projection failure")
+
+    client = make_client(setup, completion_callback=enroll)
+    uploaded = upload(client, setup).json()
+    path = f"{collection(setup)}/{uploaded['id']}"
+    assert client.post(path + "/enroll").status_code == 409
+    assert client.post(path + "/run").status_code == 200
+    setup["pending"].pop()()
+
+    response = client.post(path + "/enroll")
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+    assert attempts == [uploaded["id"], uploaded["id"]]
+
+
 def test_idempotent_http_replay_returns_same_job(setup):
     client = make_client(setup)
     first = upload(client, setup)

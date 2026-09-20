@@ -12,6 +12,7 @@ from pandax.findings import (
     FindingObservation,
     FindingRepository,
     FindingValidationError,
+    observation_from_scan_finding,
     finding_audit_events,
     finding_decisions,
 )
@@ -72,6 +73,22 @@ def ingest(repository, **changes):
         "org-acme", "product-hub", "release-14", "analysis-1",
         [observation(**changes)], actor_id="analyzer", seen_at=NOW,
     )[0]
+
+
+def test_unassessed_scan_reachability_projects_as_unknown(repository):
+    scan = {
+        "cve": "CVE-2020-11022", "component": "jquery", "version": "3.4.0",
+        "purl": "pkg:npm/jquery@3.4.0", "summary": "Potential XSS vulnerability",
+        "severity": "MEDIUM", "source": "OSV", "reachability": "not_assessed",
+        "exposure_assessment": "insufficient_evidence",
+    }
+    record = repository.upsert_from_analysis(
+        "org-acme", "product-hub", "release-14", "analysis-sample",
+        [observation_from_scan_finding(scan, "analysis-sample")],
+        actor_id="analyzer", seen_at=NOW,
+    )[0]
+    assert record.reachability == "unknown"
+    assert record.reachability_evidence["assessment"] == "insufficient_evidence"
 
 
 def recommendation(reachability="not_reachable", confidence="high"):

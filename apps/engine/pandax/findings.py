@@ -158,7 +158,7 @@ def observation_from_scan_finding(
         severity=severity,
         kev=bool(item.get("kev")),
         epss=float(item.get("epss") or 0),
-        reachability=str(item.get("reachability") or "unknown"),
+        reachability="unknown" if item.get("reachability") == "not_assessed" else str(item.get("reachability") or "unknown"),
         reachability_evidence=evidence,
         reachability_limitations=tuple(limitations),
         source=str(item.get("source") or "analysis"),

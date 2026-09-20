@@ -357,6 +357,31 @@ def create_analysis_router(
             dispatcher(work)
         return _job_response(job)
 
+    @router.post(
+        "/organizations/{organization_id}/products/{product_id}/releases/{release_id}/analysis-jobs/{job_id}/enroll",
+        response_model=AnalysisJobResponse,
+    )
+    def enroll_job(
+        organization_id: str,
+        product_id: str,
+        release_id: str,
+        job_id: str,
+        repository: Repository,
+        identity: Identity,
+    ):
+        _authorize(identity, organization_id, ANALYSIS_EDIT_ROLES, sensitive=True)
+        job = _scoped_job(repository, organization_id, product_id, release_id, job_id)
+        if job.status != "completed":
+            raise HTTPException(status.HTTP_409_CONFLICT, "Analysis is not completed")
+        if completion_callback is None:
+            raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "Enrollment is unavailable")
+        try:
+            completion_callback(job)
+        except Exception as exc:
+            logger.exception("Post-analysis enrollment retry failed for job %s", job.id)
+            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Enrollment retry failed") from exc
+        return _job_response(job)
+
     evidence_route = (
         "/organizations/{organization_id}/products/{product_id}/releases/{release_id}"
         "/analysis-jobs/{job_id}/evidence"

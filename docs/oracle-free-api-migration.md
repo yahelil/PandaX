@@ -1,57 +1,54 @@
-# Zero-cost beta API migration to Oracle Always Free
+# Zero-cost live API migration to Oracle Always Free
 
-The beta API on Render Free sleeps after 15 minutes without traffic. Its next
-request can spend about a minute waking it. The dashboard can reveal portfolio
-data before secondary sync finishes, but it cannot serve a cold API in seconds.
+The live `actis.pandax.online` dashboard used `actis-api-staging.onrender.com`.
+Render Free sleeps after idle time, delaying the next visit. The replacement API
+runs on an Oracle Always Free VM in Israel Central (Jerusalem); the Render
+service remains available for rollback with automatic deploys disabled.
 
-Move **only the beta API** to an Oracle Always Free `VM.Standard.A1.Flex` instance
-in the account's EU home region. Keep Render as the fallback until the new API
-passes the beta smoke tests. Oracle can reclaim idle Always Free instances and
-may have no A1 capacity; this route improves normal availability but has no
-uptime guarantee.
+The VM uses `VM.Standard.A1.Flex` with 2 OCPUs, 12 GB RAM, and a 46.6 GiB
+Ubuntu 24.04 ARM64 boot volume. Keep the account on Free Tier, stay within
+[Oracle's Always Free limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm),
+and do not enable paid resources. Oracle may reclaim idle Always Free VMs.
 
-References: [Render Free limits](https://render.com/docs/free),
-[Oracle Always Free limits](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm),
-and [Cloudflare Tunnel setup](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/).
+## VM configuration
 
-## Prerequisites
+- The Docker image is built from the tested Git commit on the VM. The API
+  container restarts automatically and binds port 10000 to `127.0.0.1` only.
+- Render's staging `.env` was copied over SSH, stripped of Render's quoting on
+  two signing keys, and stored at `/etc/actis-api.env`, owned by root with mode
+  600. Never put this file, the SSH private key, or values in Git or chat.
+- Ubuntu's Caddy service uses [deploy/oracle/Caddyfile](../deploy/oracle/Caddyfile)
+  to serve `https://actis-api.pandax.online` and reverse proxy to the API.
+  The VM's security list and persistent host firewall allow inbound TCP 80 and
+  443. SSH remains on 22; the API port is not public.
+- The existing Cloudflare Free DNS zone has a proxied A record for
+  `actis-api.pandax.online`. Cloudflare's [free Universal SSL](https://developers.cloudflare.com/ssl/edge-certificates/universal-ssl/)
+  covers this first-level subdomain. Certificate issuance may require setting
+  the record to DNS only temporarily, then restoring Proxied.
+- Cloudflare Zero Trust was not activated because its checkout required
+  authorization for usage charges.
 
-- Oracle Free Tier account with an A1 instance available in its home region.
-- `VM.Standard.A1.Flex`, at most 2 OCPUs and 12 GB RAM across all A1 instances,
-  with an Always Free eligible Ubuntu image and boot volume.
-- Existing Cloudflare zone and Pages dashboard; an outbound Cloudflare Tunnel
-  publishes the API without opening an inbound API port on the VM.
-- Existing beta database, private storage, OIDC provider, signing keys, and
-  scheduler secret. Copy their values directly between the providers' secret
-  stores; never place them in Git, shell history, or chat.
+Check `/health/live`, `/health/build`, and `/health/ready` through the public
+hostname before deployment. Confirm CORS for `https://actis.pandax.online` and
+that unauthenticated portfolio requests return 401. The database and storage
+stay shared with Render; do not run migrations just for the hosting move.
 
-## Cutover
+## Dashboard cutover
 
-1. Provision the A1 VM, install Docker, and allow SSH only from the operator's
-   IP. Do not open the API port to the Internet.
-2. Clone the exact tested Git commit on the VM. Build the existing Dockerfile
-   for `linux/arm64`; the bootstrap pins and verifies the ARM64 Syft binary.
-   Run the container with the current beta environment variables, a restart
-   policy, and port 10000 bound to `127.0.0.1` only. Keep the same Supabase
-   database and storage; do not run migrations merely for this move.
-3. Create a remotely managed Cloudflare Tunnel on the VM. Route a dedicated
-   HTTPS API hostname to `http://localhost:10000`. Store its token on the VM,
-   outside Git. Keep authentication and the beta dashboard origin in
-   `PANDAX_CORS_ORIGINS`.
-4. Verify `/health/live`, `/health/build`, and `/health/ready` through the new
-   hostname. Run the beta authentication, portfolio, scan, document, storage,
-   persistence, and secret-redaction smoke tests from `docs/beta-release.md`.
-5. Rebuild Cloudflare Pages with `VITE_ACTIS_API_URL` set to the new hostname.
-   Check a fresh browser session: Home, product, release, findings, and a
-   mutation. Measure first load and a second load after 20 minutes idle.
-6. Point the existing hourly release-monitoring Worker at the new hostname.
-   Verify one scheduled run. Keep the old Render service available for rollback
-   until these checks pass, then retire it to preserve free instance hours.
+Cloudflare Pages project `actis-staging` builds `main` automatically. Set its
+production `VITE_ACTIS_API_URL` to `https://actis-api.pandax.online`, then deploy
+the tested dashboard commit. Check a fresh authenticated session: Home,
+products, releases, findings, and one safe mutation. Measure first load and a
+second visit after 20 minutes idle. The dashboard now shows base portfolio data
+before analysis jobs and other secondary requests finish.
+
+If the hourly `actis-release-monitoring` Worker is deployed later, set its
+`PANDAX_API_URL` to the new hostname and configure the scheduler secret. It was
+not deployed in the Cloudflare account during this migration.
 
 ## Rollback
 
-Restore the previous Pages `VITE_ACTIS_API_URL` and Worker `PANDAX_API_URL`,
-redeploy the prior Pages build, and confirm the Render API is ready. The database
-and storage stay shared during cutover, so no data copy or restore is required.
-
-Do not switch traffic if the A1 image build, readiness, or smoke tests fail.
+Restore the previous Pages `VITE_ACTIS_API_URL` value,
+`https://actis-api-staging.onrender.com`, and redeploy the prior Pages build.
+The existing database and storage require no data copy. Keep Render on its Free
+plan and automatic deploys off while it serves as fallback.

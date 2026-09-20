@@ -141,6 +141,12 @@ fieldset.field { min-width:0; margin:0; padding:0; border:0; }
 .progress-track { height:10px; border-radius:10px; overflow:hidden; background:var(--surface-subtle); }.progress-track span { display:block; height:100%; background:linear-gradient(90deg,var(--accent),var(--info)); transition:width .3s; }
 .notice { padding:13px 15px; border-radius:10px; background:var(--info-bg); border:1px solid var(--info-border); font-size:13px; line-height:1.5; }.notice-warning { background:var(--warning-bg); border-color:var(--warning-border); }
 .create-product-panel { max-width:980px; margin-inline:auto; }
+.create-product-panel .supplemental-evidence { border:0; padding:0; border-radius:0; }
+.create-product-panel .supplemental-evidence legend { padding:0; margin-bottom:14px; }
+.create-product-panel .supplemental-grid label,.create-product-panel .supplemental-grid>.field { border:0; border-radius:0; background:transparent; padding:0; overflow:visible; }
+.create-product-panel .upload-type-toggle { border-radius:6px; background:transparent; }
+.create-product-panel .upload-type-toggle button { border-radius:4px; }
+.create-product-panel .upload-type-toggle button[aria-pressed="true"] { box-shadow:none; background:var(--accent-soft); }
 .create-product-panel .supplemental-grid + .upload-zone { margin-top:20px; }
 .create-product-panel .local-sbom-guide--compact { margin-top:20px; }
 .local-sbom-guide { margin-top:16px; border:1px solid var(--border); border-radius:12px; background:var(--surface-subtle); overflow:hidden; }

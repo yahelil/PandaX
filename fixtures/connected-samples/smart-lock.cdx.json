@@ -1,0 +1,15 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": { "type": "application", "name": "Sample Smart Lock", "version": "1.0.0-sample" },
+    "properties": [
+      { "name": "actis:sample", "value": "true" },
+      { "name": "actis:evidence-scope", "value": "Illustrative dependency inventory, not a measured shipping-product SBOM" }
+    ]
+  },
+  "components": [
+    { "type": "library", "name": "axios", "version": "0.21.1", "purl": "pkg:npm/axios@0.21.1" }
+  ]
+}

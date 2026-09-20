@@ -33,8 +33,7 @@ export function HomePage() {
   const hasReview = hasAnalysis && (demo.findings.length === 0 || demo.findings.some((item) => item.decisions.length > 0));
   const hasApprover = demo.state.members.some((item) => item.status === "active" && item.roles.includes("authorized_approver"));
   const notificationsConfigured = Object.entries(demo.state.settings.notifications).some(([key, value]) => key === "emailDigest" ? value !== "off" : value === true);
-  const setupComplete = hasProduct && hasRelease && hasAnalysis && hasReview && hasApprover && notificationsConfigured;
-  const setupMode = homeSetupMode({ isScoped, hasProduct, setupComplete });
+  const setupMode = homeSetupMode({ isScoped, hasProduct });
   const setupSteps = [
     { label: "Create product", done: hasProduct, to: "/products" },
     { label: "Register release", done: hasRelease, to: hasProduct ? `/products/${demo.products[0].id}?tab=releases` : "/products" },
@@ -51,8 +50,6 @@ export function HomePage() {
         title="Home"
         description="What needs action now, why, by when, and who owns it."
       />
-
-      {setupMode === "supplemental" ? <SetupChecklist steps={setupSteps}/> : null}
 
       {monitoring || monitoringNeedsAttention ? (
         <section className={`notice${monitoringNeedsAttention ? " notice-warning" : ""}`} aria-label="Monitoring status">
@@ -125,30 +122,6 @@ function cadenceLabel(minutes: number[]): string {
 
 function sourceName(source: string): string {
   return ({ osv: "OSV", cisa_kev: "CISA KEV", epss: "EPSS", native_advisory: "Native advisories", vendor_advisory: "Vendor advisories" } as Record<string, string>)[source] ?? source.replaceAll("_", " ");
-}
-
-function SetupChecklist({ steps }: { steps: Array<{ label: string; done: boolean; to: string }> }) {
-  return (
-    <section className="panel setup-panel" aria-labelledby="setup-heading">
-      <SectionHeader title="Finish setting up Actis" description="Complete the remaining steps without losing visibility of active compliance work." />
-      <h2 className="sr-only" id="setup-heading">Setup checklist</h2>
-      <ol className="setup-list">
-        {steps.map((item, index) => {
-          const isActive = !item.done && steps.slice(0, index).every((step) => step.done);
-          return (
-            <li className={item.done ? "done" : isActive ? "active-step" : ""} key={item.label}>
-              <span aria-hidden="true">{item.done ? "✓" : index + 1}</span>
-              <div>
-                <strong>{item.label}</strong>
-                <small>{item.done ? "Complete" : "Not started"}</small>
-              </div>
-              {isActive ? <Link className="button button-primary" to={item.to}>Continue setup</Link> : null}
-            </li>
-          );
-        })}
-      </ol>
-    </section>
-  );
 }
 
 function SetupHero({ steps }: { steps: Array<{ label: string; done: boolean; to: string }> }) {

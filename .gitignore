@@ -87,7 +87,6 @@ pnpm-debug.log*
 .local-test/
 .uv-plan-cache/
 tmp/
-scratch/
 
 # PandaX POC
 .tools/

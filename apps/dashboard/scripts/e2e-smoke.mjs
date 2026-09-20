@@ -147,7 +147,12 @@ try {
 
   await page.getByRole("button", { name: /Add (device|product)/i }).click();
   await assertVisible(page.getByRole("heading", { name: /Add (device|product)/i }), "add device form");
-  await page.getByRole("button", { name: "Start CRA assessment" }).click();
+  await page.getByLabel("Product name").fill("Unsupported SBOM example");
+  await page.getByLabel("Product identifier").fill("EXAMPLE-UNSUPPORTED-SBOM");
+  await page.getByRole("button", { name: "Continue to CRA scope" }).click();
+  await page.getByRole("button", { name: "Select Standard Route" }).click();
+  await assertVisible(page.getByText("Current classification:"), "standard CRA route");
+  await page.getByRole("button", { name: "Start Guided Assessment" }).click();
   if (visualDir) await page.screenshot({ path: join(visualDir, "add-device-cra-scope.png"), fullPage: true });
   await page.getByRole("button", { name: "Check which products are affected" }).click();
   await assertVisible(page.getByRole("dialog", { name: "Which products may be covered?" }), "CRA scope guide");
@@ -165,13 +170,12 @@ try {
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.getByRole("checkbox", { name: "Confirm classification" }).check();
   await page.getByRole("button", { name: "Use assessment" }).click();
-  await assertVisible(page.getByText("Supported JSON SBOMs: CycloneDX 1.2 or 1.6", { exact: false }), "supported SBOM formats");
-  if (visualDir) await page.screenshot({ path: join(visualDir, "add-device-evidence.png"), fullPage: true });
-  await page.getByRole("button", { name: "Edit assessment" }).click();
+  await page.getByRole("button", { name: "Re-run Assessment" }).click();
   await assertVisible(page.getByRole("button", { name: "Edit category answers" }), "saved category answers");
   await page.getByRole("button", { name: "Close CRA assessment" }).click();
-  await page.getByLabel("Product name").fill("Unsupported SBOM example");
-  await page.getByLabel("Product identifier").fill("EXAMPLE-UNSUPPORTED-SBOM");
+  await page.getByRole("button", { name: "Next: Upload SBOM" }).click();
+  await assertVisible(page.getByText("Supported JSON SBOMs: CycloneDX 1.2 or 1.6", { exact: false }), "supported SBOM formats");
+  if (visualDir) await page.screenshot({ path: join(visualDir, "add-device-evidence.png"), fullPage: true });
   await page.getByLabel("Product release version").fill("1.0.0");
   await page.locator(".create-product-panel input[type=file]").setInputFiles({
     name: "unsupported.cdx.json", mimeType: "application/json",

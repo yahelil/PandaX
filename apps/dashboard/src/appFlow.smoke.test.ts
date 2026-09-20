@@ -116,7 +116,9 @@ describe("application flow smoke contracts", () => {
     expect(products).not.toContain('{assessment && assessment.scopeResult !== "out_of_scope" ? <fieldset');
     expect(products).toContain("validateSbomFormatVersion(evidenceFile)");
     expect(products).toContain("Product release version");
-    expect(products).toContain("initialAssessment={assessment}");
+    expect(products).toContain("initialAssessment={guidedAssessment ? assessment : undefined}");
+    expect(products).toContain("Continue to CRA scope");
+    expect(products).toContain("Next: Upload SBOM");
     expect(products).toContain("demo.actions.runAnalysis");
     const localSbom = source("./pages/LocalSbomGuide.tsx");
     expect(localSbom).toContain("Generate an SBOM locally");

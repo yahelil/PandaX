@@ -96,7 +96,7 @@ def test_postgresql_clean_upgrade_rollback_lock_and_backup_restore(tmp_path):
             text=True,
         )
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260917_0016"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20260920_0017"
             assert connection.scalar(text(
                 "SELECT name FROM portfolio_organizations WHERE id = 'restore-org'"
             )) == organization.name

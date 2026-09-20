@@ -63,14 +63,14 @@ def sbom_bytes(filename: str) -> bytes:
     return content
 
 
-def upload(api: Api, product_id: str, release_id: str, filename: str):
+def upload(api: Api, product_id: str, release_id: str, filename: str, *, key_suffix: str = ""):
     content = sbom_bytes(filename)
     boundary = f"actis-{uuid.uuid4().hex}"
     body = (
         f"--{boundary}\r\nContent-Disposition: form-data; name=\"sbom\"; filename=\"{filename}\"\r\n"
         "Content-Type: application/json\r\n\r\n"
     ).encode() + content + f"\r\n--{boundary}--\r\n".encode()
-    key = "connected-sample-" + hashlib.sha256(content).hexdigest()[:24]
+    key = "connected-sample-" + hashlib.sha256(content).hexdigest()[:24] + key_suffix
     path = f"/products/{quote(product_id)}/releases/{quote(release_id)}/analysis-jobs"
     return api.call("POST", path, body, {
         "Content-Type": f"multipart/form-data; boundary={boundary}",
@@ -85,7 +85,10 @@ def main():
     parser.add_argument("--token", help="API token; alternatively set ACTIS_SAMPLE_TOKEN")
     parser.add_argument("--only", choices=tuple(SAMPLES), help="Seed one product first")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--refresh-completed", action="store_true", help="Rebuild one completed sample's documents")
     args = parser.parse_args()
+    if args.refresh_completed and not args.only:
+        parser.error("--refresh-completed requires --only")
     token = args.token or os.environ.get("ACTIS_SAMPLE_TOKEN", "")
     if not token:
         parser.error("Set ACTIS_SAMPLE_TOKEN to an authorized API token")
@@ -135,7 +138,10 @@ def main():
         existing = api.call("GET", job_path)
         if any(item["status"] in {"failed", "unsupported"} for item in existing):
             raise RuntimeError(f"Existing sample analysis failed for {sample_name}; inspect before retrying")
-        job = existing[0] if existing else upload(api, product["id"], release["id"], filename)
+        if args.refresh_completed and existing:
+            job = upload(api, product["id"], release["id"], filename, key_suffix="-monochrome-v1")
+        else:
+            job = max(existing, key=lambda item: item["created_at"]) if existing else upload(api, product["id"], release["id"], filename)
         if job["status"] == "queued":
             job = api.call("POST", job_path + f"/{quote(job['id'])}/run")
         print(f"{sample_name}: analysis {job['id']} ({job['status']})")

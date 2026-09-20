@@ -120,6 +120,28 @@ describe("ProductionAdapter", () => {
     expect(adapter.getStatusSnapshot()).toMatchObject({ phase: "ready" });
   });
 
+  it("shows the workspace before release jobs and home data finish loading", async () => {
+    const pendingJobs = deferred<ReleaseAnalysisJob[]>();
+    const pendingHome = deferred<Awaited<ReturnType<OperationsApi["getHome"]>>>();
+    const releaseApi = releaseOperations({} as ReleaseAnalysisJob);
+    releaseApi.listAnalysisJobs = vi.fn(() => pendingJobs.promise);
+    const operationsApi = {
+      getHome: vi.fn(() => pendingHome.promise),
+      listNotifications: vi.fn(async () => []),
+    } as unknown as OperationsApi;
+    const adapter = new ProductionAdapter({
+      organizationId: organization.id, portfolioApi: api(), releaseOperationsApi: releaseApi, operationsApi,
+    });
+
+    const loading = adapter.initialize();
+    await vi.waitFor(() => expect(adapter.getStatusSnapshot().phase).toBe("ready"));
+    expect(adapter.getSnapshot()).toMatchObject({ products: [product], releases: [release] });
+    pendingJobs.resolve([]);
+    pendingHome.resolve({ organizationId: organization.id, actionQueue: [], recentChanges: [], generatedAt: "2026-09-20T00:00:00Z", monitoring: null, counters: {}, dataWarnings: [] } as unknown as Awaited<ReturnType<OperationsApi["getHome"]>>);
+    await loading;
+    expect(adapter.getStatusSnapshot().phase).toBe("ready");
+  });
+
   it("shows a load error without exposing demo products when the live API is unavailable", async () => {
     const adapter = new ProductionAdapter({
       organizationId: organization.id,

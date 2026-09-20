@@ -661,8 +661,10 @@ export class ProductionAdapter implements DataAdapter {
     try {
       const portfolio = Promise.all([this.config.portfolioApi.getOrganization(this.config.organizationId, options), this.config.portfolioApi.listProducts(this.config.organizationId, options)]).then(async ([organization, products]) => {
         const releases = (await Promise.all(products.map((product) => this.config.portfolioApi.listReleases(this.config.organizationId, product.id, options)))).flat();
-        const scopedJobs = this.config.releaseOperationsApi
-          ? await Promise.all(releases.map(async (release) => {
+        return { organization, products, releases };
+      });
+      const releaseJobs = this.config.releaseOperationsApi
+        ? portfolio.then(({ releases }) => Promise.all(releases.map(async (release) => {
               const scope = { organizationId: this.config.organizationId, productId: release.productId, releaseId: release.id };
               const jobs = await this.config.releaseOperationsApi!.listAnalysisJobs(scope, options);
               let monitoring: ReleaseMonitoringStatus | undefined;
@@ -671,14 +673,12 @@ export class ProductionAdapter implements DataAdapter {
                 catch (error) { if (!(error instanceof ReleaseOperationsApiError && error.code === "not_found")) throw error; }
               }
               return { release, jobs, monitoring };
-            }))
-          : releases.map((release) => ({ release, jobs: [] as ReleaseAnalysisJob[], monitoring: undefined }));
-        return { organization, products, releases: scopedJobs.map(({ release, jobs, monitoring }) => projectRelease(release, jobs, monitoring)), analysisJobs: scopedJobs.flatMap(({ jobs }) => jobs) };
-      });
+            })))
+        : undefined;
       const operations = this.config.operationsApi ? Promise.all([this.config.operationsApi.getHome(this.config.organizationId, { signal: options?.signal }), this.config.operationsApi.listNotifications(this.config.organizationId, { view: "unread_action", signal: options?.signal })]) : undefined;
       const findingList = this.config.findingsApi ? this.config.findingsApi.listFindings(this.config.organizationId, { view: "all" }, options) : undefined;
       const governance = this.config.governanceApi ? Promise.all([this.config.governanceApi.listCompliance(this.config.organizationId, { view: "all" }, options), this.config.governanceApi.listDocuments(this.config.organizationId, {}, options), this.config.governanceApi.getSettings(this.config.organizationId, options), this.config.governanceApi.listTeam(this.config.organizationId, options), this.config.governanceApi.listIntegrations(this.config.organizationId, options)]).then(async ([compliance, documents, settings, members, integrations]) => ({ compliance, settings, members, integrations, documentDetails: await Promise.all(documents.map((document) => this.config.governanceApi!.getDocument(this.config.organizationId, document.id, options))) })) : undefined;
-      const ancillary = Promise.allSettled([operations, findingList, governance]);
+      const ancillary = Promise.allSettled([releaseJobs, operations, findingList, governance]);
       const portfolioState = await portfolio;
       if (revision !== this.refreshRevision) return;
       const receivedProductIds = new Set(portfolioState.products.map((item) => item.id));
@@ -690,16 +690,20 @@ export class ProductionAdapter implements DataAdapter {
       }
       this.fixture.replacePortfolio(portfolioState.organization, portfolioState.products, portfolioState.releases);
       this.portfolioHydrated = true;
-      this.setStatus({ mode: "production", phase: "loading", lastSyncedAt: new Date().toISOString() });
-      if (this.config.releaseOperationsApi) {
-        const jobs = portfolioState.analysisJobs.map((job) => mapAnalysisJob(job, this.draftForJob(job, portfolioState.releases)));
-        this.fixture.replaceAnalysisJobs(jobs);
-        portfolioState.analysisJobs.filter((job) => !this.isTerminalAnalysis(job) && job.status === "running").forEach((job) => {
-          if (!this.analysisTimers.has(job.id)) this.pollAnalysis(this.analysisScope(this.draftForJob(job, portfolioState.releases) as AnalysisDraft & { releaseId: string }), this.draftForJob(job, portfolioState.releases), job.id);
+      this.markReady();
+      const [releaseJobsResult, operationsResult, findingsResult, governanceResult] = await ancillary;
+      if (revision !== this.refreshRevision) return;
+      if (releaseJobsResult.status === "fulfilled" && releaseJobsResult.value) {
+        const scopedJobs = releaseJobsResult.value;
+        const currentReleases = new Map(this.getSnapshot().releases.map((release) => [release.id, release]));
+        const projectedReleases = scopedJobs.map(({ release, jobs, monitoring }) => projectRelease(currentReleases.get(release.id) ?? release, jobs, monitoring));
+        projectedReleases.forEach((release) => this.fixture.upsertRelease(release));
+        const analysisJobs = scopedJobs.flatMap(({ jobs }) => jobs);
+        this.fixture.replaceAnalysisJobs(analysisJobs.map((job) => mapAnalysisJob(job, this.draftForJob(job, projectedReleases))));
+        analysisJobs.filter((job) => !this.isTerminalAnalysis(job) && job.status === "running").forEach((job) => {
+          if (!this.analysisTimers.has(job.id)) this.pollAnalysis(this.analysisScope(this.draftForJob(job, projectedReleases) as AnalysisDraft & { releaseId: string }), this.draftForJob(job, projectedReleases), job.id);
         });
       }
-      const [operationsResult, findingsResult, governanceResult] = await ancillary;
-      if (revision !== this.refreshRevision) return;
       if (operationsResult.status === "fulfilled" && operationsResult.value) {
         const operationsState = operationsResult.value;
         const [home, notifications] = operationsState;
@@ -729,7 +733,7 @@ export class ProductionAdapter implements DataAdapter {
         );
         this.fixture.replaceOrganization(mapGovernanceSettings(governanceState.settings).organization);
       }
-      const rejected = [operationsResult, findingsResult, governanceResult].find((result) => result.status === "rejected");
+      const rejected = [releaseJobsResult, operationsResult, findingsResult, governanceResult].find((result) => result.status === "rejected");
       if (rejected?.status === "rejected") this.markFailed(operation, rejected.reason);
       else this.markReady();
     } catch (error) {

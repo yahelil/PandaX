@@ -179,7 +179,8 @@ def test_quota_and_interrupted_upload_leave_no_bundle(tmp_path, monkeypatch):
         assert connection.scalar(select(func.count()).select_from(evidence_bundles)) == 0
 
 
-def test_supabase_adapter_requires_private_bucket_and_idempotent_objects():
+@pytest.mark.parametrize("duplicate_status", [400, 409])
+def test_supabase_adapter_requires_private_bucket_and_idempotent_objects(duplicate_status):
     content = b"sealed bundle"
     posts = 0
 
@@ -190,7 +191,7 @@ def test_supabase_adapter_requires_private_bucket_and_idempotent_objects():
             return httpx.Response(200, json={"public": False})
         if request.method == "POST":
             posts += 1
-            return httpx.Response(200 if posts == 1 else 409, json={})
+            return httpx.Response(200 if posts == 1 else duplicate_status, json={})
         if request.method == "GET":
             return httpx.Response(200, content=content)
         if request.method == "DELETE":

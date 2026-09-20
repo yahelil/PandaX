@@ -18,6 +18,7 @@ from sqlalchemy.pool import StaticPool
 from pandax import events as ev
 from pandax.analysis_api import create_analysis_router
 from pandax.analysis_jobs import AnalysisJobRepository
+from pandax.analysis_storage import StoredAnalysisInput
 from pandax.portfolio import PortfolioRepository, create_portfolio_engine
 from pandax.portfolio_api import PortfolioIdentity
 from pandax import portfolio_runtime
@@ -353,9 +354,9 @@ def test_completed_analysis_enrolls_regulatory_documents(monkeypatch):
         )
 
     storage = Mock()
-    storage.put_document.side_effect = lambda org_id, scope_id, content, suffix: SimpleNamespace(
-        key=f"documents/{org_id}/{scope_id}{suffix}",
-        digest=hashlib.sha256(content).hexdigest(),
+    storage.put_document.side_effect = lambda org_id, scope_id, content, suffix: StoredAnalysisInput(
+        object_key=f"documents/{org_id}/{scope_id}{suffix}",
+        sha256=hashlib.sha256(content).hexdigest(),
         size_bytes=len(content),
     )
     analysis = Mock()

@@ -195,9 +195,13 @@ class SupabaseAnalysisInputStorage:
             content=content,
             headers={"content-type": media_type, "x-upsert": "false"},
         )
-        if response.status_code == 409:
-            existing = self.get(key, digest)
-            return StoredAnalysisInput(key, digest, len(existing))
+        if response.status_code in {400, 409}:
+            try:
+                existing = self.get(key, digest)
+            except AnalysisInputStorageError:
+                self._success(response, "upload")
+            else:
+                return StoredAnalysisInput(key, digest, len(existing))
         self._success(response, "upload")
         return StoredAnalysisInput(key, digest, len(content))
 

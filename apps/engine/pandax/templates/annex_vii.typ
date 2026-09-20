@@ -9,8 +9,8 @@
   margin: (x: 1.9cm, top: 2cm, bottom: 1.8cm),
   numbering: "1 / 1",
   footer: context [
-    #set text(size: 7pt, fill: rgb("#64748b"))
-    #line(length: 100%, stroke: 0.4pt + rgb("#e2e8f0"))
+    #set text(size: 7pt)
+    #line(length: 100%, stroke: 0.4pt + black)
     #v(2pt)
     #grid(
       columns: (1fr, auto),
@@ -23,9 +23,9 @@
 #set text(size: 9.2pt, lang: "en")
 #set par(justify: true, leading: 0.62em)
 
-#let ink = rgb("#0f172a")
-#let muted = rgb("#64748b")
-#let line_c = rgb("#e2e8f0")
+#let ink = black
+#let muted = black
+#let line_c = rgb("#999999")
 
 #show heading.where(level: 1): it => block(above: 16pt, below: 8pt)[
   #set text(size: 13pt, weight: "bold", fill: ink)
@@ -37,18 +37,13 @@
 ]
 
 #let badge(status) = {
-  let spec = if status == "derived" {
-    (rgb("#dcfce7"), rgb("#14532d"), "MACHINE-DERIVED")
-  } else if status == "attested" {
-    (rgb("#dbeafe"), rgb("#1e3a8a"), "MANUFACTURER-ATTESTED")
-  } else {
-    (rgb("#fee2e2"), rgb("#7f1d1d"), "INPUT REQUIRED")
-  }
+  let label = if status == "derived" { "MACHINE-DERIVED" }
+    else if status == "attested" { "MANUFACTURER-ATTESTED" }
+    else { "INPUT REQUIRED" }
   box(
-    fill: spec.at(0),
+    stroke: 0.5pt + ink,
     inset: (x: 5pt, y: 2.5pt),
-    radius: 2pt,
-    text(size: 6.5pt, weight: "bold", fill: spec.at(1), spec.at(2)),
+    text(size: 6.5pt, weight: "bold", label),
   )
 }
 
@@ -56,8 +51,7 @@
   above: 9pt,
   below: 2pt,
   width: 100%,
-  fill: if e.status == "required_input" { rgb("#fef2f2") } else { white },
-  stroke: (left: 2pt + if e.status == "required_input" { rgb("#dc2626") } else { line_c }),
+  stroke: (left: 1pt + line_c),
   inset: (left: 8pt, rest: 6pt),
 )[
   #grid(
@@ -70,7 +64,7 @@
   )
   #v(3pt)
   #if e.status == "required_input" [
-    #text(fill: rgb("#b91c1c"), weight: "bold", size: 9pt)[#e.value]
+    #text(weight: "bold", size: 9pt)[#e.value]
   ] else [
     #text(fill: ink)[#e.value]
   ]
@@ -129,9 +123,7 @@
 
 #block(
   width: 100%,
-  fill: rgb("#f8fafc"),
   stroke: 0.6pt + line_c,
-  radius: 3pt,
   inset: 9pt,
 )[
   #text(size: 8.4pt, weight: "bold")[How to read this document]
@@ -159,9 +151,7 @@
 
 #block(
   width: 100%,
-  fill: if data.summary.actively_exploited > 0 { rgb("#fef2f2") } else { rgb("#f0fdf4") },
-  stroke: 0.6pt + if data.summary.actively_exploited > 0 { rgb("#fecaca") } else { rgb("#bbf7d0") },
-  radius: 3pt,
+  stroke: 0.6pt + line_c,
   inset: 9pt,
 )[
   #text(size: 8.4pt, weight: "bold")[Composition and vulnerability summary]
@@ -181,12 +171,12 @@
       #text(
         size: 17pt,
         weight: "bold",
-        fill: if data.summary.actively_exploited > 0 { rgb("#b91c1c") } else { rgb("#15803d") },
+        fill: ink,
       )[#data.summary.actively_exploited] \
-      #text(size: 7.4pt, fill: muted)[ACTIVELY EXPLOITED \ CISA KEV — Art.14 trigger]
+      #text(size: 7.4pt, fill: muted)[CISA KEV MATCHES \ Review Article 14 applicability]
     ],
     [
-      #text(size: 17pt, weight: "bold", fill: rgb("#b45309"))[#data.summary.required_input] \
+      #text(size: 17pt, weight: "bold")[#data.summary.required_input] \
       #text(size: 7.4pt, fill: muted)[FIELDS AWAITING \ MANUFACTURER INPUT]
     ],
   )
@@ -206,18 +196,15 @@
 
   #block(
     width: 100%,
-    fill: rgb("#fef2f2"),
-    stroke: 0.6pt + rgb("#fecaca"),
-    radius: 3pt,
+    stroke: 0.6pt + line_c,
     inset: 9pt,
   )[
-    #text(size: 8.6pt, weight: "bold", fill: rgb("#7f1d1d"))[
-      Article 14(1) reporting obligation is engaged.
-    ]
+    #text(size: 8.6pt, weight: "bold")[Potential Article 14 reporting signal - manufacturer review required.]
     #v(3pt)
     #text(size: 8.2pt)[
       The vulnerabilities below appear in the CISA Known Exploited
-      Vulnerabilities catalogue. Under Article 14(2) the manufacturer must submit
+      Vulnerabilities catalogue. Confirm product impact and awareness promptly.
+      If Article 14 applies, the manufacturer must submit
       an early warning within 24 hours of becoming aware, a vulnerability
       notification within 72 hours, and a final report no later than 14 days
       after a corrective measure is available. Annex I Part I(2)(a) additionally
@@ -231,7 +218,7 @@
     columns: (auto, 1fr, auto, auto, auto, auto),
     inset: (x: 6pt, y: 5pt),
     stroke: 0.4pt + line_c,
-    fill: (_, y) => if y == 0 { rgb("#f1f5f9") } else { white },
+    fill: (_, y) => white,
     table.header(
       [#text(size: 7.4pt, weight: "bold")[CVE]],
       [#text(size: 7.4pt, weight: "bold")[COMPONENT]],
@@ -242,7 +229,7 @@
     ),
     ..data.kev_rows
       .map(r => (
-        [#text(size: 8pt, weight: "bold", fill: rgb("#b91c1c"))[#r.cve]],
+        [#text(size: 8pt, weight: "bold")[#r.cve]],
         [#text(size: 8pt)[#r.component]],
         [#text(size: 8pt)[#r.severity]],
         [#text(size: 8pt)[#r.epss]],
@@ -288,7 +275,7 @@
     columns: (auto, 1fr, auto, auto, auto),
     inset: (x: 6pt, y: 4pt),
     stroke: 0.4pt + line_c,
-    fill: (_, y) => if y == 0 { rgb("#f1f5f9") } else { white },
+    fill: (_, y) => white,
     table.header(
       [#text(size: 7.4pt, weight: "bold")[CVE]],
       [#text(size: 7.4pt, weight: "bold")[COMPONENT]],
@@ -324,6 +311,6 @@
   that run is recorded in a hash-chained ledger and sealed with an Ed25519
   signature over manifest.json, which can be verified independently with
   #raw("actis verify"). The signature proves the integrity of this bundle, not
-  the legal identity of the signer; an eIDAS qualified electronic seal is
-  required for that.
+  the legal identity of the signer or regulatory conformity.
+  Regulation (EU) 2024/2847: https://eur-lex.europa.eu/eli/reg/2024/2847/oj.
 ]

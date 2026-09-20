@@ -15,8 +15,8 @@
 #set text(size: 11pt, lang: "en")
 #set par(justify: false, leading: 0.7em)
 
-#let ink = rgb("#0f172a")
-#let muted = rgb("#5b6b84")
+#let ink = black
+#let muted = black
 #let missing = data.doc_url == ""
 
 #align(center)[
@@ -32,8 +32,8 @@
 #v(4pt)
 #line(length: 100%, stroke: 1pt + ink)
 #v(10pt)
-#block(width: 100%, fill: rgb("#fff7ed"), inset: 8pt, radius: 3pt)[
-  #text(size: 9pt, weight: "bold", fill: rgb("#9a3412"))[
+#block(width: 100%, inset: 8pt, stroke: 0.6pt + ink)[
+  #text(size: 9pt, weight: "bold")[
     DRAFT — NOT ISSUED. Manufacturer review and approved full declaration required.
   ]
 ]
@@ -53,7 +53,7 @@
   following internet address:
   #v(4pt)
   #if missing [
-    #text(fill: rgb("#b91c1c"), weight: "bold")[
+    #text(weight: "bold")[
       MANUFACTURER INPUT REQUIRED — Article 13(20) requires the exact internet
       address at which the full EU declaration of conformity can be accessed.
       Set `vulnerability_handling.declaration_url` in the product metadata.

@@ -73,6 +73,10 @@ describe("document adapter workflow", () => {
     const bytes = new Uint8Array(buffer);
     const header = new TextDecoder().decode(bytes.slice(0, 8));
     expect(header).toBe("%PDF-1.4");
+    const content = new TextDecoder().decode(bytes);
+    expect(content).toContain("Regulation (EU) 2024/2847");
+    expect(content).toContain("PDF/A conformance not verified");
+    expect(content).not.toContain("OFFICIAL REGULATORY EVIDENCE REPORT");
   });
 
   it("generates valid ZIP binary files for ZIP format documents with positive size", async () => {

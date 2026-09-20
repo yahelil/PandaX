@@ -16,9 +16,9 @@
 #set text(size: 10pt, lang: "en")
 #set par(justify: false, leading: 0.65em)
 
-#let ink = rgb("#0f172a")
-#let muted = rgb("#5b6b84")
-#let line_c = rgb("#d9e0ea")
+#let ink = black
+#let muted = black
+#let line_c = rgb("#999999")
 #let blocked = data.summary.actively_exploited > 0
 
 // The CE marking is NOT drawn here. Its graphic form is prescribed by Annex II
@@ -31,10 +31,9 @@
   } else {
     box(
       width: size * 1.6, height: size,
-      stroke: (thickness: 0.8pt, paint: rgb("#b91c1c"), dash: "dashed"),
-      radius: 2pt,
+      stroke: (thickness: 0.8pt, paint: ink, dash: "dashed"),
       align(center + horizon, text(
-        size: 6.5pt, fill: rgb("#b91c1c"), weight: "bold",
+        size: 6.5pt, fill: ink, weight: "bold",
       )[AFFIX\ CE MARKING]),
     )
   }
@@ -54,8 +53,8 @@
 #line(length: 100%, stroke: 1pt + ink)
 #v(12pt)
 
-#block(width: 100%, fill: rgb("#fff7ed"), inset: 8pt, radius: 3pt)[
-  #text(size: 9pt, weight: "bold", fill: rgb("#9a3412"))[
+#block(width: 100%, inset: 8pt, stroke: 0.6pt + line_c)[
+  #text(size: 9pt, weight: "bold")[
     DRAFT — NOT ISSUED. Manufacturer review, conformity assessment, and signature required.
   ]
 ]
@@ -64,23 +63,20 @@
 #if blocked [
   #block(
     width: 100%,
-    fill: rgb("#fef2f2"),
-    stroke: 1.2pt + rgb("#dc2626"),
-    radius: 3pt,
+    stroke: 1pt + ink,
     inset: 11pt,
   )[
-    #text(size: 11pt, weight: "bold", fill: rgb("#7f1d1d"))[
+    #text(size: 11pt, weight: "bold")[
       DRAFT — NOT VALID FOR SIGNATURE
     ]
     #v(4pt)
     #text(size: 9pt)[
-      This declaration cannot be issued. #data.summary.actively_exploited
-      actively exploited #if data.summary.actively_exploited == 1 [vulnerability
-      is] else [vulnerabilities are] present in the product. Annex I Part I(2)(a)
-      requires that products with digital elements are made available on the
-      market #emph[without known exploitable vulnerabilities]. Remediate the
-      findings listed in the accompanying technical documentation, then re-run
-      the assessment.
+      This draft must not be signed. #data.summary.actively_exploited
+      #if data.summary.actively_exploited == 1 [finding matches] else [findings match]
+      the CISA Known Exploited Vulnerabilities catalogue. Confirm product
+      impact and remediate as needed before conformity assessment. Annex I
+      Part I(2)(a) requires products to be made available on the market
+      without known exploitable vulnerabilities.
     ]
   ]
   #v(12pt)
@@ -99,7 +95,7 @@
         #v(2.5pt)
       ]
       #if flagged [
-        #text(fill: rgb("#b91c1c"), weight: "bold")[#body]
+        #text(weight: "bold")[#body]
       ] else [
         #body
       ]
@@ -149,9 +145,7 @@
 #block(
   breakable: false,
   width: 100%,
-  fill: rgb("#f8fafc"),
   stroke: 0.6pt + line_c,
-  radius: 3pt,
   inset: 10pt,
 )[
   #text(size: 8.5pt, weight: "bold")[Union harmonisation legislation applied]

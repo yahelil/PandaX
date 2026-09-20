@@ -115,7 +115,6 @@ export function createFixturePdf(input: FixturePdfInput | string, legacyLines?: 
   let status = "DRAFT";
   let completeness = "COMPLETE";
   let generatedAt = new Date().toISOString();
-  let format = "PDF/A-2b";
   let findings: FixturePdfFinding[] = [];
 
   if (typeof input === "string") {
@@ -130,7 +129,6 @@ export function createFixturePdf(input: FixturePdfInput | string, legacyLines?: 
         else if (line.startsWith("Status: ")) status = line.replace("Status: ", "").toUpperCase();
         else if (line.startsWith("Completeness: ")) completeness = line.replace("Completeness: ", "").toUpperCase();
         else if (line.startsWith("Generated: ")) generatedAt = line.replace("Generated: ", "");
-        else if (line.startsWith("Format: ")) format = line.replace("Format: ", "");
         else if (line.startsWith("- [")) {
           findings.push({ id: line, title: line, severity: line.includes("CRITICAL") ? "critical" : line.includes("HIGH") ? "high" : "medium" });
         }
@@ -144,62 +142,56 @@ export function createFixturePdf(input: FixturePdfInput | string, legacyLines?: 
     status = (input.status || "draft").toUpperCase();
     completeness = (input.completeness || "complete").toUpperCase();
     generatedAt = input.generatedAt || new Date().toISOString();
-    format = input.format || "PDF/A-2b";
     findings = input.findings || [];
   }
 
   const stream: string[] = [];
 
-  // Top header banner (Dark Navy)
-  stream.push("0.08 0.13 0.24 rg");
-  stream.push("50 712 512 44 re f");
+  // Restrained monochrome document rule and running title.
+  stream.push("0 G 0.5 w 50 754 m 562 754 l S");
 
   stream.push("BT");
-  stream.push("1 1 1 rg");
-  stream.push("/F2 13 Tf");
-  stream.push("65 734 Td");
-  stream.push("(PANDAX CYBER COMPLIANCE & GOVERNANCE ENGINE) Tj");
-  stream.push("0.75 0.82 0.95 rg");
+  stream.push("0 g");
+  stream.push("/F2 10 Tf");
+  stream.push("50 737 Td");
+  stream.push("(ACTIS  /  PRODUCT ASSURANCE) Tj");
+  stream.push("0 g");
   stream.push("/F1 8 Tf");
   stream.push("0 -13 Td");
-  stream.push("(OFFICIAL REGULATORY EVIDENCE REPORT  |  CONFIDENTIAL) Tj");
+  stream.push("(Internal working draft  |  Review before external use) Tj");
   stream.push("ET");
 
   // Document Title
   stream.push("BT");
-  stream.push("0.10 0.12 0.16 rg");
-  stream.push("/F2 17 Tf");
+  stream.push("0 g");
+  stream.push("/F2 12 Tf");
   stream.push("50 675 Td");
   stream.push(`(${escapePdfText(title)}) Tj`);
   stream.push("ET");
 
   // Top separator rule
-  stream.push("0.80 0.84 0.90 RG 1 w");
+  stream.push("0 G 0.5 w");
   stream.push("50 660 m 562 660 l S");
 
-  // Metadata Card background & border
-  stream.push("0.96 0.97 0.98 rg");
-  stream.push("50 535 512 110 re f");
-  stream.push("0.82 0.85 0.90 RG 0.75 w");
-  stream.push("50 535 512 110 re S");
+  stream.push("0 G 0.5 w 50 535 m 562 535 l S");
 
   // Metadata Column 1 Labels
   stream.push("BT");
-  stream.push("0.45 0.50 0.58 rg");
+  stream.push("0 g");
   stream.push("/F2 8 Tf");
   stream.push("16 TL");
   stream.push("65 623 Td");
   stream.push("(DOCUMENT ID:) Tj T*");
   stream.push("(PRODUCT REF:) Tj T*");
   stream.push("(REVISION / STATUS:) Tj T*");
-  stream.push("(EVIDENCE COMPLETENESS:) Tj T*");
-  stream.push("(FORMAT SPECIFICATION:) Tj T*");
+  stream.push("(RECORDED COMPLETENESS:) Tj T*");
+  stream.push("(OUTPUT:) Tj T*");
   stream.push("(GENERATION DATE:) Tj T*");
   stream.push("ET");
 
   // Metadata Column 1 Values
   stream.push("BT");
-  stream.push("0.12 0.15 0.20 rg");
+  stream.push("0 g");
   stream.push("/F1 8.5 Tf");
   stream.push("16 TL");
   stream.push("195 623 Td");
@@ -207,60 +199,49 @@ export function createFixturePdf(input: FixturePdfInput | string, legacyLines?: 
   stream.push(`(${escapePdfText(productId)}) Tj T*`);
   stream.push(`(Revision ${version}  -  ${escapePdfText(status)}) Tj T*`);
   stream.push(`(${escapePdfText(completeness)}) Tj T*`);
-  stream.push(`(${escapePdfText(format)} (ISO 19005-2 compliance)) Tj T*`);
+  stream.push("(PDF demo copy; PDF/A conformance not verified) Tj T*");
   stream.push(`(${escapePdfText(generatedAt)}) Tj T*`);
   stream.push("ET");
 
   // Findings Section Header
   stream.push("BT");
-  stream.push("0.10 0.12 0.16 rg");
+  stream.push("0 g");
   stream.push("/F2 12 Tf");
   stream.push("50 495 Td");
   stream.push(`(Associated Security Findings (${findings.length})) Tj`);
   stream.push("ET");
 
-  stream.push("0.80 0.84 0.90 RG 0.5 w");
+  stream.push("0 G 0.5 w");
   stream.push("50 485 m 562 485 l S");
 
   // Findings Cards
   let curY = 425;
   if (findings.length === 0) {
-    stream.push("0.98 0.98 0.99 rg");
-    stream.push(`50 ${curY} 512 45 re f`);
-    stream.push("0.88 0.90 0.92 RG 0.5 w");
-    stream.push(`50 ${curY} 512 45 re S`);
+    stream.push("0 G 0.5 w");
+    stream.push(`50 ${curY} m 562 ${curY} l S`);
     stream.push("BT");
-    stream.push("0.35 0.40 0.45 rg");
+    stream.push("0 g");
     stream.push("/F1 9 Tf");
     stream.push(`65 ${curY + 18} Td`);
-    stream.push("(No unresolved security findings recorded against this product revision.) Tj");
+    stream.push("(No findings included in this document snapshot; this is not proof of conformity.) Tj");
     stream.push("ET");
   } else {
     for (const f of findings.slice(0, 3)) {
-      const isCritical = (f.severity || "").toLowerCase() === "critical";
-      const isHigh = (f.severity || "").toLowerCase() === "high";
-      const badgeR = isCritical ? "0.82 0.15 0.15" : isHigh ? "0.85 0.35 0.10" : "0.20 0.45 0.80";
-
-      stream.push("0.98 0.98 0.99 rg");
-      stream.push(`50 ${curY} 512 50 re f`);
-      stream.push("0.88 0.90 0.93 RG 0.5 w");
-      stream.push(`50 ${curY} 512 50 re S`);
-
-      stream.push(`${badgeR} rg`);
-      stream.push(`50 ${curY} 4 50 re f`);
+      stream.push("0 G 0.5 w");
+      stream.push(`50 ${curY} m 562 ${curY} l S`);
 
       stream.push("BT");
-      stream.push(`${badgeR} rg`);
+      stream.push("0 g");
       stream.push("/F2 8.5 Tf");
       stream.push(`65 ${curY + 33} Td`);
       stream.push(`([${escapePdfText((f.severity || "UNKNOWN").toUpperCase())}]  ${escapePdfText(f.reference || f.id)}) Tj`);
 
-      stream.push("0.10 0.12 0.16 rg");
+      stream.push("0 g");
       stream.push("/F2 9.5 Tf");
       stream.push("0 -13 Td");
       stream.push(`(${escapePdfText(f.title)}) Tj`);
 
-      stream.push("0.45 0.50 0.55 rg");
+      stream.push("0 g");
       stream.push("/F1 8 Tf");
       stream.push("0 -11 Td");
       const comp = f.component ? `${f.component} ${f.componentVersion || ""}` : "System";
@@ -274,41 +255,59 @@ export function createFixturePdf(input: FixturePdfInput | string, legacyLines?: 
 
     if (findings.length > 3) {
       stream.push("BT");
-      stream.push("0.45 0.50 0.55 rg");
+      stream.push("0 g");
       stream.push("/F1 8 Tf");
-      stream.push(`65 ${curY + 45} Td`);
-      stream.push(`(... and ${findings.length - 3} additional security findings catalogued in evidence storage.) Tj`);
+      stream.push(`65 ${curY + 2} Td`);
+      stream.push(`(${findings.length - 3} further findings not reproduced here; consult the release security report.) Tj`);
       stream.push("ET");
     }
   }
 
-  // Regulatory Notice box at bottom
-  stream.push("0.94 0.96 0.99 rg");
-  stream.push("50 85 512 48 re f");
-  stream.push("0.72 0.80 0.92 RG 0.5 w");
-  stream.push("50 85 512 48 re S");
+  const isDeclaration = /declaration of conformity/i.test(title);
+  const isTechnical = /annex vii|technical documentation/i.test(title);
+  const requirements = isDeclaration ? [
+    "Annex V identifies the product and manufacturer and states the manufacturer's sole responsibility.",
+    "It must identify applicable Union law, relevant standards or specifications, and signatory details.",
+    "No declaration is issued here: conformity assessment and authorized signature are not recorded.",
+  ] : isTechnical ? [
+    "Annex VII calls for intended purpose, design and production details, and vulnerability handling.",
+    "It also calls for a cybersecurity risk assessment, applied specifications, and test evidence.",
+    "These manufacturer materials are not established by the findings snapshot above.",
+  ] : [
+    "Annex I covers security properties and vulnerability handling throughout the support period.",
+    "Article 13 sets manufacturer duties. Findings require review against product-specific evidence.",
+    "This extract does not determine compliance or replace the technical documentation.",
+  ];
+  stream.push("BT", "0 g", "/F2 10 Tf", `50 ${curY - 16} Td`, "(CRA document requirements) Tj", "ET");
+  stream.push("BT", "0 g", "/F1 8 Tf", "12 TL", `50 ${curY - 34} Td`);
+  for (const line of requirements) stream.push(`(${escapePdfText(line)}) Tj T*`);
+  stream.push("ET");
+
+  stream.push("0 G 0.5 w 50 148 m 562 148 l S");
 
   stream.push("BT");
-  stream.push("0.20 0.32 0.55 rg");
+  stream.push("0 g");
   stream.push("/F2 8 Tf");
-  stream.push("65 118 Td");
-  stream.push("(REGULATORY COMPLIANCE NOTICE) Tj");
+  stream.push("50 137 Td");
+  stream.push("(Regulatory context and limitations) Tj");
   stream.push("/F1 7.5 Tf");
   stream.push("10 TL");
   stream.push("T*");
-  stream.push("(This document certifies technical findings, verification evidence, and conformity decisions recorded at generation time.) Tj T*");
-  stream.push("(Maintained under controlled revision management compliant with EU Cyber Resilience Act (CRA) Article 14 and ISO standards.) Tj");
+  stream.push("(CRA Annex I: product security and vulnerability handling. Annex VII: technical documentation.) Tj T*");
+  stream.push("(Article 14: reporting of actively exploited vulnerabilities and severe incidents from 11 September 2026.) Tj T*");
+  stream.push("(This snapshot is not a filing, conformity assessment, certification, or signed Annex V declaration.) Tj T*");
+  stream.push("(Source: Regulation (EU) 2024/2847, eur-lex.europa.eu/eli/reg/2024/2847/oj) Tj");
   stream.push("ET");
 
   // Footer
-  stream.push("0.85 0.88 0.92 RG 0.5 w");
+  stream.push("0 G 0.5 w");
   stream.push("50 55 m 562 55 l S");
 
   stream.push("BT");
-  stream.push("0.50 0.55 0.60 rg");
+  stream.push("0 g");
   stream.push("/F1 7.5 Tf");
   stream.push("50 42 Td");
-  stream.push("(PandaX Product Security Platform  --  Automated Evidence & CRA Verification Pack  --  Page 1 of 1) Tj");
+  stream.push("(Actis  |  Internal working draft  |  Page 1 of 1) Tj");
   stream.push("ET");
 
   const contentStream = stream.join("\n");

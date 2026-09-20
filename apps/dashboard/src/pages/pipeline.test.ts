@@ -44,5 +44,10 @@ describe("CRA Compliance Pipeline", () => {
 
     const header = String.fromCharCode(...pdfBytes.slice(0, 5));
     expect(header).toBe("%PDF-");
+    const content = new TextDecoder().decode(pdfBytes);
+    expect(content).toContain("Regulation \\(EU\\) 2024/2847");
+    expect(content).toContain("Annex I");
+    expect(content).toContain("11 September 2026");
+    expect(content).not.toContain("0.09 0.16 0.29 rg");
   });
 });

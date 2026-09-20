@@ -43,9 +43,6 @@ export function AppShell() {
       <div className="app-shell__body">
         <Topbar onOpenSidebar={() => setSidebarOpen(true)} />
         <div id="main-content" className="main-content" tabIndex={-1}>
-          {adapterStatus.mode === 'production' && adapterStatus.phase === 'loading' ? (
-            <div className="adapter-status" role="status">Syncing production data…</div>
-          ) : null}
           {adapterStatus.failure ? (
             <div className="adapter-status adapter-status--error" role="alert">
               <span>{adapterStatus.failure.message}</span>
@@ -59,12 +56,51 @@ export function AppShell() {
             </div>
           ) : null}
           {awaitingFirstLoad && adapterStatus.phase === 'loading' ? (
-            <div className="adapter-status" role="status">Loading your workspace…</div>
+            <DashboardSkeleton />
           ) : awaitingFirstLoad && adapterStatus.phase === 'error' ? null : (
-            <Suspense fallback={<div className="adapter-status" role="status" aria-live="polite">Loading workspace…</div>}>
+            <Suspense fallback={<DashboardSkeleton />}>
               <Outlet />
             </Suspense>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="dashboard-skeleton" role="status">
+      <span className="sr-only">Loading your workspace</span>
+      <div aria-hidden="true">
+        <div className="dashboard-skeleton__heading">
+          <span className="skeleton-block dashboard-skeleton__title" />
+          <span className="skeleton-block dashboard-skeleton__description" />
+        </div>
+        <div className="dashboard-skeleton__metrics">
+          {Array.from({ length: 3 }, (_, index) => (
+            <div className="dashboard-skeleton__card" key={index}>
+              <span className="skeleton-block dashboard-skeleton__label" />
+              <span className="skeleton-block dashboard-skeleton__number" />
+              <span className="skeleton-block dashboard-skeleton__detail" />
+            </div>
+          ))}
+        </div>
+        <div className="dashboard-skeleton__panels">
+          {[3, 2].map((rows, index) => (
+            <div className="dashboard-skeleton__panel" key={index}>
+              <div className="dashboard-skeleton__panel-heading">
+                <span className="skeleton-block dashboard-skeleton__panel-title" />
+                <span className="skeleton-block dashboard-skeleton__panel-description" />
+              </div>
+              {Array.from({ length: rows }, (_, row) => (
+                <div className="dashboard-skeleton__row" key={row}>
+                  <span className="skeleton-block dashboard-skeleton__row-title" />
+                  <span className="skeleton-block dashboard-skeleton__row-detail" />
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -415,6 +415,28 @@ button { color: inherit; }
 .main-content > * { width: 100%; max-width: 1580px; margin-inline: auto; }
 .adapter-status { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-block:0 16px; padding:10px 14px; border:1px solid var(--info-border); border-radius:10px; background:var(--info-bg); color:var(--text-secondary); font-size:13px; }
 .adapter-status--error { border-color:var(--danger-border); background:var(--danger-bg); color:var(--danger); }
+.dashboard-skeleton > div { display:grid; gap:24px; }
+.dashboard-skeleton__heading { display:grid; gap:12px; padding:5px 0; }
+.skeleton-block { display:block; border-radius:6px; background:linear-gradient(100deg,var(--surface-subtle) 20%,var(--border) 50%,var(--surface-subtle) 80%); background-size:220% 100%; animation:dashboard-shimmer 1.6s linear infinite; }
+.dashboard-skeleton__title { width:160px; height:34px; }
+.dashboard-skeleton__description { width:min(440px,75%); height:16px; }
+.dashboard-skeleton__metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.dashboard-skeleton__card,.dashboard-skeleton__panel { min-width:0; border:1px solid var(--border); border-radius:14px; background:var(--surface); }
+.dashboard-skeleton__card { display:grid; gap:12px; padding:18px; }
+.dashboard-skeleton__label { width:55%; height:14px; }
+.dashboard-skeleton__number { width:72px; height:32px; }
+.dashboard-skeleton__detail { width:42%; height:13px; }
+.dashboard-skeleton__panels { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(300px,.75fr); gap:18px; }
+.dashboard-skeleton__panel-heading { display:grid; gap:10px; padding:20px; }
+.dashboard-skeleton__panel-title { width:170px; height:20px; }
+.dashboard-skeleton__panel-description { width:70%; height:14px; }
+.dashboard-skeleton__row { display:grid; gap:10px; padding:18px 20px; border-top:1px solid var(--border); }
+.dashboard-skeleton__row-title { width:62%; height:16px; }
+.dashboard-skeleton__row-detail { width:42%; height:13px; }
+@keyframes dashboard-shimmer { to { background-position-x:-220%; } }
+@media (max-width: 760px) {
+  .dashboard-skeleton__metrics,.dashboard-skeleton__panels { grid-template-columns:1fr; }
+}
 .page-header-actions .button { white-space: nowrap; }
 .breadcrumbs { display: flex; align-items: center; gap: 7px; margin-bottom: -10px; color: var(--text-muted); font-size: 12px; }
 .breadcrumbs span { display: inline-flex; align-items: center; gap: 7px; }

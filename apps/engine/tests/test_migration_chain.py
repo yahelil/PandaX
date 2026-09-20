@@ -14,8 +14,9 @@ def test_production_migrations_form_one_ordered_head():
     config.set_main_option("script_location", str(root / "alembic"))
     scripts = ScriptDirectory.from_config(config)
 
-    assert scripts.get_heads() == ["20260917_0016"]
+    assert scripts.get_heads() == ["20260920_0017"]
     assert [revision.revision for revision in scripts.walk_revisions()] == [
+        "20260920_0017",
         "20260917_0016",
         "20260915_0015",
         "20260915_0014",
@@ -145,7 +146,7 @@ def test_finding_targets_migration_backfills_due_dates(tmp_path):
     config = Config(str(root / "alembic.ini"))
     config.set_main_option("script_location", str(root / "alembic"))
     config.set_main_option("sqlalchemy.url", f"sqlite:///{database.as_posix()}")
-    command.upgrade(config, "head")
+    command.upgrade(config, "20260917_0016")
 
     with engine.connect() as connection:
         assert connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one() == "20260917_0016"

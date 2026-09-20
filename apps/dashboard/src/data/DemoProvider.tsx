@@ -87,6 +87,7 @@ export interface DemoActions {
   recordDocumentSelfFiling(input: RecordDocumentSelfFilingInput): MaybePromise<DocumentRecord>;
   createProduct(input: CreateProductInput): Promise<Product>;
   updateProduct(input: UpdateProductInput): Promise<Product>;
+  archiveProduct(productId: EntityId): Promise<void>;
   createRelease(input: CreateReleaseInput): Promise<Release>;
   selectActiveRelease(productId: EntityId, releaseId: EntityId): Promise<Product>;
   downloadReleaseReport(productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile>;
@@ -183,6 +184,7 @@ export function DemoProvider({ adapter: providedAdapter, currentUserOverride, ch
     recordDocumentSelfFiling: adapter.recordDocumentSelfFiling,
     createProduct: adapter.createProduct,
     updateProduct: adapter.updateProduct,
+    archiveProduct: adapter.archiveProduct,
     createRelease: adapter.createRelease,
     selectActiveRelease: adapter.selectActiveRelease,
     downloadReleaseReport: adapter.downloadReleaseReport,

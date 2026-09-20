@@ -21,6 +21,7 @@ function portfolioApi(): PortfolioApi {
     createProduct: vi.fn(async () => initial.products[0]),
     getProduct: vi.fn(async () => initial.products[0]),
     updateProduct: vi.fn(async () => initial.products[0]),
+    archiveProduct: vi.fn(async () => {}),
     listReleases: vi.fn(async () => []),
     createRelease: vi.fn(async () => initial.releases[0]),
     getRelease: vi.fn(async () => initial.releases[0]),

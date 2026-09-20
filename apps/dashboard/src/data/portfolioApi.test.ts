@@ -79,6 +79,16 @@ function fetchSequence(...responses: Response[]) {
 }
 
 describe("portfolio API", () => {
+  it("archives a product without deleting its retained records", async () => {
+    const fetcher = fetchSequence(json({ ...productDto, archived_at: "2026-09-20T12:00:00Z" }));
+    const client = createPortfolioApi({ baseUrl: "https://engine.example.test", getBearerToken: () => "token", fetch: fetcher });
+    await client.archiveProduct("org/acme", "product-camera");
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://engine.example.test/v1/organizations/org%2Facme/products/product-camera",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
   it("adds async bearer auth, encodes tenant paths, and maps backend fields", async () => {
     const fetcher = fetchSequence(json([productDto]), json(releaseDto));
     const client = createPortfolioApi({

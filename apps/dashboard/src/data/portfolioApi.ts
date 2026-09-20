@@ -195,6 +195,7 @@ export interface PortfolioApi {
   createProduct(organizationId: string, input: CreatePortfolioProductRequest, options?: PortfolioRequestOptions): Promise<Product>;
   getProduct(organizationId: string, productId: string, options?: PortfolioRequestOptions): Promise<Product>;
   updateProduct(organizationId: string, productId: string, input: UpdatePortfolioProductRequest, options?: PortfolioRequestOptions): Promise<Product>;
+  archiveProduct(organizationId: string, productId: string, options?: PortfolioRequestOptions): Promise<void>;
   listReleases(organizationId: string, productId: string, options?: PortfolioRequestOptions): Promise<Release[]>;
   createRelease(organizationId: string, productId: string, input: CreatePortfolioReleaseRequest, options?: PortfolioRequestOptions): Promise<Release>;
   getRelease(organizationId: string, productId: string, releaseId: string, options?: PortfolioRequestOptions): Promise<Release>;
@@ -489,6 +490,9 @@ export function createPortfolioApi(config: PortfolioApiConfig): PortfolioApi {
     async updateProduct(organizationId, productId, input, options) {
       const payload = { slug: input.slug, identifier: input.identifier, name: input.name, manufacturer: input.manufacturer, description: input.description, cra_class: input.craClass, classification_status: input.classificationStatus, classification_assessment: input.classificationAssessment ? assessmentPayload(input.classificationAssessment) : undefined, support_start: input.supportStart, support_end: input.supportEnd, owner_id: input.ownerId, clear_owner: input.clearOwner, readiness: input.readiness, monitoring_health: input.monitoringHealth, active_release_id: input.activeReleaseId };
       return mapProduct(parseProduct(await request(`${productPath(organizationId)}/${id(productId)}`, { method: "PATCH", body: body(payload) }, options)));
+    },
+    async archiveProduct(organizationId, productId, options) {
+      await request(`${productPath(organizationId)}/${id(productId)}`, { method: "DELETE" }, options);
     },
     async listReleases(organizationId, productId, options) {
       return parseList(await request(releasePath(organizationId, productId), { method: "GET" }, options), parseRelease).map(mapRelease);

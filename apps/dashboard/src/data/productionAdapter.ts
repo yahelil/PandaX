@@ -571,6 +571,12 @@ export class ProductionAdapter implements DataAdapter {
     return updated;
   });
 
+  archiveProduct = async (productId: EntityId): Promise<void> => this.mutation("archive_product", async () => {
+    await this.config.portfolioApi.archiveProduct(this.config.organizationId, productId);
+    await this.fixture.archiveProduct(productId);
+    await this.refresh();
+  });
+
   createRelease = async (input: CreateReleaseInput): Promise<Release> => this.mutation("create_release", async () => {
     const created = await this.config.portfolioApi.createRelease(this.config.organizationId, input.productId, { version: input.version, channel: input.channel, status: "draft", releaseDate: input.releaseDate, supportStart: input.releaseDate, supportEnd: input.supportedUntil });
     this.fixture.upsertRelease(created); return created;
@@ -717,7 +723,7 @@ export class ProductionAdapter implements DataAdapter {
       if (findingsResult.status === "fulfilled" && findingsResult.value) {
         const findingsState = findingsResult.value;
         findingsState.forEach((finding) => this.findingDetails.set(finding.id, finding));
-        this.fixture.replaceFindings(findingsState);
+        this.fixture.replaceFindings(findingsState.filter((item) => receivedProductIds.has(item.productId)));
       }
       if (governanceResult.status === "fulfilled" && governanceResult.value) {
         const governanceState = governanceResult.value;
@@ -726,8 +732,8 @@ export class ProductionAdapter implements DataAdapter {
         governanceState.documentDetails.forEach((detail) => this.documentDetails.set(detail.document.id, detail));
         governanceState.compliance.forEach((item) => this.complianceDetails.set(item.id, item));
         this.fixture.replaceGovernanceState(
-          governanceState.compliance.map((item) => mapCompliance(item)),
-          governanceState.documentDetails.map(mapDocument), mapGovernanceSettings(governanceState.settings).settings,
+          governanceState.compliance.filter((item) => !item.productId || receivedProductIds.has(item.productId)).map((item) => mapCompliance(item)),
+          governanceState.documentDetails.filter((item) => !item.document.productId || receivedProductIds.has(item.document.productId)).map(mapDocument), mapGovernanceSettings(governanceState.settings).settings,
           governanceState.members.flatMap((item) => { const mapped = mapTeamMember(item); return mapped ? [mapped] : []; }),
           governanceState.integrations.map(mapIntegration),
         );

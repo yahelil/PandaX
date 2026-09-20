@@ -238,6 +238,23 @@ def test_product_lookup_is_scoped_to_organization(client: TestClient):
     assert response.json()["detail"] == "product not found"
 
 
+def test_product_archive_and_restore_keep_release(client: TestClient):
+    organization = create_organization(client)
+    product = create_product(client, organization["id"])
+    release = create_release(client, organization["id"], product["id"])
+    path = f"/v1/organizations/{organization['id']}/products/{product['id']}"
+
+    response = client.delete(path)
+    assert response.status_code == 200
+    assert response.json()["archived_at"] is not None
+    assert client.get(f"/v1/organizations/{organization['id']}/products").json() == []
+    assert len(client.get(f"/v1/organizations/{organization['id']}/products?include_archived=true").json()) == 1
+    assert client.get(f"{path}/releases/{release['id']}").status_code == 200
+
+    assert client.post(f"{path}/restore").json()["archived_at"] is None
+    assert len(client.get(f"/v1/organizations/{organization['id']}/products").json()) == 1
+
+
 def test_release_create_list_detail_update_and_activate(client: TestClient):
     organization = create_organization(client)
     product = create_product(client, organization["id"])

@@ -63,6 +63,7 @@ function api(overrides: Partial<PortfolioApi> = {}): PortfolioApi {
     createProduct: vi.fn(async () => product),
     getProduct: vi.fn(async () => product),
     updateProduct: vi.fn(async () => product),
+    archiveProduct: vi.fn(async () => {}),
     listReleases: vi.fn(async () => [release]),
     createRelease: vi.fn(async () => release),
     getRelease: vi.fn(async () => release),

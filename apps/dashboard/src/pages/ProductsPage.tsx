@@ -44,6 +44,21 @@ export function ProductsPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [createPending, setCreatePending] = useState(false);
   const [createError, setCreateError] = useState<string>();
+  const [archivePending, setArchivePending] = useState<string>();
+  const [archiveError, setArchiveError] = useState<string>();
+  const archiveProduct = async (product: Product) => {
+    if (!window.confirm(`Remove ${product.name} from active products? Its releases and compliance history will be retained, and an administrator can restore it.`)) return;
+    setArchivePending(product.id);
+    setArchiveError(undefined);
+    try {
+      await demo.actions.archiveProduct(product.id);
+      setSelected((current) => current.filter((id) => id !== product.id));
+    } catch (error) {
+      setArchiveError(error instanceof Error ? error.message : "Product could not be removed.");
+    } finally {
+      setArchivePending(undefined);
+    }
+  };
   const openFindings = useMemo(() => {
     const counts = new Map<string, number>();
     for (const finding of demo.findings) {
@@ -126,6 +141,7 @@ export function ProductsPage() {
         }
       }} members={demo.state.members} rawArtifactsAllowed={demo.state.settings.security.allowRawArtifacts} demoMode={demo.adapterStatus.mode === "fixture"} /> : null}
       <section className="panel devices-list">
+        {archiveError ? <div className="notice notice-warning" role="alert">{archiveError}</div> : null}
         <div className="devices-toolbar" aria-label="Device filters">
           <label className="devices-search"><Search size={18} aria-hidden="true" /><input type="search" aria-label="Search devices" placeholder="Search devices..." value={query} onChange={(event) => setFilter(setQuery, event.target.value)} /></label>
           <select className="select-field" aria-label="Scope status" value={scope} onChange={(event) => setFilter(setScope, event.target.value)}><option value="all">All status</option><option value="in_scope">In scope</option><option value="out_of_scope">Out of scope</option><option value="needs_review">Needs review</option></select>
@@ -163,7 +179,7 @@ export function ProductsPage() {
                 <td><ExactTimerBadge timer={mostUrgentTimer} compact /></td>
                 <td>{formatDate(latestAssessment(product))}</td>
                 <td>{memberName(demo.state.members, product.ownerId)}</td>
-                <td><details className="devices-row-menu"><summary aria-label={`Actions for ${product.name}`}><MoreVertical size={18} /></summary><div><Link to={`/products/${product.id}`}>Open device</Link>{release ? <Link to={`/products/${product.id}/releases/${release.id}`}>Open release</Link> : null}<Link to={`/findings?product=${encodeURIComponent(product.id)}`}>View findings</Link><button type="button" onClick={() => setReviewProduct(product)} style={{ textAlign: "left", background: "none", border: "none", padding: "8px", borderRadius: "5px", cursor: "pointer", font: "inherit", fontSize: "12px", color: "inherit" }}>Review CRA scope</button></div></details></td>
+                <td><details className="devices-row-menu"><summary aria-label={`Actions for ${product.name}`}><MoreVertical size={18} /></summary><div><Link to={`/products/${product.id}`}>Open device</Link>{release ? <Link to={`/products/${product.id}/releases/${release.id}`}>Open release</Link> : null}<Link to={`/findings?product=${encodeURIComponent(product.id)}`}>View findings</Link><button type="button" onClick={() => setReviewProduct(product)} style={{ textAlign: "left", background: "none", border: "none", padding: "8px", borderRadius: "5px", cursor: "pointer", font: "inherit", fontSize: "12px", color: "inherit" }}>Review CRA scope</button>{canManagePortfolio ? <button type="button" disabled={archivePending === product.id} onClick={() => void archiveProduct(product)}>Remove product</button> : null}</div></details></td>
               </tr>;
             })}{pageProducts.length === 0 ? <tr><td colSpan={9} className="devices-empty">No products match these filters.</td></tr> : null}</tbody>
           </table>
@@ -175,6 +191,7 @@ export function ProductsPage() {
             <button type="button" className={`devices-scope devices-scope-button devices-scope--${scopeStatus(product)}`} onClick={() => setReviewProduct(product)} title="Click to open window to review CRA scope, classification, or upload evidence" aria-label={`Review CRA scope for ${product.name}: ${scopeLabel(scopeStatus(product))}`}><span />{scopeLabel(scopeStatus(product))}</button>
             <ExactTimerBadge timer={mostUrgentTimer} compact />
             <span>{openFindings.get(product.id) ?? 0} open findings · {formatDate(latestAssessment(product))}</span>
+            {canManagePortfolio ? <button type="button" disabled={archivePending === product.id} onClick={() => void archiveProduct(product)}>Remove product</button> : null}
           </article>;
         })}</div>
         <footer className="devices-footer"><span>Showing {pageProducts.length ? (currentPage - 1) * pageSize + 1 : 0}–{Math.min(currentPage * pageSize, visible.length)} of {visible.length} devices</span><nav aria-label="Device pages"><button type="button" aria-label="Previous page" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}><ChevronLeft size={18} /></button>{Array.from({ length: pageCount }, (_, index) => <button type="button" key={index} aria-label={`Page ${index + 1}`} aria-current={currentPage === index + 1 ? "page" : undefined} onClick={() => setPage(index + 1)}>{index + 1}</button>)}<button type="button" aria-label="Next page" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}><ChevronRight size={18} /></button></nav></footer>

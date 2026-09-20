@@ -37,7 +37,7 @@ import type { AnalysisEvidenceFile } from "./releaseOperationsApi";
 export type DemoListener = () => void;
 
 export type AdapterOperation =
-  | "initialize" | "refresh" | "search" | "create_product" | "update_product" | "create_release"
+  | "initialize" | "refresh" | "search" | "create_product" | "update_product" | "archive_product" | "create_release"
   | "mark_notification_read" | "acknowledge_notification" | "ingest_analytics" | "assign_finding" | "decide_finding" | "batch_decide_findings"
   | "update_remediation" | "load_finding" | "approve_document"
   | "reject_document" | "load_document" | "download_document" | "download_document_content" | "request_document_approval"
@@ -118,6 +118,7 @@ export interface DataAdapter {
   recordDocumentSelfFiling(input: RecordDocumentSelfFilingInput): MaybePromise<DocumentRecord>;
   createProduct(input: CreateProductInput): Promise<Product>;
   updateProduct(input: UpdateProductInput): Promise<Product>;
+  archiveProduct(productId: EntityId): Promise<void>;
   createRelease(input: CreateReleaseInput): Promise<Release>;
   selectActiveRelease(productId: EntityId, releaseId: EntityId): Promise<Product>;
   downloadReleaseReport(productId: EntityId, releaseId: EntityId, jobId: EntityId): Promise<AnalysisEvidenceFile>;

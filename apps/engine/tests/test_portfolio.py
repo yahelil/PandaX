@@ -103,6 +103,35 @@ def test_tenant_scope_hides_products_and_releases(repository):
         repository.get_release(second.id, release.id)
 
 
+def test_archive_hides_product_but_preserves_release_and_can_restore(repository):
+    organization = create_organization(repository)
+    product = create_product(repository, organization.id)
+    release = create_release(repository, organization.id, product.id)
+    repository.set_active_release(organization.id, product.id, release.id, "user-admin")
+
+    archived = repository.archive_product(organization.id, product.id, "user-admin")
+    assert archived.archived_at is not None
+    assert repository.list_products(organization.id) == []
+    assert repository.list_products(organization.id, include_archived=True) == [archived]
+    assert repository.get_release(organization.id, release.id).id == release.id
+    repository.archive_product(organization.id, product.id, "user-admin")
+    assert [event.action for event in repository.list_audit_events(organization.id)].count("product.archived") == 1
+
+    restored = repository.restore_product(organization.id, product.id, "user-admin")
+    assert restored.archived_at is None
+    assert repository.list_products(organization.id) == [restored]
+    assert repository.list_audit_events(organization.id)[-1].action == "product.restored"
+
+
+def test_archive_is_tenant_scoped(repository):
+    first = create_organization(repository, "one")
+    second = create_organization(repository, "two")
+    product = create_product(repository, first.id)
+    with pytest.raises(PortfolioNotFound):
+        repository.archive_product(second.id, product.id, "user-admin")
+    assert repository.get_product(first.id, product.id).archived_at is None
+
+
 def test_unique_identifiers_slugs_and_release_versions_are_transactional(repository):
     organization = create_organization(repository)
     product = create_product(repository, organization.id)

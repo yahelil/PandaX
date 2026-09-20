@@ -1103,6 +1103,17 @@ export class FixtureAdapter implements DataAdapter {
     });
   };
 
+  archiveProduct = async (productId: EntityId): Promise<void> => {
+    this.mutate((state) => {
+      state.products = state.products.filter((item) => item.id !== productId);
+      state.releases = state.releases.filter((item) => item.productId !== productId);
+      state.findings = state.findings.filter((item) => item.productId !== productId);
+      state.complianceItems = state.complianceItems.filter((item) => item.productId !== productId);
+      state.documents = state.documents.filter((item) => item.productId !== productId);
+      state.actions = state.actions.filter((item) => item.productId !== productId);
+    });
+  };
+
   upsertRelease = (release: Release): void => {
     this.mutate((state) => {
       const index = state.releases.findIndex((item) => item.id === release.id);

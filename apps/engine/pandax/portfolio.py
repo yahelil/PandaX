@@ -85,6 +85,7 @@ class ProductRecord:
     active_release_id: str | None
     created_at: datetime
     updated_at: datetime
+    archived_at: datetime | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,6 +223,7 @@ products = Table(
     _required_string("readiness", 32),
     _required_string("monitoring_health", 32),
     _column("active_release_id", 36, nullable=True),
+    _column("archived_at", DateTime(timezone=True), nullable=True),
     _created_column(),
     _updated_column(),
     UniqueConstraint("organization_id", "slug", name="uq_portfolio_products_org_slug"),
@@ -383,6 +385,7 @@ class PortfolioRepository:
             "readiness": _choice(readiness, READINESS_STATUSES, "readiness"),
             "monitoring_health": _choice(monitoring_health, MONITORING_STATUSES, "monitoring_health"),
             "active_release_id": None,
+            "archived_at": None,
             "created_at": _utc_now(),
             "updated_at": _utc_now(),
         }
@@ -399,12 +402,36 @@ class PortfolioRepository:
             raise PortfolioNotFound("product not found")
         return _product_record(row)
 
-    def list_products(self, organization_id: str) -> list[ProductRecord]:
+    def list_products(self, organization_id: str, *, include_archived: bool = False) -> list[ProductRecord]:
         with Session(self.engine) as session:
+            predicate = products.c.organization_id == organization_id
+            if not include_archived:
+                predicate &= products.c.archived_at.is_(None)
             rows = session.execute(
-                select(products).where(products.c.organization_id == organization_id).order_by(products.c.name, products.c.id)
+                select(products).where(predicate).order_by(products.c.name, products.c.id)
             ).mappings().all()
         return [_product_record(row) for row in rows]
+
+    def archive_product(self, organization_id: str, product_id: str, actor_id: str) -> ProductRecord:
+        with self._transaction() as session:
+            row = self._product_row(session, organization_id, product_id)
+            if row is None:
+                raise PortfolioNotFound("product not found")
+            if row["archived_at"] is None:
+                archived_at = _utc_now()
+                session.execute(update(products).where(products.c.id == product_id).values(archived_at=archived_at, updated_at=archived_at))
+                self._audit(session, organization_id, "product", product_id, "product.archived", actor_id, {"archived_at": archived_at.isoformat()})
+        return self.get_product(organization_id, product_id)
+
+    def restore_product(self, organization_id: str, product_id: str, actor_id: str) -> ProductRecord:
+        with self._transaction() as session:
+            row = self._product_row(session, organization_id, product_id)
+            if row is None:
+                raise PortfolioNotFound("product not found")
+            if row["archived_at"] is not None:
+                session.execute(update(products).where(products.c.id == product_id).values(archived_at=None, updated_at=_utc_now()))
+                self._audit(session, organization_id, "product", product_id, "product.restored", actor_id, {})
+        return self.get_product(organization_id, product_id)
 
     def update_product(self, organization_id: str, product_id: str, changes: ProductChanges, actor_id: str) -> ProductRecord:
         current = self.get_product(organization_id, product_id)

@@ -224,6 +224,7 @@ class ProductResponse(ApiModel):
     active_release_id: str | None
     created_at: datetime
     updated_at: datetime
+    archived_at: datetime | None = None
     # Read-model fields are populated by later aggregation slices.
     action_count: int = 0
     next_deadline: datetime | None = None
@@ -361,10 +362,10 @@ def create_portfolio_router(
         return _call(lambda: repository.update_organization(organization_id, changes, identity.actor_id))
 
     @router.get("/organizations/{organization_id}/products", response_model=list[ProductResponse])
-    def list_products(organization_id: str, repository: Repository, identity: Identity):
+    def list_products(organization_id: str, repository: Repository, identity: Identity, include_archived: bool = False):
         _authorize(identity, organization_id=organization_id)
         _call(lambda: repository.get_organization(organization_id))
-        return _call(lambda: repository.list_products(organization_id))
+        return _call(lambda: repository.list_products(organization_id, include_archived=include_archived))
 
     @router.post(
         "/organizations/{organization_id}/products",
@@ -391,6 +392,16 @@ def create_portfolio_router(
     def get_product(organization_id: str, product_id: str, repository: Repository, identity: Identity):
         _authorize(identity, organization_id=organization_id)
         return _call(lambda: repository.get_product(organization_id, product_id))
+
+    @router.delete("/organizations/{organization_id}/products/{product_id}", response_model=ProductResponse)
+    def archive_product(organization_id: str, product_id: str, repository: Repository, identity: Identity):
+        _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES, sensitive=True)
+        return _call(lambda: repository.archive_product(organization_id, product_id, identity.actor_id))
+
+    @router.post("/organizations/{organization_id}/products/{product_id}/restore", response_model=ProductResponse)
+    def restore_product(organization_id: str, product_id: str, repository: Repository, identity: Identity):
+        _authorize(identity, organization_id=organization_id, roles=PORTFOLIO_EDIT_ROLES, sensitive=True)
+        return _call(lambda: repository.restore_product(organization_id, product_id, identity.actor_id))
 
     @router.patch("/organizations/{organization_id}/products/{product_id}", response_model=ProductResponse)
     def update_product(

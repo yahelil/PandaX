@@ -104,6 +104,7 @@ evaluation/results/
 .presentation-build/
 presentation-assets/
 presentation-output/
+videos/actis-first-use/
 *.pptx
 !docs/reference/PandaX.pptx
 !docs/published/presentations/*.pptx

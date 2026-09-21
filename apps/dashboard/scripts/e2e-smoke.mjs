@@ -220,9 +220,9 @@ try {
   if (!technicalPdf.suggestedFilename().endsWith("-draft.pdf")) throw new Error("Technical document is missing its draft label.");
   if (!(await readFile(await technicalPdf.path())).subarray(0, 5).equals(Buffer.from("%PDF-"))) throw new Error("Technical document is not a PDF file.");
   if (visualDir) await page.screenshot({ path: join(visualDir, "release-pdf-reports-1440.png"), fullPage: true });
-  await page.getByRole("navigation", { name: "Release workspace" }).getByRole("link", { name: "Compliance" }).click();
-  await assertVisible(page.getByRole("heading", { name: "Compliance evidence for Home Hub 1.8.0" }), "release compliance evidence");
-  await assertVisible(page.getByText("Finding decisions", { exact: true }), "finding review evidence");
+  if (await page.getByRole("navigation", { name: "Release workspace" }).getByRole("link", { name: "Compliance" }).count()) {
+    throw new Error("Release workspace still shows a Compliance tab.");
+  }
   await page.getByRole("link", { name: "Analyze release" }).click();
   await waitForRoute(page, `${baseUrl}/products/product-home-hub/releases/release-hub-1-8-0/analyze`, "Analysis input");
   await assertSingleMain(page, "Analysis input");

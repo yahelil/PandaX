@@ -100,8 +100,10 @@ describe("application flow smoke contracts", () => {
     expect(workspace).toContain("generateSecurityPdf");
 
     const releaseWorkspace = source("./pages/ReleaseWorkspacePage.tsx");
+    expect(releaseWorkspace).toContain('const releaseTabs = ["overview", "findings", "documents"] as const;');
+    expect(releaseWorkspace).not.toContain("ReleaseCompliance");
     expect(releaseWorkspace).toContain("<ReleaseDocuments product={product} release={release} latestCompleted={latestCompleted} />");
-    expect(releaseWorkspace).toContain("Draft PDFs and regulatory outputs are available below for review and download.");
+    expect(releaseWorkspace).toContain("Draft legal documents still require manufacturer review and approval.");
 
     const compliancePage = source("./pages/CompliancePage.tsx");
     expect(compliancePage).toContain('["documents", "Documents"]');

@@ -93,7 +93,9 @@ describe("application flow smoke contracts", () => {
     const workspace = source("./pages/ProductWorkspacePage.tsx");
     expect(workspace).toContain("`/products/${product.id}/releases/${release.id}`");
     expect(workspace).toContain("navigate(`/products/${productId}/releases/${created.id}/analyze`)");
-    expect(workspace).toContain('<ProductCompliance productId={product.id} /><ProductDocuments productId={product.id} />');
+    expect(workspace).toContain('const tabs = ["overview", "releases", "findings", "documents"] as const;');
+    expect(workspace).toContain('{tab === "documents" ? <ProductDocuments productId={product.id} /> : null}');
+    expect(workspace).not.toContain("ProductCompliance");
     expect(workspace).toContain("Product release security report");
     expect(workspace).toContain("generateSecurityPdf");
 

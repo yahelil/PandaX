@@ -3,15 +3,15 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { usePermission } from "../auth";
 import { useDemo } from "../data/DemoProvider";
 import { createReleasePdf, type ReleasePdfKind } from "../data/releasePdf";
-import { Breadcrumbs, EmptyState, EvidenceMeter, FindingInsights, MetricCard, SectionHeader, StatusPill, formatDate, memberName, relativeDate } from "./PageKit";
+import { Breadcrumbs, EmptyState, EvidenceMeter, FindingInsights, MetricCard, SectionHeader, StatusPill, formatDate, memberName } from "./PageKit";
 import { craClassLabel } from "./craAssessment";
 import { downloadFile } from "./downloadFile";
 import { ExactTimerBadge } from "../components/ExactTimerBadge";
 import { ProductScopeModal } from "../components/ProductScopeModal";
-import { getProductMostUrgentTimer, getFindingTimers, computeExactTimer } from "./exactTimers";
+import { getProductMostUrgentTimer, getFindingTimers } from "./exactTimers";
 import "./pages.css";
 
-const tabs = ["overview", "releases", "findings", "compliance", "documents"] as const;
+const tabs = ["overview", "releases", "findings", "documents"] as const;
 
 export function ProductWorkspacePage() {
   const { productId = "" } = useParams();
@@ -40,7 +40,6 @@ export function ProductWorkspacePage() {
     {tab === "overview" ? <ProductOverview productId={product.id} /> : null}
     {tab === "releases" ? <><ActiveReleaseControl productId={product.id} /><ReleasesTable productId={product.id} /></> : null}
     {tab === "findings" ? <ProductFindings productId={product.id} /> : null}
-    {tab === "compliance" ? <div className="page"><ProductCompliance productId={product.id} /><ProductDocuments productId={product.id} /></div> : null}
     {tab === "documents" ? <ProductDocuments productId={product.id} /> : null}
   </main>;
 }
@@ -151,44 +150,6 @@ function ProductFindings({ productId }: { productId: string }) {
           </tbody>
         </table>
       </div>
-    </section>
-  );
-}
-
-function ProductCompliance({ productId }: { productId: string }) {
-  const demo = useDemo();
-  const items = demo.complianceItems.filter((item) => item.productId === productId);
-  return (
-    <section className="panel">
-      <SectionHeader
-        title="CRA obligations"
-        description="Readiness, reporting, evidence, and approvals."
-        action={<Link className="text-link" to={`/compliance?product=${productId}`}>Open compliance center</Link>}
-      />
-      <ul className="priority-list">
-        {items.map((item) => {
-          const timer = computeExactTimer(item.dueAt, item.title);
-          return (
-            <li className="priority-item" key={item.id}>
-              <span className={`priority-marker ${item.priority}`} />
-              <div className="item-main">
-                <Link to={`/compliance?product=${productId}&item=${encodeURIComponent(item.id)}`}>{item.title}</Link>
-                <p>{item.requirement} · {item.reason}</p>
-              </div>
-              <div className="item-meta">
-                <Link
-                  to={`/compliance?product=${productId}&item=${encodeURIComponent(item.id)}`}
-                  className="status-pill-link"
-                  title="Click to open window to upload/write what's needed"
-                >
-                  <StatusPill value={item.lifecycleStatus ?? item.status} />
-                </Link>
-                {timer ? <ExactTimerBadge timer={timer} compact /> : <span>{relativeDate(item.dueAt)}</span>}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
     </section>
   );
 }

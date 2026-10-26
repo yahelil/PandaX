@@ -87,6 +87,8 @@ pnpm-debug.log*
 .local-test/
 .uv-plan-cache/
 tmp/
+.codex-build/
+.codex-finalizer/
 
 # PandaX POC
 .tools/
